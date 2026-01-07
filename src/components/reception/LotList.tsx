@@ -9,13 +9,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '../ui/button';
-import { LotCreationForm } from './LotCreationForm';
 import { WeightCalculator } from './WeightCalculator';
 import { TemperatureForm } from './TemperatureForm';
 
 interface LotListProps {
-  exporterId: string;
-  producerId: string;
+  exporterId: string | null;
+  producerId: string | null;
 }
 
 export function LotList({ exporterId, producerId }: LotListProps) {
@@ -23,13 +22,12 @@ export function LotList({ exporterId, producerId }: LotListProps) {
   const [lots, setLots] = React.useState<ReceptionLot[]>([]);
   const [loading, setLoading] = React.useState(true);
   
-  const [isCreateOpen, setCreateOpen] = React.useState(false);
   const [isWeightOpen, setWeightOpen] = React.useState(false);
   const [isTempOpen, setTempOpen] = React.useState(false);
   const [selectedLot, setSelectedLot] = React.useState<ReceptionLot | null>(null);
 
   React.useEffect(() => {
-    if (!firestore || !producerId) {
+    if (!firestore || !producerId || !exporterId) {
         setLots([]);
         setLoading(false);
         return;
@@ -85,12 +83,9 @@ export function LotList({ exporterId, producerId }: LotListProps) {
   return (
     <>
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-            <div>
-                <CardTitle>Lotes en Recepción</CardTitle>
-                <CardDescription>Lotes registrados para el productor seleccionado.</CardDescription>
-            </div>
-            <Button onClick={() => setCreateOpen(true)}>Crear Nuevo Lote</Button>
+        <CardHeader>
+            <CardTitle>Lotes en Recepción</CardTitle>
+            <CardDescription>Lotes registrados para la selección actual.</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="rounded-md border">
@@ -129,7 +124,9 @@ export function LotList({ exporterId, producerId }: LotListProps) {
                       <TableCell className="text-right">
                         {lot.status !== 'Cerrado' && (
                           <Button size="sm" onClick={() => handleActionClick(lot)}>
-                            {lot.status === 'Pendiente de Peso' ? 'Pesar' : 'Temp'}
+                            {lot.status === 'Pendiente de Peso' && 'Pesar'}
+                            {lot.status === 'Pendiente de Pre-Hidro' && 'T° Pre-Hidro'}
+                            {lot.status === 'Pendiente de Post-Hidro' && 'T° Post-Hidro'}
                           </Button>
                         )}
                       </TableCell>
@@ -147,14 +144,6 @@ export function LotList({ exporterId, producerId }: LotListProps) {
           </div>
         </CardContent>
       </Card>
-      
-      <LotCreationForm 
-        exporterId={exporterId} 
-        producerId={producerId} 
-        open={isCreateOpen} 
-        onOpenChange={setCreateOpen} 
-        onLotCreated={()=>{}}
-      />
       
       {selectedLot && (
         <>

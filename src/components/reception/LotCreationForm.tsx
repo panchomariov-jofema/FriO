@@ -14,6 +14,8 @@ import { receptionLotSchema } from '@/lib/schemas';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import type { Variety } from '@/lib/types';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '../ui/dialog';
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError } from '@/firebase/errors';
 
 interface LotCreationFormProps {
   exporterId: string;
@@ -48,7 +50,9 @@ export function LotCreationForm({ exporterId, producerId, open, onOpenChange, on
   const binCount = form.watch('binCount');
 
   React.useEffect(() => {
-    form.setValue('toteCount', binCount * 24);
+    if (!form.formState.dirtyFields.toteCount) {
+        form.setValue('toteCount', binCount * 24);
+    }
   }, [binCount, form]);
   
   React.useEffect(() => {
@@ -86,8 +90,16 @@ export function LotCreationForm({ exporterId, producerId, open, onOpenChange, on
         toast({
           variant: 'destructive',
           title: 'Error al crear el lote',
-          description: 'No se pudo guardar el registro. Revise la consola para más detalles.'
+          description: error.message || 'No se pudo guardar el registro.'
         });
+        errorEmitter.emit(
+          'permission-error',
+          new FirestorePermissionError({
+            path: collRef.path,
+            operation: 'create',
+            requestResourceData: lotData,
+          })
+        );
       });
   };
 
@@ -127,7 +139,7 @@ export function LotCreationForm({ exporterId, producerId, open, onOpenChange, on
                   <FormItem><FormLabel>Cantidad de Bins</FormLabel><FormControl><Input type="number" {...field} value={field.value || 0} autoComplete="off" /></FormControl><FormMessage /></FormItem>
                 )} />
                 <FormField control={form.control} name="toteCount" render={({ field }) => (
-                  <FormItem><FormLabel>Cantidad de Totes</FormLabel><FormControl><Input type="number" {...field} value={field.value || 0} readOnly className="bg-muted" /></FormControl><FormMessage /></FormItem>
+                  <FormItem><FormLabel>Cantidad de Totes</FormLabel><FormControl><Input type="number" {...field} value={field.value || 0} autoComplete="off" /></FormControl><FormMessage /></FormItem>
                 )} />
                 <FormField control={form.control} name="emptyTotes" render={({ field }) => (
                   <FormItem><FormLabel>Totes Vacíos (Opcional)</FormLabel><FormControl><Input type="number" {...field} value={field.value || 0} autoComplete="off" /></FormControl><FormMessage /></FormItem>

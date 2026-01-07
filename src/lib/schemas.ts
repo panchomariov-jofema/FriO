@@ -49,18 +49,18 @@ export const profileSchema = z.object({
 
 
 export const receptionLotSchema = z.object({
-    exporterId: z.string().min(1, "Exportador es obligatorio"),
+    exporterId: z.string().optional(), // These will be added before submission
     producerId: z.string().min(1, "Productor es obligatorio"),
     document: z.string().min(1, "Documento es obligatorio"),
     variety: z.enum(['SANTINA', 'LAPINS', 'REGINA', 'KORDIA', 'SKEENA', 'SWEETHEART', 'SYLVIA', 'SUNBURST'], {
       required_error: "Debe seleccionar una variedad.",
     }),
-    binCount: z.coerce.number().positive("La cantidad de bins debe ser mayor a 0"),
-    toteCount: z.coerce.number().positive("La cantidad de totes debe ser mayor a 0"),
-    emptyTotes: z.coerce.number().optional(),
-    status: z.string(),
+    binCount: z.coerce.number({invalid_type_error: 'Debe ser un número.'}).positive("La cantidad de bins debe ser mayor a 0"),
+    toteCount: z.coerce.number({invalid_type_error: 'Debe ser un número.'}).positive("La cantidad de totes debe ser mayor a 0"),
+    emptyTotes: z.coerce.number({invalid_type_error: 'Debe ser un número.'}).optional(),
+    status: z.string().optional(),
     totalWeight: z.number().optional(),
     preHydroTemp: z.number().optional(),
     postHydroTemp: z.number().optional(),
-    createdAt: z.any(),
+    createdAt: z.any().optional(),
 });
