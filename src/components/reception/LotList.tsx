@@ -35,15 +35,16 @@ export function LotList({ exporterId, producerId }: LotListProps) {
 
     setLoading(true);
     const lotsRef = collection(firestore, 'receptionLots');
+    // Query only by producerId to avoid needing a composite index
     const q = query(
       lotsRef,
-      where('producerId', '==', producerId),
-      where('status', '!=', 'Cerrado')
+      where('producerId', '==', producerId)
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const fetchedLots = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ReceptionLot))
-        .filter(lot => lot.exporterId === exporterId)
+        // Filter out closed lots and by exporter on the client-side
+        .filter(lot => lot.status !== 'Cerrado' && lot.exporterId === exporterId)
         .sort((a, b) => {
             if (!b.createdAt) return -1; // b is newer (not yet saved)
             if (!a.createdAt) return 1;  // a is newer
