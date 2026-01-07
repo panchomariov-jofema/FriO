@@ -54,7 +54,7 @@ const ProducerForm = ({ form, exporters }: { form: any; exporters: Exporter[] })
         <FormItem><FormLabel>Nombre</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
       )} />
       <FormField control={form.control} name="exporterId" render={({ field }) => (
-        <FormItem><FormLabel>Exportador</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}>
+        <FormItem><FormLabel>Exportador</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
           <FormControl><SelectTrigger><SelectValue placeholder="Seleccione un exportador" /></SelectTrigger></FormControl>
           <SelectContent>{exporters?.map(e => <SelectItem key={e.id} value={e.exporterId}>{e.name}</SelectItem>)}</SelectContent>
         </Select><FormMessage /></FormItem>
@@ -73,7 +73,7 @@ const BinMaterialForm = ({ form, exporters }: { form: any, exporters: Exporter[]
         <FormItem><FormLabel>Nombre</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
       )} />
       <FormField control={form.control} name="exporterId" render={({ field }) => (
-        <FormItem><FormLabel>Exportador</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}>
+        <FormItem><FormLabel>Exportador</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
           <FormControl><SelectTrigger><SelectValue placeholder="Seleccione un exportador" /></SelectTrigger></FormControl>
           <SelectContent>{exporters?.map(e => <SelectItem key={e.id} value={e.exporterId}>{e.name}</SelectItem>)}</SelectContent>
         </Select><FormMessage /></FormItem>
@@ -109,7 +109,7 @@ const PackagingMasterForm = ({ form, otherClients }: { form: any, otherClients: 
         <FormItem><FormLabel>Nombre</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
       )} />
        <FormField control={form.control} name="clientId" render={({ field }) => (
-        <FormItem><FormLabel>Cliente</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}>
+        <FormItem><FormLabel>Cliente</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
           <FormControl><SelectTrigger><SelectValue placeholder="Seleccione un cliente" /></SelectTrigger></FormControl>
           <SelectContent>{otherClients?.map(c => <SelectItem key={c.id} value={c.clientId}>{c.name}</SelectItem>)}</SelectContent>
         </Select><FormMessage /></FormItem>
@@ -125,7 +125,7 @@ const UserMasterForm = ({ form, profiles }: { form: any, profiles: Profile[] }) 
         <FormItem><FormLabel>Nombre Usuario</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
       )} />
       <FormField control={form.control} name="profileId" render={({ field }) => (
-        <FormItem><FormLabel>Perfil</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}>
+        <FormItem><FormLabel>Perfil</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
           <FormControl><SelectTrigger><SelectValue placeholder="Seleccione un perfil" /></SelectTrigger></FormControl>
           <SelectContent>{profiles?.map(p => <SelectItem key={p.id} value={p.profileId}>{p.name}</SelectItem>)}</SelectContent>
         </Select><FormMessage /></FormItem>
@@ -149,9 +149,9 @@ const ProfileForm = ({ form }: { form: any }) => (
 );
 
 export default function DatosMaestrosPage() {
-  const { data: exporters } = useFirestoreCollection<Exporter>('exporters');
-  const { data: otherClients } = useFirestoreCollection<OtherClient>('otherClients');
-  const { data: profiles } = useFirestoreCollection<Profile>('profiles');
+  const { data: exporters, loading: loadingExporters } = useFirestoreCollection<Exporter>('exporters');
+  const { data: otherClients, loading: loadingOtherClients } = useFirestoreCollection<OtherClient>('otherClients');
+  const { data: profiles, loading: loadingProfiles } = useFirestoreCollection<Profile>('profiles');
 
   const tabs = [
     { value: 'exporters', label: 'Exportadores' },
@@ -179,6 +179,7 @@ export default function DatosMaestrosPage() {
           
           <TabsContent value="exporters" className="mt-4">
             <MasterDataShell
+              title="Exportadores"
               collectionName="exporters"
               schema={exporterSchema}
               columns={[{key: 'exporterId', header: 'ID'}, {key: 'name', header: 'Nombre'}, {key: 'type', header: 'Tipo'}]}
@@ -191,6 +192,7 @@ export default function DatosMaestrosPage() {
           </TabsContent>
           <TabsContent value="producers" className="mt-4">
             <MasterDataShell
+              title="Productores"
               collectionName="producers"
               schema={producerSchema}
               columns={[{key: 'producerId', header: 'ID'}, {key: 'shortName', header: 'Nombre Corto'}, {key: 'name', header: 'Nombre'}, {key: 'exporterId', header: 'ID Exportador'}]}
@@ -198,11 +200,12 @@ export default function DatosMaestrosPage() {
               docNameField="name"
               csvHeaders={['producerId', 'shortName', 'name', 'exporterId']}
               csvTemplateFileName="plantilla_productores.csv"
-              formProps={{ exporters }}
+              formProps={{ exporters: loadingExporters ? [] : exporters }}
             />
           </TabsContent>
           <TabsContent value="binMaterials" className="mt-4">
             <MasterDataShell
+              title="Bins y Materiales"
               collectionName="binMaterials"
               schema={binMaterialSchema}
               columns={[{key: 'code', header: 'Código'}, {key: 'name', header: 'Nombre'}, {key: 'exporterId', header: 'ID Exportador'}, {key: 'type', header: 'Tipo'}]}
@@ -210,11 +213,12 @@ export default function DatosMaestrosPage() {
               docNameField="name"
               csvHeaders={['code', 'name', 'exporterId', 'type']}
               csvTemplateFileName="plantilla_bins_y_materiales.csv"
-              formProps={{ exporters }}
+              formProps={{ exporters: loadingExporters ? [] : exporters }}
             />
           </TabsContent>
           <TabsContent value="otherClients" className="mt-4">
             <MasterDataShell
+              title="Otros Clientes"
               collectionName="otherClients"
               schema={otherClientSchema}
               columns={[{key: 'clientId', header: 'ID'}, {key: 'name', header: 'Nombre'}, {key: 'type', header: 'Tipo'}]}
@@ -227,6 +231,7 @@ export default function DatosMaestrosPage() {
           </TabsContent>
           <TabsContent value="packagingMaster" className="mt-4">
              <MasterDataShell
+                title="Maestro de Embalajes"
                 collectionName="packagingMaster"
                 schema={packagingMasterSchema}
                 columns={[{key: 'code', header: 'Código'}, {key: 'name', header: 'Nombre'}, {key: 'clientId', header: 'ID Cliente'}]}
@@ -234,11 +239,12 @@ export default function DatosMaestrosPage() {
                 docNameField="name"
                 csvHeaders={['code', 'name', 'clientId']}
                 csvTemplateFileName="plantilla_embalajes.csv"
-                formProps={{ otherClients }}
+                formProps={{ otherClients: loadingOtherClients ? [] : otherClients }}
               />
           </TabsContent>
            <TabsContent value="usersMaster" className="mt-4">
              <MasterDataShell
+                title="Maestro de Usuarios"
                 collectionName="usersMaster"
                 schema={userMasterSchema}
                 columns={[{key: 'userName', header: 'Usuario'}, {key: 'profileId', header: 'ID Perfil'}]}
@@ -246,11 +252,12 @@ export default function DatosMaestrosPage() {
                 docNameField="userName"
                 csvHeaders={['userName', 'profileId']}
                 csvTemplateFileName="plantilla_usuarios.csv"
-                formProps={{ profiles }}
+                formProps={{ profiles: loadingProfiles ? [] : profiles }}
               />
           </TabsContent>
           <TabsContent value="profiles" className="mt-4">
             <MasterDataShell
+              title="Perfiles"
               collectionName="profiles"
               schema={profileSchema}
               columns={[{key: 'profileId', header: 'ID'}, {key: 'name', header: 'Nombre'}, {key: 'modulesAccess', header: 'Módulos'}]}
