@@ -80,11 +80,14 @@ export function LotCreationForm({ exporterId, producerId, onLotCreated }: LotCre
         onLotCreated();
       })
       .catch((error) => {
-        toast({
-          title: 'Error',
-          description: 'No se pudo crear el lote. ' + error.message,
-          variant: 'destructive',
-        });
+         errorEmitter.emit(
+          'permission-error',
+          new FirestorePermissionError({
+            path: collRef.path,
+            operation: 'create',
+            requestResourceData: lotData,
+          })
+        );
       });
   };
 
