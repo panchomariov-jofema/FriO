@@ -73,5 +73,14 @@ service cloud.firestore {
     match /receptionLots/{lotId} {
       allow read, write: if isSignedIn();
     }
+
+    /**
+     * @description Collection for lots in the hidrocooler process.
+     * @path /hidrocoolerLots/{lotId}
+     * @allow Any authenticated user can create, read, and update lots.
+     */
+    match /hidrocoolerLots/{lotId} {
+      allow read, write: if isSignedIn();
+    }
   }
 }

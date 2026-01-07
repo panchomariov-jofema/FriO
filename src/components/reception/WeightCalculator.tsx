@@ -1,9 +1,9 @@
 'use client';
 
 import * as React from 'react';
-import { doc, updateDoc } from 'firebase/firestore';
+import { doc, updateDoc, collection, addDoc, serverTimestamp, writeBatch } from 'firebase/firestore';
 import { useFirestore } from '@/firebase';
-import type { ReceptionLot } from '@/lib/types';
+import type { Producer, ReceptionLot } from '@/lib/types';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
@@ -11,6 +11,7 @@ import { PlusCircle, Trash2 } from 'lucide-react';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '../ui/dialog';
+import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
 
 
 interface WeightCalculatorProps {
@@ -26,6 +27,8 @@ export function WeightCalculator({ lot, open, onOpenChange, onWeightSaved }: Wei
   const [partialWeights, setPartialWeights] = React.useState<number[]>([]);
   const [currentWeight, setCurrentWeight] = React.useState('');
   const inputRef = React.useRef<HTMLInputElement>(null);
+  
+  const { data: producers } = useFirestoreCollection<Producer>('producers');
 
   React.useEffect(() => {
     if (open) {
@@ -56,26 +59,50 @@ export function WeightCalculator({ lot, open, onOpenChange, onWeightSaved }: Wei
       toast({ title: 'Error', description: 'El peso total debe ser mayor a 0.', variant: 'destructive' });
       return;
     }
+    if (!firestore) return;
 
+    const producer = producers.find(p => p.producerId === lot.producerId);
+    if (!producer) {
+        toast({ title: 'Error', description: 'No se pudo encontrar el productor para crear el registro en hidrocooler.', variant: 'destructive' });
+        return;
+    }
+
+    const batch = writeBatch(firestore);
+
+    // 1. Update reception lot
     const lotRef = doc(firestore, 'receptionLots', lot.id);
-    const updateData = {
+    const receptionUpdate = {
         totalWeight,
         status: 'Pendiente de Pre-Hidro' as const,
     };
+    batch.update(lotRef, receptionUpdate);
+
+    // 2. Create hidrocooler lot
+    const hidrocoolerRef = collection(firestore, 'hidrocoolerLots');
+    const hidrocoolerLotData = {
+        displayLotId: lot.displayLotId,
+        producerShortName: producer.shortName,
+        binCount: lot.binCount,
+        status: 'Pendiente de Pre-Hidro' as const,
+        createdAt: serverTimestamp(),
+    };
+    // We can't use batch.add, so we create a new doc ref
+    const newHidroLotRef = doc(hidrocoolerRef);
+    batch.set(newHidroLotRef, hidrocoolerLotData);
     
-    updateDoc(lotRef, updateData)
+    batch.commit()
       .then(() => {
-        toast({ title: 'Éxito', description: 'Peso total guardado correctamente.' });
+        toast({ title: 'Éxito', description: 'Peso guardado y lote enviado a Hidrocooler.' });
         onWeightSaved();
       })
       .catch((error) => {
-        console.error("Error saving weight: ", error);
+        console.error("Error saving weight and sending to hydro: ", error);
         errorEmitter.emit(
           'permission-error',
           new FirestorePermissionError({
-            path: lotRef.path,
-            operation: 'update',
-            requestResourceData: updateData,
+            path: `receptionLots/${lot.id} or hidrocoolerLots`,
+            operation: 'write',
+            requestResourceData: { receptionUpdate, hidrocoolerLotData },
           })
         );
       });
@@ -86,7 +113,7 @@ export function WeightCalculator({ lot, open, onOpenChange, onWeightSaved }: Wei
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Registro de Peso</DialogTitle>
-          <DialogDescription>Lote ID: <span className="font-mono">{lot.id}</span></DialogDescription>
+          <DialogDescription>Lote ID: <span className="font-mono">{lot.displayLotId}</span></DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-4">
             <div className="flex gap-2">
@@ -129,7 +156,7 @@ export function WeightCalculator({ lot, open, onOpenChange, onWeightSaved }: Wei
             <Button type="button" variant="outline">Cancelar</Button>
           </DialogClose>
           <Button onClick={handleSaveTotalWeight} disabled={totalWeight <= 0}>
-            Confirmar y Guardar Peso Total
+            Confirmar y Enviar a Hidro
           </Button>
         </DialogFooter>
       </DialogContent>

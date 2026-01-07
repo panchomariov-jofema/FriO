@@ -193,6 +193,10 @@
           "type": "string",
           "description": "Unique identifier for the lot."
         },
+        "displayLotId": {
+          "type": "string",
+          "description": "User-friendly lot identifier (e.g., PROD-DOC123)."
+        },
         "exporterId": {
           "type": "string",
           "description": "Reference to the selected Exporter."
@@ -244,12 +248,49 @@
         }
       },
       "required": [
+        "displayLotId",
         "exporterId",
         "producerId",
         "document",
         "variety",
         "binCount",
         "toteCount",
+        "status",
+        "createdAt"
+      ]
+    },
+    "HidrocoolerLot": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "HidrocoolerLot",
+      "type": "object",
+      "description": "Represents a lot in the hidrocooler process.",
+      "properties": {
+        "displayLotId": {
+          "type": "string",
+          "description": "User-friendly lot identifier, same as in ReceptionLot."
+        },
+        "producerShortName": {
+          "type": "string",
+          "description": "Short name of the producer."
+        },
+        "binCount": {
+          "type": "number",
+          "description": "Number of bins in the lot."
+        },
+        "status": {
+          "type": "string",
+          "description": "Status of the lot in the hidrocooler (e.g., 'Pendiente de Pre-Hidro', 'En Proceso', 'Finalizado')."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp of when the lot entered the hidrocooler process."
+        }
+      },
+      "required": [
+        "displayLotId",
+        "producerShortName",
+        "binCount",
         "status",
         "createdAt"
       ]
@@ -387,6 +428,22 @@
             {
               "name": "lotId",
               "description": "The unique identifier for the reception lot."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/hidrocoolerLots/{hidrocoolerLotId}",
+        "definition": {
+          "entityName": "HidrocoolerLot",
+          "schema": {
+            "$ref": "#/backend/entities/HidrocoolerLot"
+          },
+          "description": "Stores lots that are in the hidrocooler process. A generated ID will be used.",
+          "params": [
+            {
+              "name": "hidrocoolerLotId",
+              "description": "The unique identifier for the hidrocooler lot."
             }
           ]
         }

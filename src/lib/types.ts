@@ -69,5 +69,14 @@ export interface ReceptionLot {
     createdAt: Timestamp;
 }
 
+export interface HidrocoolerLot {
+  id: string;
+  displayLotId: string;
+  producerShortName: string;
+  binCount: number;
+  status: 'Pendiente de Pre-Hidro' | 'En Proceso' | 'Finalizado';
+  createdAt: Timestamp;
+}
+
 
 export type MasterData = Exporter | Producer | BinMaterial | OtherClient | PackagingMaster | UserMaster | Profile;
