@@ -1,15 +1,18 @@
 import { useState, useEffect } from 'react';
 import { collection, onSnapshot, query, DocumentData, orderBy } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { useFirestore } from '@/firebase';
 
 export function useFirestoreCollection<T extends DocumentData>(collectionName: string) {
   const [data, setData] = useState<T[]>([]);
   const [loading, setLoading] = useState(true);
+  const firestore = useFirestore();
 
   useEffect(() => {
+    if (!firestore) return;
+
     // Note: A 'createdAt' field is assumed for ordering. 
     // You might need to adjust this or handle cases where it doesn't exist.
-    const q = query(collection(db, collectionName));
+    const q = query(collection(firestore, collectionName));
     
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
       const items: T[] = [];
@@ -24,7 +27,7 @@ export function useFirestoreCollection<T extends DocumentData>(collectionName: s
     });
 
     return () => unsubscribe();
-  }, [collectionName]);
+  }, [collectionName, firestore]);
 
   return { data, loading };
 }

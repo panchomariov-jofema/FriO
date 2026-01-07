@@ -36,11 +36,13 @@ import type { z } from 'zod';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
 import type { MasterData } from '@/lib/types';
 import { addDoc, collection, deleteDoc, doc, updateDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { useFirestore } from '@/firebase';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Download, MoreHorizontal, Pencil, PlusCircle, Trash2, Upload } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '../ui/skeleton';
+import { FirestorePermissionError } from '@/firebase/errors';
+import { errorEmitter } from '@/firebase/error-emitter';
 
 interface MasterDataShellProps<T extends MasterData> {
   collectionName: string;
@@ -67,12 +69,13 @@ export function MasterDataShell<T extends MasterData>({
   const [currentItem, setCurrentItem] = React.useState<T | null>(null);
   const { toast } = useToast();
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const firestore = useFirestore();
 
   const form = useForm<z.infer<typeof schema>>({
     resolver: zodResolver(schema),
     defaultValues: Object.fromEntries(
       Object.keys(schema.shape).map(key => [key, ''])
-    ) as z.infer<typeof schema>,
+    ),
   });
 
   const handleDialogOpen = (item: T | null = null) => {
@@ -95,40 +98,79 @@ export function MasterDataShell<T extends MasterData>({
     setIsDeleteDialogOpen(true);
   };
 
-  const onSubmit = async (values: z.infer<typeof schema>) => {
-    try {
+  const onSubmit = (values: z.infer<typeof schema>) => {
       if (currentItem?.id) {
-        await updateDoc(doc(db, collectionName, currentItem.id), values);
-        toast({ title: 'Éxito', description: 'Registro actualizado correctamente.' });
+        const docRef = doc(firestore, collectionName, currentItem.id);
+        updateDoc(docRef, values)
+        .then(()=> {
+            toast({ title: 'Éxito', description: 'Registro actualizado correctamente.' });
+        })
+        .catch(error => {
+            console.error('Error saving document: ', error);
+            errorEmitter.emit(
+              'permission-error',
+              new FirestorePermissionError({
+                path: docRef.path,
+                operation: 'update',
+                requestResourceData: values,
+              })
+            );
+            toast({
+              title: 'Error',
+              description: 'No se pudo guardar el registro.',
+              variant: 'destructive',
+            });
+        });
+
       } else {
-        await addDoc(collection(db, collectionName), values);
-        toast({ title: 'Éxito', description: 'Registro creado correctamente.' });
+        const collRef = collection(firestore, collectionName);
+        addDoc(collRef, values)
+        .then(() => {
+            toast({ title: 'Éxito', description: 'Registro creado correctamente.' });
+        })
+        .catch(error => {
+            console.error('Error saving document: ', error);
+             errorEmitter.emit(
+              'permission-error',
+              new FirestorePermissionError({
+                path: collRef.path,
+                operation: 'create',
+                requestResourceData: values,
+              })
+            );
+            toast({
+              title: 'Error',
+              description: 'No se pudo guardar el registro.',
+              variant: 'destructive',
+            });
+        });
       }
       setIsDialogOpen(false);
-    } catch (error) {
-      console.error('Error saving document: ', error);
-      toast({
-        title: 'Error',
-        description: 'No se pudo guardar el registro.',
-        variant: 'destructive',
-      });
-    }
   };
 
-  const handleDelete = async () => {
+  const handleDelete = () => {
     if (!currentItem?.id) return;
-    try {
-      await deleteDoc(doc(db, collectionName, currentItem.id));
+    const docRef = doc(firestore, collectionName, currentItem.id);
+    deleteDoc(docRef)
+    .then(() => {
       toast({ title: 'Éxito', description: 'Registro eliminado correctamente.' });
       setIsDeleteDialogOpen(false);
-    } catch (error) {
+    })
+    .catch(error => {
       console.error('Error deleting document: ', error);
+       errorEmitter.emit(
+        'permission-error',
+        new FirestorePermissionError({
+          path: docRef.path,
+          operation: 'delete',
+        })
+      );
       toast({
         title: 'Error',
         description: 'No se pudo eliminar el registro.',
         variant: 'destructive',
       });
-    }
+    });
   };
   
   const handleFileImport = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -162,7 +204,7 @@ export function MasterDataShell<T extends MasterData>({
 
             try {
                 const validatedData = schema.parse(rowData);
-                await addDoc(collection(db, collectionName), validatedData);
+                await addDoc(collection(firestore, collectionName), validatedData);
                 successCount++;
             } catch (error) {
                 if (error instanceof z.ZodError) {
@@ -297,7 +339,7 @@ export function MasterDataShell<T extends MasterData>({
           </DialogHeader>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-              {RenderForm && <RenderForm form={form} />}
+              <RenderForm form={form} />
               <div className="flex justify-end gap-2">
                 <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>Cancelar</Button>
                 <Button type="submit">Guardar</Button>
