@@ -77,17 +77,9 @@ export function LotCreationForm({ exporterId, producerId, onLotCreated }: LotCre
       })
       .catch((error) => {
         console.error("Error creating lot: ", error);
-        errorEmitter.emit(
-          'permission-error',
-          new FirestorePermissionError({
-            path: collRef.path,
-            operation: 'create',
-            requestResourceData: lotData,
-          })
-        );
         toast({
           title: 'Error',
-          description: 'No se pudo crear el lote.',
+          description: 'No se pudo crear el lote. Verifique la consola para más detalles.',
           variant: 'destructive',
         });
       });
@@ -126,5 +118,3 @@ export function LotCreationForm({ exporterId, producerId, onLotCreated }: LotCre
     </Card>
   );
 }
-
-    
