@@ -69,7 +69,6 @@ export function WeightCalculator({ lot, onWeightSaved }: WeightCalculatorProps) 
             requestResourceData: updateData,
           })
         );
-        toast({ title: 'Error', description: 'No se pudo guardar el peso.', variant: 'destructive' });
       });
   };
 
@@ -121,5 +120,3 @@ export function WeightCalculator({ lot, onWeightSaved }: WeightCalculatorProps) 
     </Card>
   );
 }
-
-    

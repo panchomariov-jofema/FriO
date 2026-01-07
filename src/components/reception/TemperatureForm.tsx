@@ -67,6 +67,7 @@ export function TemperatureForm({ lot, onTempSaved }: TemperatureFormProps) {
         onTempSaved();
       })
       .catch((error) => {
+        console.error("Error saving pre-hydro temp: ", error);
         errorEmitter.emit(
           'permission-error',
           new FirestorePermissionError({
@@ -97,6 +98,7 @@ export function TemperatureForm({ lot, onTempSaved }: TemperatureFormProps) {
         onTempSaved();
       })
       .catch((error) => {
+        console.error("Error finishing lot: ", error);
         errorEmitter.emit(
           'permission-error',
           new FirestorePermissionError({
@@ -147,5 +149,3 @@ export function TemperatureForm({ lot, onTempSaved }: TemperatureFormProps) {
     </Card>
   );
 }
-
-    

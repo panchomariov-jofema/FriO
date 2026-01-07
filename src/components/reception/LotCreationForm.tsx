@@ -80,7 +80,8 @@ export function LotCreationForm({ exporterId, producerId, onLotCreated }: LotCre
         onLotCreated();
       })
       .catch((error) => {
-         errorEmitter.emit(
+        console.error("Error creating lot: ", error);
+        errorEmitter.emit(
           'permission-error',
           new FirestorePermissionError({
             path: collRef.path,
