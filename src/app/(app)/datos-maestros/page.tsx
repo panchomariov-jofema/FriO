@@ -41,8 +41,7 @@ const ExporterForm = ({ form }: { form: any }) => (
   </>
 );
 
-const ProducerForm = ({ form }: { form: any }) => {
-  const { data: exporters } = useFirestoreCollection<Exporter>('exporters');
+const ProducerForm = ({ form, exporters }: { form: any; exporters: Exporter[] }) => {
   return (
     <>
       <FormField control={form.control} name="producerId" render={({ field }) => (
@@ -64,8 +63,7 @@ const ProducerForm = ({ form }: { form: any }) => {
   )
 };
 
-const BinMaterialForm = ({ form }: { form: any }) => {
-    const { data: exporters } = useFirestoreCollection<Exporter>('exporters');
+const BinMaterialForm = ({ form, exporters }: { form: any, exporters: Exporter[] }) => {
     return (
     <>
       <FormField control={form.control} name="code" render={({ field }) => (
@@ -101,8 +99,7 @@ const OtherClientForm = ({ form }: { form: any }) => (
     </>
 );
 
-const PackagingMasterForm = ({ form }: { form: any }) => {
-    const { data: otherClients } = useFirestoreCollection<OtherClient>('otherClients');
+const PackagingMasterForm = ({ form, otherClients }: { form: any, otherClients: OtherClient[] }) => {
     return (
     <>
       <FormField control={form.control} name="code" render={({ field }) => (
@@ -121,8 +118,7 @@ const PackagingMasterForm = ({ form }: { form: any }) => {
   )
 };
 
-const UserMasterForm = ({ form }: { form: any }) => {
-    const { data: profiles } = useFirestoreCollection<Profile>('profiles');
+const UserMasterForm = ({ form, profiles }: { form: any, profiles: Profile[] }) => {
     return (
     <>
       <FormField control={form.control} name="userName" render={({ field }) => (
@@ -152,39 +148,49 @@ const ProfileForm = ({ form }: { form: any }) => (
     </>
 );
 
+export default function DatosMaestrosPage() {
+  const { data: exporters } = useFirestoreCollection<Exporter>('exporters');
+  const { data: otherClients } = useFirestoreCollection<OtherClient>('otherClients');
+  const { data: profiles } = useFirestoreCollection<Profile>('profiles');
 
-const tabs = [
+  const tabs = [
     { value: 'exporters', label: 'Exportadores', collection: 'exporters', schema: exporterSchema,
       columns: [{key: 'exporterId', header: 'ID'}, {key: 'name', header: 'Nombre'}, {key: 'type', header: 'Tipo'}],
-      form: ExporterForm, docName: 'name', csvHeaders: ['exporterId', 'name', 'type'], csvFile: 'plantilla_exportadores.csv'
+      RenderFormComponent: ExporterForm, docName: 'name', csvHeaders: ['exporterId', 'name', 'type'], csvFile: 'plantilla_exportadores.csv',
+      formProps: {}
     },
     { value: 'producers', label: 'Productores', collection: 'producers', schema: producerSchema,
       columns: [{key: 'producerId', header: 'ID'}, {key: 'shortName', header: 'Nombre Corto'}, {key: 'name', header: 'Nombre'}, {key: 'exporterId', header: 'ID Exportador'}],
-      form: ProducerForm, docName: 'name', csvHeaders: ['producerId', 'shortName', 'name', 'exporterId'], csvFile: 'plantilla_productores.csv'
+      RenderFormComponent: ProducerForm, docName: 'name', csvHeaders: ['producerId', 'shortName', 'name', 'exporterId'], csvFile: 'plantilla_productores.csv',
+      formProps: { exporters }
     },
     { value: 'binMaterials', label: 'Bins y Mat.', collection: 'binMaterials', schema: binMaterialSchema,
       columns: [{key: 'code', header: 'Código'}, {key: 'name', header: 'Nombre'}, {key: 'exporterId', header: 'ID Exportador'}, {key: 'type', header: 'Tipo'}],
-      form: BinMaterialForm, docName: 'name', csvHeaders: ['code', 'name', 'exporterId', 'type'], csvFile: 'plantilla_bins_y_materiales.csv'
+      RenderFormComponent: BinMaterialForm, docName: 'name', csvHeaders: ['code', 'name', 'exporterId', 'type'], csvFile: 'plantilla_bins_y_materiales.csv',
+      formProps: { exporters }
     },
     { value: 'otherClients', label: 'Otros Clientes', collection: 'otherClients', schema: otherClientSchema,
       columns: [{key: 'clientId', header: 'ID'}, {key: 'name', header: 'Nombre'}, {key: 'type', header: 'Tipo'}],
-      form: OtherClientForm, docName: 'name', csvHeaders: ['clientId', 'name', 'type'], csvFile: 'plantilla_otros_clientes.csv'
+      RenderFormComponent: OtherClientForm, docName: 'name', csvHeaders: ['clientId', 'name', 'type'], csvFile: 'plantilla_otros_clientes.csv',
+      formProps: {}
     },
     { value: 'packagingMaster', label: 'Embalajes', collection: 'packagingMaster', schema: packagingMasterSchema,
       columns: [{key: 'code', header: 'Código'}, {key: 'name', header: 'Nombre'}, {key: 'clientId', header: 'ID Cliente'}],
-      form: PackagingMasterForm, docName: 'name', csvHeaders: ['code', 'name', 'clientId'], csvFile: 'plantilla_embalajes.csv'
+      RenderFormComponent: PackagingMasterForm, docName: 'name', csvHeaders: ['code', 'name', 'clientId'], csvFile: 'plantilla_embalajes.csv',
+      formProps: { otherClients }
     },
     { value: 'usersMaster', label: 'Usuarios', collection: 'usersMaster', schema: userMasterSchema,
       columns: [{key: 'userName', header: 'Usuario'}, {key: 'profileId', header: 'ID Perfil'}],
-      form: UserMasterForm, docName: 'userName', csvHeaders: ['userName', 'profileId'], csvFile: 'plantilla_usuarios.csv'
+      RenderFormComponent: UserMasterForm, docName: 'userName', csvHeaders: ['userName', 'profileId'], csvFile: 'plantilla_usuarios.csv',
+      formProps: { profiles }
     },
     { value: 'profiles', label: 'Perfiles', collection: 'profiles', schema: profileSchema,
       columns: [{key: 'profileId', header: 'ID'}, {key: 'name', header: 'Nombre'}, {key: 'modulesAccess', header: 'Módulos'}],
-      form: ProfileForm, docName: 'name', csvHeaders: ['profileId', 'name', 'modulesAccess'], csvFile: 'plantilla_perfiles.csv'
+      RenderFormComponent: ProfileForm, docName: 'name', csvHeaders: ['profileId', 'name', 'modulesAccess'], csvFile: 'plantilla_perfiles.csv',
+      formProps: {}
     },
-];
+  ];
 
-export default function DatosMaestrosPage() {
   return (
     <Card>
       <CardHeader>
@@ -204,10 +210,11 @@ export default function DatosMaestrosPage() {
                 collectionName={tab.collection}
                 schema={tab.schema}
                 columns={tab.columns as any}
-                RenderFormComponent={tab.form}
+                RenderFormComponent={tab.RenderFormComponent}
                 docNameField={tab.docName as any}
                 csvHeaders={tab.csvHeaders as any}
                 csvTemplateFileName={tab.csvFile}
+                formProps={tab.formProps}
               />
             </TabsContent>
           ))}

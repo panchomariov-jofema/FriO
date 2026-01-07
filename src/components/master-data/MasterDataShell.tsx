@@ -48,10 +48,11 @@ interface MasterDataShellProps<T extends MasterData> {
   collectionName: string;
   schema: z.ZodType<any, any>;
   columns: { key: keyof T; header: string }[];
-  RenderFormComponent: React.ComponentType<{ form: any }>;
+  RenderFormComponent: React.ComponentType<{ form: any, [key: string]: any }>;
   docNameField: keyof T;
   csvHeaders: (keyof T)[];
   csvTemplateFileName: string;
+  formProps?: Record<string, any>;
 }
 
 export function MasterDataShell<T extends MasterData>({
@@ -62,6 +63,7 @@ export function MasterDataShell<T extends MasterData>({
   docNameField,
   csvHeaders,
   csvTemplateFileName,
+  formProps,
 }: MasterDataShellProps<T>) {
   const { data, loading } = useFirestoreCollection<T>(collectionName);
   const [isDialogOpen, setIsDialogOpen] = React.useState(false);
@@ -339,7 +341,7 @@ export function MasterDataShell<T extends MasterData>({
           </DialogHeader>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-              <RenderFormComponent form={form} />
+              <RenderFormComponent form={form} {...formProps} />
               <div className="flex justify-end gap-2">
                 <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>Cancelar</Button>
                 <Button type="submit">Guardar</Button>
