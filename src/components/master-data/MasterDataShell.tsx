@@ -109,7 +109,6 @@ export function MasterDataShell<T extends MasterData>({
             handleCancelEdit();
         })
         .catch(error => {
-            console.error('Error updating document: ', error);
             errorEmitter.emit(
               'permission-error',
               new FirestorePermissionError({
@@ -128,7 +127,6 @@ export function MasterDataShell<T extends MasterData>({
             handleCancelEdit();
         })
         .catch(error => {
-            console.error('Error creating document: ', error);
              errorEmitter.emit(
               'permission-error',
               new FirestorePermissionError({
@@ -151,7 +149,6 @@ export function MasterDataShell<T extends MasterData>({
       setItemToDelete(null);
     })
     .catch(error => {
-      console.error('Error deleting document: ', error);
        errorEmitter.emit(
         'permission-error',
         new FirestorePermissionError({
@@ -159,11 +156,6 @@ export function MasterDataShell<T extends MasterData>({
           operation: 'delete',
         })
       );
-      toast({
-        title: 'Error',
-        description: 'No se pudo eliminar el registro.',
-        variant: 'destructive',
-      });
     });
   };
   
@@ -361,5 +353,3 @@ export function MasterDataShell<T extends MasterData>({
     </div>
   );
 }
-
-    

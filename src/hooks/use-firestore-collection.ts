@@ -1,5 +1,7 @@
+'use client';
+
 import { useState, useEffect } from 'react';
-import { collection, onSnapshot, query, DocumentData, orderBy } from 'firebase/firestore';
+import { collection, onSnapshot, query, DocumentData, orderBy, doc } from 'firebase/firestore';
 import { useFirestore } from '@/firebase';
 
 export function useFirestoreCollection<T extends DocumentData>(collectionName: string) {
@@ -10,9 +12,8 @@ export function useFirestoreCollection<T extends DocumentData>(collectionName: s
   useEffect(() => {
     if (!firestore) return;
 
-    // Note: A 'createdAt' field is assumed for ordering. 
-    // You might need to adjust this or handle cases where it doesn't exist.
-    const q = query(collection(firestore, collectionName));
+    // Order by document ID to ensure consistent ordering and prevent certain query errors.
+    const q = query(collection(firestore, collectionName), orderBy('__name__'));
     
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
       const items: T[] = [];
