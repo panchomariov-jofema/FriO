@@ -53,7 +53,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, isUserLoading } = useUser();
 
   React.useEffect(() => {
-    if (!user && !isUserLoading) {
+    if (!isUserLoading && !user && auth) {
       signInAnonymously(auth);
     }
   }, [user, isUserLoading, auth]);
