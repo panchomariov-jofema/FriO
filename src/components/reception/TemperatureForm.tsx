@@ -23,8 +23,8 @@ interface TemperatureFormProps {
 }
 
 const tempSchema = z.object({
-  preHydroTemp: z.coerce.number().optional(),
-  postHydroTemp: z.coerce.number().optional(),
+  preHydroTemp: z.coerce.number({invalid_type_error: 'Debe ingresar un número.'}).optional(),
+  postHydroTemp: z.coerce.number({invalid_type_error: 'Debe ingresar un número.'}).optional(),
 });
 
 type TempFormValues = z.infer<typeof tempSchema>;
@@ -53,6 +53,9 @@ export function TemperatureForm({ lot, open, onOpenChange, onTempSaved }: Temper
   const showPostHydro = lot.status === 'Pendiente de Post-Hidro';
 
   const handleSavePreHydro = async () => {
+    const isValid = await form.trigger('preHydroTemp');
+    if (!isValid) return;
+
     const { preHydroTemp } = form.getValues();
     if (typeof preHydroTemp !== 'number') {
       form.setError('preHydroTemp', { message: 'Debe ingresar un valor.'});
@@ -84,6 +87,9 @@ export function TemperatureForm({ lot, open, onOpenChange, onTempSaved }: Temper
   };
 
   const handleFinish = async () => {
+    const isValid = await form.trigger('postHydroTemp');
+    if (!isValid) return;
+
     const { postHydroTemp } = form.getValues();
      if (typeof postHydroTemp !== 'number') {
       form.setError('postHydroTemp', { message: 'Debe ingresar un valor.'});
@@ -122,19 +128,19 @@ export function TemperatureForm({ lot, open, onOpenChange, onTempSaved }: Temper
             <DialogDescription>Lote ID: <span className="font-mono">{lot.id}</span></DialogDescription>
         </DialogHeader>
         <Form {...form}>
-          <form className="space-y-4">
+          <form className="space-y-4" onSubmit={(e) => e.preventDefault()}>
             {showPreHydro && (
               <div className="space-y-4">
                 <FormField control={form.control} name="preHydroTemp" render={({ field }) => (
                   <FormItem>
                     <FormLabel>Temperatura Pre-Hidro (°C)</FormLabel>
-                    <FormControl><Input type="number" step="0.1" {...field} value={field.value || ''} autoComplete="off" /></FormControl>
+                    <FormControl><Input type="number" step="0.1" {...field} value={field.value ?? ''} autoComplete="off" /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )} />
                 <DialogFooter>
                   <DialogClose asChild><Button type="button" variant="outline">Cancelar</Button></DialogClose>
-                  <Button onClick={form.handleSubmit(handleSavePreHydro)}>Guardar Temp. Pre-Hidro</Button>
+                  <Button onClick={handleSavePreHydro}>Guardar Temp. Pre-Hidro</Button>
                 </DialogFooter>
               </div>
             )}
@@ -143,13 +149,13 @@ export function TemperatureForm({ lot, open, onOpenChange, onTempSaved }: Temper
                  <FormField control={form.control} name="postHydroTemp" render={({ field }) => (
                   <FormItem>
                     <FormLabel>Temperatura Post-Hidro (°C)</FormLabel>
-                    <FormControl><Input type="number" step="0.1" {...field} value={field.value || ''} autoComplete="off" /></FormControl>
+                    <FormControl><Input type="number" step="0.1" {...field} value={field.value ?? ''} autoComplete="off" /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )} />
                 <DialogFooter>
                     <DialogClose asChild><Button type="button" variant="outline">Cancelar</Button></DialogClose>
-                    <Button onClick={form.handleSubmit(handleFinish)}>TERMINAR</Button>
+                    <Button onClick={handleFinish}>TERMINAR</Button>
                 </DialogFooter>
               </div>
             )}
