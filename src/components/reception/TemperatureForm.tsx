@@ -51,74 +51,64 @@ export function TemperatureForm({ lot, open, onOpenChange, onTempSaved }: Temper
 
   const showPreHydro = lot.status === 'Pendiente de Pre-Hidro';
   const showPostHydro = lot.status === 'Pendiente de Post-Hidro';
-
-  const handleSavePreHydro = async () => {
-    const isValid = await form.trigger('preHydroTemp');
-    if (!isValid) return;
-
-    const { preHydroTemp } = form.getValues();
-    if (typeof preHydroTemp !== 'number') {
-      form.setError('preHydroTemp', { message: 'Debe ingresar un valor.'});
-      return;
-    }
-
+  
+  const onSubmit = (values: TempFormValues) => {
     const lotRef = doc(firestore, 'receptionLots', lot.id);
-    const updateData = {
-      preHydroTemp,
-      status: 'Pendiente de Post-Hidro' as const,
-    };
-    
-    updateDoc(lotRef, updateData)
-      .then(() => {
-        toast({ title: 'Éxito', description: 'Temperatura Pre-Hidro guardada.' });
-        onTempSaved();
-      })
-      .catch((error) => {
-        console.error("Error saving pre-hydro temp: ", error);
-        errorEmitter.emit(
-          'permission-error',
-          new FirestorePermissionError({
-            path: lotRef.path,
-            operation: 'update',
-            requestResourceData: updateData,
-          })
-        );
-      });
+
+    if (showPreHydro) {
+      if (typeof values.preHydroTemp !== 'number') {
+        form.setError('preHydroTemp', { message: 'Debe ingresar un valor.'});
+        return;
+      }
+      const updateData = {
+        preHydroTemp: values.preHydroTemp,
+        status: 'Pendiente de Post-Hidro' as const,
+      };
+      
+      updateDoc(lotRef, updateData)
+        .then(() => {
+          toast({ title: 'Éxito', description: 'Temperatura Pre-Hidro guardada.' });
+          onTempSaved();
+        })
+        .catch((error) => {
+          errorEmitter.emit(
+            'permission-error',
+            new FirestorePermissionError({
+              path: lotRef.path,
+              operation: 'update',
+              requestResourceData: updateData,
+            })
+          );
+        });
+
+    } else if (showPostHydro) {
+      if (typeof values.postHydroTemp !== 'number') {
+        form.setError('postHydroTemp', { message: 'Debe ingresar un valor.'});
+        return;
+      }
+      const updateData = {
+        postHydroTemp: values.postHydroTemp,
+        status: 'Cerrado' as const,
+      };
+
+      updateDoc(lotRef, updateData)
+       .then(() => {
+          toast({ title: 'Éxito', description: 'Lote cerrado correctamente.' });
+          onTempSaved();
+        })
+        .catch((error) => {
+          errorEmitter.emit(
+            'permission-error',
+            new FirestorePermissionError({
+              path: lotRef.path,
+              operation: 'update',
+              requestResourceData: updateData,
+            })
+          );
+        });
+    }
   };
 
-  const handleFinish = async () => {
-    const isValid = await form.trigger('postHydroTemp');
-    if (!isValid) return;
-
-    const { postHydroTemp } = form.getValues();
-     if (typeof postHydroTemp !== 'number') {
-      form.setError('postHydroTemp', { message: 'Debe ingresar un valor.'});
-      return;
-    }
-
-    const lotRef = doc(firestore, 'receptionLots', lot.id);
-    const updateData = {
-      postHydroTemp,
-      status: 'Cerrado' as const,
-    };
-
-    updateDoc(lotRef, updateData)
-     .then(() => {
-        toast({ title: 'Éxito', description: 'Lote cerrado correctamente.' });
-        onTempSaved();
-      })
-      .catch((error) => {
-        console.error("Error finishing lot: ", error);
-        errorEmitter.emit(
-          'permission-error',
-          new FirestorePermissionError({
-            path: lotRef.path,
-            operation: 'update',
-            requestResourceData: updateData,
-          })
-        );
-      });
-  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -128,7 +118,7 @@ export function TemperatureForm({ lot, open, onOpenChange, onTempSaved }: Temper
             <DialogDescription>Lote ID: <span className="font-mono">{lot.id}</span></DialogDescription>
         </DialogHeader>
         <Form {...form}>
-          <form className="space-y-4" onSubmit={(e) => e.preventDefault()}>
+          <form className="space-y-4" onSubmit={form.handleSubmit(onSubmit)}>
             {showPreHydro && (
               <div className="space-y-4">
                 <FormField control={form.control} name="preHydroTemp" render={({ field }) => (
@@ -140,7 +130,7 @@ export function TemperatureForm({ lot, open, onOpenChange, onTempSaved }: Temper
                 )} />
                 <DialogFooter>
                   <DialogClose asChild><Button type="button" variant="outline">Cancelar</Button></DialogClose>
-                  <Button onClick={handleSavePreHydro}>Guardar Temp. Pre-Hidro</Button>
+                  <Button type="submit">Guardar Temp. Pre-Hidro</Button>
                 </DialogFooter>
               </div>
             )}
@@ -155,7 +145,7 @@ export function TemperatureForm({ lot, open, onOpenChange, onTempSaved }: Temper
                 )} />
                 <DialogFooter>
                     <DialogClose asChild><Button type="button" variant="outline">Cancelar</Button></DialogClose>
-                    <Button onClick={handleFinish}>TERMINAR</Button>
+                    <Button type="submit">TERMINAR</Button>
                 </DialogFooter>
               </div>
             )}
