@@ -11,6 +11,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '../ui/button';
 import { WeightCalculator } from './WeightCalculator';
 import { TemperatureForm } from './TemperatureForm';
+import { Checkbox } from '../ui/checkbox';
+import { Label } from '../ui/label';
 
 interface LotListProps {
   exporterId: string | null;
@@ -21,13 +23,14 @@ export function LotList({ exporterId, producerId }: LotListProps) {
   const firestore = useFirestore();
   const [lots, setLots] = React.useState<ReceptionLot[]>([]);
   const [loading, setLoading] = React.useState(true);
+  const [showOnlyOpen, setShowOnlyOpen] = React.useState(true);
   
   const [isWeightOpen, setWeightOpen] = React.useState(false);
   const [isTempOpen, setTempOpen] = React.useState(false);
   const [selectedLot, setSelectedLot] = React.useState<ReceptionLot | null>(null);
 
   React.useEffect(() => {
-    if (!firestore || !producerId || !exporterId) {
+    if (!firestore || !producerId) {
         setLots([]);
         setLoading(false);
         return;
@@ -35,7 +38,6 @@ export function LotList({ exporterId, producerId }: LotListProps) {
 
     setLoading(true);
     const lotsRef = collection(firestore, 'receptionLots');
-    // Query only by producerId to avoid needing a composite index
     const q = query(
       lotsRef,
       where('producerId', '==', producerId)
@@ -43,11 +45,10 @@ export function LotList({ exporterId, producerId }: LotListProps) {
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const fetchedLots = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ReceptionLot))
-        // Filter out closed lots and by exporter on the client-side
-        .filter(lot => lot.status !== 'Cerrado' && lot.exporterId === exporterId)
+        .filter(lot => lot.exporterId === exporterId)
         .sort((a, b) => {
-            if (!b.createdAt) return -1; // b is newer (not yet saved)
-            if (!a.createdAt) return 1;  // a is newer
+            if (!b.createdAt) return -1;
+            if (!a.createdAt) return 1;
             return b.createdAt.toMillis() - a.createdAt.toMillis();
         });
         
@@ -86,12 +87,22 @@ export function LotList({ exporterId, producerId }: LotListProps) {
     }
   };
 
+  const filteredLots = showOnlyOpen ? lots.filter(lot => lot.status !== 'Cerrado') : lots;
+
   return (
     <>
       <Card>
         <CardHeader>
-            <CardTitle>Lotes en Recepción</CardTitle>
-            <CardDescription>Lotes activos para la selección actual.</CardDescription>
+          <div className="flex justify-between items-center">
+            <div>
+              <CardTitle>Lotes en Recepción</CardTitle>
+              <CardDescription>Lotes activos para la selección actual.</CardDescription>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Checkbox id="show-open" checked={showOnlyOpen} onCheckedChange={(checked) => setShowOnlyOpen(!!checked)} />
+              <Label htmlFor="show-open">Mostrar solo lotes abiertos</Label>
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           <div className="rounded-md border">
@@ -115,8 +126,8 @@ export function LotList({ exporterId, producerId }: LotListProps) {
                       <TableCell colSpan={8}><Skeleton className="h-4 w-full" /></TableCell>
                     </TableRow>
                   ))
-                ) : lots.length > 0 ? (
-                  lots.map((lot) => (
+                ) : filteredLots.length > 0 ? (
+                  filteredLots.map((lot) => (
                     <TableRow key={lot.id}>
                       <TableCell className="font-medium truncate" style={{maxWidth: '120px'}} title={lot.id}>{lot.id}</TableCell>
                       <TableCell>{lot.document}</TableCell>
@@ -141,7 +152,7 @@ export function LotList({ exporterId, producerId }: LotListProps) {
                 ) : (
                   <TableRow>
                     <TableCell colSpan={8} className="h-24 text-center">
-                      No se encontraron lotes activos para esta selección.
+                      No se encontraron lotes para esta selección.
                     </TableCell>
                   </TableRow>
                 )}
