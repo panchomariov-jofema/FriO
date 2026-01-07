@@ -67,8 +67,7 @@ export function TemperatureForm({ lot, onTempSaved }: TemperatureFormProps) {
         onTempSaved();
       })
       .catch((error) => {
-        console.error("Error updating temp: ", error);
-         errorEmitter.emit(
+        errorEmitter.emit(
           'permission-error',
           new FirestorePermissionError({
             path: lotRef.path,
@@ -76,7 +75,6 @@ export function TemperatureForm({ lot, onTempSaved }: TemperatureFormProps) {
             requestResourceData: updateData,
           })
         );
-        toast({ title: 'Error', description: 'No se pudo guardar la temperatura.', variant: 'destructive' });
       });
   };
 
@@ -99,7 +97,6 @@ export function TemperatureForm({ lot, onTempSaved }: TemperatureFormProps) {
         onTempSaved();
       })
       .catch((error) => {
-        console.error("Error finishing lot: ", error);
         errorEmitter.emit(
           'permission-error',
           new FirestorePermissionError({
@@ -108,7 +105,6 @@ export function TemperatureForm({ lot, onTempSaved }: TemperatureFormProps) {
             requestResourceData: updateData,
           })
         );
-        toast({ title: 'Error', description: 'No se pudo cerrar el lote.', variant: 'destructive' });
       });
   };
 
