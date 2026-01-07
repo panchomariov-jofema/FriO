@@ -204,7 +204,7 @@ export default function DatosMaestrosPage() {
                 collectionName={tab.collection}
                 schema={tab.schema}
                 columns={tab.columns as any}
-                renderForm={tab.form}
+                RenderFormComponent={tab.form}
                 docNameField={tab.docName as any}
                 csvHeaders={tab.csvHeaders as any}
                 csvTemplateFileName={tab.csvFile}
