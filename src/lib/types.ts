@@ -54,6 +54,7 @@ export type Variety = 'SANTINA' | 'LAPINS' | 'REGINA' | 'KORDIA' | 'SKEENA' | 'S
 
 export interface ReceptionLot {
     id: string;
+    displayLotId: string;
     exporterId: string;
     producerId: string;
     document: string;

@@ -7,7 +7,7 @@ import { z } from 'zod';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
-import type { Exporter, Variety } from '@/lib/types';
+import type { Exporter, Variety, Producer } from '@/lib/types';
 import { Label } from '@/components/ui/label';
 import { LotList } from '@/components/reception/LotList';
 import { useProducersByExporter } from '@/hooks/use-producers-by-exporter';
@@ -47,15 +47,14 @@ export default function RecepcionPage() {
   const isFormSubmitting = form.formState.isSubmitting;
   
   React.useEffect(() => {
-    // Only update toteCount if the field is not dirty (i.e., user hasn't manually edited it)
     if (!form.formState.dirtyFields.toteCount) {
       form.setValue('toteCount', binCount * 24);
     }
   }, [binCount, form]);
 
   const onSubmit = (values: LotFormValues) => {
-    const selectedProducer = form.getValues('producerId');
-    if (!selectedExporter || !selectedProducer) {
+    const selectedProducerId = form.getValues('producerId');
+    if (!selectedExporter || !selectedProducerId) {
         toast({
             variant: 'destructive',
             title: 'Error de validación',
@@ -63,11 +62,20 @@ export default function RecepcionPage() {
         });
         return;
     }
+    
+    const producer = producers.find(p => p.producerId === selectedProducerId);
+    if (!producer) {
+        toast({ variant: 'destructive', title: 'Error', description: 'No se pudo encontrar el productor seleccionado.' });
+        return;
+    }
+
+    const displayLotId = `${producer.shortName}-${values.document}`;
 
     const lotData = {
       ...values,
+      displayLotId,
       exporterId: selectedExporter,
-      producerId: selectedProducer,
+      producerId: selectedProducerId,
       status: 'Pendiente de Peso' as const,
       createdAt: serverTimestamp(),
     };
@@ -75,7 +83,7 @@ export default function RecepcionPage() {
     const collRef = collection(firestore, 'receptionLots');
     addDoc(collRef, lotData)
       .then(() => {
-        toast({ title: 'Éxito', description: 'Lote creado correctamente.' });
+        toast({ title: 'Éxito', description: `Lote ${displayLotId} creado correctamente.` });
         form.reset({
           ...form.getValues(),
           document: '',
@@ -84,6 +92,9 @@ export default function RecepcionPage() {
           toteCount: 0,
           emptyTotes: 0,
         });
+        // Keep exporter and producer selected
+        form.setValue('exporterId', selectedExporter);
+        form.setValue('producerId', selectedProducerId);
       })
       .catch((error) => {
         console.error("Error creating lot: ", error);
@@ -118,7 +129,11 @@ export default function RecepcionPage() {
                   <Label htmlFor="exporter-select">Exportador</Label>
                   <Select
                     value={selectedExporter ?? ''}
-                    onValueChange={setSelectedExporter}
+                    onValueChange={(value) => {
+                        setSelectedExporter(value);
+                        form.setValue('exporterId', value);
+                        form.reset({ ...form.getValues(), producerId: undefined });
+                    }}
                     disabled={loadingExporters}
                   >
                     <SelectTrigger id="exporter-select">

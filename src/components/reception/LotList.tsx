@@ -42,16 +42,14 @@ export function LotList({ exporterId, producerId }: LotListProps) {
     const lotsRef = collection(firestore, 'receptionLots');
 
     if (producerId) {
-      // If a producer is selected, query for their lots.
       q = query(lotsRef, where('producerId', '==', producerId));
     } else {
-      // If no producer is selected, query all lots.
       q = query(lotsRef);
     }
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const fetchedLots = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ReceptionLot))
-        .filter(lot => exporterId ? lot.exporterId === exporterId : true) // Filter by exporter client-side if selected
+        .filter(lot => exporterId ? lot.exporterId === exporterId : true)
         .sort((a, b) => {
             if (!b.createdAt) return -1;
             if (!a.createdAt) return 1;
@@ -115,13 +113,14 @@ export function LotList({ exporterId, producerId }: LotListProps) {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[120px]">ID Lote</TableHead>
-                  <TableHead>Documento</TableHead>
+                  <TableHead className="w-[150px]">ID Lote</TableHead>
                   <TableHead>Variedad</TableHead>
                   <TableHead>Bins</TableHead>
                   <TableHead>Totes</TableHead>
                   <TableHead>Estado</TableHead>
                   <TableHead>Peso Total</TableHead>
+                  <TableHead>T° Pre</TableHead>
+                  <TableHead>T° Post</TableHead>
                   <TableHead className="w-[120px] text-right">Acción</TableHead>
                 </TableRow>
               </TableHeader>
@@ -129,14 +128,13 @@ export function LotList({ exporterId, producerId }: LotListProps) {
                 {loading ? (
                   Array.from({ length: 3 }).map((_, i) => (
                     <TableRow key={i}>
-                      <TableCell colSpan={8}><Skeleton className="h-4 w-full" /></TableCell>
+                      <TableCell colSpan={9}><Skeleton className="h-4 w-full" /></TableCell>
                     </TableRow>
                   ))
                 ) : filteredLots.length > 0 ? (
                   filteredLots.map((lot) => (
                     <TableRow key={lot.id}>
-                      <TableCell className="font-medium truncate" style={{maxWidth: '120px'}} title={lot.id}>{lot.id}</TableCell>
-                      <TableCell>{lot.document}</TableCell>
+                      <TableCell className="font-medium">{lot.displayLotId || lot.id}</TableCell>
                       <TableCell>{lot.variety}</TableCell>
                       <TableCell>{lot.binCount}</TableCell>
                       <TableCell>{lot.toteCount}</TableCell>
@@ -144,6 +142,8 @@ export function LotList({ exporterId, producerId }: LotListProps) {
                         <Badge variant={getStatusVariant(lot.status)}>{lot.status}</Badge>
                       </TableCell>
                       <TableCell>{lot.totalWeight ? `${lot.totalWeight.toFixed(2)} kg` : '-'}</TableCell>
+                      <TableCell>{lot.preHydroTemp ? `${lot.preHydroTemp.toFixed(1)} °C` : '-'}</TableCell>
+                      <TableCell>{lot.postHydroTemp ? `${lot.postHydroTemp.toFixed(1)} °C` : '-'}</TableCell>
                       <TableCell className="text-right">
                         {lot.status !== 'Cerrado' && (
                           <Button size="sm" onClick={() => handleActionClick(lot)}>
@@ -157,7 +157,7 @@ export function LotList({ exporterId, producerId }: LotListProps) {
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={8} className="h-24 text-center">
+                    <TableCell colSpan={9} className="h-24 text-center">
                       No se encontraron lotes para esta selección.
                     </TableCell>
                   </TableRow>

@@ -49,8 +49,9 @@ export const profileSchema = z.object({
 
 
 export const receptionLotSchema = z.object({
-    exporterId: z.string().optional(), // These will be added before submission
+    exporterId: z.string().optional(),
     producerId: z.string().min(1, "Productor es obligatorio"),
+    displayLotId: z.string().optional(),
     document: z.string().min(1, "Documento es obligatorio"),
     variety: z.enum(['SANTINA', 'LAPINS', 'REGINA', 'KORDIA', 'SKEENA', 'SWEETHEART', 'SYLVIA', 'SUNBURST'], {
       required_error: "Debe seleccionar una variedad.",
