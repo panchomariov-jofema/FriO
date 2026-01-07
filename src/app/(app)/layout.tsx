@@ -27,11 +27,12 @@ import {
   SidebarInset,
   SidebarTrigger,
   SidebarFooter,
-  SidebarMenuSub,
-  SidebarMenuSubButton,
-  SidebarMenuSubItem
 } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
+import { useAuth, useUser } from '@/firebase';
+import { signInAnonymously } from 'firebase/auth';
+import { LoadingScreen } from '@/components/LoadingScreen';
+
 
 const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -48,6 +49,18 @@ const navItems = [
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const auth = useAuth();
+  const { user, isUserLoading } = useUser();
+
+  React.useEffect(() => {
+    if (!user && !isUserLoading) {
+      signInAnonymously(auth);
+    }
+  }, [user, isUserLoading, auth]);
+
+  if (isUserLoading || !user) {
+    return <LoadingScreen />;
+  }
 
   return (
     <SidebarProvider>
