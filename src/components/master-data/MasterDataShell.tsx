@@ -74,7 +74,7 @@ export function MasterDataShell<T extends MasterData>({
 
   const handleDialogOpen = (item: T | null = null) => {
     setCurrentItem(item);
-    form.reset(item ? (typeof item.modulesAccess === 'object' ? {...item, modulesAccess: item.modulesAccess.join(', ')} : item) : schema.cast({}));
+    form.reset(item ? (typeof item.modulesAccess === 'object' ? {...item, modulesAccess: item.modulesAccess.join(', ')} : item) : {});
     setIsDialogOpen(true);
   };
 
@@ -301,7 +301,7 @@ export function MasterDataShell<T extends MasterData>({
             <AlertDialogTitle>¿Está seguro?</AlertDialogTitle>
             <AlertDialogDescription>
               Esta acción no se puede deshacer. Esto eliminará permanentemente el registro de <strong>{String(currentItem?.[docNameField] ?? '')}</strong>.
-            </AlertDialogDescription>
+            </d-content>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
@@ -312,3 +312,5 @@ export function MasterDataShell<T extends MasterData>({
     </div>
   );
 }
+
+    
