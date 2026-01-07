@@ -126,7 +126,7 @@ export function TemperatureForm({ lot, onTempSaved }: TemperatureFormProps) {
                 <FormField control={form.control} name="preHydroTemp" render={({ field }) => (
                   <FormItem>
                     <FormLabel>Temperatura Pre-Hidro (°C)</FormLabel>
-                    <FormControl><Input type="number" step="0.1" {...field} /></FormControl>
+                    <FormControl><Input type="number" step="0.1" {...field} value={field.value || ''} /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )} />
@@ -135,10 +135,10 @@ export function TemperatureForm({ lot, onTempSaved }: TemperatureFormProps) {
             )}
             {showPostHydro && (
               <div className="space-y-4">
-                <FormField control={form.control} name="postHydroTemp" render={({ field }) => (
+                 <FormField control={form.control} name="postHydroTemp" render={({ field }) => (
                   <FormItem>
                     <FormLabel>Temperatura Post-Hidro (°C)</FormLabel>
-                    <FormControl><Input type="number" step="0.1" {...field} /></FormControl>
+                    <FormControl><Input type="number" step="0.1" {...field} value={field.value || ''} /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )} />
@@ -151,3 +151,5 @@ export function TemperatureForm({ lot, onTempSaved }: TemperatureFormProps) {
     </Card>
   );
 }
+
+    

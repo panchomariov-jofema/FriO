@@ -103,19 +103,19 @@ export function LotCreationForm({ exporterId, producerId, onLotCreated }: LotCre
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <FormField control={form.control} name="document" render={({ field }) => (
-              <FormItem><FormLabel>Documento</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+              <FormItem><FormLabel>Documento</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem>
             )} />
             <FormField control={form.control} name="variety" render={({ field }) => (
-              <FormItem><FormLabel>Variedad</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+              <FormItem><FormLabel>Variedad</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem>
             )} />
             <FormField control={form.control} name="binCount" render={({ field }) => (
-              <FormItem><FormLabel>Cantidad de Bins</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>
+              <FormItem><FormLabel>Cantidad de Bins</FormLabel><FormControl><Input type="number" {...field} value={field.value || 0} /></FormControl><FormMessage /></FormItem>
             )} />
             <FormField control={form.control} name="toteCount" render={({ field }) => (
-              <FormItem><FormLabel>Cantidad de Totes</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>
+              <FormItem><FormLabel>Cantidad de Totes</FormLabel><FormControl><Input type="number" {...field} value={field.value || 0} /></FormControl><FormMessage /></FormItem>
             )} />
             <FormField control={form.control} name="emptyTotes" render={({ field }) => (
-              <FormItem><FormLabel>Totes Vacíos (Opcional)</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>
+              <FormItem><FormLabel>Totes Vacíos (Opcional)</FormLabel><FormControl><Input type="number" {...field} value={field.value || 0} /></FormControl><FormMessage /></FormItem>
             )} />
             <Button type="submit" disabled={form.formState.isSubmitting}>
               {form.formState.isSubmitting ? 'Guardando...' : 'Guardar Lote'}
@@ -126,3 +126,5 @@ export function LotCreationForm({ exporterId, producerId, onLotCreated }: LotCre
     </Card>
   );
 }
+
+    

@@ -120,3 +120,5 @@ export function WeightCalculator({ lot, onWeightSaved }: WeightCalculatorProps) 
     </Card>
   );
 }
+
+    

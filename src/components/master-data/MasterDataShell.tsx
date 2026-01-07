@@ -28,12 +28,12 @@ import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
 import type { MasterData } from '@/lib/types';
 import { addDoc, collection, deleteDoc, doc, updateDoc } from 'firebase/firestore';
 import { useFirestore } from '@/firebase';
-import { Download, MoreHorizontal, Pencil, PlusCircle, Trash2, Upload, XCircle } from 'lucide-react';
+import { Download, Pencil, Trash2, Upload } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '../ui/skeleton';
-import { FirestorePermissionError } from '@/firebase/errors';
-import { errorEmitter } from '@/firebase/error-emitter';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError } from '@/firebase/errors';
 
 interface MasterDataShellProps<T extends MasterData> {
   title: string;
@@ -253,7 +253,7 @@ export function MasterDataShell<T extends MasterData>({
       <div className="md:col-span-1">
         <Card>
             <CardHeader>
-                <CardTitle>{currentItem ? 'Editar' : 'Nuevo'} {title}</CardTitle>
+                <CardTitle>{currentItem ? 'Editar' : 'Nuevo'} {title.slice(0, -1)}</CardTitle>
                 <CardDescription>
                     {currentItem ? 'Modifique los datos del registro.' : 'Complete el formulario para crear un nuevo registro.'}
                 </CardDescription>
@@ -361,3 +361,5 @@ export function MasterDataShell<T extends MasterData>({
     </div>
   );
 }
+
+    
