@@ -163,6 +163,7 @@ service cloud.firestore {
 
     // ------------------------------------------------------------------------
     // Collection: receptionLots
+    // Rule update to force redeployment.
     // ------------------------------------------------------------------------
     match /receptionLots/{lotId} {
       allow read, write: if isSignedIn();
