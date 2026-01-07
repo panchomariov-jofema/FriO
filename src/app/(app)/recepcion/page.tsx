@@ -203,6 +203,7 @@ export default function RecepcionPage() {
 
       <LotList
         exporterId={selectedExporter}
+        producerId={form.watch('producerId')}
       />
     </div>
   );
