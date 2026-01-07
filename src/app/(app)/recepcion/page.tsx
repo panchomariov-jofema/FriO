@@ -10,6 +10,7 @@ import { LotCreationForm } from '@/components/reception/LotCreationForm';
 import { LotList } from '@/components/reception/LotList';
 import { WeightCalculator } from '@/components/reception/WeightCalculator';
 import { TemperatureForm } from '@/components/reception/TemperatureForm';
+import { useProducersByExporter } from '@/hooks/use-producers-by-exporter';
 
 export default function RecepcionPage() {
   const [selectedExporter, setSelectedExporter] = React.useState<string | null>(null);
@@ -17,12 +18,7 @@ export default function RecepcionPage() {
   const [selectedLot, setSelectedLot] = React.useState<ReceptionLot | null>(null);
 
   const { data: exporters, loading: loadingExporters } = useFirestoreCollection<Exporter>('exporters');
-  const { data: producers, loading: loadingProducers } = useFirestoreCollection<Producer>('producers');
-
-  const filteredProducers = React.useMemo(() => {
-    if (!selectedExporter) return [];
-    return producers.filter(p => p.exporterId === selectedExporter);
-  }, [selectedExporter, producers]);
+  const { data: producers, loading: loadingProducers } = useProducersByExporter(selectedExporter);
 
   React.useEffect(() => {
     setSelectedProducer(null);
@@ -71,7 +67,7 @@ export default function RecepcionPage() {
                 <SelectValue placeholder="Seleccione un productor..." />
               </SelectTrigger>
               <SelectContent>
-                {filteredProducers.map(p => (
+                {producers.map(p => (
                   <SelectItem key={p.id} value={p.producerId}>
                     {p.name}
                   </SelectItem>
