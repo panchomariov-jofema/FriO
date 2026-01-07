@@ -301,7 +301,7 @@ export function MasterDataShell<T extends MasterData>({
             <AlertDialogTitle>¿Está seguro?</AlertDialogTitle>
             <AlertDialogDescription>
               Esta acción no se puede deshacer. Esto eliminará permanentemente el registro de <strong>{String(currentItem?.[docNameField] ?? '')}</strong>.
-            </d-content>
+            </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
@@ -312,5 +312,3 @@ export function MasterDataShell<T extends MasterData>({
     </div>
   );
 }
-
-    
