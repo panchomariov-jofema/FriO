@@ -160,7 +160,7 @@ export default function RecepcionPage() {
                             <SelectContent>
                                 {producers.map(p => (
                                 <SelectItem key={p.id} value={p.producerId}>
-                                    {p.name}
+                                    {p.shortName}
                                 </SelectItem>
                                 ))}
                             </SelectContent>
@@ -203,7 +203,6 @@ export default function RecepcionPage() {
 
       <LotList
         exporterId={selectedExporter}
-        producerId={form.watch('producerId')}
       />
     </div>
   );
