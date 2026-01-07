@@ -66,6 +66,8 @@ export function WeightCalculator({ lot, open, onOpenChange, onWeightSaved }: Wei
         toast({ title: 'Error', description: 'No se pudo encontrar el productor para crear el registro en hidrocooler.', variant: 'destructive' });
         return;
     }
+    
+    const displayLotId = `${producer.shortName}-${lot.document}`;
 
     const batch = writeBatch(firestore);
 
@@ -74,13 +76,14 @@ export function WeightCalculator({ lot, open, onOpenChange, onWeightSaved }: Wei
     const receptionUpdate = {
         totalWeight,
         status: 'Pendiente de Pre-Hidro' as const,
+        displayLotId: displayLotId,
     };
     batch.update(lotRef, receptionUpdate);
 
     // 2. Create hidrocooler lot
     const hidrocoolerRef = collection(firestore, 'hidrocoolerLots');
     const hidrocoolerLotData = {
-        displayLotId: lot.displayLotId,
+        displayLotId: displayLotId,
         producerShortName: producer.shortName,
         binCount: lot.binCount,
         status: 'Pendiente de Pre-Hidro' as const,
@@ -113,7 +116,7 @@ export function WeightCalculator({ lot, open, onOpenChange, onWeightSaved }: Wei
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Registro de Peso</DialogTitle>
-          <DialogDescription>Lote ID: <span className="font-mono">{lot.displayLotId}</span></DialogDescription>
+          <DialogDescription>Lote ID: <span className="font-mono">{lot.displayLotId || `${lot.producerId}-${lot.document}`}</span></DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-4">
             <div className="flex gap-2">
