@@ -197,13 +197,23 @@ export function MasterDataShell<T extends MasterData>({
 
             try {
                 const validatedData = schema.parse(rowData);
-                await addDoc(collection(firestore, collectionName), validatedData);
+                const collRef = collection(firestore, collectionName);
+                addDoc(collRef, validatedData).catch(error => {
+                  errors.push(`Línea ${i + 1}: Error al guardar - ${error.message}`);
+                   errorEmitter.emit(
+                      'permission-error',
+                      new FirestorePermissionError({
+                        path: collRef.path,
+                        operation: 'create',
+                        requestResourceData: validatedData,
+                      })
+                    );
+                });
                 successCount++;
             } catch (error) {
                 if (error instanceof z.ZodError) {
                     errors.push(`Línea ${i + 1}: ${error.errors.map(e => e.message).join(', ')}`);
                 } else {
-                    console.error('Import error:', error);
                     errors.push(`Línea ${i + 1}: Error desconocido al guardar.`);
                 }
             }
@@ -211,7 +221,7 @@ export function MasterDataShell<T extends MasterData>({
         
         toast({
             title: 'Importación Completada',
-            description: `${successCount} registros importados. ${errors.length} errores.`,
+            description: `${successCount} registros procesados. ${errors.length} errores.`,
         });
 
         if (errors.length > 0) {
