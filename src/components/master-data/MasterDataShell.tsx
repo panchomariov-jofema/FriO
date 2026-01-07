@@ -46,7 +46,7 @@ interface MasterDataShellProps<T extends MasterData> {
   collectionName: string;
   schema: z.ZodType<any, any>;
   columns: { key: keyof T; header: string }[];
-  renderForm: (form: any) => React.ReactNode;
+  renderForm: React.ComponentType<{ form: any }>;
   docNameField: keyof T;
   csvHeaders: (keyof T)[];
   csvTemplateFileName: string;
@@ -56,7 +56,7 @@ export function MasterDataShell<T extends MasterData>({
   collectionName,
   schema,
   columns,
-  renderForm,
+  renderForm: RenderFormComponent,
   docNameField,
   csvHeaders,
   csvTemplateFileName,
@@ -285,7 +285,7 @@ export function MasterDataShell<T extends MasterData>({
           </DialogHeader>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-              {renderForm && renderForm(form)}
+              {RenderFormComponent && <RenderFormComponent form={form} />}
               <div className="flex justify-end gap-2">
                 <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>Cancelar</Button>
                 <Button type="submit">Guardar</Button>
