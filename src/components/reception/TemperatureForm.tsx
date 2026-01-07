@@ -7,16 +7,18 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { doc, updateDoc } from 'firebase/firestore';
 import { useFirestore } from '@/firebase';
 import type { ReceptionLot } from '@/lib/types';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '../ui/dialog';
 
 interface TemperatureFormProps {
   lot: ReceptionLot;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
   onTempSaved: () => void;
 }
 
@@ -27,7 +29,7 @@ const tempSchema = z.object({
 
 type TempFormValues = z.infer<typeof tempSchema>;
 
-export function TemperatureForm({ lot, onTempSaved }: TemperatureFormProps) {
+export function TemperatureForm({ lot, open, onOpenChange, onTempSaved }: TemperatureFormProps) {
   const firestore = useFirestore();
   const { toast } = useToast();
   const form = useForm<TempFormValues>({
@@ -39,11 +41,13 @@ export function TemperatureForm({ lot, onTempSaved }: TemperatureFormProps) {
   });
   
   React.useEffect(() => {
-    form.reset({
-      preHydroTemp: lot.preHydroTemp || undefined,
-      postHydroTemp: lot.postHydroTemp || undefined,
-    });
-  }, [lot, form]);
+    if (open) {
+        form.reset({
+          preHydroTemp: lot.preHydroTemp || undefined,
+          postHydroTemp: lot.postHydroTemp || undefined,
+        });
+    }
+  }, [lot, open, form]);
 
   const showPreHydro = lot.status === 'Pendiente de Pre-Hidro';
   const showPostHydro = lot.status === 'Pendiente de Post-Hidro';
@@ -111,12 +115,12 @@ export function TemperatureForm({ lot, onTempSaved }: TemperatureFormProps) {
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Registro de Temperatura</CardTitle>
-        <CardDescription>Lote ID: <span className="font-mono">{lot.id}</span></CardDescription>
-      </CardHeader>
-      <CardContent>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+            <DialogTitle>Registro de Temperatura</DialogTitle>
+            <DialogDescription>Lote ID: <span className="font-mono">{lot.id}</span></DialogDescription>
+        </DialogHeader>
         <Form {...form}>
           <form className="space-y-4">
             {showPreHydro && (
@@ -128,7 +132,10 @@ export function TemperatureForm({ lot, onTempSaved }: TemperatureFormProps) {
                     <FormMessage />
                   </FormItem>
                 )} />
-                <Button onClick={form.handleSubmit(handleSavePreHydro)}>Guardar Temp. Pre-Hidro</Button>
+                <DialogFooter>
+                  <DialogClose asChild><Button type="button" variant="outline">Cancelar</Button></DialogClose>
+                  <Button onClick={form.handleSubmit(handleSavePreHydro)}>Guardar Temp. Pre-Hidro</Button>
+                </DialogFooter>
               </div>
             )}
             {showPostHydro && (
@@ -140,12 +147,15 @@ export function TemperatureForm({ lot, onTempSaved }: TemperatureFormProps) {
                     <FormMessage />
                   </FormItem>
                 )} />
-                <Button onClick={form.handleSubmit(handleFinish)}>TERMINAR</Button>
+                <DialogFooter>
+                    <DialogClose asChild><Button type="button" variant="outline">Cancelar</Button></DialogClose>
+                    <Button onClick={form.handleSubmit(handleFinish)}>TERMINAR</Button>
+                </DialogFooter>
               </div>
             )}
           </form>
         </Form>
-      </CardContent>
-    </Card>
+      </DialogContent>
+    </Dialog>
   );
 }

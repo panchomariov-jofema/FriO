@@ -7,19 +7,19 @@ import { z } from 'zod';
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { useFirestore } from '@/firebase';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { receptionLotSchema } from '@/lib/schemas';
-import { errorEmitter } from '@/firebase/error-emitter';
-import { FirestorePermissionError } from '@/firebase/errors';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import type { Variety } from '@/lib/types';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '../ui/dialog';
 
 interface LotCreationFormProps {
   exporterId: string;
   producerId: string;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
   onLotCreated: () => void;
 }
 
@@ -27,7 +27,7 @@ type LotFormValues = z.infer<typeof receptionLotSchema>;
 
 const varieties: Variety[] = ['SANTINA', 'LAPINS', 'REGINA', 'KORDIA', 'SKEENA', 'SWEETHEART', 'SYLVIA', 'SUNBURST'];
 
-export function LotCreationForm({ exporterId, producerId, onLotCreated }: LotCreationFormProps) {
+export function LotCreationForm({ exporterId, producerId, open, onOpenChange, onLotCreated }: LotCreationFormProps) {
   const firestore = useFirestore();
   const { toast } = useToast();
   const form = useForm<LotFormValues>({
@@ -52,18 +52,20 @@ export function LotCreationForm({ exporterId, producerId, onLotCreated }: LotCre
   }, [binCount, form]);
   
   React.useEffect(() => {
-    form.reset({
-      exporterId,
-      producerId,
-      document: '',
-      variety: undefined,
-      binCount: 0,
-      toteCount: 0,
-      emptyTotes: 0,
-      status: 'Pendiente de Peso',
-      createdAt: null,
-    })
-  }, [exporterId, producerId, form]);
+    if (open) {
+        form.reset({
+          exporterId,
+          producerId,
+          document: '',
+          variety: undefined,
+          binCount: 0,
+          toteCount: 0,
+          emptyTotes: 0,
+          status: 'Pendiente de Peso',
+          createdAt: null,
+        })
+    }
+  }, [open, exporterId, producerId, form]);
 
   const onSubmit = (values: LotFormValues) => {
     const lotData = {
@@ -76,8 +78,8 @@ export function LotCreationForm({ exporterId, producerId, onLotCreated }: LotCre
     addDoc(collRef, lotData)
       .then(() => {
         toast({ title: 'Éxito', description: 'Lote creado correctamente.' });
-        form.reset();
         onLotCreated();
+        onOpenChange(false);
       })
       .catch((error) => {
         console.error("Error creating lot: ", error);
@@ -90,52 +92,57 @@ export function LotCreationForm({ exporterId, producerId, onLotCreated }: LotCre
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Crear Nuevo Lote</CardTitle>
-        <CardDescription>Ingrese los detalles para registrar un nuevo lote de fruta.</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField control={form.control} name="document" render={({ field }) => (
-              <FormItem><FormLabel>Documento</FormLabel><FormControl><Input {...field} value={field.value || ''} autoComplete="off" /></FormControl><FormMessage /></FormItem>
-            )} />
-            <FormField
-              control={form.control}
-              name="variety"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Variedad</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Seleccione una variedad" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {varieties.map(v => <SelectItem key={v} value={v}>{v}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField control={form.control} name="binCount" render={({ field }) => (
-              <FormItem><FormLabel>Cantidad de Bins</FormLabel><FormControl><Input type="number" {...field} value={field.value || 0} autoComplete="off" /></FormControl><FormMessage /></FormItem>
-            )} />
-            <FormField control={form.control} name="toteCount" render={({ field }) => (
-              <FormItem><FormLabel>Cantidad de Totes</FormLabel><FormControl><Input type="number" {...field} value={field.value || 0} autoComplete="off" /></FormControl><FormMessage /></FormItem>
-            )} />
-            <FormField control={form.control} name="emptyTotes" render={({ field }) => (
-              <FormItem><FormLabel>Totes Vacíos (Opcional)</FormLabel><FormControl><Input type="number" {...field} value={field.value || 0} autoComplete="off" /></FormControl><FormMessage /></FormItem>
-            )} />
-            <Button type="submit" disabled={form.formState.isSubmitting}>
-              {form.formState.isSubmitting ? 'Guardando...' : 'Guardar Lote'}
-            </Button>
-          </form>
-        </Form>
-      </CardContent>
-    </Card>
+     <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle>Crear Nuevo Lote</DialogTitle>
+                <DialogDescription>Ingrese los detalles para registrar un nuevo lote de fruta.</DialogDescription>
+            </DialogHeader>
+             <Form {...form}>
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                <FormField control={form.control} name="document" render={({ field }) => (
+                  <FormItem><FormLabel>Documento</FormLabel><FormControl><Input {...field} value={field.value || ''} autoComplete="off" /></FormControl><FormMessage /></FormItem>
+                )} />
+                <FormField
+                  control={form.control}
+                  name="variety"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Variedad</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Seleccione una variedad" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {varieties.map(v => <SelectItem key={v} value={v}>{v}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField control={form.control} name="binCount" render={({ field }) => (
+                  <FormItem><FormLabel>Cantidad de Bins</FormLabel><FormControl><Input type="number" {...field} value={field.value || 0} autoComplete="off" /></FormControl><FormMessage /></FormItem>
+                )} />
+                <FormField control={form.control} name="toteCount" render={({ field }) => (
+                  <FormItem><FormLabel>Cantidad de Totes</FormLabel><FormControl><Input type="number" {...field} value={field.value || 0} readOnly className="bg-muted" /></FormControl><FormMessage /></FormItem>
+                )} />
+                <FormField control={form.control} name="emptyTotes" render={({ field }) => (
+                  <FormItem><FormLabel>Totes Vacíos (Opcional)</FormLabel><FormControl><Input type="number" {...field} value={field.value || 0} autoComplete="off" /></FormControl><FormMessage /></FormItem>
+                )} />
+                <DialogFooter>
+                    <DialogClose asChild>
+                        <Button type="button" variant="outline">Cancelar</Button>
+                    </DialogClose>
+                    <Button type="submit" disabled={form.formState.isSubmitting}>
+                      {form.formState.isSubmitting ? 'Guardando...' : 'Guardar Lote'}
+                    </Button>
+                </DialogFooter>
+              </form>
+            </Form>
+        </DialogContent>
+     </Dialog>
   );
 }
