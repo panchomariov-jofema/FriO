@@ -24,19 +24,22 @@ export function LotList({ exporterId, producerId, selectedLot, onSelectLot }: Lo
   const [loading, setLoading] = React.useState(true);
 
   React.useEffect(() => {
-    if (!firestore || !exporterId || !producerId) return;
+    if (!firestore || !exporterId || !producerId) {
+        setLots([]);
+        return;
+    };
 
     setLoading(true);
     const lotsRef = collection(firestore, 'receptionLots');
     const q = query(
       lotsRef,
-      where('exporterId', '==', exporterId),
       where('producerId', '==', producerId),
       orderBy('createdAt', 'desc')
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const fetchedLots = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ReceptionLot));
+      const fetchedLots = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ReceptionLot))
+        .filter(lot => lot.exporterId === exporterId);
       setLots(fetchedLots);
       setLoading(false);
     }, (error) => {
