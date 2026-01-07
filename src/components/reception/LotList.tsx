@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, Query } from 'firebase/firestore';
 import { useFirestore } from '@/firebase';
 import type { ReceptionLot } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -30,22 +30,28 @@ export function LotList({ exporterId, producerId }: LotListProps) {
   const [selectedLot, setSelectedLot] = React.useState<ReceptionLot | null>(null);
 
   React.useEffect(() => {
-    if (!firestore || !producerId) {
+    if (!firestore) {
         setLots([]);
         setLoading(false);
         return;
     };
 
     setLoading(true);
+    
+    let q: Query;
     const lotsRef = collection(firestore, 'receptionLots');
-    const q = query(
-      lotsRef,
-      where('producerId', '==', producerId)
-    );
+
+    if (producerId) {
+      // If a producer is selected, query for their lots.
+      q = query(lotsRef, where('producerId', '==', producerId));
+    } else {
+      // If no producer is selected, query all lots.
+      q = query(lotsRef);
+    }
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const fetchedLots = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ReceptionLot))
-        .filter(lot => lot.exporterId === exporterId)
+        .filter(lot => exporterId ? lot.exporterId === exporterId : true) // Filter by exporter client-side if selected
         .sort((a, b) => {
             if (!b.createdAt) return -1;
             if (!a.createdAt) return 1;
