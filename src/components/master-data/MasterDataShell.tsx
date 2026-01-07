@@ -46,7 +46,7 @@ interface MasterDataShellProps<T extends MasterData> {
   collectionName: string;
   schema: z.ZodType<any, any>;
   columns: { key: keyof T; header: string }[];
-  renderForm: React.ComponentType<{ form: any }>;
+  RenderFormComponent: React.ComponentType<{ form: any }>;
   docNameField: keyof T;
   csvHeaders: (keyof T)[];
   csvTemplateFileName: string;
@@ -56,7 +56,7 @@ export function MasterDataShell<T extends MasterData>({
   collectionName,
   schema,
   columns,
-  renderForm: RenderFormComponent,
+  RenderFormComponent,
   docNameField,
   csvHeaders,
   csvTemplateFileName,
@@ -70,11 +70,21 @@ export function MasterDataShell<T extends MasterData>({
 
   const form = useForm<z.infer<typeof schema>>({
     resolver: zodResolver(schema),
+    defaultValues: Object.fromEntries(
+      Object.keys(schema.shape).map(key => [key, ''])
+    ) as z.infer<typeof schema>,
   });
 
   const handleDialogOpen = (item: T | null = null) => {
     setCurrentItem(item);
-    form.reset(item ? (typeof item.modulesAccess === 'object' ? {...item, modulesAccess: item.modulesAccess.join(', ')} : item) : {});
+    if (item) {
+      const itemData = typeof (item as any).modulesAccess === 'object' 
+        ? {...item, modulesAccess: (item as any).modulesAccess.join(', ')} 
+        : item;
+      form.reset(itemData);
+    } else {
+      form.reset(); // Resets to defaultValues
+    }
     setIsDialogOpen(true);
   };
 
@@ -285,7 +295,7 @@ export function MasterDataShell<T extends MasterData>({
           </DialogHeader>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-              {RenderFormComponent && <RenderFormComponent form={form} />}
+              <RenderFormComponent form={form} />
               <div className="flex justify-end gap-2">
                 <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>Cancelar</Button>
                 <Button type="submit">Guardar</Button>
