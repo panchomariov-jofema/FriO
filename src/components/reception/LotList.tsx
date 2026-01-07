@@ -43,7 +43,11 @@ export function LotList({ exporterId, producerId }: LotListProps) {
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const fetchedLots = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ReceptionLot))
         .filter(lot => lot.exporterId === exporterId)
-        .sort((a, b) => b.createdAt.toMillis() - a.createdAt.toMillis());
+        .sort((a, b) => {
+            if (!b.createdAt) return -1; // b is newer (not yet saved)
+            if (!a.createdAt) return 1;  // a is newer
+            return b.createdAt.toMillis() - a.createdAt.toMillis();
+        });
         
       setLots(fetchedLots);
       setLoading(false);
