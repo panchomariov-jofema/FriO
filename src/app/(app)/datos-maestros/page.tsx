@@ -30,13 +30,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 const ExporterForm = ({ form }: { form: any }) => (
   <>
     <FormField control={form.control} name="exporterId" render={({ field }) => (
-      <FormItem><FormLabel>ID Exportador</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+      <FormItem><FormLabel>ID Exportador</FormLabel><FormControl><Input {...field} autoComplete="off" /></FormControl><FormMessage /></FormItem>
     )} />
     <FormField control={form.control} name="name" render={({ field }) => (
-      <FormItem><FormLabel>Nombre</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+      <FormItem><FormLabel>Nombre</FormLabel><FormControl><Input {...field} autoComplete="off" /></FormControl><FormMessage /></FormItem>
     )} />
     <FormField control={form.control} name="type" render={({ field }) => (
-      <FormItem><FormLabel>Tipo</FormLabel><FormControl><Input {...field} placeholder="Ej: exportador, productor_exportador" /></FormControl><FormMessage /></FormItem>
+      <FormItem><FormLabel>Tipo</FormLabel><FormControl><Input {...field} placeholder="Ej: exportador, productor_exportador" autoComplete="off" /></FormControl><FormMessage /></FormItem>
     )} />
   </>
 );
@@ -45,13 +45,13 @@ const ProducerForm = ({ form, exporters }: { form: any; exporters: Exporter[] })
   return (
     <>
       <FormField control={form.control} name="producerId" render={({ field }) => (
-        <FormItem><FormLabel>ID Productor</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+        <FormItem><FormLabel>ID Productor</FormLabel><FormControl><Input {...field} autoComplete="off" /></FormControl><FormMessage /></FormItem>
       )} />
       <FormField control={form.control} name="shortName" render={({ field }) => (
-        <FormItem><FormLabel>Nombre Corto</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+        <FormItem><FormLabel>Nombre Corto</FormLabel><FormControl><Input {...field} autoComplete="off" /></FormControl><FormMessage /></FormItem>
       )} />
       <FormField control={form.control} name="name" render={({ field }) => (
-        <FormItem><FormLabel>Nombre</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+        <FormItem><FormLabel>Nombre</FormLabel><FormControl><Input {...field} autoComplete="off" /></FormControl><FormMessage /></FormItem>
       )} />
       <FormField control={form.control} name="exporterId" render={({ field }) => (
         <FormItem><FormLabel>Exportador</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
@@ -67,10 +67,10 @@ const BinMaterialForm = ({ form, exporters }: { form: any, exporters: Exporter[]
     return (
     <>
       <FormField control={form.control} name="code" render={({ field }) => (
-        <FormItem><FormLabel>Código</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+        <FormItem><FormLabel>Código</FormLabel><FormControl><Input {...field} autoComplete="off" /></FormControl><FormMessage /></FormItem>
       )} />
       <FormField control={form.control} name="name" render={({ field }) => (
-        <FormItem><FormLabel>Nombre</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+        <FormItem><FormLabel>Nombre</FormLabel><FormControl><Input {...field} autoComplete="off" /></FormControl><FormMessage /></FormItem>
       )} />
       <FormField control={form.control} name="exporterId" render={({ field }) => (
         <FormItem><FormLabel>Exportador</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
@@ -79,7 +79,7 @@ const BinMaterialForm = ({ form, exporters }: { form: any, exporters: Exporter[]
         </Select><FormMessage /></FormItem>
       )} />
       <FormField control={form.control} name="type" render={({ field }) => (
-        <FormItem><FormLabel>Tipo</FormLabel><FormControl><Input {...field} placeholder="Ej: bin, material" /></FormControl><FormMessage /></FormItem>
+        <FormItem><FormLabel>Tipo</FormLabel><FormControl><Input {...field} placeholder="Ej: bin, material" autoComplete="off" /></FormControl><FormMessage /></FormItem>
       )} />
     </>
   )
@@ -88,13 +88,13 @@ const BinMaterialForm = ({ form, exporters }: { form: any, exporters: Exporter[]
 const OtherClientForm = ({ form }: { form: any }) => (
     <>
       <FormField control={form.control} name="clientId" render={({ field }) => (
-        <FormItem><FormLabel>ID Cliente</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+        <FormItem><FormLabel>ID Cliente</FormLabel><FormControl><Input {...field} autoComplete="off" /></FormControl><FormMessage /></FormItem>
       )} />
       <FormField control={form.control} name="name" render={({ field }) => (
-        <FormItem><FormLabel>Nombre</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+        <FormItem><FormLabel>Nombre</FormLabel><FormControl><Input {...field} autoComplete="off" /></FormControl><FormMessage /></FormItem>
       )} />
       <FormField control={form.control} name="type" render={({ field }) => (
-        <FormItem><FormLabel>Tipo</FormLabel><FormControl><Input {...field} placeholder="Ej: embalajes, frio_hortofruticola" /></FormControl><FormMessage /></FormItem>
+        <FormItem><FormLabel>Tipo</FormLabel><FormControl><Input {...field} placeholder="Ej: embalajes, frio_hortofruticola" autoComplete="off" /></FormControl><FormMessage /></FormItem>
       )} />
     </>
 );
@@ -103,10 +103,10 @@ const PackagingMasterForm = ({ form, otherClients }: { form: any, otherClients: 
     return (
     <>
       <FormField control={form.control} name="code" render={({ field }) => (
-        <FormItem><FormLabel>Código</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+        <FormItem><FormLabel>Código</FormLabel><FormControl><Input {...field} autoComplete="off" /></FormControl><FormMessage /></FormItem>
       )} />
       <FormField control={form.control} name="name" render={({ field }) => (
-        <FormItem><FormLabel>Nombre</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+        <FormItem><FormLabel>Nombre</FormLabel><FormControl><Input {...field} autoComplete="off" /></FormControl><FormMessage /></FormItem>
       )} />
        <FormField control={form.control} name="clientId" render={({ field }) => (
         <FormItem><FormLabel>Cliente</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
@@ -122,7 +122,7 @@ const UserMasterForm = ({ form, profiles }: { form: any, profiles: Profile[] }) 
     return (
     <>
       <FormField control={form.control} name="userName" render={({ field }) => (
-        <FormItem><FormLabel>Nombre Usuario</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+        <FormItem><FormLabel>Nombre Usuario</FormLabel><FormControl><Input {...field} autoComplete="off" /></FormControl><FormMessage /></FormItem>
       )} />
       <FormField control={form.control} name="profileId" render={({ field }) => (
         <FormItem><FormLabel>Perfil</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
@@ -137,13 +137,13 @@ const UserMasterForm = ({ form, profiles }: { form: any, profiles: Profile[] }) 
 const ProfileForm = ({ form }: { form: any }) => (
     <>
       <FormField control={form.control} name="profileId" render={({ field }) => (
-        <FormItem><FormLabel>ID Perfil</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+        <FormItem><FormLabel>ID Perfil</FormLabel><FormControl><Input {...field} autoComplete="off" /></FormControl><FormMessage /></FormItem>
       )} />
       <FormField control={form.control} name="name" render={({ field }) => (
-        <FormItem><FormLabel>Nombre</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+        <FormItem><FormLabel>Nombre</FormLabel><FormControl><Input {...field} autoComplete="off" /></FormControl><FormMessage /></FormItem>
       )} />
       <FormField control={form.control} name="modulesAccess" render={({ field }) => (
-        <FormItem><FormLabel>Acceso a Módulos</FormLabel><FormControl><Input {...field} placeholder="Dashboard,Recepción,Cámaras..." /></FormControl><FormMessage /></FormItem>
+        <FormItem><FormLabel>Acceso a Módulos</FormLabel><FormControl><Input {...field} placeholder="Dashboard,Recepción,Cámaras..." autoComplete="off" /></FormControl><FormMessage /></FormItem>
       )} />
     </>
 );

@@ -88,6 +88,7 @@ export function WeightCalculator({ lot, onWeightSaved }: WeightCalculatorProps) 
             value={currentWeight}
             onChange={(e) => setCurrentWeight(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleAddWeight()}
+            autoComplete="off"
           />
           <Button onClick={handleAddWeight} size="icon" aria-label="Agregar peso">
             <PlusCircle />
