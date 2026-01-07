@@ -37,7 +37,8 @@ export function LotList({ exporterId, producerId }: LotListProps) {
     const lotsRef = collection(firestore, 'receptionLots');
     const q = query(
       lotsRef,
-      where('producerId', '==', producerId)
+      where('producerId', '==', producerId),
+      where('status', '!=', 'Cerrado')
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -89,7 +90,7 @@ export function LotList({ exporterId, producerId }: LotListProps) {
       <Card>
         <CardHeader>
             <CardTitle>Lotes en Recepción</CardTitle>
-            <CardDescription>Lotes registrados para la selección actual.</CardDescription>
+            <CardDescription>Lotes activos para la selección actual.</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="rounded-md border">
@@ -139,7 +140,7 @@ export function LotList({ exporterId, producerId }: LotListProps) {
                 ) : (
                   <TableRow>
                     <TableCell colSpan={8} className="h-24 text-center">
-                      No se encontraron lotes para esta selección.
+                      No se encontraron lotes activos para esta selección.
                     </TableCell>
                   </TableRow>
                 )}
