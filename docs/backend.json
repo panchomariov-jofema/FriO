@@ -1,0 +1,310 @@
+{
+  "entities": {
+    "Exporter": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Exporter",
+      "type": "object",
+      "description": "Represents an exporter or producer.",
+      "properties": {
+        "exporterId": {
+          "type": "string",
+          "description": "Unique identifier for the exporter."
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the exporter/producer."
+        },
+        "type": {
+          "type": "string",
+          "description": "Type of exporter (e.g., exportador, productor_exportador)."
+        }
+      },
+      "required": [
+        "exporterId",
+        "name",
+        "type"
+      ]
+    },
+    "Producer": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Producer",
+      "type": "object",
+      "description": "Represents a producer.",
+      "properties": {
+        "producerId": {
+          "type": "string",
+          "description": "Unique identifier for the producer."
+        },
+        "shortName": {
+          "type": "string",
+          "description": "Short name of the producer."
+        },
+        "name": {
+          "type": "string",
+          "description": "Full name of the producer."
+        },
+        "exporterId": {
+          "type": "string",
+          "description": "Reference to Exporter. (Relationship: Exporter 1:N Producer)"
+        }
+      },
+      "required": [
+        "producerId",
+        "shortName",
+        "name",
+        "exporterId"
+      ]
+    },
+    "BinMaterial": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "BinMaterial",
+      "type": "object",
+      "description": "Represents a bin or material.",
+      "properties": {
+        "code": {
+          "type": "string",
+          "description": "Article code."
+        },
+        "name": {
+          "type": "string",
+          "description": "Product name."
+        },
+        "exporterId": {
+          "type": "string",
+          "description": "Reference to Exporter. (Relationship: Exporter 1:N BinMaterial)"
+        },
+        "type": {
+          "type": "string",
+          "description": "Type of bin or material (e.g., bin, material)."
+        }
+      },
+      "required": [
+        "code",
+        "name",
+        "exporterId",
+        "type"
+      ]
+    },
+    "OtherClient": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "OtherClient",
+      "type": "object",
+      "description": "Represents a client other than exporters or producers.",
+      "properties": {
+        "clientId": {
+          "type": "string",
+          "description": "Unique identifier for the client."
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the client."
+        },
+        "type": {
+          "type": "string",
+          "description": "Type of client (e.g., embalajes, frio_hortofruticola)."
+        }
+      },
+      "required": [
+        "clientId",
+        "name",
+        "type"
+      ]
+    },
+    "PackagingMaster": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "PackagingMaster",
+      "type": "object",
+      "description": "Represents a packaging material.",
+      "properties": {
+        "code": {
+          "type": "string",
+          "description": "Article code."
+        },
+        "name": {
+          "type": "string",
+          "description": "Product name."
+        },
+        "clientId": {
+          "type": "string",
+          "description": "Reference to OtherClient. (Relationship: OtherClient 1:N PackagingMaster)"
+        }
+      },
+      "required": [
+        "code",
+        "name",
+        "clientId"
+      ]
+    },
+    "UserMaster": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "UserMaster",
+      "type": "object",
+      "description": "Represents a user of the application.",
+      "properties": {
+        "userName": {
+          "type": "string",
+          "description": "User's name."
+        },
+        "profileId": {
+          "type": "string",
+          "description": "Reference to Profile. (Relationship: Profile 1:N UserMaster)"
+        }
+      },
+      "required": [
+        "userName",
+        "profileId"
+      ]
+    },
+    "Profile": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Profile",
+      "type": "object",
+      "description": "Represents a user profile with access permissions.",
+      "properties": {
+        "profileId": {
+          "type": "string",
+          "description": "Unique identifier for the profile."
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the profile."
+        },
+        "modulesAccess": {
+          "type": "array",
+          "description": "List of module names the profile has access to.",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "profileId",
+        "name",
+        "modulesAccess"
+      ]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password",
+      "anonymous"
+    ]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "/exporters/{exporterId}",
+        "definition": {
+          "entityName": "Exporter",
+          "schema": {
+            "$ref": "#/backend/entities/Exporter"
+          },
+          "description": "Stores exporter data.  exporterId is used as the document ID.",
+          "params": [
+            {
+              "name": "exporterId",
+              "description": "The unique identifier for the exporter."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/producers/{producerId}",
+        "definition": {
+          "entityName": "Producer",
+          "schema": {
+            "$ref": "#/backend/entities/Producer"
+          },
+          "description": "Stores producer data.  producerId is used as the document ID. Includes exporterId for reference.",
+          "params": [
+            {
+              "name": "producerId",
+              "description": "The unique identifier for the producer."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/binMaterials/{binMaterialId}",
+        "definition": {
+          "entityName": "BinMaterial",
+          "schema": {
+            "$ref": "#/backend/entities/BinMaterial"
+          },
+          "description": "Stores bin and material data. A generated ID will be used, but the code and exporterId fields are present for querying and relationships.",
+          "params": [
+            {
+              "name": "binMaterialId",
+              "description": "The unique identifier for the bin material."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/otherClients/{otherClientId}",
+        "definition": {
+          "entityName": "OtherClient",
+          "schema": {
+            "$ref": "#/backend/entities/OtherClient"
+          },
+          "description": "Stores data for other clients. otherClientId is used as the document ID.",
+          "params": [
+            {
+              "name": "otherClientId",
+              "description": "The unique identifier for the other client."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/packagingMaster/{packagingMasterId}",
+        "definition": {
+          "entityName": "PackagingMaster",
+          "schema": {
+            "$ref": "#/backend/entities/PackagingMaster"
+          },
+          "description": "Stores packaging material data. A generated ID will be used, but code and clientId fields are present for querying and relationships.",
+          "params": [
+            {
+              "name": "packagingMasterId",
+              "description": "The unique identifier for the packaging master."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/usersMaster/{userMasterId}",
+        "definition": {
+          "entityName": "UserMaster",
+          "schema": {
+            "$ref": "#/backend/entities/UserMaster"
+          },
+          "description": "Stores user data. A generated ID will be used. Includes profileId for role-based access control.",
+          "params": [
+            {
+              "name": "userMasterId",
+              "description": "The unique identifier for the user master."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/profiles/{profileId}",
+        "definition": {
+          "entityName": "Profile",
+          "schema": {
+            "$ref": "#/backend/entities/Profile"
+          },
+          "description": "Stores profile data. profileId is used as the document ID. Defines access permissions based on modules.",
+          "params": [
+            {
+              "name": "profileId",
+              "description": "The unique identifier for the profile."
+            }
+          ]
+        }
+      }
+    ],
+    "reasoning": "The Firestore data structure is designed to support the FrigoManager application, focusing on master data management and related operational modules.  The design prioritizes authorization independence and easy debugging. Each master data entity (Exporter, Producer, BinMaterial, OtherClient, PackagingMaster, UserMaster, Profile) is stored in its own top-level collection. This Structural Segregation ensures a homogeneous security posture for each entity type. The `exporterId`, `producerId`, `clientId`, and `profileId` fields are used as logical keys to relate data between modules, but are not used for access control.  User authentication is handled by Firebase Auth, and user roles can be managed through the `profiles` and `usersMaster` collections.  Since user roles are managed in the database, no custom claims are required. This design inherently supports QAPs because list operations are secured by collection-level rules, and all documents within a collection share the same security requirements.  There are no hierarchical dependencies, so complex filtering within rules is avoided."
+  }
+}

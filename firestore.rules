@@ -1,0 +1,193 @@
+/**
+ * # Firestore Security Rules
+ *
+ * ## Core Philosophy
+ * This ruleset establishes a secure "read-only" model for all master data collections in the application.
+ * The primary security posture is that any authenticated user can read data from any master data
+ * collection, but no user is permitted to write (create, update, or delete) data. This provides a
+ * highly secure default, preventing unauthorized data modification while allowing the application's
+ * front-end to function for read operations. Write access will need to be explicitly granted as
+ * administrative roles and features are developed.
+ *
+ * ## Data Structure
+ * The data is organized into several top-level collections, each representing a distinct master data
+ * entity (e.g., /exporters, /producers, /profiles). This flat hierarchy simplifies security rules,
+ * as there are no nested subcollections that would require complex relational checks.
+ *
+ * ## Key Security Decisions
+ * - **Authenticated Reads**: All read access (`get`, `list`) is granted to any user who is signed in.
+ *   This allows the application to freely query and display master data required for its operation.
+ * - **Default Deny on Writes**: All write operations (`create`, `update`, `delete`) are explicitly
+ *   denied (`if false;`). This is a critical security measure to protect the integrity of the master
+ *   data until a proper administrative role system is implemented.
+ * - **User Registration (`/usersMaster`)**: The current `UserMaster` entity lacks a field to store
+ *   the Firebase Authentication UID. This makes it impossible to write a secure rule allowing users
+ *   to create their own profile upon registration. Writes to this collection are disabled by default.
+ *   To enable user registration, the `UserMaster` entity must be updated to include a `uid` field
+ *   that stores the user's `request.auth.uid`.
+ *
+ * ## Denormalization for Authorization
+ * This ruleset currently does not rely on denormalization for authorization, as the rules are
+ * uniform across entire collections. As role-based write access is introduced, it is recommended
+ * to denormalize an `admin: true` flag or role onto the `/usersMaster/{userId}` document rather than
+ * performing lookups to a separate permissions collection.
+ *
+ * ## Structural Segregation
+ * The data model effectively uses structural segregation by placing each master data type in its
+ * own top-level collection. This design is ideal for security rules, as it allows for clear,
+ * distinct, and performant rules for each data type without overlap or complexity.
+ */
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ------------------------------------------------------------------------
+    // Helper Functions
+    // ------------------------------------------------------------------------
+
+    /**
+     * Checks if the user is authenticated via Firebase Auth.
+     */
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // ------------------------------------------------------------------------
+    // Collection: exporters
+    // ------------------------------------------------------------------------
+
+    /**
+     * @description Controls access to exporter master data.
+     * @path /exporters/{exporterId}
+     * @allow A signed-in user reads an exporter document. (auth: {uid: 'user1'}, op: get)
+     * @deny An anonymous user attempts to read data. (auth: null, op: list)
+     * @deny Any user, signed-in or not, attempts to create or modify an exporter. (auth: {uid: 'user1'}, op: create)
+     * @principle Allows authenticated reads for master data, but denies all writes for data integrity.
+     */
+    match /exporters/{exporterId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    // ------------------------------------------------------------------------
+    // Collection: producers
+    // ------------------------------------------------------------------------
+
+    /**
+     * @description Controls access to producer master data.
+     * @path /producers/{producerId}
+     * @allow A signed-in user lists all producers. (auth: {uid: 'user1'}, op: list)
+     * @deny An anonymous user attempts to get a producer. (auth: null, op: get)
+     * @deny Any signed-in user attempts to update a producer. (auth: {uid: 'user1'}, op: update)
+     * @principle Allows authenticated reads for master data, but denies all writes for data integrity.
+     */
+    match /producers/{producerId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    // ------------------------------------------------------------------------
+    // Collection: binMaterials
+    // ------------------------------------------------------------------------
+
+    /**
+     * @description Controls access to bin and material master data.
+     * @path /binMaterials/{binMaterialId}
+     * @allow A signed-in user gets a specific bin/material document. (auth: {uid: 'user1'}, op: get)
+     * @deny An anonymous user attempts to list the collection. (auth: null, op: list)
+     * @deny Any user attempts to delete a bin/material. (auth: {uid: 'user1'}, op: delete)
+     * @principle Allows authenticated reads for master data, but denies all writes for data integrity.
+     */
+    match /binMaterials/{binMaterialId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    // ------------------------------------------------------------------------
+    // Collection: otherClients
+    // ------------------------------------------------------------------------
+
+    /**
+     * @description Controls access to "other clients" master data.
+     * @path /otherClients/{otherClientId}
+     * @allow A signed-in user reads a client document. (auth: {uid: 'user1'}, op: get)
+     * @deny Any signed-in user attempts to create a new client. (auth: {uid: 'user1'}, op: create)
+     * @principle Allows authenticated reads for master data, but denies all writes for data integrity.
+     */
+    match /otherClients/{otherClientId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    // ------------------------------------------------------------------------
+    // Collection: packagingMaster
+    // ------------------------------------------------------------------------
+
+    /**
+     * @description Controls access to packaging master data.
+     * @path /packagingMaster/{packagingMasterId}
+     * @allow A signed-in user lists all packaging materials. (auth: {uid: 'user1'}, op: list)
+     * @deny Any user attempts to modify a packaging material. (auth: {uid: 'user1'}, op: update)
+     * @principle Allows authenticated reads for master data, but denies all writes for data integrity.
+     */
+    match /packagingMaster/{packagingMasterId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    // ------------------------------------------------------------------------
+    // Collection: usersMaster
+    // ------------------------------------------------------------------------
+
+    /**
+     * @description Controls access to user profile data.
+     * @path /usersMaster/{userMasterId}
+     * @allow A signed-in user reads a user's master document. (auth: {uid: 'user1'}, op: get)
+     * @deny Any user attempts to create a new user document. (auth: {uid: 'user1'}, op: create)
+     * @principle Allows authenticated reads for master data, but denies all writes for data integrity.
+     * @principle CRITICAL: To allow user registration, the 'UserMaster' entity in the app's code MUST be modified to include a `uid` field. The rule can then be changed to `allow create: if request.resource.data.uid == request.auth.uid;`. Without this schema change, securely allowing user creation is not possible.
+     */
+    match /usersMaster/{userMasterId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      // TODO: Enable user creation once schema is updated with a `uid` field linked to auth.
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    // ------------------------------------------------------------------------
+    // Collection: profiles
+    // ------------------------------------------------------------------------
+
+    /**
+     * @description Controls access to role profile definitions.
+     * @path /profiles/{profileId}
+     * @allow A signed-in user reads profile definitions to determine UI visibility. (auth: {uid: 'user1'}, op: list)
+     * @deny Any user attempts to modify a profile definition. (auth: {uid: 'admin_user'}, op: update)
+     * @principle Allows authenticated reads for master data, but denies all writes for data integrity.
+     */
+    match /profiles/{profileId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
+    }
+  }
+}
