@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { collection, onSnapshot, query, DocumentData, orderBy } from 'firebase/firestore';
+import { collection, onSnapshot, query, DocumentData } from 'firebase/firestore';
 import { useFirestore } from '@/firebase';
 
 export function useFirestoreCollection<T extends DocumentData>(collectionName: string) {
@@ -12,9 +12,9 @@ export function useFirestoreCollection<T extends DocumentData>(collectionName: s
   useEffect(() => {
     if (!firestore) return;
 
-    // Adding orderBy('__name__') provides a default, stable ordering based on document ID.
-    // This prevents certain Firestore errors related to queries that would otherwise require a composite index.
-    const q = query(collection(firestore, collectionName), orderBy('__name__'));
+    // Use a simple collection query. Ordering can be added if specifically needed
+    // for a feature, but a basic listener is more stable.
+    const q = query(collection(firestore, collectionName));
     
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
       const items: T[] = [];
@@ -28,6 +28,8 @@ export function useFirestoreCollection<T extends DocumentData>(collectionName: s
       setLoading(false);
     });
 
+    // Cleanup function to unsubscribe from the listener when the component unmounts
+    // or dependencies change.
     return () => unsubscribe();
   }, [collectionName, firestore]);
 
