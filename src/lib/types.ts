@@ -50,12 +50,14 @@ export interface Profile {
   modulesAccess: string[];
 }
 
+export type Variety = 'SANTINA' | 'LAPINS' | 'REGINA' | 'KORDIA' | 'SKEENA' | 'SWEETHEART' | 'SYLVIA' | 'SUNBURST';
+
 export interface ReceptionLot {
     id: string;
     exporterId: string;
     producerId: string;
     document: string;
-    variety: string;
+    variety: Variety;
     binCount: number;
     toteCount: number;
     emptyTotes?: number;

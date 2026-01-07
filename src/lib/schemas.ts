@@ -40,7 +40,11 @@ export const userMasterSchema = z.object({
 export const profileSchema = z.object({
   profileId: z.string().min(1, 'El ID de perfil es obligatorio'),
   name: z.string().min(1, 'El nombre es obligatorio'),
-  modulesAccess: z.string().min(1, 'El acceso a módulos es obligatorio').transform(val => val.split(',').map(s => s.trim())),
+  modulesAccess: z.any().transform(val => {
+    if (Array.isArray(val)) return val;
+    if (typeof val === 'string') return val.split(',').map(s => s.trim());
+    return [];
+  }),
 });
 
 
@@ -48,7 +52,9 @@ export const receptionLotSchema = z.object({
     exporterId: z.string().min(1, "Exportador es obligatorio"),
     producerId: z.string().min(1, "Productor es obligatorio"),
     document: z.string().min(1, "Documento es obligatorio"),
-    variety: z.string().min(1, "Variedad es obligatoria"),
+    variety: z.enum(['SANTINA', 'LAPINS', 'REGINA', 'KORDIA', 'SKEENA', 'SWEETHEART', 'SYLVIA', 'SUNBURST'], {
+      required_error: "Debe seleccionar una variedad.",
+    }),
     binCount: z.coerce.number().positive("La cantidad de bins debe ser mayor a 0"),
     toteCount: z.coerce.number().positive("La cantidad de totes debe ser mayor a 0"),
     emptyTotes: z.coerce.number().optional(),

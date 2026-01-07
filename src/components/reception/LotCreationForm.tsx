@@ -14,6 +14,8 @@ import { useToast } from '@/hooks/use-toast';
 import { receptionLotSchema } from '@/lib/schemas';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+import type { Variety } from '@/lib/types';
 
 interface LotCreationFormProps {
   exporterId: string;
@@ -22,6 +24,8 @@ interface LotCreationFormProps {
 }
 
 type LotFormValues = z.infer<typeof receptionLotSchema>;
+
+const varieties: Variety[] = ['SANTINA', 'LAPINS', 'REGINA', 'KORDIA', 'SKEENA', 'SWEETHEART', 'SYLVIA', 'SUNBURST'];
 
 export function LotCreationForm({ exporterId, producerId, onLotCreated }: LotCreationFormProps) {
   const firestore = useFirestore();
@@ -32,7 +36,7 @@ export function LotCreationForm({ exporterId, producerId, onLotCreated }: LotCre
       exporterId,
       producerId,
       document: '',
-      variety: '',
+      variety: undefined,
       binCount: 0,
       toteCount: 0,
       emptyTotes: 0,
@@ -52,7 +56,7 @@ export function LotCreationForm({ exporterId, producerId, onLotCreated }: LotCre
       exporterId,
       producerId,
       document: '',
-      variety: '',
+      variety: undefined,
       binCount: 0,
       toteCount: 0,
       emptyTotes: 0,
@@ -61,7 +65,7 @@ export function LotCreationForm({ exporterId, producerId, onLotCreated }: LotCre
     })
   }, [exporterId, producerId, form]);
 
-  const onSubmit = async (values: LotFormValues) => {
+  const onSubmit = (values: LotFormValues) => {
     const lotData = {
       ...values,
       status: 'Pendiente de Peso' as const,
@@ -76,10 +80,9 @@ export function LotCreationForm({ exporterId, producerId, onLotCreated }: LotCre
         onLotCreated();
       })
       .catch((error) => {
-        console.error("Error creating lot: ", error);
         toast({
           title: 'Error',
-          description: 'No se pudo crear el lote. Verifique la consola para más detalles.',
+          description: 'No se pudo crear el lote. ' + error.message,
           variant: 'destructive',
         });
       });
@@ -97,9 +100,26 @@ export function LotCreationForm({ exporterId, producerId, onLotCreated }: LotCre
             <FormField control={form.control} name="document" render={({ field }) => (
               <FormItem><FormLabel>Documento</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem>
             )} />
-            <FormField control={form.control} name="variety" render={({ field }) => (
-              <FormItem><FormLabel>Variedad</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem>
-            )} />
+            <FormField
+              control={form.control}
+              name="variety"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Variedad</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Seleccione una variedad" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {varieties.map(v => <SelectItem key={v} value={v}>{v}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
             <FormField control={form.control} name="binCount" render={({ field }) => (
               <FormItem><FormLabel>Cantidad de Bins</FormLabel><FormControl><Input type="number" {...field} value={field.value || 0} /></FormControl><FormMessage /></FormItem>
             )} />
