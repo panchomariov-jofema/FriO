@@ -82,32 +82,53 @@ export function TemperatureForm({ lot, open, onOpenChange, onTempSaved }: Temper
         });
 
     } else if (showPostHydro) {
-      if (typeof values.postHydroTemp !== 'number') {
-        form.setError('postHydroTemp', { message: 'Debe ingresar un valor.'});
-        return;
-      }
-      const updateData = {
-        postHydroTemp: values.postHydroTemp,
-        status: 'Cerrado' as const,
-      };
+        if (typeof values.postHydroTemp !== 'number') {
+            form.setError('postHydroTemp', { message: 'Debe ingresar un valor.'});
+            return;
+        }
+        const updateData = {
+            postHydroTemp: values.postHydroTemp,
+        };
 
-      updateDoc(lotRef, updateData)
-       .then(() => {
-          toast({ title: 'Éxito', description: 'Lote cerrado correctamente.' });
-          onTempSaved();
+        updateDoc(lotRef, updateData)
+        .then(() => {
+            toast({ title: 'Éxito', description: 'Temperatura Post-Hidro guardada.' });
+            // No cerramos el diálogo aquí, el usuario debe hacer clic en TERMINAR
         })
         .catch((error) => {
-          errorEmitter.emit(
-            'permission-error',
-            new FirestorePermissionError({
-              path: lotRef.path,
-              operation: 'update',
-              requestResourceData: updateData,
-            })
-          );
+            errorEmitter.emit(
+                'permission-error',
+                new FirestorePermissionError({
+                path: lotRef.path,
+                operation: 'update',
+                requestResourceData: updateData,
+                })
+            );
         });
     }
   };
+
+  const handleFinish = () => {
+    const lotRef = doc(firestore, 'receptionLots', lot.id);
+    const updateData = {
+        status: 'Cerrado' as const,
+    };
+    updateDoc(lotRef, updateData)
+        .then(() => {
+            toast({ title: 'Éxito', description: 'Lote cerrado correctamente.' });
+            onTempSaved();
+        })
+        .catch((error) => {
+            errorEmitter.emit(
+                'permission-error',
+                new FirestorePermissionError({
+                path: lotRef.path,
+                operation: 'update',
+                requestResourceData: updateData,
+                })
+            );
+        });
+  }
 
 
   return (
@@ -130,7 +151,7 @@ export function TemperatureForm({ lot, open, onOpenChange, onTempSaved }: Temper
                 )} />
                 <DialogFooter>
                   <DialogClose asChild><Button type="button" variant="outline">Cancelar</Button></DialogClose>
-                  <Button type="submit">Guardar Temp. Pre-Hidro</Button>
+                  <Button type="submit">Guardar y Continuar</Button>
                 </DialogFooter>
               </div>
             )}
@@ -144,8 +165,9 @@ export function TemperatureForm({ lot, open, onOpenChange, onTempSaved }: Temper
                   </FormItem>
                 )} />
                 <DialogFooter>
-                    <DialogClose asChild><Button type="button" variant="outline">Cancelar</Button></DialogClose>
-                    <Button type="submit">TERMINAR</Button>
+                    <DialogClose asChild><Button type="button" variant="outline">Cerrar</Button></DialogClose>
+                    <Button type="submit" disabled={form.formState.isSubmitting}>Guardar Temperatura</Button>
+                    <Button onClick={handleFinish} disabled={typeof lot.postHydroTemp !== 'number'}>TERMINAR</Button>
                 </DialogFooter>
               </div>
             )}
