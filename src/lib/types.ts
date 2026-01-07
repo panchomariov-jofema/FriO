@@ -1,3 +1,5 @@
+import type { Timestamp } from "firebase/firestore";
+
 export interface Exporter {
   id: string;
   exporterId: string;
@@ -47,5 +49,22 @@ export interface Profile {
   name: string;
   modulesAccess: string[];
 }
+
+export interface ReceptionLot {
+    id: string;
+    exporterId: string;
+    producerId: string;
+    document: string;
+    variety: string;
+    binCount: number;
+    toteCount: number;
+    emptyTotes?: number;
+    status: 'Pendiente de Peso' | 'Pendiente de Pre-Hidro' | 'Pendiente de Post-Hidro' | 'Cerrado';
+    totalWeight?: number;
+    preHydroTemp?: number;
+    postHydroTemp?: number;
+    createdAt: Timestamp;
+}
+
 
 export type MasterData = Exporter | Producer | BinMaterial | OtherClient | PackagingMaster | UserMaster | Profile;

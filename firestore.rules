@@ -65,8 +65,7 @@ service cloud.firestore {
      * @principle Allows authenticated reads for master data, but denies all writes for data integrity.
      */
     match /exporters/{exporterId} {
-      allow read: if isSignedIn();
-      allow write: if isSignedIn();
+      allow read, write: if isSignedIn();
     }
 
     // ------------------------------------------------------------------------
@@ -82,8 +81,7 @@ service cloud.firestore {
      * @principle Allows authenticated reads for master data, but denies all writes for data integrity.
      */
     match /producers/{producerId} {
-      allow read: if isSignedIn();
-      allow write: if isSignedIn();
+      allow read, write: if isSignedIn();
     }
 
     // ------------------------------------------------------------------------
@@ -99,8 +97,7 @@ service cloud.firestore {
      * @principle Allows authenticated reads for master data, but denies all writes for data integrity.
      */
     match /binMaterials/{binMaterialId} {
-      allow read: if isSignedIn();
-      allow write: if isSignedIn();
+      allow read, write: if isSignedIn();
     }
 
     // ------------------------------------------------------------------------
@@ -115,8 +112,7 @@ service cloud.firestore {
      * @principle Allows authenticated reads for master data, but denies all writes for data integrity.
      */
     match /otherClients/{otherClientId} {
-      allow read: if isSignedIn();
-      allow write: if isSignedIn();
+      allow read, write: if isSignedIn();
     }
 
     // ------------------------------------------------------------------------
@@ -131,8 +127,7 @@ service cloud.firestore {
      * @principle Allows authenticated reads for master data, but denies all writes for data integrity.
      */
     match /packagingMaster/{packagingMasterId} {
-      allow read: if isSignedIn();
-      allow write: if isSignedIn();
+      allow read, write: if isSignedIn();
     }
 
     // ------------------------------------------------------------------------
@@ -148,9 +143,7 @@ service cloud.firestore {
      * @principle CRITICAL: To allow user registration, the 'UserMaster' entity in the app's code MUST be modified to include a `uid` field. The rule can then be changed to `allow create: if request.resource.data.uid == request.auth.uid;`. Without this schema change, securely allowing user creation is not possible.
      */
     match /usersMaster/{userMasterId} {
-      allow read: if isSignedIn();
-      // TODO: Enable user creation once schema is updated with a `uid` field linked to auth.
-      allow write: if isSignedIn();
+      allow read, write: if isSignedIn();
     }
 
     // ------------------------------------------------------------------------
@@ -165,8 +158,14 @@ service cloud.firestore {
      * @principle Allows authenticated reads for master data, but denies all writes for data integrity.
      */
     match /profiles/{profileId} {
-      allow read: if isSignedIn();
-      allow write: if isSignedIn();
+      allow read, write: if isSignedIn();
+    }
+
+    // ------------------------------------------------------------------------
+    // Collection: receptionLots
+    // ------------------------------------------------------------------------
+    match /receptionLots/{lotId} {
+      allow read, write: if isSignedIn();
     }
   }
 }

@@ -182,6 +182,77 @@
         "name",
         "modulesAccess"
       ]
+    },
+    "ReceptionLot": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "ReceptionLot",
+      "type": "object",
+      "description": "Represents a reception lot of fruit.",
+      "properties": {
+        "lotId": {
+          "type": "string",
+          "description": "Unique identifier for the lot."
+        },
+        "exporterId": {
+          "type": "string",
+          "description": "Reference to the selected Exporter."
+        },
+        "producerId": {
+          "type": "string",
+          "description": "Reference to the selected Producer."
+        },
+        "document": {
+          "type": "string",
+          "description": "Document number for the lot."
+        },
+        "variety": {
+          "type": "string",
+          "description": "Variety of the fruit."
+        },
+        "binCount": {
+          "type": "number",
+          "description": "Number of bins in the lot."
+        },
+        "toteCount": {
+          "type": "number",
+          "description": "Number of totes in the lot."
+        },
+        "emptyTotes": {
+          "type": "number",
+          "description": "Optional number of empty totes."
+        },
+        "status": {
+          "type": "string",
+          "description": "Status of the lot (e.g., 'Pendiente de Peso')."
+        },
+        "totalWeight": {
+          "type": "number",
+          "description": "Total weight of the lot."
+        },
+        "preHydroTemp": {
+          "type": "number",
+          "description": "Pre-Hidrocooler temperature."
+        },
+        "postHydroTemp": {
+          "type": "number",
+          "description": "Post-Hidrocooler temperature."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp of when the lot was created."
+        }
+      },
+      "required": [
+        "exporterId",
+        "producerId",
+        "document",
+        "variety",
+        "binCount",
+        "toteCount",
+        "status",
+        "createdAt"
+      ]
     }
   },
   "auth": {
@@ -300,6 +371,22 @@
             {
               "name": "profileId",
               "description": "The unique identifier for the profile."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/receptionLots/{lotId}",
+        "definition": {
+          "entityName": "ReceptionLot",
+          "schema": {
+            "$ref": "#/backend/entities/ReceptionLot"
+          },
+          "description": "Stores reception lot data. A generated ID will be used.",
+          "params": [
+            {
+              "name": "lotId",
+              "description": "The unique identifier for the reception lot."
             }
           ]
         }
