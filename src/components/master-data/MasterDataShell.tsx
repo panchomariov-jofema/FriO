@@ -32,7 +32,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import {
   Form,
 } from '@/components/ui/form';
-import type { z } from 'zod';
+import { z } from 'zod';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
 import type { MasterData } from '@/lib/types';
 import { addDoc, collection, deleteDoc, doc, updateDoc } from 'firebase/firestore';
@@ -48,7 +48,7 @@ interface MasterDataShellProps<T extends MasterData> {
   collectionName: string;
   schema: z.ZodType<any, any>;
   columns: { key: keyof T; header: string }[];
-  renderForm: React.ComponentType<{ form: any }>;
+  RenderFormComponent: React.ComponentType<{ form: any }>;
   docNameField: keyof T;
   csvHeaders: (keyof T)[];
   csvTemplateFileName: string;
@@ -58,7 +58,7 @@ export function MasterDataShell<T extends MasterData>({
   collectionName,
   schema,
   columns,
-  renderForm: RenderForm,
+  RenderFormComponent,
   docNameField,
   csvHeaders,
   csvTemplateFileName,
@@ -339,7 +339,7 @@ export function MasterDataShell<T extends MasterData>({
           </DialogHeader>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-              <RenderForm form={form} />
+              <RenderFormComponent form={form} />
               <div className="flex justify-end gap-2">
                 <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>Cancelar</Button>
                 <Button type="submit">Guardar</Button>
