@@ -24,13 +24,16 @@ export function LotList({ exporterId, producerId, selectedLot, onSelectLot }: Lo
   const [loading, setLoading] = React.useState(true);
 
   React.useEffect(() => {
-    if (!firestore || !exporterId || !producerId) {
+    if (!firestore || !producerId) {
         setLots([]);
+        setLoading(false);
         return;
     };
 
     setLoading(true);
     const lotsRef = collection(firestore, 'receptionLots');
+    // This query might require a composite index in Firestore: (producerId, createdAt desc)
+    // Firestore will typically provide a link in the console error to create it automatically.
     const q = query(
       lotsRef,
       where('producerId', '==', producerId),
@@ -38,12 +41,15 @@ export function LotList({ exporterId, producerId, selectedLot, onSelectLot }: Lo
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
+      // Post-filter by exporterId on the client-side to avoid complex composite indexes for now.
       const fetchedLots = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ReceptionLot))
         .filter(lot => lot.exporterId === exporterId);
+        
       setLots(fetchedLots);
       setLoading(false);
     }, (error) => {
       console.error("Error fetching lots: ", error);
+      // Here you could emit a more specific error if needed
       setLoading(false);
     });
 

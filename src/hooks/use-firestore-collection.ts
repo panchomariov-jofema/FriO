@@ -12,8 +12,7 @@ export function useFirestoreCollection<T extends DocumentData>(collectionName: s
   useEffect(() => {
     if (!firestore) return;
 
-    // Order by document ID to ensure consistent ordering and prevent certain query errors.
-    const q = query(collection(firestore, collectionName), orderBy('__name__'));
+    const q = query(collection(firestore, collectionName));
     
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
       const items: T[] = [];
