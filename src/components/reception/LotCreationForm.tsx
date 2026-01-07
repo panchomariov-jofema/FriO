@@ -81,14 +81,11 @@ export function LotCreationForm({ exporterId, producerId, onLotCreated }: LotCre
       })
       .catch((error) => {
         console.error("Error creating lot: ", error);
-        errorEmitter.emit(
-          'permission-error',
-          new FirestorePermissionError({
-            path: collRef.path,
-            operation: 'create',
-            requestResourceData: lotData,
-          })
-        );
+        toast({
+          variant: 'destructive',
+          title: 'Error al crear el lote',
+          description: 'No se pudo guardar el registro. Revise la consola para más detalles.'
+        });
       });
   };
 
