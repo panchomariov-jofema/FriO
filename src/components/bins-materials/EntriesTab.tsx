@@ -17,6 +17,7 @@ import { useBinMaterialsByExporter } from '@/hooks/use-bin-materials-by-exporter
 import { PlusCircle, Trash2 } from 'lucide-react';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
+import { Label } from '@/components/ui/label';
 
 const movementItemSchema = z.object({
   binMaterialId: z.string().min(1, 'Debe seleccionar un material.'),
@@ -197,4 +198,3 @@ export function EntriesTab({ exporterId, producerId }: EntriesTabProps) {
     </Card>
   );
 }
-    

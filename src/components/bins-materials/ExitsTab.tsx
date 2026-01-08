@@ -18,6 +18,7 @@ import { PlusCircle, Trash2 } from 'lucide-react';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
+import { Label } from '@/components/ui/label';
 
 const movementItemSchema = z.object({
   binMaterialId: z.string().min(1, 'Debe seleccionar un material.'),
@@ -222,4 +223,3 @@ export function ExitsTab({ exporterId, producerId }: ExitsTabProps) {
     </Card>
   );
 }
-    
