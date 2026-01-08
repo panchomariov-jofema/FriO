@@ -165,10 +165,11 @@ export function ExitTab() {
         handleClientChange(values.clientId);
     } catch (error: any) {
         console.error("Error creating packaging exit:", error);
-        toast({ variant: 'destructive', title: 'Error', description: error.message || 'No se pudo registrar la salida.' });
+        toast({ variant: 'destructive', title: 'Error de transacción', description: error.message || 'No se pudo registrar la salida.' });
         errorEmitter.emit('permission-error', new FirestorePermissionError({
-            path: 'packagingMovements or packagingReceptions',
-            operation: 'write'
+            path: 'packagingMovements',
+            operation: 'write',
+            requestResourceData: {info: 'La transacción falló. Puede ser un error de permisos en `packagingMovements` o `packagingReceptions`.'}
         }));
     }
   };
@@ -255,5 +256,3 @@ export function ExitTab() {
     </>
   );
 }
-
-    
