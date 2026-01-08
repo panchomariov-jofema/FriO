@@ -235,6 +235,7 @@ export interface OtherFruitReception {
   id: string;
   clientId: string;
   clientName: string;
+  displayLotId?: string;
   unit: 'Bins' | 'Pallets';
   document: string;
   items: OtherFruitReceptionItem[];

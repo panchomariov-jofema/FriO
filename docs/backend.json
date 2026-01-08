@@ -329,6 +329,7 @@
       "properties": {
         "clientId": { "type": "string", "description": "Reference to the 'OtherClient'." },
         "clientName": { "type": "string" },
+        "displayLotId": { "type": "string", "description": "User-friendly lot identifier."},
         "unit": { "type": "string", "enum": ["Bins", "Pallets"] },
         "document": { "type": "string", "description": "Reception document number." },
         "items": {

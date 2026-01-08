@@ -76,11 +76,15 @@ export function OtherFruitReceptionTab() {
         status: 'Pendiente de almacenar'
     }));
 
+    const clientAbbreviation = selectedClient.name.substring(0, 4).toUpperCase();
+    const displayLotId = `${clientAbbreviation}-${values.document}`;
+
     const receptionData = {
         clientId: values.clientId,
         clientName: selectedClient.name,
         unit: selectedClient.unit,
         document: values.document,
+        displayLotId: displayLotId,
         items: itemsWithStatus,
         status: 'Pendiente de almacenar' as const,
         createdAt: serverTimestamp(),
@@ -89,7 +93,7 @@ export function OtherFruitReceptionTab() {
     try {
         const collRef = collection(firestore, 'otherFruitReceptions');
         await addDoc(collRef, receptionData);
-        toast({ title: 'Éxito', description: 'Recepción de fruta registrada. Ahora puede asignar una ubicación.' });
+        toast({ title: 'Éxito', description: `Recepción de fruta registrada con lote ${displayLotId}. Ahora puede asignar una ubicación.` });
         form.reset({
             clientId: values.clientId,
             document: '',
