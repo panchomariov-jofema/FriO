@@ -19,6 +19,7 @@ import { useToast } from '@/hooks/use-toast';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { Label } from '@/components/ui/label';
+import { usePackagingMastersByClient } from '@/hooks/usePackagingMastersByClient';
 
 type ReceptionFormValues = z.infer<typeof otherFruitReceptionSchema>;
 
@@ -42,6 +43,10 @@ export function OtherFruitReceptionTab() {
       items: [defaultItem],
     },
   });
+  
+  const selectedClientId = form.watch('clientId');
+  const { data: clientProducts, loading: loadingProducts } = usePackagingMastersByClient(selectedClientId);
+
 
   const { fields, append, remove } = useFieldArray({
     control: form.control,
@@ -49,7 +54,7 @@ export function OtherFruitReceptionTab() {
   });
 
   const fruitClients = React.useMemo(() => {
-    return (allClients || []).filter(c => c.type.toLowerCase() === 'fruta');
+    return (allClients || []).filter(c => c.type.toUpperCase() === 'FRUTA');
   }, [allClients]);
 
   const handleClientChange = (clientId: string) => {
@@ -100,6 +105,14 @@ export function OtherFruitReceptionTab() {
         }));
     }
   };
+  
+  const handleProductChange = (index: number, productCode: string) => {
+    const product = clientProducts.find(p => p.code === productCode);
+    if (product) {
+      form.setValue(`items.${index}.productCode`, product.code);
+      form.setValue(`items.${index}.productName`, product.name);
+    }
+  }
 
   return (
     <Card>
@@ -163,9 +176,18 @@ export function OtherFruitReceptionTab() {
                       render={({ field: itemField }) => (
                         <FormItem>
                           <FormLabel>Cód. Producto</FormLabel>
-                           <FormControl>
-                               <Input {...itemField} autoComplete="off" placeholder="Ej: CHER-LAP" />
-                           </FormControl>
+                           <Select onValueChange={(value) => handleProductChange(index, value)} value={itemField.value} disabled={!selectedClientId || loadingProducts}>
+                                <FormControl>
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Seleccione un producto..." />
+                                    </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                    {clientProducts.map(p => (
+                                        <SelectItem key={p.id} value={p.code}>{p.code}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                           </Select>
                           <FormMessage />
                         </FormItem>
                       )}
@@ -177,7 +199,7 @@ export function OtherFruitReceptionTab() {
                         <FormItem>
                           <FormLabel>Nombre Producto</FormLabel>
                            <FormControl>
-                               <Input {...itemField} autoComplete="off" placeholder="Ej: Cereza Lapins" />
+                               <Input {...itemField} autoComplete="off" placeholder="Seleccione un código" readOnly />
                            </FormControl>
                           <FormMessage />
                         </FormItem>
