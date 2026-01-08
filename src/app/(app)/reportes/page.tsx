@@ -391,7 +391,7 @@ function PackagingStockReport() {
 
   const flattenedStock = React.useMemo(() => {
     const stock: FlattenedStockItem[] = [];
-    allLots
+    (allLots || [])
       .filter(lot => lot.status === 'Almacenado' || lot.status === 'Parcialmente Almacenado')
       .forEach(lot => {
         lot.items.forEach((item, index) => {
@@ -420,16 +420,49 @@ function PackagingStockReport() {
   }, [flattenedStock, clientFilter, codeFilter]);
 
   const packagingClients = React.useMemo(() => {
-    return clients.filter(c => c.type.toLowerCase() === 'embalaje');
+    if (!clients) return [];
+    return clients.filter(c => c.type.toLowerCase() === 'embalajes');
   }, [clients]);
 
   const isLoading = loadingLots || loadingClients;
 
+  const handleExportCSV = () => {
+    const headers = ['Código', 'Descripción', 'Cliente', 'Ubicación', 'Cantidad (Pallets)'];
+    const csvRows = [headers.join(',')];
+
+    filteredStock.forEach(item => {
+        const row = [
+            `"${item.code}"`,
+            `"${item.description}"`,
+            `"${item.clientName}"`,
+            `"${item.location}"`,
+            item.quantity
+        ];
+        csvRows.push(row.join(','));
+    });
+
+    const csvContent = "data:text/csv;charset=utf-8," + csvRows.join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", "reporte_stock_embalajes.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+
   return (
     <Card>
-      <CardHeader>
-        <CardTitle>Reporte de Stock de Embalajes</CardTitle>
-        <CardDescription>Inventario físico de todos los materiales de embalaje almacenados, con filtros.</CardDescription>
+      <CardHeader className="flex flex-row items-center justify-between">
+        <div>
+            <CardTitle>Reporte de Stock de Embalajes</CardTitle>
+            <CardDescription>Inventario físico de todos los materiales de embalaje almacenados, con filtros.</CardDescription>
+        </div>
+        <Button onClick={handleExportCSV} disabled={isLoading || filteredStock.length === 0}>
+            <Download className="mr-2 h-4 w-4" />
+            Exportar a CSV
+        </Button>
       </CardHeader>
       <CardContent>
         <div className="flex flex-col sm:flex-row gap-4 mb-6">
