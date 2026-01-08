@@ -350,8 +350,9 @@ export default function CamarasPage() {
                             <div className="text-right">
                                 <p className={cn("font-mono font-semibold", (chamberOccupancy[chamberId]?.percentage ?? 0) > 50 ? 'text-destructive' : 'text-foreground')}>
                                     {chamberOccupancy[chamberId]?.occupied ?? 0} / {config.capacity} Bins
+                                    ({(chamberOccupancy[chamberId]?.percentage ?? 0).toFixed(1)}%)
                                 </p>
-                                <Progress value={chamberOccupancy[chamberId]?.percentage ?? 0} className="w-32 h-2 mt-1" />
+                                <Progress value={chamberOccupancy[chamberId]?.percentage ?? 0} className="w-48 h-2 mt-1" />
                             </div>
                         </div>
                     </AccordionTrigger>
@@ -426,3 +427,5 @@ export default function CamarasPage() {
     </div>
   );
 }
+
+    
