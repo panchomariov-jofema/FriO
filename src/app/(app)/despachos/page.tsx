@@ -74,9 +74,13 @@ export default function DespachosPage() {
       maxBins: 0,
     },
   });
+  
+  const getExporterName = (exporterId: string) => {
+    return exporters.find(e => e.exporterId === exporterId)?.name || exporterId;
+  };
 
   const { binsPerChamber, binsPerExporter } = React.useMemo(() => {
-    const storedLots = chamberLots.filter(lot => lot.status === 'Almacenado');
+    const storedLots = (chamberLots || []).filter(lot => lot.status === 'Almacenado');
 
     const perChamber = storedLots.reduce((acc, lot) => {
       const chamberName = chambersConfig[lot.chamberId!]?.name || lot.chamberId!;
@@ -186,9 +190,6 @@ export default function DespachosPage() {
     }
   };
 
-  const getExporterName = (exporterId: string) => {
-    return exporters.find(e => e.exporterId === exporterId)?.name || exporterId;
-  };
 
   const summaryIsLoading = loadingChamberLots || loadingExporters;
 
@@ -397,4 +398,3 @@ export default function DespachosPage() {
       </Card>
     </div>
   );
-}
