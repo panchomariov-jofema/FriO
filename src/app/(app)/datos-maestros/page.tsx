@@ -99,7 +99,15 @@ const OtherClientForm = ({ form }: { form: any }) => (
         <FormItem><FormLabel>Tipo</FormLabel><FormControl><Input {...field} placeholder="Ej: embalajes, frio_hortofruticola" autoComplete="off" /></FormControl><FormMessage /></FormItem>
       )} />
       <FormField control={form.control} name="unit" render={({ field }) => (
-        <FormItem><FormLabel>Unidad</FormLabel><FormControl><Input {...field} placeholder="Ej: Venta de Servicios" autoComplete="off" /></FormControl><FormMessage /></FormItem>
+        <FormItem><FormLabel>Unidad</FormLabel>
+        <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
+          <FormControl><SelectTrigger><SelectValue placeholder="Seleccione una unidad" /></SelectTrigger></FormControl>
+          <SelectContent>
+            <SelectItem value="Bins">Bins</SelectItem>
+            <SelectItem value="Pallets">Pallets</SelectItem>
+          </SelectContent>
+        </Select>
+        <FormMessage /></FormItem>
       )} />
     </>
 );
@@ -308,5 +316,3 @@ export default function DatosMaestrosPage() {
     </Card>
   );
 }
-
-    
