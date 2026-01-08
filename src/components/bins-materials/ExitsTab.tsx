@@ -182,7 +182,7 @@ export function ExitsTab({ exporterId, producerId }: ExitsTabProps) {
                             </FormControl>
                             <SelectContent>
                               {materials.map(m => (
-                                <SelectItem key={m.id} value={m.id}>{m.name} ({m.code})</SelectItem>
+                                <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
                               ))}
                             </SelectContent>
                           </Select>

@@ -155,11 +155,13 @@ export function EntriesTab({ exporterId, producerId }: EntriesTabProps) {
                       <FormItem className="flex-1">
                         <Select onValueChange={field.onChange} value={field.value} disabled={loadingMaterials}>
                           <FormControl>
-                            <SelectTrigger><SelectValue placeholder="Seleccione un material..." /></SelectTrigger>
+                             <SelectTrigger>
+                                <SelectValue placeholder="Seleccione un material..." />
+                              </SelectTrigger>
                           </FormControl>
                           <SelectContent>
                             {materials.map(m => (
-                              <SelectItem key={m.id} value={m.id}>{m.name} ({m.code})</SelectItem>
+                              <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
