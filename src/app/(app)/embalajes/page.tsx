@@ -5,7 +5,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ReceptionTab } from '@/components/packaging/ReceptionTab';
 import { StorageTab } from '@/components/packaging/StorageTab';
-import { StockTab } from '@/components/packaging/StockTab';
 import { Button } from '@/components/ui/button';
 import { Trash2 } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
@@ -57,7 +56,7 @@ export default function EmbalajesPage() {
           <div>
             <CardTitle>Gestión de Embalajes</CardTitle>
             <CardDescription>
-              Recepción, almacenamiento y consulta de stock de materiales de embalaje en pallets.
+              Recepción y almacenamiento de materiales de embalaje en pallets.
             </CardDescription>
           </div>
            <AlertDialog>
@@ -87,10 +86,9 @@ export default function EmbalajesPage() {
       </Card>
 
       <Tabs defaultValue="recepcion" className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="recepcion">Recepción</TabsTrigger>
           <TabsTrigger value="almacenamiento">Pendientes de Almacenar</TabsTrigger>
-          <TabsTrigger value="stock">Stock en Bodega</TabsTrigger>
         </TabsList>
         
         <TabsContent value="recepcion">
@@ -100,11 +98,6 @@ export default function EmbalajesPage() {
         <TabsContent value="almacenamiento">
           <StorageTab />
         </TabsContent>
-
-        <TabsContent value="stock">
-          <StockTab />
-        </TabsContent>
-
       </Tabs>
     </div>
   );
