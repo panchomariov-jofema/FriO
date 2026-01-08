@@ -54,16 +54,19 @@ export const stockLocationSchema = z.object({
 export type StockLocation = z.infer<typeof stockLocationSchema>;
 
 
+const packagingExitItemLocationSchema = z.object({
+    locationKey: z.string(),
+    receptionId: z.string(),
+    itemIndex: z.number(),
+    palletsToWithdraw: z.coerce.number().min(0),
+});
+
 export const packagingExitItemSchema = z.object({
     packagingMasterId: z.string().min(1, "Debe ingresar un código de artículo válido."),
     packagingMasterCode: z.string().min(1, "Debe ingresar un código de artículo."),
     packagingMasterName: z.string(),
     palletCount: z.coerce.number().min(0),
-    locations: z.array(z.object({
-        receptionId: z.string(),
-        location: z.string(),
-        palletsToWithdraw: z.coerce.number().min(0),
-    })),
+    locations: z.array(packagingExitItemLocationSchema),
 });
 
 export const packagingExitSchema = z.object({

@@ -15,6 +15,7 @@ import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
 import type { PackagingReception } from '@/lib/types';
+import { ExitTab } from '@/components/packaging/ExitTab';
 
 export default function EmbalajesPage() {
   const firestore = useFirestore();
@@ -86,8 +87,9 @@ export default function EmbalajesPage() {
       </Card>
 
       <Tabs defaultValue="recepcion" className="w-full">
-        <TabsList className="grid w-full grid-cols-2">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="recepcion">Recepción</TabsTrigger>
+          <TabsTrigger value="salidas">Salidas</TabsTrigger>
           <TabsTrigger value="almacenamiento">Pendientes de Almacenar</TabsTrigger>
         </TabsList>
         
@@ -95,6 +97,10 @@ export default function EmbalajesPage() {
           <ReceptionTab />
         </TabsContent>
         
+        <TabsContent value="salidas">
+          <ExitTab />
+        </TabsContent>
+
         <TabsContent value="almacenamiento">
           <StorageTab />
         </TabsContent>

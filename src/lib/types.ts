@@ -106,6 +106,21 @@ export interface PackagingMovement {
   createdAt: Timestamp;
 }
 
+export interface PackagingExitItemLocation {
+  locationKey: string;
+  receptionId: string;
+  itemIndex: number;
+  palletsToWithdraw: number;
+}
+
+export interface PackagingExitItem {
+  packagingMasterId: string;
+  packagingMasterCode: string;
+  packagingMasterName: string;
+  palletCount: number;
+  locations: PackagingExitItemLocation[];
+}
+
 
 export interface Packing {
   id: string;
