@@ -16,6 +16,8 @@ import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { Table, TableBody, TableCell, TableHeader, TableRow, TableHead } from '../ui/table';
 import { Skeleton } from '../ui/skeleton';
+import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
+import type { Exporter } from '@/lib/types';
 
 const movementItemSchema = z.object({
   binMaterialId: z.string(),
@@ -36,10 +38,27 @@ interface EntriesTabProps {
   producerId: string;
 }
 
+// Rules for automatic calculation
+const calculationRules: Record<string, { binCode: string; related: Record<string, number> }> = {
+    'SUBSOLE': {
+        binCode: '10001',
+        related: { '10002': 24, '10003': 24 } // totes, láminas
+    },
+    'MEYER': {
+        binCode: '10007',
+        related: { '10008': 24, '10009': 24 } // totes verdes, esponjas
+    },
+    'BLOSSOM': {
+        binCode: '10011',
+        related: { '10012': 24, '10013': 24 } // totes, esponjas
+    }
+};
+
 export function EntriesTab({ exporterId, producerId }: EntriesTabProps) {
   const { toast } = useToast();
   const firestore = useFirestore();
   const { materials, loading: loadingMaterials } = useBinMaterialsByExporter(exporterId);
+  const { data: exporters, loading: loadingExporters } = useFirestoreCollection<Exporter>('exporters');
 
   const form = useForm<MovementFormValues>({
     resolver: zodResolver(movementSchema),
@@ -47,22 +66,35 @@ export function EntriesTab({ exporterId, producerId }: EntriesTabProps) {
   });
 
   const items = form.watch('items');
+  const exporterName = React.useMemo(() => {
+    return exporters.find(e => e.exporterId === exporterId)?.name;
+  }, [exporters, exporterId]);
   
   React.useEffect(() => {
-    // Find the index for BINS and TOTES
-    const binsIndex = items.findIndex(item => item.binMaterialName.toUpperCase().includes('BINS'));
-    const totesIndex = items.findIndex(item => item.binMaterialName.toUpperCase().includes('TOTES PLASTICO'));
+    if (!exporterName || loadingExporters) return;
 
-    if (binsIndex !== -1 && totesIndex !== -1) {
-      const binsQuantity = items[binsIndex].quantity;
-      if (typeof binsQuantity === 'number' && binsQuantity > 0) {
-        // Only update if the totes field has not been manually touched
-        if (!form.formState.dirtyFields.items?.[totesIndex]?.quantity) {
-          form.setValue(`items.${totesIndex}.quantity`, binsQuantity * 24, { shouldDirty: true });
+    const rules = calculationRules[exporterName];
+    if (!rules) return;
+
+    const binItemIndex = items.findIndex(item => item.binMaterialCode === rules.binCode);
+    if (binItemIndex === -1) return;
+
+    const binQuantity = items[binItemIndex].quantity;
+    
+    // Check if the user actually changed the bin quantity
+    if (!form.formState.dirtyFields.items?.[binItemIndex]?.quantity) return;
+
+    Object.entries(rules.related).forEach(([relatedCode, multiplier]) => {
+        const relatedItemIndex = items.findIndex(item => item.binMaterialCode === relatedCode);
+        if (relatedItemIndex !== -1) {
+            // Only update if the field hasn't been manually dirtied by the user
+            if (!form.formState.dirtyFields.items?.[relatedItemIndex]?.quantity) {
+                form.setValue(`items.${relatedItemIndex}.quantity`, binQuantity * multiplier, { shouldDirty: true });
+            }
         }
-      }
-    }
-  }, [items, form]);
+    });
+
+  }, [items, exporterName, form, loadingExporters]);
 
 
   React.useEffect(() => {
