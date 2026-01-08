@@ -49,6 +49,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
+import { chambersConfig } from '@/lib/chambers-config';
 
 const dispatchSchema = z.object({
   exporterId: z.string().min(1, 'Debe seleccionar un cliente.'),
@@ -62,6 +63,7 @@ type DispatchFormValues = z.infer<typeof dispatchSchema>;
 export default function DespachosPage() {
   const { data: exporters, loading: loadingExporters } = useFirestoreCollection<Exporter>('exporters');
   const { data: dispatches, loading: loadingDispatches } = useFirestoreCollection<Dispatch>('dispatches');
+  const { data: chamberLots, loading: loadingChamberLots } = useFirestoreCollection<ChamberLot>('chamberLots');
   const firestore = useFirestore();
   const { toast } = useToast();
 
@@ -72,6 +74,23 @@ export default function DespachosPage() {
       maxBins: 0,
     },
   });
+
+  const { binsPerChamber, binsPerExporter } = React.useMemo(() => {
+    const storedLots = chamberLots.filter(lot => lot.status === 'Almacenado');
+
+    const perChamber = storedLots.reduce((acc, lot) => {
+      const chamberName = chambersConfig[lot.chamberId!]?.name || lot.chamberId!;
+      acc[chamberName] = (acc[chamberName] || 0) + lot.binCount;
+      return acc;
+    }, {} as Record<string, number>);
+
+    const perExporter = storedLots.reduce((acc, lot) => {
+      acc[lot.exporterId] = (acc[lot.exporterId] || 0) + lot.binCount;
+      return acc;
+    }, {} as Record<string, number>);
+
+    return { binsPerChamber: perChamber, binsPerExporter: perExporter };
+  }, [chamberLots]);
 
   const onSubmit = async (values: DispatchFormValues) => {
     if (!firestore) return;
@@ -167,8 +186,81 @@ export default function DespachosPage() {
     }
   };
 
+  const getExporterName = (exporterId: string) => {
+    return exporters.find(e => e.exporterId === exporterId)?.name || exporterId;
+  };
+
+  const summaryIsLoading = loadingChamberLots || loadingExporters;
+
   return (
     <div className="space-y-6">
+      <div className="grid md:grid-cols-2 gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Resumen: Bins por Cámara</CardTitle>
+            <CardDescription>Total de bins en estado "Almacenado" por cada cámara.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="rounded-md border max-h-48 overflow-y-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Cámara</TableHead>
+                    <TableHead className="text-right">Total Bins</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {summaryIsLoading ? (
+                    <TableRow><TableCell colSpan={2}><Skeleton className="h-4 w-full my-1" /></TableCell></TableRow>
+                  ) : Object.keys(binsPerChamber).length > 0 ? (
+                    Object.entries(binsPerChamber).map(([chamberName, count]) => (
+                      <TableRow key={chamberName}>
+                        <TableCell className="font-medium">{chamberName}</TableCell>
+                        <TableCell className="text-right">{count}</TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
+                    <TableRow><TableCell colSpan={2} className="h-24 text-center">No hay bins almacenados.</TableCell></TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>Resumen: Bins por Exportador</CardTitle>
+            <CardDescription>Total de bins en estado "Almacenado" por cada cliente.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="rounded-md border max-h-48 overflow-y-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Exportador</TableHead>
+                      <TableHead className="text-right">Total Bins</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {summaryIsLoading ? (
+                       <TableRow><TableCell colSpan={2}><Skeleton className="h-4 w-full my-1" /></TableCell></TableRow>
+                    ) : Object.keys(binsPerExporter).length > 0 ? (
+                      Object.entries(binsPerExporter).map(([exporterId, count]) => (
+                        <TableRow key={exporterId}>
+                          <TableCell className="font-medium">{getExporterName(exporterId)}</TableCell>
+                          <TableCell className="text-right">{count}</TableCell>
+                        </TableRow>
+                      ))
+                    ) : (
+                      <TableRow><TableCell colSpan={2} className="h-24 text-center">No hay bins almacenados.</TableCell></TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
       <Card>
         <CardHeader>
           <CardTitle>Crear Nuevo Despacho</CardTitle>
@@ -306,5 +398,3 @@ export default function DespachosPage() {
     </div>
   );
 }
-
-    
