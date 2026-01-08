@@ -102,6 +102,7 @@ export default function DespachosPage() {
   const { data: packings, loading: loadingPackings } = usePackingsByExporter(selectedExporterId);
   
   const getExporterName = (exporterId: string) => {
+    if (exporterId === 'undefined' || !exporterId) return 'Subsole';
     return exporters?.find(e => e.exporterId === exporterId)?.name || exporterId;
   };
 
@@ -115,7 +116,8 @@ export default function DespachosPage() {
     }, {} as Record<string, number>);
 
     const perExporter = storedLots.reduce((acc, lot) => {
-      acc[lot.exporterId] = (acc[lot.exporterId] || 0) + lot.binCount;
+      const id = lot.exporterId || 'undefined';
+      acc[id] = (acc[id] || 0) + lot.binCount;
       return acc;
     }, {} as Record<string, number>);
 
@@ -627,5 +629,3 @@ const handleUndoDispatch = async (dispatchToUndo: Dispatch) => {
     </div>
   );
 }
-
-    
