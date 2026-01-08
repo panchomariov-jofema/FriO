@@ -81,6 +81,7 @@ export default function DespachosPage() {
   const { data: chamberLots, loading: loadingChamberLots } = useFirestoreCollection<ChamberLot>('chamberLots');
   const firestore = useFirestore();
   const { toast } = useToast();
+  const [isConfirming, setIsConfirming] = React.useState(false);
 
   const form = useForm<DispatchFormValues>({
     resolver: zodResolver(dispatchSchema),
@@ -91,7 +92,7 @@ export default function DespachosPage() {
   });
   
   const getExporterName = (exporterId: string) => {
-    return exporters.find(e => e.exporterId === exporterId)?.name || exporterId;
+    return exporters?.find(e => e.exporterId === exporterId)?.name || exporterId;
   };
 
   const { binsPerChamber, binsPerExporter } = React.useMemo(() => {
@@ -141,9 +142,10 @@ export default function DespachosPage() {
         return;
       }
       
-      // 2. Select bins up to the requested quantity
       let binsToDispatch = [];
       let binsCount = 0;
+      let lotsToUpdate: { ref: any, originalBinCount: number, binsTaken: number }[] = [];
+
       for (const lot of availableLots) {
         if (binsCount >= values.maxBins) break;
 
@@ -158,12 +160,19 @@ export default function DespachosPage() {
             binCount: binsFromLot,
         });
 
+        lotsToUpdate.push({
+            ref: doc(firestore, 'chamberLots', lot.id),
+            originalBinCount: lot.binCount,
+            binsTaken: binsFromLot
+        });
+
         binsCount += binsFromLot;
       }
 
+
       const actualTotalBins = binsToDispatch.reduce((sum, bin) => sum + bin.binCount, 0);
 
-      // 3. Create dispatch record and update bin status in a batch
+      // Create dispatch record and update bin status in a batch
       const batch = writeBatch(firestore);
 
       const dispatchData = {
@@ -177,12 +186,16 @@ export default function DespachosPage() {
 
       const dispatchRef = doc(collection(firestore, 'dispatches'));
       batch.set(dispatchRef, dispatchData);
+      
+      for (const lotInfo of lotsToUpdate) {
+        const remainingBins = lotInfo.originalBinCount - lotInfo.binsTaken;
+        if (remainingBins > 0) {
+          batch.update(lotInfo.ref, { binCount: remainingBins });
+        } else {
+          batch.update(lotInfo.ref, { status: 'Despachado' });
+        }
+      }
 
-      // 4. Update the status of the used chamberLots
-      binsToDispatch.forEach(binInfo => {
-        const lotRef = doc(firestore, 'chamberLots', binInfo.chamberLotId);
-        batch.update(lotRef, { status: 'Despachado' });
-      });
 
       await batch.commit();
       
@@ -205,8 +218,50 @@ export default function DespachosPage() {
     }
   };
 
+  const handleConfirmDispatch = async (dispatchToConfirm: Dispatch) => {
+    if (!firestore) return;
+    setIsConfirming(true);
+
+    try {
+        const batch = writeBatch(firestore);
+
+        // 1. Delete the chamberLot documents associated with the dispatch
+        for (const bin of dispatchToConfirm.bins) {
+            const lotRef = doc(firestore, 'chamberLots', bin.chamberLotId);
+            batch.delete(lotRef);
+        }
+
+        // 2. Update the dispatch status
+        const dispatchRef = doc(firestore, 'dispatches', dispatchToConfirm.id);
+        batch.update(dispatchRef, { status: 'Completado' });
+
+        await batch.commit();
+
+        toast({
+            title: 'Despacho Confirmado',
+            description: `El stock ha sido rebajado y las ubicaciones están libres.`,
+        });
+
+    } catch (error: any) {
+        console.error("Error confirming dispatch:", error);
+        toast({ variant: 'destructive', title: 'Error', description: 'Ocurrió un error al confirmar el despacho.' });
+        errorEmitter.emit(
+            'permission-error',
+            new FirestorePermissionError({
+                path: 'dispatches or chamberLots',
+                operation: 'write',
+            })
+        );
+    } finally {
+        setIsConfirming(false);
+    }
+};
 
   const summaryIsLoading = loadingChamberLots || loadingExporters;
+  const sortedDispatches = React.useMemo(() => {
+    if (!dispatches) return [];
+    return [...dispatches].sort((a,b) => b.createdAt.toMillis() - a.createdAt.toMillis());
+  }, [dispatches]);
 
   return (
     <div className="space-y-6">
@@ -346,20 +401,20 @@ export default function DespachosPage() {
                             <TableHead>Fecha</TableHead>
                             <TableHead>Total Bins</TableHead>
                             <TableHead>Estado</TableHead>
-                            <TableHead className="text-right">Detalles</TableHead>
+                            <TableHead className="text-right">Acciones</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                         {loadingDispatches ? (
                              Array.from({ length: 3 }).map((_, i) => <TableRow key={i}><TableCell colSpan={5}><Skeleton className="h-4 w-full" /></TableCell></TableRow>)
-                        ) : dispatches.length > 0 ? (
-                            dispatches.map(dispatch => (
+                        ) : sortedDispatches.length > 0 ? (
+                            sortedDispatches.map(dispatch => (
                                 <TableRow key={dispatch.id}>
                                     <TableCell className="font-medium">{dispatch.exporterName}</TableCell>
                                     <TableCell>{dispatch.createdAt?.toDate().toLocaleDateString()}</TableCell>
                                     <TableCell>{dispatch.totalBins}</TableCell>
                                     <TableCell><Badge variant={dispatch.status === 'Completado' ? 'default' : 'secondary'}>{dispatch.status}</Badge></TableCell>
-                                    <TableCell className="text-right">
+                                    <TableCell className="text-right space-x-2">
                                        <AlertDialog>
                                           <AlertDialogTrigger asChild>
                                              <Button variant="outline" size="sm">Ver Bins</Button>
@@ -398,6 +453,27 @@ export default function DespachosPage() {
                                             </AlertDialogFooter>
                                           </AlertDialogContent>
                                         </AlertDialog>
+                                        {dispatch.status === 'Pendiente de Salida' && (
+                                            <AlertDialog>
+                                                <AlertDialogTrigger asChild>
+                                                    <Button size="sm" disabled={isConfirming}>Confirmar</Button>
+                                                </AlertDialogTrigger>
+                                                <AlertDialogContent>
+                                                    <AlertDialogHeader>
+                                                        <AlertDialogTitle>¿Confirmar salida del despacho?</AlertDialogTitle>
+                                                        <AlertDialogDescription>
+                                                            Esta acción rebajará el stock de las cámaras y liberará las coordenadas. Esta acción no se puede deshacer.
+                                                        </AlertDialogDescription>
+                                                    </AlertDialogHeader>
+                                                    <AlertDialogFooter>
+                                                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                                        <AlertDialogAction onClick={() => handleConfirmDispatch(dispatch)}>
+                                                            Confirmar Salida
+                                                        </AlertDialogAction>
+                                                    </AlertDialogFooter>
+                                                </AlertDialogContent>
+                                            </AlertDialog>
+                                        )}
                                     </TableCell>
                                 </TableRow>
                             ))
