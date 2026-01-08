@@ -4,7 +4,7 @@ import * as React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
-import type { ChamberLot } from '@/lib/types';
+import type { ChamberLot, OtherFruitReception } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -37,9 +37,23 @@ const naturalSort = (a: string, b: string) => {
   return aNum - bNum;
 };
 
+// Unified type for any stored item
+type StoredItem = {
+  id: string;
+  isProducerLot: boolean; // Differentiator
+  displayId: string; // e.g., displayLotId or productName
+  ownerName: string; // e.g., producerShortName or clientName
+  varietyOrProduct: string;
+  quantity: number;
+  unit: 'Bins' | 'Pallets';
+  chamberId: string;
+  coordinate: string;
+}
+
 
 export default function CamarasPage() {
-  const { data: chamberLots, loading } = useFirestoreCollection<ChamberLot>('chamberLots');
+  const { data: chamberLots, loading: loadingChamberLots } = useFirestoreCollection<ChamberLot>('chamberLots');
+  const { data: otherFruitReceptions, loading: loadingOtherFruit } = useFirestoreCollection<OtherFruitReception>('otherFruitReceptions');
   const [lotToStore, setLotToStore] = React.useState<ChamberLot | null>(null);
   const [coordToRelocate, setCoordToRelocate] = React.useState<{ chamberId: string; coordinate: string } | null>(null);
   const [isStoreDialogOpen, setStoreDialogOpen] = React.useState(false);
@@ -47,29 +61,65 @@ export default function CamarasPage() {
   const firestore = useFirestore();
   const { toast } = useToast();
 
-  const { pendingLots, storedLotsByChamber, chamberOccupancy } = React.useMemo(() => {
+  const loading = loadingChamberLots || loadingOtherFruit;
+
+  const { pendingLots, storedItemsByChamber, chamberOccupancy } = React.useMemo(() => {
     const allChamberLots = chamberLots || [];
+    const allOtherFruitReceptions = otherFruitReceptions || [];
 
     const calculatedPendingLots = allChamberLots
       .filter((lot) => lot.status === 'Pendiente por Almacenar')
       .sort((a, b) => b.storedAt && a.storedAt ? b.storedAt.toMillis() - a.storedAt.toMillis() : 0);
       
-    const calculatedStoredLotsByChamber = allChamberLots
-      .filter((lot) => lot.status === 'Almacenado' && lot.chamberId && lot.coordinate)
-      .reduce((acc, lot) => {
-        if (!acc[lot.chamberId!]) {
-          acc[lot.chamberId!] = {};
+    const allStoredItems = [
+      ...allChamberLots
+        .filter(lot => lot.status === 'Almacenado' && lot.chamberId && lot.coordinate)
+        .map(lot => ({
+            id: lot.id,
+            isProducerLot: true,
+            displayId: lot.displayLotId,
+            ownerName: lot.producerShortName,
+            varietyOrProduct: lot.variety,
+            quantity: lot.binCount,
+            unit: 'Bins' as const,
+            chamberId: lot.chamberId!,
+            coordinate: lot.coordinate!,
+        })),
+      ...allOtherFruitReceptions
+        .flatMap(reception => reception.items
+            .filter(item => item.status === 'Almacenado' && item.storageLocation?.chamberId && item.storageLocation?.coordinate)
+            .map((item, index) => ({
+                id: `${reception.id}-${index}`,
+                isProducerLot: false,
+                displayId: item.productCode,
+                ownerName: reception.clientName,
+                varietyOrProduct: item.productName,
+                quantity: item.quantity,
+                unit: reception.unit,
+                chamberId: item.storageLocation!.chamberId,
+                coordinate: item.storageLocation!.coordinate,
+            }))
+        )
+    ];
+
+    const calculatedStoredItemsByChamber = allStoredItems.reduce((acc, item) => {
+        if (!acc[item.chamberId]) {
+          acc[item.chamberId] = {};
         }
-        if (!acc[lot.chamberId!][lot.coordinate!]) {
-          acc[lot.chamberId!][lot.coordinate!] = [];
+        if (!acc[item.chamberId][item.coordinate]) {
+          acc[item.chamberId][item.coordinate] = [];
         }
-        acc[lot.chamberId!][lot.coordinate!].push(lot);
+        acc[item.chamberId][item.coordinate].push(item);
         return acc;
-    }, {} as Record<string, Record<string, ChamberLot[]>>);
+    }, {} as Record<string, Record<string, StoredItem[]>>);
+
 
     const calculatedChamberOccupancy = Object.keys(chambersConfig).reduce((acc, chamberId) => {
-        const lotsInChamber = allChamberLots.filter(lot => lot.chamberId === chamberId && lot.status === 'Almacenado');
-        const totalBins = lotsInChamber.reduce((sum, lot) => sum + lot.binCount, 0);
+        // We only count Bins towards total capacity for this view
+        const totalBins = allStoredItems
+            .filter(item => item.chamberId === chamberId && item.unit === 'Bins')
+            .reduce((sum, item) => sum + item.quantity, 0);
+
         acc[chamberId] = {
             occupied: totalBins,
             total: chambersConfig[chamberId].capacity,
@@ -78,12 +128,13 @@ export default function CamarasPage() {
         return acc;
     }, {} as Record<string, {occupied: number; total: number; percentage: number}>);
 
+
     return { 
         pendingLots: calculatedPendingLots, 
-        storedLotsByChamber: calculatedStoredLotsByChamber, 
+        storedItemsByChamber: calculatedStoredItemsByChamber, 
         chamberOccupancy: calculatedChamberOccupancy 
     };
-  }, [chamberLots]);
+  }, [chamberLots, otherFruitReceptions]);
 
 
   const handleStoreClick = (lot: ChamberLot) => {
@@ -92,8 +143,14 @@ export default function CamarasPage() {
   };
   
   const handleRelocateClick = (chamberId: string, coordinate: string) => {
-    setCoordToRelocate({ chamberId, coordinate });
-    setRelocateDialogOpen(true);
+    // Relocation for other fruit is not implemented in this view
+    const lotsInCoord = storedItemsByChamber[chamberId]?.[coordinate] || [];
+    if (lotsInCoord.every(l => l.isProducerLot)) {
+        setCoordToRelocate({ chamberId, coordinate });
+        setRelocateDialogOpen(true);
+    } else {
+        toast({ title: "Acción no disponible", description: "La reubicación de lotes de otros clientes debe hacerse desde su módulo específico."})
+    }
   }
 
   const handleStoreInChamber = async ({ chamberId }: { chamberId: string; }) => {
@@ -200,8 +257,11 @@ export default function CamarasPage() {
     if (!coordToRelocate || !firestore) return;
     
     const { chamberId: sourceChamberId, coordinate: sourceCoordinate } = coordToRelocate;
-    const lotsToMove = (storedLotsByChamber[sourceChamberId]?.[sourceCoordinate] || []).map(l => l.id);
-    const totalBinsToMove = (storedLotsByChamber[sourceChamberId]?.[sourceCoordinate] || []).reduce((sum, l) => sum + l.binCount, 0);
+    const itemsInCoord = storedItemsByChamber[sourceChamberId]?.[sourceCoordinate] || [];
+    
+    // This logic is simplified for producer lots only as per handleRelocateClick logic
+    const lotsToMove = itemsInCoord.filter(item => item.isProducerLot).map(l => l.id);
+    const totalBinsToMove = itemsInCoord.filter(item => item.isProducerLot).reduce((sum, l) => sum + l.quantity, 0);
 
     // Validate capacity if moving to a different chamber
     if (sourceChamberId !== targetChamberId) {
@@ -240,25 +300,36 @@ export default function CamarasPage() {
   
   const handleClearStock = async () => {
     if (!firestore) return;
-    if (!chamberLots || chamberLots.length === 0) {
+    const hasChamberLots = chamberLots && chamberLots.length > 0;
+    const hasOtherFruit = otherFruitReceptions && otherFruitReceptions.length > 0;
+    
+    if (!hasChamberLots && !hasOtherFruit) {
       toast({ title: 'Sin Stock', description: 'No hay lotes en las cámaras para limpiar.' });
       return;
     }
 
     try {
-      const chamberLotsRef = collection(firestore, 'chamberLots');
-      const querySnapshot = await getDocs(chamberLotsRef);
       const batch = writeBatch(firestore);
-      querySnapshot.forEach((doc) => {
-        batch.delete(doc.ref);
-      });
+      
+      if (hasChamberLots) {
+        const chamberLotsRef = collection(firestore, 'chamberLots');
+        const querySnapshot = await getDocs(chamberLotsRef);
+        querySnapshot.forEach((doc) => batch.delete(doc.ref));
+      }
+
+      if (hasOtherFruit) {
+        const otherFruitRef = collection(firestore, 'otherFruitReceptions');
+        const querySnapshot = await getDocs(otherFruitRef);
+        querySnapshot.forEach((doc) => batch.delete(doc.ref));
+      }
+
       await batch.commit();
       toast({ title: 'Éxito', description: 'Todo el stock de las cámaras ha sido eliminado.' });
     } catch (e: any) {
       console.error("Error al limpiar el stock de cámaras: ", e);
       toast({ variant: 'destructive', title: 'Error', description: 'Ocurrió un error al limpiar el stock.' });
       errorEmitter.emit('permission-error', new FirestorePermissionError({
-          path: 'chamberLots',
+          path: 'chamberLots or otherFruitReceptions',
           operation: 'delete'
       }));
     }
@@ -268,7 +339,7 @@ export default function CamarasPage() {
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>Lotes Pendientes por Almacenar</CardTitle>
+          <CardTitle>Lotes de Productor Pendientes</CardTitle>
           <CardDescription>Lotes que finalizaron el proceso de hidrocooler y esperan ser asignados a una cámara.</CardDescription>
         </CardHeader>
         <CardContent>
@@ -301,7 +372,7 @@ export default function CamarasPage() {
                     </TableRow>
                   ))
                 ) : (
-                  <TableRow><TableCell colSpan={6} className="h-24 text-center">No hay lotes pendientes de almacenar.</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={6} className="h-24 text-center">No hay lotes de productor pendientes.</TableCell></TableRow>
                 )}
               </TableBody>
             </Table>
@@ -363,11 +434,14 @@ export default function CamarasPage() {
                                   {config.rows.map(row =>
                                     config.columns.map(col => {
                                       const coord = `${col}${row}`;
-                                      const lotsInCoord = storedLotsByChamber[chamberId]?.[coord] || [];
-                                      const isOccupied = lotsInCoord.length > 0;
-                                      const totalBinsInCoord = isOccupied ? lotsInCoord.reduce((sum, lot) => sum + lot.binCount, 0) : 0;
-                                      const occupancyPercentage = isOccupied ? (totalBinsInCoord / 6) * 100 : 0;
-                                      const firstLot = isOccupied ? lotsInCoord[0] : null;
+                                      const itemsInCoord = storedItemsByChamber[chamberId]?.[coord] || [];
+                                      const isOccupied = itemsInCoord.length > 0;
+                                      
+                                      const totalBins = itemsInCoord.filter(i => i.unit === 'Bins').reduce((s, i) => s + i.quantity, 0);
+                                      const totalPallets = itemsInCoord.filter(i => i.unit === 'Pallets').reduce((s, i) => s + i.quantity, 0);
+                                      
+                                      const occupancyPercentage = isOccupied ? (totalBins + totalPallets * 3) / 6 * 100 : 0; // Approx. 1 pallet = 3 bins for display
+                                      const firstItem = isOccupied ? itemsInCoord[0] : null;
 
                                       return (
                                         <Tooltip key={coord} delayDuration={100}>
@@ -379,13 +453,18 @@ export default function CamarasPage() {
                                               <span className="relative z-10 font-semibold">{coord}</span>
                                             </div>
                                           </TooltipTrigger>
-                                          {isOccupied && firstLot && (
+                                          {isOccupied && firstItem && (
                                             <TooltipContent className="p-4">
                                               <div className="space-y-2">
-                                                <p className="font-bold">Lote: {firstLot.displayLotId}</p>
-                                                <p>Productor: {firstLot.producerShortName}</p>
-                                                <p>Variedad: {firstLot.variety}</p>
-                                                <p>Bins: {totalBinsInCoord} / 6</p>
+                                                <p className="font-bold">
+                                                  {firstItem.isProducerLot ? `Lote: ${firstItem.displayId}` : `Producto: ${firstItem.displayId}`}
+                                                </p>
+                                                <p>
+                                                  {firstItem.isProducerLot ? `Productor: ${firstItem.ownerName}` : `Cliente: ${firstItem.ownerName}`}
+                                                </p>
+                                                <p>Variedad/Producto: {firstItem.varietyOrProduct}</p>
+                                                <p>Bins: {totalBins}</p>
+                                                <p>Pallets: {totalPallets}</p>
                                                 <Button size="sm" className="w-full mt-2" onClick={() => handleRelocateClick(chamberId, coord)}>Reubicar</Button>
                                               </div>
                                             </TooltipContent>
@@ -420,12 +499,14 @@ export default function CamarasPage() {
             onRelocate={handleRelocateLot}
             sourceChamberId={coordToRelocate.chamberId}
             sourceCoordinate={coordToRelocate.coordinate}
-            lotsInCoordinate={storedLotsByChamber[coordToRelocate.chamberId]?.[coordToRelocate.coordinate] || []}
+            lotsInCoordinate={(chamberLots || []).filter(l => l.chamberId === coordToRelocate.chamberId && l.coordinate === coordToRelocate.coordinate)}
             allLots={chamberLots || []}
         />
       )}
     </div>
   );
 }
+
+    
 
     
