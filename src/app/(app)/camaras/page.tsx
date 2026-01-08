@@ -44,12 +44,12 @@ export default function CamarasPage() {
 
   const { pendingLots, storedLotsByChamber, chamberOccupancy } = React.useMemo(() => {
     const allChamberLots = chamberLots || [];
-    
-    const pendingLots = allChamberLots
+
+    const calculatedPendingLots = allChamberLots
       .filter((lot) => lot.status === 'Pendiente por Almacenar')
       .sort((a, b) => b.storedAt && a.storedAt ? b.storedAt.toMillis() - a.storedAt.toMillis() : 0);
       
-    const storedLotsByChamber = allChamberLots
+    const calculatedStoredLotsByChamber = allChamberLots
       .filter((lot) => lot.status === 'Almacenado' && lot.chamberId && lot.coordinate)
       .reduce((acc, lot) => {
         if (!acc[lot.chamberId!]) {
@@ -62,7 +62,7 @@ export default function CamarasPage() {
         return acc;
     }, {} as Record<string, Record<string, ChamberLot[]>>);
 
-    const chamberOccupancy = Object.keys(chambersConfig).reduce((acc, chamberId) => {
+    const calculatedChamberOccupancy = Object.keys(chambersConfig).reduce((acc, chamberId) => {
         const lotsInChamber = allChamberLots.filter(lot => lot.chamberId === chamberId && lot.status === 'Almacenado');
         const totalBins = lotsInChamber.reduce((sum, lot) => sum + lot.binCount, 0);
         acc[chamberId] = {
@@ -73,7 +73,11 @@ export default function CamarasPage() {
         return acc;
     }, {} as Record<string, {occupied: number; total: number; percentage: number}>);
 
-    return { pendingLots, storedLotsByChamber, chamberOccupancy };
+    return { 
+        pendingLots: calculatedPendingLots, 
+        storedLotsByChamber: calculatedStoredLotsByChamber, 
+        chamberOccupancy: calculatedChamberOccupancy 
+    };
   }, [chamberLots]);
 
 
@@ -253,6 +257,7 @@ export default function CamarasPage() {
                                                         <TooltipContent>
                                                             <p className="font-bold">Lote: {firstLot.displayLotId}</p>
                                                             <p>Productor: {firstLot.producerShortName}</p>
+                                                            <p>Variedad: {firstLot.variety}</p>
                                                             <p>Bins: {totalBinsInCoord} / 6</p>
                                                         </TooltipContent>
                                                     )}

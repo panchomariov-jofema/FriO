@@ -363,6 +363,10 @@
           "type": "number",
           "description": "Number of bins in this portion of the lot."
         },
+        "variety": {
+          "type": "string",
+          "description": "Variety of the fruit."
+        },
         "hidrocooler": {
           "type": "string",
           "description": "The hidrocooler unit used for processing."
@@ -390,6 +394,7 @@
         "displayLotId",
         "producerShortName",
         "binCount",
+        "variety",
         "hidrocooler",
         "status",
         "storedAt"

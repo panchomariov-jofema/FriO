@@ -96,6 +96,7 @@ export interface ChamberLot {
     displayLotId: string;
     producerShortName: string;
     binCount: number;
+    variety: Variety;
     hidrocooler: string;
     chamberId?: string;
     coordinate?: string;

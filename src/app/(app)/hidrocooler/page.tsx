@@ -4,7 +4,7 @@ import * as React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
-import type { HidrocoolerLot, ProcessingLot } from '@/lib/types';
+import type { HidrocoolerLot, ProcessingLot, ReceptionLot } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -18,7 +18,9 @@ import { FirestorePermissionError } from '@/firebase/errors';
 export default function HidrocoolerPage() {
   const { data: pendingLots, loading: loadingPending } = useFirestoreCollection<HidrocoolerLot>('hidrocoolerLots');
   const { data: processingLots, loading: loadingProcessing } = useFirestoreCollection<ProcessingLot>('processingLots');
-  
+  // Need to get reception lot to get variety
+  const { data: receptionLots } = useFirestoreCollection<ReceptionLot>('receptionLots');
+
   const [lotToProcess, setLotToProcess] = React.useState<HidrocoolerLot | null>(null);
   const [isProcessDialogOpen, setProcessDialogOpen] = React.useState(false);
 
@@ -103,11 +105,18 @@ export default function HidrocoolerPage() {
   };
   
   const handleFinishProcessingClick = async (processingLot: ProcessingLot) => {
-    if (!firestore) return;
+    if (!firestore || !receptionLots) return;
+
+    const originalReceptionLot = receptionLots.find(lot => lot.displayLotId === processingLot.displayLotId);
+    if (!originalReceptionLot) {
+        toast({ variant: 'destructive', title: 'Error', description: 'No se pudo encontrar el lote de recepción original para obtener la variedad.' });
+        return;
+    }
 
     const chamberLotData = {
         displayLotId: processingLot.displayLotId,
         producerShortName: processingLot.producerShortName,
+        variety: originalReceptionLot.variety,
         binCount: processingLot.binCount,
         hidrocooler: processingLot.hidrocooler,
         status: 'Pendiente por Almacenar' as const,
