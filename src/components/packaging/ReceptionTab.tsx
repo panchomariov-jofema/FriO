@@ -21,6 +21,13 @@ import { FirestorePermissionError } from '@/firebase/errors';
 
 type ReceptionFormValues = z.infer<typeof packagingReceptionSchema>;
 
+const defaultItem = {
+  packagingMasterId: '',
+  packagingMasterCode: '',
+  packagingMasterName: '',
+  palletCount: 1,
+};
+
 export function ReceptionTab() {
   const { data: allClients, loading: loadingClients } = useFirestoreCollection<OtherClient>('otherClients');
   const { data: allPackagingMasters, loading: loadingMasters } = useFirestoreCollection<PackagingMaster>('packagingMaster');
@@ -32,7 +39,7 @@ export function ReceptionTab() {
     defaultValues: {
       clientId: '',
       document: '',
-      items: [{ packagingMasterId: '', palletCount: 1, packagingMasterName: '' }],
+      items: [defaultItem],
     },
   });
 
@@ -46,11 +53,6 @@ export function ReceptionTab() {
   const packagingClients = React.useMemo(() => {
     return allClients.filter(c => c.type.toLowerCase() === 'embalaje');
   }, [allClients]);
-
-  const availableMasters = React.useMemo(() => {
-    if (!selectedClientId) return [];
-    return allPackagingMasters.filter(m => m.clientId === selectedClientId);
-  }, [selectedClientId, allPackagingMasters]);
 
   const onSubmit = async (values: ReceptionFormValues) => {
     if (!firestore) return;
@@ -75,7 +77,7 @@ export function ReceptionTab() {
         form.reset({
             clientId: '',
             document: '',
-            items: [{ packagingMasterId: '', palletCount: 1, packagingMasterName: '' }],
+            items: [defaultItem],
         });
     } catch (error) {
         console.error("Error creating packaging reception:", error);
@@ -87,22 +89,33 @@ export function ReceptionTab() {
         }));
     }
   };
-
-  const handleMaterialChange = (value: string, index: number) => {
-    const selectedMaster = availableMasters.find(m => m.id === value);
-    if (selectedMaster) {
-        form.setValue(`items.${index}.packagingMasterId`, selectedMaster.id);
-        form.setValue(`items.${index}.packagingMasterName`, selectedMaster.name);
+  
+  const handleCodeBlur = (index: number) => {
+    const code = form.getValues(`items.${index}.packagingMasterCode`);
+    if (!code || !selectedClientId) {
+      toast({ variant: 'destructive', title: 'Error', description: 'Por favor, seleccione un cliente e ingrese un código.' });
+      return;
+    }
+    
+    const foundMaster = allPackagingMasters.find(m => m.clientId === selectedClientId && m.code === code);
+    
+    if (foundMaster) {
+      form.setValue(`items.${index}.packagingMasterId`, foundMaster.id, { shouldValidate: true });
+      form.setValue(`items.${index}.packagingMasterName`, foundMaster.name);
+    } else {
+      form.setValue(`items.${index}.packagingMasterId`, '');
+      form.setValue(`items.${index}.packagingMasterName`, '');
+      form.setError(`items.${index}.packagingMasterCode`, { message: 'Código no encontrado para este cliente.' });
     }
   };
 
+
   const handleClientChange = (value: string) => {
     form.setValue('clientId', value);
-    // Reset items when client changes
     form.reset({
         ...form.getValues(),
         clientId: value,
-        items: [{ packagingMasterId: '', palletCount: 1, packagingMasterName: '' }]
+        items: [defaultItem]
     });
   }
 
@@ -156,33 +169,32 @@ export function ReceptionTab() {
               <FormLabel>Ítems Recibidos</FormLabel>
               {fields.map((field, index) => (
                 <div key={field.id} className="flex items-end gap-2 p-3 border rounded-md">
-                  <div className="flex-1 grid sm:grid-cols-2 gap-4">
+                  <div className="flex-1 grid sm:grid-cols-3 gap-4 items-end">
                     <FormField
                       control={form.control}
-                      name={`items.${index}.packagingMasterId`}
+                      name={`items.${index}.packagingMasterCode`}
                       render={({ field: itemField }) => (
                         <FormItem>
-                          <FormLabel>Artículo</FormLabel>
-                           <Select onValueChange={(value) => handleMaterialChange(value, index)} value={itemField.value} disabled={!selectedClientId || loadingMasters || availableMasters.length === 0}>
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder={
-                                    !selectedClientId 
-                                    ? 'Seleccione un cliente primero' 
-                                    : (availableMasters.length === 0 ? 'Cliente sin embalajes configurados' : 'Seleccione un artículo...')
-                                } />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {availableMasters.map(m => (
-                                <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                          <FormLabel>Cod. Artículo</FormLabel>
+                           <FormControl>
+                               <Input 
+                                {...itemField} 
+                                onBlur={() => handleCodeBlur(index)} 
+                                autoComplete="off" 
+                                disabled={!selectedClientId || loadingMasters}
+                                placeholder={!selectedClientId ? "Seleccione cliente" : "Ingrese código..."}
+                               />
+                           </FormControl>
                           <FormMessage />
                         </FormItem>
                       )}
                     />
+                     <div className="space-y-2">
+                        <Label>Descripción</Label>
+                        <p className="font-medium text-sm h-10 flex items-center">
+                            {form.watch(`items.${index}.packagingMasterName`) || <span className="text-muted-foreground">--</span>}
+                        </p>
+                    </div>
                     <FormField
                       control={form.control}
                       name={`items.${index}.palletCount`}
@@ -204,7 +216,7 @@ export function ReceptionTab() {
                 type="button"
                 variant="outline"
                 size="sm"
-                onClick={() => append({ packagingMasterId: '', palletCount: 1, packagingMasterName: '' })}
+                onClick={() => append(defaultItem)}
               >
                 <PlusCircle className="mr-2 h-4 w-4" />
                 Agregar Artículo

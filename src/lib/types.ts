@@ -72,6 +72,7 @@ export interface PackagingReception {
   document: string;
   items: {
     packagingMasterId: string;
+    packagingMasterCode: string;
     packagingMasterName: string;
     palletCount: number;
   }[];

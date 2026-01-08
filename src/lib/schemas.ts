@@ -34,7 +34,8 @@ export const packagingMasterSchema = z.object({
 });
 
 export const packagingReceptionItemSchema = z.object({
-    packagingMasterId: z.string().min(1, "Debe seleccionar un artículo."),
+    packagingMasterId: z.string().min(1, "Debe ingresar un código de artículo válido."),
+    packagingMasterCode: z.string().min(1, "Debe ingresar un código de artículo."),
     packagingMasterName: z.string(),
     palletCount: z.coerce.number().min(1, "La cantidad debe ser al menos 1."),
 });
