@@ -17,6 +17,8 @@ import { chambersConfig } from '@/lib/chambers-config';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Boxes, PackageCheck, Truck, Warehouse, Archive } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
 
 
 const CHART_COLORS = [
@@ -28,12 +30,13 @@ const CHART_COLORS = [
 ];
 
 export default function DashboardPage() {
+    const [selectedExporterId, setSelectedExporterId] = React.useState<string | null>(null);
+
     const { data: chamberLots, loading: loadingChamber } = useFirestoreCollection<ChamberLot>('chamberLots');
     const { data: processingLots, loading: loadingProcessing } = useFirestoreCollection<ProcessingLot>('processingLots');
     const { data: dispatches, loading: loadingDispatches } = useFirestoreCollection<Dispatch>('dispatches');
     const { data: receptionLots, loading: loadingReception } = useFirestoreCollection<ReceptionLot>('receptionLots');
     const { data: exporters, loading: loadingExporters } = useFirestoreCollection<Exporter>('exporters');
-    const { data: binMaterials, loading: loadingBinMaterials } = useFirestoreCollection<BinMaterial>('binMaterials');
     const { data: binMaterialStock, loading: loadingBinStock } = useFirestoreCollection<BinMaterialStock>('binMaterialStock');
     
     const { 
@@ -46,21 +49,31 @@ export default function DashboardPage() {
         latestReceptions,
         totalEmptyBins,
     } = React.useMemo(() => {
-        const storedLots = (chamberLots || []).filter(lot => lot.status === 'Almacenado');
+        const filteredChamberLots = (chamberLots || []).filter(lot => !selectedExporterId || lot.exporterId === selectedExporterId);
+        const filteredDispatches = (dispatches || []).filter(d => !selectedExporterId || d.exporterId === selectedExporterId);
+        const filteredReceptionLots = (receptionLots || []).filter(lot => !selectedExporterId || lot.exporterId === selectedExporterId);
+        
+        const exporterDisplayLotIds = new Set(filteredReceptionLots.map(lot => lot.displayLotId));
+        const filteredProcessingLots = (processingLots || []).filter(p => exporterDisplayLotIds.has(p.displayLotId));
+
+
+        const storedLots = filteredChamberLots.filter(lot => lot.status === 'Almacenado');
         const calculatedTotalBins = storedLots.reduce((sum, lot) => sum + lot.binCount, 0);
         
-        const calculatedPendingStorage = (chamberLots || []).filter(lot => lot.status === 'Pendiente por Almacenar').length;
+        const calculatedPendingStorage = filteredChamberLots.filter(lot => lot.status === 'Pendiente por Almacenar').length;
         
-        const calculatedPendingDispatch = (dispatches || []).filter(d => d.status === 'Pendiente de Salida').length;
+        const calculatedPendingDispatch = filteredDispatches.filter(d => d.status === 'Pendiente de Salida').length;
         
-        const calculatedInProcess = (processingLots || []).filter(p => p.status === 'En Proceso').length;
+        const calculatedInProcess = filteredProcessingLots.filter(p => p.status === 'En Proceso').length;
 
         const exporterMap = (exporters || []).reduce((acc, e) => {
             acc[e.exporterId] = e.name;
             return acc;
         }, {} as Record<string, string>);
-
-        const calculatedStockByExporter = storedLots.reduce((acc, lot) => {
+        
+        // This chart should always show the global view, so we use all chamber lots
+        const allStoredLots = (chamberLots || []).filter(lot => lot.status === 'Almacenado');
+        const calculatedStockByExporter = allStoredLots.reduce((acc, lot) => {
             const exporterName = exporterMap[lot.exporterId] || 'No Asignado';
             if (!acc[exporterName]) {
                 acc[exporterName] = 0;
@@ -74,6 +87,7 @@ export default function DashboardPage() {
             value,
         }));
         
+        // Occupancy is also filtered by exporter
         const calculatedOccupancy = Object.keys(chambersConfig).map(chamberId => {
             const chamber = chambersConfig[chamberId];
             const binsInChamber = storedLots
@@ -87,13 +101,18 @@ export default function DashboardPage() {
             };
         });
 
-        const sortedReceptions = (receptionLots || [])
+        const sortedReceptions = filteredReceptionLots
             .filter(lot => lot.createdAt)
             .sort((a,b) => b.createdAt!.toMillis() - a.createdAt!.toMillis())
             .slice(0, 5);
-
+        
         const specificBinCodes = ['10001', '10011', '10007'];
-        const calculatedEmptyBins = (binMaterialStock || [])
+        let stockForEmptyBins = binMaterialStock || [];
+        if (selectedExporterId) {
+            stockForEmptyBins = (binMaterialStock || []).filter(s => s.exporterId === selectedExporterId);
+        }
+
+        const calculatedEmptyBins = stockForEmptyBins
             .filter(s => specificBinCodes.includes(s.binMaterialCode))
             .reduce((sum, s) => sum + s.quantity, 0);
 
@@ -109,9 +128,9 @@ export default function DashboardPage() {
             totalEmptyBins: calculatedEmptyBins,
         };
 
-    }, [chamberLots, processingLots, dispatches, exporters, receptionLots, binMaterials, binMaterialStock]);
+    }, [chamberLots, processingLots, dispatches, exporters, receptionLots, binMaterialStock, selectedExporterId]);
 
-    const loading = loadingChamber || loadingProcessing || loadingDispatches || loadingExporters || loadingReception || loadingBinMaterials || loadingBinStock;
+    const loading = loadingChamber || loadingProcessing || loadingDispatches || loadingExporters || loadingReception || loadingBinStock;
 
     const kpiCards = [
         { title: "Total Bins en Cámara (Fruta)", value: totalBinsInStock, icon: Warehouse },
@@ -135,6 +154,37 @@ export default function DashboardPage() {
 
     return (
         <div className="space-y-6">
+            <Card>
+                <CardContent className="pt-6">
+                    <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+                         <div className="flex-1">
+                            <h2 className="text-2xl font-bold tracking-tight">Dashboard Ejecutivo</h2>
+                            <p className="text-muted-foreground">
+                                Vista general de los indicadores clave de la operación.
+                            </p>
+                        </div>
+                        <div className="w-full sm:w-auto sm:min-w-[200px]">
+                            <Label htmlFor="exporter-filter">Filtrar por Exportador</Label>
+                            <Select
+                                value={selectedExporterId ?? 'all'}
+                                onValueChange={(value) => setSelectedExporterId(value === 'all' ? null : value)}
+                                disabled={loadingExporters}
+                            >
+                                <SelectTrigger id="exporter-filter">
+                                    <SelectValue placeholder="Seleccione..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">Ver Todos</SelectItem>
+                                    {exporters.map(e => (
+                                        <SelectItem key={e.id} value={e.exporterId}>{e.name}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    </div>
+                </CardContent>
+            </Card>
+
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
                 {kpiCards.map(kpi => (
                     <Card key={kpi.title}>
@@ -156,8 +206,8 @@ export default function DashboardPage() {
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-5">
                 <Card className="lg:col-span-2">
                     <CardHeader>
-                        <CardTitle>Distribución de Stock por Cliente (Fruta)</CardTitle>
-                        <CardDescription>Bins con fruta almacenados por cliente exportador.</CardDescription>
+                        <CardTitle>Distribución Global de Stock (Fruta)</CardTitle>
+                        <CardDescription>Porcentaje del stock total por cliente exportador.</CardDescription>
                     </CardHeader>
                     <CardContent>
                         {loading ? (
@@ -173,6 +223,7 @@ export default function DashboardPage() {
                                         <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
                                     ))}
                                 </Pie>
+                                <Legend content={<ChartTooltipContent nameKey="name" hideLabel />} />
                             </PieChart>
                         </ChartContainer>
                         ) : (
@@ -186,7 +237,7 @@ export default function DashboardPage() {
                 <Card className="lg:col-span-3">
                     <CardHeader>
                         <CardTitle>Ocupación por Cámara</CardTitle>
-                        <CardDescription>Capacidad utilizada en cada cámara.</CardDescription>
+                        <CardDescription>Capacidad utilizada en cada cámara según el filtro aplicado.</CardDescription>
                     </CardHeader>
                     <CardContent>
                          {loading ? (
