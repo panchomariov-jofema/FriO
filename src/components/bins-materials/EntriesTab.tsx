@@ -46,6 +46,25 @@ export function EntriesTab({ exporterId, producerId }: EntriesTabProps) {
     defaultValues: { document: '', items: [] },
   });
 
+  const items = form.watch('items');
+  
+  React.useEffect(() => {
+    // Find the index for BINS and TOTES
+    const binsIndex = items.findIndex(item => item.binMaterialName.toUpperCase().includes('BINS'));
+    const totesIndex = items.findIndex(item => item.binMaterialName.toUpperCase().includes('TOTES PLASTICO'));
+
+    if (binsIndex !== -1 && totesIndex !== -1) {
+      const binsQuantity = items[binsIndex].quantity;
+      if (typeof binsQuantity === 'number' && binsQuantity > 0) {
+        // Only update if the totes field has not been manually touched
+        if (!form.formState.dirtyFields.items?.[totesIndex]?.quantity) {
+          form.setValue(`items.${totesIndex}.quantity`, binsQuantity * 24, { shouldDirty: true });
+        }
+      }
+    }
+  }, [items, form]);
+
+
   React.useEffect(() => {
     if (materials.length > 0) {
       form.reset({
