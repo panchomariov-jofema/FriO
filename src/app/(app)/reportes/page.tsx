@@ -267,7 +267,7 @@ function ReceptionReport() {
     const isLoading = loadingLots || loadingExporters || loadingProducers;
 
     const handleExportCSV = () => {
-        const headers = ['Fecha', 'Exportador', 'Productor', 'Variedad', 'Kilos (Peso Total)', 'T° Pre-Hidro', 'T° Post-Hidro', 'Status'];
+        const headers = ['Fecha', 'Exportador', 'Productor', 'Cantidad de Bins', 'Cantidad de Totes', 'Totes Vacios', 'Variedad', 'Kilos (Peso Total)', 'T° Pre-Hidro', 'T° Post-Hidro', 'Status'];
         const csvRows = [headers.join(',')];
 
         sortedData.forEach(lot => {
@@ -276,6 +276,9 @@ function ReceptionReport() {
                 `"${date}"`,
                 `"${exporterMap[lot.exporterId] || lot.exporterId}"`,
                 `"${producerMap[lot.producerId] || lot.producerId}"`,
+                lot.binCount,
+                lot.toteCount,
+                lot.emptyTotes || 0,
                 `"${lot.variety}"`,
                 lot.totalWeight || 0,
                 lot.preHydroTemp || '',
@@ -317,6 +320,9 @@ function ReceptionReport() {
                                 <TableHead>Fecha</TableHead>
                                 <TableHead>Exportador</TableHead>
                                 <TableHead>Productor</TableHead>
+                                <TableHead>Bins</TableHead>
+                                <TableHead>Totes</TableHead>
+                                <TableHead>Totes Vacíos</TableHead>
                                 <TableHead>Variedad</TableHead>
                                 <TableHead>Kilos</TableHead>
                                 <TableHead>T° Pre</TableHead>
@@ -328,7 +334,7 @@ function ReceptionReport() {
                             {isLoading ? (
                                 Array.from({ length: 15 }).map((_, i) => (
                                     <TableRow key={i}>
-                                        <TableCell colSpan={8}><Skeleton className="h-4 w-full" /></TableCell>
+                                        <TableCell colSpan={11}><Skeleton className="h-4 w-full" /></TableCell>
                                     </TableRow>
                                 ))
                             ) : sortedData.length > 0 ? (
@@ -337,6 +343,9 @@ function ReceptionReport() {
                                         <TableCell>{lot.createdAt ? lot.createdAt.toDate().toLocaleDateString() : 'N/A'}</TableCell>
                                         <TableCell>{exporterMap[lot.exporterId] || lot.exporterId}</TableCell>
                                         <TableCell>{producerMap[lot.producerId] || lot.producerId}</TableCell>
+                                        <TableCell>{lot.binCount}</TableCell>
+                                        <TableCell>{lot.toteCount}</TableCell>
+                                        <TableCell>{lot.emptyTotes || 0}</TableCell>
                                         <TableCell>{lot.variety}</TableCell>
                                         <TableCell>{lot.totalWeight?.toFixed(2) ?? '-'}</TableCell>
                                         <TableCell>{lot.preHydroTemp?.toFixed(1) ?? '-'}</TableCell>
@@ -346,7 +355,7 @@ function ReceptionReport() {
                                 ))
                             ) : (
                                 <TableRow>
-                                    <TableCell colSpan={8} className="h-24 text-center">
+                                    <TableCell colSpan={11} className="h-24 text-center">
                                         No hay lotes de recepción registrados.
                                     </TableCell>
                                 </TableRow>
