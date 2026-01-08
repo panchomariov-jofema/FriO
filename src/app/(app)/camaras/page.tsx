@@ -9,7 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { StoreInChamberDialog } from '@/components/hidrocooler/StoreInChamberDialog';
-import { collection, doc, writeBatch } from 'firebase/firestore';
+import { collection, doc, writeBatch, getDocs } from 'firebase/firestore';
 import { useFirestore } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { errorEmitter } from '@/firebase/error-emitter';
@@ -20,6 +20,8 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { cn } from '@/lib/utils';
 import { Progress } from '@/components/ui/progress';
 import { RelocateLotDialog } from '@/components/hidrocooler/RelocateLotDialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { Trash2 } from 'lucide-react';
 
 // Helper for natural sorting (e.g., A1, A2, ... A10)
 const naturalSort = (a: string, b: string) => {
@@ -236,6 +238,32 @@ export default function CamarasPage() {
     }
   };
   
+  const handleClearStock = async () => {
+    if (!firestore) return;
+    if (!chamberLots || chamberLots.length === 0) {
+      toast({ title: 'Sin Stock', description: 'No hay lotes en las cámaras para limpiar.' });
+      return;
+    }
+
+    try {
+      const chamberLotsRef = collection(firestore, 'chamberLots');
+      const querySnapshot = await getDocs(chamberLotsRef);
+      const batch = writeBatch(firestore);
+      querySnapshot.forEach((doc) => {
+        batch.delete(doc.ref);
+      });
+      await batch.commit();
+      toast({ title: 'Éxito', description: 'Todo el stock de las cámaras ha sido eliminado.' });
+    } catch (e: any) {
+      console.error("Error al limpiar el stock de cámaras: ", e);
+      toast({ variant: 'destructive', title: 'Error', description: 'Ocurrió un error al limpiar el stock.' });
+      errorEmitter.emit('permission-error', new FirestorePermissionError({
+          path: 'chamberLots',
+          operation: 'delete'
+      }));
+    }
+  };
+
   return (
     <div className="space-y-6">
       <Card>
@@ -282,9 +310,35 @@ export default function CamarasPage() {
       </Card>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Estado de Cámaras</CardTitle>
-          <CardDescription>Ocupación y distribución de los lotes en las cámaras de frío.</CardDescription>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div>
+            <CardTitle>Estado de Cámaras</CardTitle>
+            <CardDescription>Ocupación y distribución de los lotes en las cámaras de frío.</CardDescription>
+          </div>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+                <Button variant="destructive" size="icon">
+                    <Trash2 className="h-4 w-4" />
+                    <span className="sr-only">Limpiar Stock</span>
+                </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                    <AlertDialogTitle>¿Está seguro de limpiar todo el stock?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                        Esta acción no se puede deshacer. Se eliminarán permanentemente TODOS los lotes
+                        almacenados en las cámaras. Esta herramienta es solo para fines de desarrollo y pruebas.
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleClearStock} className="bg-destructive hover:bg-destructive/90">
+                        Sí, Limpiar Stock
+                    </AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
+
         </CardHeader>
         <CardContent>
           <Accordion type="single" collapsible className="w-full" defaultValue="CAMARA-1">
