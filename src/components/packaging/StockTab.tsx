@@ -9,32 +9,37 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 
 export function StockTab() {
-  const { data: storedLots, loading } = useFirestoreCollection<PackagingReception>('packagingReceptions');
+  const { data: allLots, loading } = useFirestoreCollection<PackagingReception>('packagingReceptions');
 
   const stockByMaterial = React.useMemo(() => {
-    const stock: Record<string, { total: number; locations: Record<string, number> }> = {};
+    const stock: Record<string, { total: number; locations: Record<string, number>, pending: number }> = {};
 
-    storedLots
-      .filter(lot => lot.status === 'Almacenado' && lot.storageLocation)
+    allLots
       .forEach(lot => {
         lot.items.forEach(item => {
           if (!stock[item.packagingMasterName]) {
-            stock[item.packagingMasterName] = { total: 0, locations: {} };
+            stock[item.packagingMasterName] = { total: 0, locations: {}, pending: 0 };
           }
-          stock[item.packagingMasterName].total += item.palletCount;
-          const locationKey = `${lot.storageLocation!.warehouse} / ${lot.storageLocation!.aisle}`;
-          stock[item.packagingMasterName].locations[locationKey] = (stock[item.packagingMasterName].locations[locationKey] || 0) + item.palletCount;
+          
+          if (lot.status === 'Almacenado' && lot.storageLocation) {
+            stock[item.packagingMasterName].total += item.palletCount;
+            const locationKey = `${lot.storageLocation.warehouse} / ${lot.storageLocation.aisle}`;
+            stock[item.packagingMasterName].locations[locationKey] = (stock[item.packagingMasterName].locations[locationKey] || 0) + item.palletCount;
+          } else if (lot.status === 'Pendiente de almacenar') {
+            stock[item.packagingMasterName].pending += item.palletCount;
+            stock[item.packagingMasterName].total += item.palletCount;
+          }
         });
       });
       
     return Object.entries(stock).sort((a,b) => a[0].localeCompare(b[0]));
-  }, [storedLots]);
+  }, [allLots]);
 
   return (
     <Card>
       <CardHeader>
         <CardTitle>Stock de Embalajes en Bodega</CardTitle>
-        <CardDescription>Resumen del total de pallets por material y sus ubicaciones.</CardDescription>
+        <CardDescription>Resumen del total de pallets por material, incluyendo stock físico y pendientes de almacenar.</CardDescription>
       </CardHeader>
       <CardContent>
         {loading ? (
@@ -58,11 +63,17 @@ export function StockTab() {
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead>Ubicación (Almacén / Pasillo)</TableHead>
+                          <TableHead>Ubicación</TableHead>
                           <TableHead className="text-right">Cantidad de Pallets</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
+                        {data.pending > 0 && (
+                            <TableRow>
+                                <TableCell className="font-semibold text-secondary-foreground">Pendiente de Almacenar</TableCell>
+                                <TableCell className="text-right font-semibold">{data.pending}</TableCell>
+                            </TableRow>
+                        )}
                         {Object.entries(data.locations).sort().map(([location, count]) => (
                           <TableRow key={location}>
                             <TableCell>{location}</TableCell>
@@ -78,7 +89,7 @@ export function StockTab() {
           </Accordion>
         ) : (
           <div className="flex h-40 items-center justify-center rounded-md border border-dashed">
-            <p className="text-muted-foreground">No hay stock almacenado.</p>
+            <p className="text-muted-foreground">No hay stock registrado.</p>
           </div>
         )}
       </CardContent>
