@@ -44,7 +44,7 @@ export function ReceptionTab() {
   const selectedClientId = form.watch('clientId');
 
   const packagingClients = React.useMemo(() => {
-    return allClients.filter(c => c.type === 'embalajes');
+    return allClients.filter(c => c.type.toLowerCase() === 'embalajes');
   }, [allClients]);
 
   const availableMasters = React.useMemo(() => {
