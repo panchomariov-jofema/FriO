@@ -1,3 +1,5 @@
+'use client';
+
 import type { Timestamp } from "firebase/firestore";
 
 export interface Exporter {
@@ -79,14 +81,14 @@ export interface HidrocoolerLot {
 }
 
 export interface ProcessingLot {
-  id: string; // Combination of originalLotId and timestamp for uniqueness
+  id: string;
   originalLotId: string;
   displayLotId: string;
   producerShortName: string;
   binCount: number;
   hidrocooler: string;
   status: 'En Proceso' | 'Finalizado';
-  createdAt: Timestamp | any;
+  createdAt: Timestamp;
 }
 
 export interface ChamberLot {

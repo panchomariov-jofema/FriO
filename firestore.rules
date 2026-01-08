@@ -75,12 +75,21 @@ service cloud.firestore {
     }
 
     /**
-     * @description Collection for lots in the hidrocooler process.
+     * @description Collection for lots that are pending to enter the hidrocooler process.
      * @path /hidrocoolerLots/{lotId}
      * @allow Any authenticated user can create, read, and update lots.
      */
     match /hidrocoolerLots/{lotId} {
       allow read, write: if isSignedIn();
+    }
+    
+    /**
+     * @description Collection for lot fractions currently being processed in a hidrocooler.
+     * @path /processingLots/{lotId}
+     * @allow Any authenticated user can create, read, and update lots.
+     */
+    match /processingLots/{lotId} {
+        allow read, write: if isSignedIn();
     }
 
     /**

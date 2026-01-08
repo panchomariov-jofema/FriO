@@ -295,7 +295,57 @@
         "createdAt"
       ]
     },
-     "ChamberLot": {
+    "ProcessingLot": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "ProcessingLot",
+      "type": "object",
+      "description": "Represents a fraction of a lot being processed in a hidrocooler.",
+      "properties": {
+        "originalLotId": {
+          "type": "string",
+          "description": "The ID of the original lot in hidrocoolerLots."
+        },
+        "displayLotId": {
+          "type": "string",
+          "description": "User-friendly lot identifier."
+        },
+        "producerShortName": {
+          "type": "string",
+          "description": "Short name of the producer."
+        },
+        "binCount": {
+          "type": "number",
+          "description": "Number of bins in this processing fraction."
+        },
+        "hidrocooler": {
+          "type": "string",
+          "description": "The hidrocooler unit used (e.g., 'HIDROCOOLER 1')."
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "En Proceso",
+            "Finalizado"
+          ],
+          "description": "Status of the processing fraction."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp of when processing started."
+        }
+      },
+      "required": [
+        "originalLotId",
+        "displayLotId",
+        "producerShortName",
+        "binCount",
+        "hidrocooler",
+        "status",
+        "createdAt"
+      ]
+    },
+    "ChamberLot": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "ChamberLot",
       "type": "object",
@@ -485,11 +535,27 @@
           "schema": {
             "$ref": "#/backend/entities/HidrocoolerLot"
           },
-          "description": "Stores lots that are in the hidrocooler process. A generated ID will be used.",
+          "description": "Stores lots that are pending to enter the hidrocooler process. A generated ID will be used.",
           "params": [
             {
               "name": "hidrocoolerLotId",
               "description": "The unique identifier for the hidrocooler lot."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/processingLots/{processingLotId}",
+        "definition": {
+          "entityName": "ProcessingLot",
+          "schema": {
+            "$ref": "#/backend/entities/ProcessingLot"
+          },
+          "description": "Stores fractions of lots that are actively being processed in a hidrocooler. A generated ID will be used.",
+          "params": [
+            {
+              "name": "processingLotId",
+              "description": "The unique identifier for the processing lot."
             }
           ]
         }

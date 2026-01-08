@@ -9,7 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ProcessLotDialog } from '@/components/hidrocooler/ProcessLotDialog';
-import { collection, doc, runTransaction, serverTimestamp, addDoc } from 'firebase/firestore';
+import { collection, doc, runTransaction, serverTimestamp, addDoc, updateDoc } from 'firebase/firestore';
 import { useFirestore } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { errorEmitter } from '@/firebase/error-emitter';
@@ -18,7 +18,7 @@ import { StoreInChamberDialog } from '@/components/hidrocooler/StoreInChamberDia
 
 export default function HidrocoolerPage() {
   const { data: pendingLots, loading: loadingPending } = useFirestoreCollection<HidrocoolerLot>('hidrocoolerLots');
-  const [processingLots, setProcessingLots] = React.useState<ProcessingLot[]>([]);
+  const { data: processingLots, loading: loadingProcessing } = useFirestoreCollection<ProcessingLot>('processingLots');
   
   const [lotToProcess, setLotToProcess] = React.useState<HidrocoolerLot | null>(null);
   const [isProcessDialogOpen, setProcessDialogOpen] = React.useState(false);
@@ -37,6 +37,11 @@ export default function HidrocoolerPage() {
         return a.createdAt.toMillis() - b.createdAt.toMillis();
     });
   }, [pendingLots]);
+
+  const sortedProcessingLots = React.useMemo(() => {
+    if (!processingLots) return [];
+    return [...processingLots].sort((a,b) => b.createdAt.toMillis() - a.createdAt.toMillis());
+  }, [processingLots]);
   
   const handleProcessClick = (lot: HidrocoolerLot) => {
     setLotToProcess(lot);
@@ -47,6 +52,7 @@ export default function HidrocoolerPage() {
     if (!lotToProcess || !firestore) return;
 
     const originalLotRef = doc(firestore, 'hidrocoolerLots', lotToProcess.id);
+    const processingLotsRef = collection(firestore, 'processingLots');
 
     try {
         await runTransaction(firestore, async (transaction) => {
@@ -68,30 +74,33 @@ export default function HidrocoolerPage() {
                  transaction.delete(originalLotRef);
             }
            
-            const newProcessingLot: ProcessingLot = {
-                id: `${lotToProcess.id}-${Date.now()}`,
+            const newProcessingLot = {
                 originalLotId: lotToProcess.id,
                 displayLotId: lotToProcess.displayLotId,
                 producerShortName: lotToProcess.producerShortName,
                 binCount: binCount,
                 hidrocooler,
-                status: 'En Proceso',
+                status: 'En Proceso' as const,
                 createdAt: serverTimestamp(),
             };
-            setProcessingLots(prev => [...prev, newProcessingLot]);
+            
+            // We can't use addDoc in a transaction, so we create a ref and set it.
+            const newProcessingLotRef = doc(processingLotsRef);
+            transaction.set(newProcessingLotRef, newProcessingLot);
         });
         
         toast({ title: "Éxito", description: `${binCount} bins del lote ${lotToProcess.displayLotId} enviados a ${hidrocooler}.` });
 
     } catch (e: any) {
         console.error("Error al procesar el lote: ", e);
+        const errPath = e.message.includes('permission-denied') ? `processingLots` : `hidrocoolerLots/${lotToProcess.id}`;
         toast({ variant: 'destructive', title: 'Error', description: e.toString() });
         errorEmitter.emit(
             'permission-error',
             new FirestorePermissionError({
-              path: `hidrocoolerLots/${lotToProcess.id}`,
-              operation: 'update',
-              requestResourceData: { binCount: lotToProcess.binCount - binCount },
+              path: errPath,
+              operation: 'write',
+              requestResourceData: { originalLotId: lotToProcess.id, hidrocooler },
             })
         );
     }
@@ -111,31 +120,31 @@ export default function HidrocoolerPage() {
         binCount: lotToStore.binCount,
         hidrocooler: lotToStore.hidrocooler,
         chamberId: chamberId,
-        status: 'Almacenado',
+        status: 'Almacenado' as const,
         storedAt: serverTimestamp(),
     };
     
     const chamberLotsRef = collection(firestore, 'chamberLots');
     
-    addDoc(chamberLotsRef, chamberLotData)
-        .then(() => {
-            setProcessingLots(prev => prev.map(lot => 
-                lot.id === lotToStore.id ? { ...lot, status: 'Finalizado' } : lot
-            ));
-            toast({ title: "Proceso Finalizado", description: `Lote enviado a ${chamberId}.` });
-        })
-        .catch((error) => {
-            console.error("Error al almacenar en cámara: ", error);
-            toast({ variant: 'destructive', title: 'Error', description: 'No se pudo mover el lote a la cámara.' });
-            errorEmitter.emit(
-                'permission-error',
-                new FirestorePermissionError({
-                  path: chamberLotsRef.path,
-                  operation: 'create',
-                  requestResourceData: chamberLotData,
-                })
-            );
-        });
+    try {
+        await addDoc(chamberLotsRef, chamberLotData);
+        
+        const processingLotRef = doc(firestore, 'processingLots', lotToStore.id);
+        await updateDoc(processingLotRef, { status: 'Finalizado' });
+
+        toast({ title: "Proceso Finalizado", description: `Lote enviado a ${chamberId}.` });
+    } catch(error) {
+        console.error("Error al almacenar en cámara: ", error);
+        toast({ variant: 'destructive', title: 'Error', description: 'No se pudo mover el lote a la cámara.' });
+        errorEmitter.emit(
+            'permission-error',
+            new FirestorePermissionError({
+              path: chamberLotsRef.path,
+              operation: 'create',
+              requestResourceData: chamberLotData,
+            })
+        );
+    }
   };
 
   const getStatusVariant = (status: string) => {
@@ -212,8 +221,12 @@ export default function HidrocoolerPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {processingLots.length > 0 ? (
-                  processingLots.map((lot) => (
+                 {loadingProcessing ? (
+                  Array.from({ length: 3 }).map((_, i) => (
+                    <TableRow key={i}><TableCell colSpan={5}><Skeleton className="h-4 w-full" /></TableCell></TableRow>
+                  ))
+                ) : sortedProcessingLots.length > 0 ? (
+                  sortedProcessingLots.map((lot) => (
                     <TableRow key={lot.id}>
                       <TableCell className="font-medium">{lot.displayLotId}</TableCell>
                       <TableCell>{lot.hidrocooler}</TableCell>
