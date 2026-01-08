@@ -26,6 +26,21 @@ const storeSchema = z.object({
 
 type StoreFormValues = z.infer<typeof storeSchema>;
 
+// Helper for natural sorting (e.g., A1, A2, ... A10)
+const naturalSort = (a: string, b: string) => {
+  const re = /(\d+)/;
+  const aNum = parseInt(a.split(re)[1], 10);
+  const bNum = parseInt(b.split(re)[1], 10);
+  const aLetter = a.split(re)[0];
+  const bLetter = b.split(re)[0];
+
+  if (aLetter < bLetter) return -1;
+  if (aLetter > bLetter) return 1;
+  
+  return aNum - bNum;
+};
+
+
 export function StoreInChamberDialog({ lot, storedLots, open, onOpenChange, onStore }: StoreInChamberDialogProps) {
   const form = useForm<StoreFormValues>({
     resolver: zodResolver(storeSchema),
@@ -51,7 +66,7 @@ export function StoreInChamberDialog({ lot, storedLots, open, onOpenChange, onSt
     const allCoordinates = config.columns.flatMap(col => config.rows.map(row => `${col}${row}`));
     const occupiedCoordinates = storedLots
         .filter(l => l.chamberId === selectedChamberId && l.coordinate)
-        .map(l => l.coordinate);
+        .map(l => l.coordinate!);
     
     // Coordinates that are not occupied at all
     const completelyFree = allCoordinates.filter(c => !occupiedCoordinates.includes(c));
@@ -61,7 +76,10 @@ export function StoreInChamberDialog({ lot, storedLots, open, onOpenChange, onSt
         .filter(l => l.chamberId === selectedChamberId && l.displayLotId === lot?.displayLotId && l.binCount < 6)
         .map(l => l.coordinate!);
 
-    return [...completelyFree, ...partiallyOccupiedBySameLot].sort();
+    // Use a Set to avoid duplicates, then sort naturally
+    const uniqueCoordinates = [...new Set([...completelyFree, ...partiallyOccupiedBySameLot])];
+    
+    return uniqueCoordinates.sort(naturalSort);
 
   }, [selectedChamberId, storedLots, lot]);
 
@@ -107,7 +125,10 @@ export function StoreInChamberDialog({ lot, storedLots, open, onOpenChange, onSt
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Cámara de Destino</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
+                  <Select onValueChange={(value) => {
+                    field.onChange(value);
+                    form.setValue('coordinate', undefined); // Reset coordinate on chamber change
+                  }} defaultValue={field.value} value={field.value}>
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="Seleccione una cámara" />
@@ -138,7 +159,7 @@ export function StoreInChamberDialog({ lot, storedLots, open, onOpenChange, onSt
                     <SelectContent>
                       {availableCoordinates.length > 0 ? availableCoordinates.map(coord => (
                         <SelectItem key={coord} value={coord}>{coord}</SelectItem>
-                      )) : <p className="p-2 text-sm text-muted-foreground">No hay coordenadas disponibles.</p>}
+                      )) : <div className="p-2 text-sm text-muted-foreground text-center">No hay coordenadas disponibles.</div>}
                     </SelectContent>
                   </Select>
                   <FormMessage />
