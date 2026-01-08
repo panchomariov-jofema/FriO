@@ -271,7 +271,7 @@ export default function DashboardPage() {
                         <Table>
                             <TableHeader>
                                 <TableRow>
-                                    <TableHead>Fecha</TableHead>
+                                    <TableHead>Fecha y Hora</TableHead>
                                     <TableHead>ID Lote</TableHead>
                                     <TableHead>Productor</TableHead>
                                     <TableHead>Variedad</TableHead>
@@ -285,7 +285,7 @@ export default function DashboardPage() {
                                 ) : latestReceptions.length > 0 ? (
                                     latestReceptions.map(lot => (
                                         <TableRow key={lot.id}>
-                                            <TableCell>{lot.createdAt?.toDate().toLocaleDateString()}</TableCell>
+                                            <TableCell>{lot.createdAt?.toDate().toLocaleString()}</TableCell>
                                             <TableCell className="font-mono">{lot.displayLotId}</TableCell>
                                             <TableCell>{lot.producerId}</TableCell>
                                             <TableCell>{lot.variety}</TableCell>

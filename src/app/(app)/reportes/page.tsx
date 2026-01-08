@@ -342,7 +342,7 @@ function ReceptionReport() {
                             ) : sortedData.length > 0 ? (
                                 sortedData.map((lot) => (
                                     <TableRow key={lot.id}>
-                                        <TableCell>{lot.createdAt ? lot.createdAt.toDate().toLocaleDateString() : 'N/A'}</TableCell>
+                                        <TableCell>{lot.createdAt ? lot.createdAt.toDate().toLocaleString() : 'N/A'}</TableCell>
                                         <TableCell>{exporterMap[lot.exporterId] || lot.exporterId}</TableCell>
                                         <TableCell>{producerMap[lot.producerId] || lot.producerId}</TableCell>
                                         <TableCell>{lot.binCount}</TableCell>
