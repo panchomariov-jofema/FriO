@@ -71,28 +71,30 @@ export function EntriesTab({ exporterId, producerId }: EntriesTabProps) {
   }, [exporters, exporterId]);
   
   React.useEffect(() => {
-    if (!exporterName || loadingExporters) return;
+    if (!exporterName || loadingExporters || !items.length) return;
 
     const rules = calculationRules[exporterName];
     if (!rules) return;
-
+    
+    // Find index of the primary bin for the current rule set
     const binItemIndex = items.findIndex(item => item.binMaterialCode === rules.binCode);
     if (binItemIndex === -1) return;
 
-    const binQuantity = items[binItemIndex].quantity;
-    
-    // Check if the user actually changed the bin quantity
-    if (!form.formState.dirtyFields.items?.[binItemIndex]?.quantity) return;
+    const binItem = items[binItemIndex];
+    const isBinManuallyChanged = form.formState.dirtyFields.items?.[binItemIndex]?.quantity;
 
-    Object.entries(rules.related).forEach(([relatedCode, multiplier]) => {
-        const relatedItemIndex = items.findIndex(item => item.binMaterialCode === relatedCode);
-        if (relatedItemIndex !== -1) {
-            // Only update if the field hasn't been manually dirtied by the user
-            if (!form.formState.dirtyFields.items?.[relatedItemIndex]?.quantity) {
+    // Only proceed if the main bin's quantity was changed by the user
+    if (isBinManuallyChanged) {
+        const binQuantity = binItem.quantity;
+        
+        Object.entries(rules.related).forEach(([relatedCode, multiplier]) => {
+            const relatedItemIndex = items.findIndex(item => item.binMaterialCode === relatedCode);
+            if (relatedItemIndex !== -1) {
+                // Force update the related item's quantity
                 form.setValue(`items.${relatedItemIndex}.quantity`, binQuantity * multiplier, { shouldDirty: true });
             }
-        }
-    });
+        });
+    }
 
   }, [items, exporterName, form, loadingExporters]);
 
