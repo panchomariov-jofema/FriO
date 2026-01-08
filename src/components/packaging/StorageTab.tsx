@@ -59,7 +59,7 @@ export function StorageTab() {
         ...updatedItems[selectedItem.itemIndex],
         status: 'Almacenado',
         storageLocation: location,
-        storedAt: new Date(), // Use client-side date, server timestamp is at top level
+        storedAt: new Date(), // Use client-side date
     };
     
     const allItemsStored = updatedItems.every((item: PackagingReceptionItem) => item.status === 'Almacenado');
@@ -101,6 +101,7 @@ export function StorageTab() {
                 <TableRow>
                   <TableHead>Cliente</TableHead>
                   <TableHead>Documento</TableHead>
+                  <TableHead>Código</TableHead>
                   <TableHead>Artículo</TableHead>
                   <TableHead>Cant. Pallets</TableHead>
                   <TableHead>Estado</TableHead>
@@ -110,13 +111,14 @@ export function StorageTab() {
               <TableBody>
                 {loading ? (
                   Array.from({ length: 3 }).map((_, i) => (
-                    <TableRow key={i}><TableCell colSpan={6}><Skeleton className="h-4 w-full" /></TableCell></TableRow>
+                    <TableRow key={i}><TableCell colSpan={7}><Skeleton className="h-4 w-full" /></TableCell></TableRow>
                   ))
                 ) : pendingItems.length > 0 ? (
                   pendingItems.map((item) => (
                     <TableRow key={`${item.receptionId}-${item.itemIndex}`}>
                         <TableCell>{item.clientName}</TableCell>
                         <TableCell className="font-mono">{item.document}</TableCell>
+                        <TableCell className="font-mono">{item.packagingMasterCode}</TableCell>
                         <TableCell className="font-medium">{item.packagingMasterName}</TableCell>
                         <TableCell className="font-semibold">{item.palletCount}</TableCell>
                         <TableCell><Badge variant="secondary">{item.status}</Badge></TableCell>
@@ -127,7 +129,7 @@ export function StorageTab() {
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={6} className="h-24 text-center">No hay artículos pendientes de almacenar.</TableCell>
+                    <TableCell colSpan={7} className="h-24 text-center">No hay artículos pendientes de almacenar.</TableCell>
                   </TableRow>
                 )}
               </TableBody>
