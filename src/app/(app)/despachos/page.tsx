@@ -32,7 +32,7 @@ import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
 import type { ChamberLot, Dispatch, Exporter } from '@/lib/types';
 import { useFirestore } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
-import { collection, query, where, getDocs, writeBatch, serverTimestamp, doc, addDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, writeBatch, serverTimestamp, doc, addDoc, getDoc, deleteDoc } from 'firebase/firestore';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -82,6 +82,7 @@ export default function DespachosPage() {
   const firestore = useFirestore();
   const { toast } = useToast();
   const [isConfirming, setIsConfirming] = React.useState(false);
+  const [isUndoing, setIsUndoing] = React.useState(false);
 
   const form = useForm<DispatchFormValues>({
     resolver: zodResolver(dispatchSchema),
@@ -122,7 +123,6 @@ export default function DespachosPage() {
     }
 
     try {
-      // 1. Find available bins for the exporter, ordered by FIFO (storedAt)
       const chamberLotsRef = collection(firestore, 'chamberLots');
       const q = query(
         chamberLotsRef,
@@ -144,36 +144,41 @@ export default function DespachosPage() {
       
       let binsToDispatch = [];
       let binsCount = 0;
-      let lotsToUpdate: { ref: any, originalBinCount: number, binsTaken: number }[] = [];
+
+      const batch = writeBatch(firestore);
 
       for (const lot of availableLots) {
         if (binsCount >= values.maxBins) break;
 
         const binsNeeded = values.maxBins - binsCount;
-        const binsFromLot = Math.min(lot.binCount, binsNeeded);
+        const binsFromThisLot = Math.min(lot.binCount, binsNeeded);
         
         binsToDispatch.push({
             chamberLotId: lot.id,
             displayLotId: lot.displayLotId,
             chamberId: lot.chamberId!,
             coordinate: lot.coordinate!,
-            binCount: binsFromLot,
+            binCount: binsFromThisLot,
         });
+        
+        const lotRef = doc(firestore, 'chamberLots', lot.id);
+        const remainingBins = lot.binCount - binsFromThisLot;
 
-        lotsToUpdate.push({
-            ref: doc(firestore, 'chamberLots', lot.id),
-            originalBinCount: lot.binCount,
-            binsTaken: binsFromLot
-        });
+        if (remainingBins > 0) {
+            batch.update(lotRef, { binCount: remainingBins });
+        } else {
+            batch.update(lotRef, { status: 'Despachado' });
+        }
 
-        binsCount += binsFromLot;
+        binsCount += binsFromThisLot;
       }
-
 
       const actualTotalBins = binsToDispatch.reduce((sum, bin) => sum + bin.binCount, 0);
 
-      // Create dispatch record and update bin status in a batch
-      const batch = writeBatch(firestore);
+      if (actualTotalBins === 0) {
+        toast({ variant: 'destructive', title: 'Sin Stock', description: 'No se encontraron bins para despachar.' });
+        return;
+      }
 
       const dispatchData = {
         exporterId: selectedExporter.exporterId,
@@ -186,16 +191,6 @@ export default function DespachosPage() {
 
       const dispatchRef = doc(collection(firestore, 'dispatches'));
       batch.set(dispatchRef, dispatchData);
-      
-      for (const lotInfo of lotsToUpdate) {
-        const remainingBins = lotInfo.originalBinCount - lotInfo.binsTaken;
-        if (remainingBins > 0) {
-          batch.update(lotInfo.ref, { binCount: remainingBins });
-        } else {
-          batch.update(lotInfo.ref, { status: 'Despachado' });
-        }
-      }
-
 
       await batch.commit();
       
@@ -225,13 +220,17 @@ export default function DespachosPage() {
     try {
         const batch = writeBatch(firestore);
 
-        // 1. Delete the chamberLot documents associated with the dispatch
-        for (const bin of dispatchToConfirm.bins) {
-            const lotRef = doc(firestore, 'chamberLots', bin.chamberLotId);
-            batch.delete(lotRef);
+        const lotsToDelete = dispatchToConfirm.bins.map(bin => bin.chamberLotId);
+        const uniqueLotsToDelete = [...new Set(lotsToDelete)];
+
+        for (const lotId of uniqueLotsToDelete) {
+             const lotRef = doc(firestore, 'chamberLots', lotId);
+             const lotDoc = await getDoc(lotRef);
+             if (lotDoc.exists() && lotDoc.data().status === 'Despachado') {
+                 batch.delete(lotRef);
+             }
         }
 
-        // 2. Update the dispatch status
         const dispatchRef = doc(firestore, 'dispatches', dispatchToConfirm.id);
         batch.update(dispatchRef, { status: 'Completado' });
 
@@ -256,6 +255,60 @@ export default function DespachosPage() {
         setIsConfirming(false);
     }
 };
+
+const handleUndoDispatch = async (dispatchToUndo: Dispatch) => {
+    if (!firestore) return;
+    setIsUndoing(true);
+
+    try {
+        const batch = writeBatch(firestore);
+
+        // Revert chamber lots
+        for (const bin of dispatchToUndo.bins) {
+            const lotRef = doc(firestore, 'chamberLots', bin.chamberLotId);
+            const lotDoc = await getDoc(lotRef);
+            
+            if (lotDoc.exists()) {
+                const currentLot = lotDoc.data() as ChamberLot;
+                if (currentLot.status === 'Despachado') {
+                    // If it was fully dispatched, just revert status
+                    batch.update(lotRef, { status: 'Almacenado' });
+                } else {
+                    // If it was partially dispatched, add back the bins
+                    batch.update(lotRef, { binCount: currentLot.binCount + bin.binCount });
+                }
+            } else {
+              // This case shouldn't happen if dispatch is 'Pendiente', but as a safeguard
+              console.warn(`Lot ${bin.chamberLotId} not found, cannot undo.`);
+            }
+        }
+
+        // Delete the dispatch document
+        const dispatchRef = doc(firestore, 'dispatches', dispatchToUndo.id);
+        batch.delete(dispatchRef);
+
+        await batch.commit();
+
+        toast({
+            title: 'Despacho Deshecho',
+            description: `El despacho para ${dispatchToUndo.exporterName} ha sido cancelado y el stock restaurado.`,
+        });
+
+    } catch (error: any) {
+        console.error("Error undoing dispatch:", error);
+        toast({ variant: 'destructive', title: 'Error', description: 'Ocurrió un error al deshacer el despacho.' });
+        errorEmitter.emit(
+            'permission-error',
+            new FirestorePermissionError({
+                path: 'dispatches or chamberLots',
+                operation: 'write',
+            })
+        );
+    } finally {
+        setIsUndoing(false);
+    }
+};
+
 
   const summaryIsLoading = loadingChamberLots || loadingExporters;
   const sortedDispatches = React.useMemo(() => {
@@ -454,9 +507,10 @@ export default function DespachosPage() {
                                           </AlertDialogContent>
                                         </AlertDialog>
                                         {dispatch.status === 'Pendiente de Salida' && (
+                                            <>
                                             <AlertDialog>
                                                 <AlertDialogTrigger asChild>
-                                                    <Button size="sm" disabled={isConfirming}>Confirmar</Button>
+                                                    <Button size="sm" disabled={isConfirming || isUndoing}>Confirmar</Button>
                                                 </AlertDialogTrigger>
                                                 <AlertDialogContent>
                                                     <AlertDialogHeader>
@@ -473,6 +527,26 @@ export default function DespachosPage() {
                                                     </AlertDialogFooter>
                                                 </AlertDialogContent>
                                             </AlertDialog>
+                                            <AlertDialog>
+                                                <AlertDialogTrigger asChild>
+                                                    <Button variant="destructive" size="sm" disabled={isConfirming || isUndoing}>Deshacer</Button>
+                                                </AlertDialogTrigger>
+                                                <AlertDialogContent>
+                                                    <AlertDialogHeader>
+                                                        <AlertDialogTitle>¿Deshacer el despacho?</AlertDialogTitle>
+                                                        <AlertDialogDescription>
+                                                           Esta acción cancelará el despacho y restaurará el stock a su estado original. Los bins volverán a estar disponibles.
+                                                        </AlertDialogDescription>
+                                                    </AlertDialogHeader>
+                                                    <AlertDialogFooter>
+                                                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                                        <AlertDialogAction onClick={() => handleUndoDispatch(dispatch)} className="bg-destructive hover:bg-destructive/90">
+                                                            Sí, Deshacer
+                                                        </AlertDialogAction>
+                                                    </AlertDialogFooter>
+                                                </AlertDialogContent>
+                                            </AlertDialog>
+                                            </>
                                         )}
                                     </TableCell>
                                 </TableRow>
