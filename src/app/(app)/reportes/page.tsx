@@ -167,7 +167,7 @@ function KardexReport() {
                 `"${producerMap[item.producerId] || item.producerId}"`,
                 `"${item.binMaterialCode}"`,
                 `"${item.binMaterialName}"`,
-                item.quantity
+                item.type === 'salida' ? -item.quantity : item.quantity,
             ];
             csvRows.push(row.join(','));
         });
@@ -230,7 +230,9 @@ function KardexReport() {
                             <TableCell>{producerMap[item.producerId] || item.producerId}</TableCell>
                             <TableCell className="font-mono">{item.binMaterialCode}</TableCell>
                             <TableCell className="font-medium">{item.binMaterialName}</TableCell>
-                            <TableCell className="text-right font-semibold">{item.quantity}</TableCell>
+                            <TableCell className="text-right font-semibold">
+                                {item.type === 'salida' ? -item.quantity : item.quantity}
+                            </TableCell>
                         </TableRow>
                         ))
                     ) : (
