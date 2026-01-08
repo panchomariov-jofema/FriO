@@ -93,6 +93,32 @@ export function LotList({ exporterId, producerId }: LotListProps) {
 
   const filteredLots = showOnlyOpen ? lots.filter(lot => lot.status !== 'Cerrado') : lots;
 
+  const renderCellContent = (lot: ReceptionLot, field: 'totalWeight' | 'preHydroTemp' | 'postHydroTemp') => {
+    const status = lot.status;
+
+    if (field === 'totalWeight') {
+        if (status === 'Pendiente de Peso') {
+            return <Button size="sm" variant="outline" onClick={() => handleActionClick(lot)}>Pesar</Button>;
+        }
+        return lot.totalWeight ? `${lot.totalWeight.toFixed(2)} kg` : '-';
+    }
+    
+    if (field === 'preHydroTemp') {
+        if (status === 'Pendiente de Pre-Hidro') {
+            return <Button size="sm" variant="outline" onClick={() => handleActionClick(lot)}>Registrar T°</Button>;
+        }
+        return lot.preHydroTemp ? `${lot.preHydroTemp.toFixed(1)} °C` : '-';
+    }
+
+    if (field === 'postHydroTemp') {
+        if (status === 'Pendiente de Post-Hidro') {
+            return <Button size="sm" variant="outline" onClick={() => handleActionClick(lot)}>Registrar T°</Button>;
+        }
+        return lot.postHydroTemp ? `${lot.postHydroTemp.toFixed(1)} °C` : '-';
+    }
+  }
+
+
   return (
     <>
       <Card>
@@ -121,14 +147,13 @@ export function LotList({ exporterId, producerId }: LotListProps) {
                   <TableHead>Peso Total</TableHead>
                   <TableHead>T° Pre</TableHead>
                   <TableHead>T° Post</TableHead>
-                  <TableHead className="w-[120px] text-right">Acción</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {loading ? (
                   Array.from({ length: 3 }).map((_, i) => (
                     <TableRow key={i}>
-                      <TableCell colSpan={9}><Skeleton className="h-4 w-full" /></TableCell>
+                      <TableCell colSpan={8}><Skeleton className="h-4 w-full" /></TableCell>
                     </TableRow>
                   ))
                 ) : filteredLots.length > 0 ? (
@@ -141,23 +166,14 @@ export function LotList({ exporterId, producerId }: LotListProps) {
                       <TableCell>
                         <Badge variant={getStatusVariant(lot.status)}>{lot.status}</Badge>
                       </TableCell>
-                      <TableCell>{lot.totalWeight ? `${lot.totalWeight.toFixed(2)} kg` : '-'}</TableCell>
-                      <TableCell>{lot.preHydroTemp ? `${lot.preHydroTemp.toFixed(1)} °C` : '-'}</TableCell>
-                      <TableCell>{lot.postHydroTemp ? `${lot.postHydroTemp.toFixed(1)} °C` : '-'}</TableCell>
-                      <TableCell className="text-right">
-                        {lot.status !== 'Cerrado' && (
-                          <Button size="sm" onClick={() => handleActionClick(lot)}>
-                            {lot.status === 'Pendiente de Peso' && 'Pesar'}
-                            {lot.status === 'Pendiente de Pre-Hidro' && 'T° Pre-Hidro'}
-                            {lot.status === 'Pendiente de Post-Hidro' && 'T° Post-Hidro'}
-                          </Button>
-                        )}
-                      </TableCell>
+                      <TableCell>{renderCellContent(lot, 'totalWeight')}</TableCell>
+                      <TableCell>{renderCellContent(lot, 'preHydroTemp')}</TableCell>
+                      <TableCell>{renderCellContent(lot, 'postHydroTemp')}</TableCell>
                     </TableRow>
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={9} className="h-24 text-center">
+                    <TableCell colSpan={8} className="h-24 text-center">
                       No se encontraron lotes para esta selección.
                     </TableCell>
                   </TableRow>
