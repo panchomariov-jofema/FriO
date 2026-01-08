@@ -54,10 +54,10 @@ service cloud.firestore {
 
     /**
      * @description Master data collections. Open access for any signed-in user during development.
-     * @paths /exporters/{docId}, /producers/{docId}, /binMaterials/{docId}, /otherClients/{docId}, /packagingMaster/{docId}, /usersMaster/{docId}, /profiles/{docId}
+     * @paths /exporters/{docId}, /producers/{docId}, /binMaterials/{docId}, /otherClients/{docId}, /packagingMaster/{docId}, /usersMaster/{docId}, /profiles/{docId}, /packings/{docId}
      * @allow Authenticated users can read and write freely.
      */
-    match /{collection}/{docId} where collection in ['exporters', 'producers', 'binMaterials', 'otherClients', 'packagingMaster', 'usersMaster', 'profiles'] {
+    match /{collection}/{docId} where collection in ['exporters', 'producers', 'binMaterials', 'otherClients', 'packagingMaster', 'usersMaster', 'profiles', 'packings'] {
       allow read, write: if isSignedIn();
     }
 

@@ -32,6 +32,11 @@ export const packagingMasterSchema = z.object({
   clientId: z.string().min(1, 'El ID de cliente es obligatorio'),
 });
 
+export const packingSchema = z.object({
+    exporterId: z.string().min(1, 'El exportador es obligatorio'),
+    name: z.string().min(1, 'El nombre es obligatorio'),
+});
+
 export const userMasterSchema = z.object({
   userName: z.string().min(1, 'El nombre de usuario es obligatorio'),
   profileId: z.string().min(1, 'El ID de perfil es obligatorio'),
@@ -65,3 +70,5 @@ export const receptionLotSchema = z.object({
     postHydroTemp: z.number().optional(),
     createdAt: z.any().optional(),
 });
+
+    

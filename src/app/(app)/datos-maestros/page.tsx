@@ -10,6 +10,7 @@ import type {
   BinMaterial,
   OtherClient,
   PackagingMaster,
+  Packing,
   UserMaster,
   Profile,
 } from '@/lib/types';
@@ -19,6 +20,7 @@ import {
   binMaterialSchema,
   otherClientSchema,
   packagingMasterSchema,
+  packingSchema,
   userMasterSchema,
   profileSchema,
 } from '@/lib/schemas';
@@ -118,6 +120,22 @@ const PackagingMasterForm = ({ form, otherClients }: { form: any, otherClients: 
   )
 };
 
+const PackingForm = ({ form, exporters }: { form: any; exporters: Exporter[] }) => {
+  return (
+    <>
+      <FormField control={form.control} name="exporterId" render={({ field }) => (
+        <FormItem><FormLabel>Exportador</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
+          <FormControl><SelectTrigger><SelectValue placeholder="Seleccione un exportador" /></SelectTrigger></FormControl>
+          <SelectContent>{exporters?.map(e => <SelectItem key={e.id} value={e.exporterId}>{e.name}</SelectItem>)}</SelectContent>
+        </Select><FormMessage /></FormItem>
+      )} />
+      <FormField control={form.control} name="name" render={({ field }) => (
+        <FormItem><FormLabel>Nombre</FormLabel><FormControl><Input {...field} autoComplete="off" /></FormControl><FormMessage /></FormItem>
+      )} />
+    </>
+  )
+};
+
 const UserMasterForm = ({ form, profiles }: { form: any, profiles: Profile[] }) => {
     return (
     <>
@@ -159,6 +177,7 @@ export default function DatosMaestrosPage() {
     { value: 'binMaterials', label: 'Bins y Mat.' },
     { value: 'otherClients', label: 'Otros Clientes' },
     { value: 'packagingMaster', label: 'Embalajes' },
+    { value: 'packing', label: 'Packing' },
     { value: 'usersMaster', label: 'Usuarios' },
     { value: 'profiles', label: 'Perfiles' },
   ];
@@ -171,7 +190,7 @@ export default function DatosMaestrosPage() {
       </CardHeader>
       <CardContent>
         <Tabs defaultValue="exporters" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 lg:grid-cols-7">
+          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 lg:grid-cols-8">
             {tabs.map((tab) => (
               <TabsTrigger key={tab.value} value={tab.value}>{tab.label}</TabsTrigger>
             ))}
@@ -242,6 +261,19 @@ export default function DatosMaestrosPage() {
                 formProps={{ otherClients: loadingOtherClients ? [] : otherClients }}
               />
           </TabsContent>
+           <TabsContent value="packing" className="mt-4">
+             <MasterDataShell
+                title="Packing"
+                collectionName="packings"
+                schema={packingSchema}
+                columns={[{key: 'exporterId', header: 'ID Exportador'}, {key: 'name', header: 'Nombre'}]}
+                RenderFormComponent={PackingForm}
+                docNameField="name"
+                csvHeaders={['exporterId', 'name']}
+                csvTemplateFileName="plantilla_packing.csv"
+                formProps={{ exporters: loadingExporters ? [] : exporters }}
+              />
+          </TabsContent>
            <TabsContent value="usersMaster" className="mt-4">
              <MasterDataShell
                 title="Maestro de Usuarios"
@@ -273,3 +305,5 @@ export default function DatosMaestrosPage() {
     </Card>
   );
 }
+
+    

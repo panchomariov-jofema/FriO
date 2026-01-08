@@ -135,6 +135,26 @@
         "clientId"
       ]
     },
+    "Packing": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Packing",
+      "type": "object",
+      "description": "Represents a packing material associated with an exporter.",
+      "properties": {
+        "exporterId": {
+          "type": "string",
+          "description": "Reference to Exporter. (Relationship: Exporter 1:N Packing)"
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the packing material."
+        }
+      },
+      "required": [
+        "exporterId",
+        "name"
+      ]
+    },
     "UserMaster": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "UserMaster",
@@ -557,6 +577,22 @@
             {
               "name": "packagingMasterId",
               "description": "The unique identifier for the packaging master."
+            }
+          ]
+        }
+      },
+       {
+        "path": "/packings/{packingId}",
+        "definition": {
+          "entityName": "Packing",
+          "schema": {
+            "$ref": "#/backend/entities/Packing"
+          },
+          "description": "Stores packing data related to an exporter.",
+          "params": [
+            {
+              "name": "packingId",
+              "description": "The unique identifier for the packing."
             }
           ]
         }

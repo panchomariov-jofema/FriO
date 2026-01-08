@@ -39,6 +39,12 @@ export interface PackagingMaster {
   clientId: string;
 }
 
+export interface Packing {
+  id: string;
+  exporterId: string;
+  name: string;
+}
+
 export interface UserMaster {
   id: string;
   userName: string;
@@ -130,6 +136,7 @@ export interface Dispatch {
 }
 
 
-export type MasterData = Exporter | Producer | BinMaterial | OtherClient | PackagingMaster | UserMaster | Profile;
+export type MasterData = Exporter | Producer | BinMaterial | OtherClient | PackagingMaster | UserMaster | Profile | Packing;
 
+    
     
