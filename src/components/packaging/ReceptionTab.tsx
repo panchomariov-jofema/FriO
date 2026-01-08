@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
-import type { OtherClient, PackagingMaster, PackagingReception } from '@/lib/types';
+import type { OtherClient, PackagingMaster } from '@/lib/types';
 import { packagingReceptionSchema } from '@/lib/schemas';
 import { PlusCircle, Trash2 } from 'lucide-react';
 import { useFirestore } from '@/firebase';
@@ -96,6 +96,16 @@ export function ReceptionTab() {
     }
   };
 
+  const handleClientChange = (value: string) => {
+    form.setValue('clientId', value);
+    // Reset items when client changes
+    form.reset({
+        ...form.getValues(),
+        clientId: value,
+        items: [{ packagingMasterId: '', palletCount: 1, packagingMasterName: '' }]
+    });
+  }
+
 
   return (
     <Card>
@@ -113,7 +123,7 @@ export function ReceptionTab() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Cliente de Embalaje</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value} disabled={loadingClients}>
+                    <Select onValueChange={handleClientChange} value={field.value} disabled={loadingClients}>
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Seleccione un cliente..." />
@@ -152,11 +162,11 @@ export function ReceptionTab() {
                       name={`items.${index}.packagingMasterId`}
                       render={({ field: itemField }) => (
                         <FormItem>
-                          <FormLabel>Material</FormLabel>
+                          <FormLabel>Artículo</FormLabel>
                            <Select onValueChange={(value) => handleMaterialChange(value, index)} value={itemField.value} disabled={!selectedClientId || loadingMasters}>
                             <FormControl>
                               <SelectTrigger>
-                                <SelectValue placeholder="Seleccione material..." />
+                                <SelectValue placeholder={!selectedClientId ? 'Seleccione un cliente primero' : 'Seleccione un artículo...'} />
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
@@ -193,7 +203,7 @@ export function ReceptionTab() {
                 onClick={() => append({ packagingMasterId: '', palletCount: 1, packagingMasterName: '' })}
               >
                 <PlusCircle className="mr-2 h-4 w-4" />
-                Agregar Material
+                Agregar Artículo
               </Button>
             </div>
 

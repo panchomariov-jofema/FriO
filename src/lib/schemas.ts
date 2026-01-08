@@ -34,7 +34,7 @@ export const packagingMasterSchema = z.object({
 });
 
 export const packagingReceptionItemSchema = z.object({
-    packagingMasterId: z.string().min(1, "Debe seleccionar un material."),
+    packagingMasterId: z.string().min(1, "Debe seleccionar un artículo."),
     packagingMasterName: z.string(),
     palletCount: z.coerce.number().min(1, "La cantidad debe ser al menos 1."),
 });
@@ -42,7 +42,7 @@ export const packagingReceptionItemSchema = z.object({
 export const packagingReceptionSchema = z.object({
     clientId: z.string().min(1, "Debe seleccionar un cliente."),
     document: z.string().min(1, "El documento es obligatorio."),
-    items: z.array(packagingReceptionItemSchema).min(1, "Debe agregar al menos un ítem."),
+    items: z.array(packagingReceptionItemSchema).min(1, "Debe agregar al menos un artículo."),
 });
 
 
