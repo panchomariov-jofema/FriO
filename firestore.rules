@@ -82,5 +82,14 @@ service cloud.firestore {
     match /hidrocoolerLots/{lotId} {
       allow read, write: if isSignedIn();
     }
+
+    /**
+     * @description Collection for lots stored in cooling chambers.
+     * @path /chamberLots/{lotId}
+     * @allow Any authenticated user can create, read, and update lots.
+     */
+    match /chamberLots/{lotId} {
+      allow read, write: if isSignedIn();
+    }
   }
 }

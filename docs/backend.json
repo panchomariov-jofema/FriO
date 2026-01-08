@@ -294,6 +294,52 @@
         "status",
         "createdAt"
       ]
+    },
+     "ChamberLot": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "ChamberLot",
+      "type": "object",
+      "description": "Represents a lot stored in a cooling chamber.",
+      "properties": {
+        "displayLotId": {
+          "type": "string",
+          "description": "User-friendly lot identifier."
+        },
+        "producerShortName": {
+          "type": "string",
+          "description": "Short name of the producer."
+        },
+        "binCount": {
+          "type": "number",
+          "description": "Number of bins in this portion of the lot."
+        },
+        "hidrocooler": {
+          "type": "string",
+          "description": "The hidrocooler unit used for processing."
+        },
+        "chamberId": {
+          "type": "string",
+          "description": "The identifier of the chamber where the lot is stored."
+        },
+        "status": {
+          "type": "string",
+          "description": "Status of the lot in the chamber (e.g., 'Almacenado')."
+        },
+        "storedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp of when the lot was stored in the chamber."
+        }
+      },
+      "required": [
+        "displayLotId",
+        "producerShortName",
+        "binCount",
+        "hidrocooler",
+        "chamberId",
+        "status",
+        "storedAt"
+      ]
     }
   },
   "auth": {
@@ -444,6 +490,22 @@
             {
               "name": "hidrocoolerLotId",
               "description": "The unique identifier for the hidrocooler lot."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/chamberLots/{chamberLotId}",
+        "definition": {
+          "entityName": "ChamberLot",
+          "schema": {
+            "$ref": "#/backend/entities/ChamberLot"
+          },
+          "description": "Stores lot fractions that have been moved into a cooling chamber.",
+          "params": [
+            {
+              "name": "chamberLotId",
+              "description": "The unique identifier for the lot in the chamber."
             }
           ]
         }

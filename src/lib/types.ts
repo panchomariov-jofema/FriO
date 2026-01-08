@@ -66,7 +66,7 @@ export interface ReceptionLot {
     totalWeight?: number;
     preHydroTemp?: number;
     postHydroTemp?: number;
-    createdAt: Timestamp;
+    createdAt: Timestamp | null;
 }
 
 export interface HidrocoolerLot {
@@ -87,6 +87,17 @@ export interface ProcessingLot {
   hidrocooler: string;
   status: 'En Proceso' | 'Finalizado';
   createdAt: Timestamp | any;
+}
+
+export interface ChamberLot {
+    id: string;
+    displayLotId: string;
+    producerShortName: string;
+    binCount: number;
+    hidrocooler: string;
+    chamberId: string;
+    status: 'Almacenado';
+    storedAt: Timestamp;
 }
 
 
