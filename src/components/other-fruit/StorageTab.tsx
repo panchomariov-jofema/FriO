@@ -247,7 +247,13 @@ export function OtherFruitStorageTab() {
                 .map((item, itemIndex) => ({ ...item, receptionId: lot.id, clientName: lot.clientName, document: lot.document, itemIndex, unit: lot.unit }))
                 .filter(item => item.status === 'Pendiente de almacenar')
         )
-        .sort((a,b) => (data.find(l => l.id === a.receptionId)!.createdAt.toMillis()) - (data.find(l => l.id === b.receptionId)!.createdAt.toMillis()));
+        .sort((a,b) => {
+            const lotA = data.find(l => l.id === a.receptionId);
+            const lotB = data.find(l => l.id === b.receptionId);
+            if (!lotA?.createdAt) return 1;
+            if (!lotB?.createdAt) return -1;
+            return lotA.createdAt.toMillis() - lotB.createdAt.toMillis();
+        });
   }, [data]);
 
 
