@@ -4,7 +4,7 @@ import * as React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useFirestore } from '@/firebase';
-import type { BinMaterialStock, Exporter, BinMaterialMovement, Producer } from '@/lib/types';
+import type { BinMaterialStock, Exporter, BinMaterialMovement, Producer, ReceptionLot } from '@/lib/types';
 import { collection, onSnapshot, query } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
@@ -248,6 +248,118 @@ function KardexReport() {
     );
 }
 
+function ReceptionReport() {
+    const { data: receptionLots, loading: loadingLots } = useFirestoreCollection<ReceptionLot>('receptionLots');
+    const { data: exporters, loading: loadingExporters } = useFirestoreCollection<Exporter>('exporters');
+    const { data: producers, loading: loadingProducers } = useFirestoreCollection<Producer>('producers');
+
+    const exporterMap = React.useMemo(() => exporters.reduce((acc, e) => ({ ...acc, [e.exporterId]: e.name }), {} as Record<string, string>), [exporters]);
+    const producerMap = React.useMemo(() => producers.reduce((acc, p) => ({ ...acc, [p.producerId]: p.shortName }), {} as Record<string, string>), [producers]);
+
+    const sortedData = React.useMemo(() => {
+        if (!receptionLots) return [];
+        return [...receptionLots].sort((a, b) => {
+          if (!a.createdAt || !b.createdAt) return 0;
+          return b.createdAt.toMillis() - a.createdAt.toMillis();
+        });
+    }, [receptionLots]);
+
+    const isLoading = loadingLots || loadingExporters || loadingProducers;
+
+    const handleExportCSV = () => {
+        const headers = ['Fecha', 'Exportador', 'Productor', 'Variedad', 'Kilos (Peso Total)', 'T° Pre-Hidro', 'T° Post-Hidro', 'Status'];
+        const csvRows = [headers.join(',')];
+
+        sortedData.forEach(lot => {
+            const date = lot.createdAt ? lot.createdAt.toDate().toLocaleDateString() : 'N/A';
+            const row = [
+                `"${date}"`,
+                `"${exporterMap[lot.exporterId] || lot.exporterId}"`,
+                `"${producerMap[lot.producerId] || lot.producerId}"`,
+                `"${lot.variety}"`,
+                lot.totalWeight || 0,
+                lot.preHydroTemp || '',
+                lot.postHydroTemp || '',
+                `"${lot.status}"`
+            ];
+            csvRows.push(row.join(','));
+        });
+
+        const csvContent = "data:text/csv;charset=utf-8," + csvRows.join('\n');
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", "reporte_recepcion.csv");
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
+    return (
+        <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                    <CardTitle>Registro de Recepción</CardTitle>
+                    <CardDescription>
+                        Historial de todos los lotes ingresados en el módulo de recepción.
+                    </CardDescription>
+                </div>
+                <Button onClick={handleExportCSV} disabled={isLoading || sortedData.length === 0}>
+                    <Download className="mr-2 h-4 w-4" />
+                    Exportar a CSV
+                </Button>
+            </CardHeader>
+            <CardContent>
+                <div className="rounded-md border max-h-[600px] overflow-y-auto">
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Fecha</TableHead>
+                                <TableHead>Exportador</TableHead>
+                                <TableHead>Productor</TableHead>
+                                <TableHead>Variedad</TableHead>
+                                <TableHead>Kilos</TableHead>
+                                <TableHead>T° Pre</TableHead>
+                                <TableHead>T° Post</TableHead>
+                                <TableHead>Estado</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {isLoading ? (
+                                Array.from({ length: 15 }).map((_, i) => (
+                                    <TableRow key={i}>
+                                        <TableCell colSpan={8}><Skeleton className="h-4 w-full" /></TableCell>
+                                    </TableRow>
+                                ))
+                            ) : sortedData.length > 0 ? (
+                                sortedData.map((lot) => (
+                                    <TableRow key={lot.id}>
+                                        <TableCell>{lot.createdAt ? lot.createdAt.toDate().toLocaleDateString() : 'N/A'}</TableCell>
+                                        <TableCell>{exporterMap[lot.exporterId] || lot.exporterId}</TableCell>
+                                        <TableCell>{producerMap[lot.producerId] || lot.producerId}</TableCell>
+                                        <TableCell>{lot.variety}</TableCell>
+                                        <TableCell>{lot.totalWeight?.toFixed(2) ?? '-'}</TableCell>
+                                        <TableCell>{lot.preHydroTemp?.toFixed(1) ?? '-'}</TableCell>
+                                        <TableCell>{lot.postHydroTemp?.toFixed(1) ?? '-'}</TableCell>
+                                        <TableCell><Badge variant="secondary">{lot.status}</Badge></TableCell>
+                                    </TableRow>
+                                ))
+                            ) : (
+                                <TableRow>
+                                    <TableCell colSpan={8} className="h-24 text-center">
+                                        No hay lotes de recepción registrados.
+                                    </TableCell>
+                                </TableRow>
+                            )}
+                        </TableBody>
+                    </Table>
+                </div>
+            </CardContent>
+        </Card>
+    );
+}
+
+
 export default function ReportesPage() {
   return (
     <div className="space-y-4">
@@ -266,6 +378,14 @@ export default function ReportesPage() {
                 </AccordionTrigger>
                 <AccordionContent className="pt-4">
                    <KardexReport />
+                </AccordionContent>
+            </AccordionItem>
+            <AccordionItem value="registro-recepcion">
+                <AccordionTrigger className="text-lg font-semibold">
+                    Registro de Recepción
+                </AccordionTrigger>
+                <AccordionContent className="pt-4">
+                   <ReceptionReport />
                 </AccordionContent>
             </AccordionItem>
         </Accordion>
