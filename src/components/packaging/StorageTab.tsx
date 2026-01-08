@@ -54,20 +54,21 @@ export function StorageTab() {
     const originalReception = data.find(r => r.id === selectedItem.receptionId);
     if (!originalReception) return;
 
-    const updatedItems = [...originalReception.items];
+    const updatedItems = JSON.parse(JSON.stringify(originalReception.items));
     updatedItems[selectedItem.itemIndex] = {
         ...updatedItems[selectedItem.itemIndex],
         status: 'Almacenado',
         storageLocation: location,
-        storedAt: serverTimestamp(),
+        storedAt: new Date(), // Use client-side date, server timestamp is at top level
     };
     
-    const allItemsStored = updatedItems.every(item => item.status === 'Almacenado');
+    const allItemsStored = updatedItems.every((item: PackagingReceptionItem) => item.status === 'Almacenado');
     const newStatus = allItemsStored ? 'Almacenado' : 'Parcialmente Almacenado';
 
     const updateData = {
         items: updatedItems,
         status: newStatus,
+        updatedAt: serverTimestamp(), // Top-level server timestamp
     };
 
     try {

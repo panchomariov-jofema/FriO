@@ -75,7 +75,7 @@ export interface PackagingReceptionItem {
       warehouse: string;
       aisle: string;
     };
-    storedAt?: Timestamp;
+    storedAt?: Timestamp | Date;
 }
 
 
@@ -87,6 +87,7 @@ export interface PackagingReception {
   items: PackagingReceptionItem[];
   status: 'Pendiente de almacenar' | 'Parcialmente Almacenado' | 'Almacenado';
   createdAt: Timestamp;
+  updatedAt?: Timestamp;
 }
 
 export interface PackagingMovementItem {
