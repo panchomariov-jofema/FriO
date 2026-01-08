@@ -44,6 +44,7 @@ const navItems = [
   { href: '/reportes', label: 'Reportes', icon: PieChart },
   { href: '/datos-maestros', label: 'Datos Maestros', icon: Database },
   { href: '/embalajes', label: 'Embalajes', icon: Package },
+  { href: '/otros-clientes-frutas', label: 'Otros Clientes Frutas', icon: Grape },
   { href: '/otros-hortofruticolas', label: 'Otros Hortofrutícolas', icon: Grape },
 ];
 
