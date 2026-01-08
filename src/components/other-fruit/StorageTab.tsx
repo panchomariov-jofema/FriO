@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useFirestore } from '@/firebase';
-import { doc, serverTimestamp, updateDoc } from 'firebase/firestore';
+import { doc, serverTimestamp, updateDoc, writeBatch } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
@@ -37,7 +37,7 @@ const naturalSort = (a: string, b: string) => {
 
 const storeSchema = z.object({
   chamberId: z.string({ required_error: 'Debe seleccionar una cámara.' }),
-  coordinate: z.string({ required_error: 'Debe seleccionar una coordenada.' }),
+  coordinate: z.string({ required_error: 'Debe seleccionar una coordenada de inicio.' }),
   quantity: z.coerce.number().positive("La cantidad debe ser mayor a 0"),
 });
 type StoreFormValues = z.infer<typeof storeSchema>;
@@ -60,32 +60,29 @@ function StorageForm({ item, onCancel, allReceptions, allChamberLots }: { item: 
         defaultValues: { 
             chamberId: undefined, 
             coordinate: undefined, 
-            quantity: item.unit === 'Pallets' ? 1 : item.quantity 
+            quantity: item.unit === 'Pallets' ? 1 : 2, 
         },
     });
 
     const targetChamberId = form.watch('chamberId');
-    const targetCoordinate = form.watch('coordinate');
 
-    const { availableCoordinates, occupancyMessage, getOccupancyFor } = React.useMemo(() => {
-        if (!targetChamberId) return { availableCoordinates: [], occupancyMessage: '', getOccupancyFor: () => ({bins: 0, pallets: 0}) };
+    const { availableCoordinates, occupancyMap } = React.useMemo(() => {
+        if (!targetChamberId) return { availableCoordinates: [], occupancyMap: new Map() };
         
         const chamberConfig = chambersConfig[targetChamberId];
-        if (!chamberConfig) return { availableCoordinates: [], occupancyMessage: '', getOccupancyFor: () => ({bins: 0, pallets: 0}) };
+        if (!chamberConfig) return { availableCoordinates: [], occupancyMap: new Map() };
         
-        const allPossibleCoords = chamberConfig.columns.flatMap(col => chamberConfig.rows.map(row => `${col}${row}`));
+        const allPossibleCoords = chamberConfig.columns.flatMap(col => chamberConfig.rows.map(row => `${col}${row}`)).sort(naturalSort);
         
-        const occupancyMap = new Map<string, { bins: number, pallets: number }>();
+        const currentOccupancyMap = new Map<string, { bins: number, pallets: number }>();
 
-        // Function to initialize or get a coordinate from the map
         const getCoord = (coord: string) => {
-            if (!occupancyMap.has(coord)) {
-                occupancyMap.set(coord, { bins: 0, pallets: 0 });
+            if (!currentOccupancyMap.has(coord)) {
+                currentOccupancyMap.set(coord, { bins: 0, pallets: 0 });
             }
-            return occupancyMap.get(coord)!;
+            return currentOccupancyMap.get(coord)!;
         };
 
-        // 1. Calculate occupancy from OtherFruitReceptions
         allReceptions.forEach(reception => {
             if (reception.status !== 'Almacenado' && reception.status !== 'Parcialmente Almacenado') return;
             reception.items.forEach(storedItem => {
@@ -93,14 +90,13 @@ function StorageForm({ item, onCancel, allReceptions, allChamberLots }: { item: 
                     const coordData = getCoord(storedItem.storageLocation.coordinate);
                     if (reception.unit === 'Bins') {
                         coordData.bins += storedItem.quantity;
-                    } else { // Pallets
+                    } else {
                         coordData.pallets += storedItem.quantity;
                     }
                 }
             });
         });
 
-        // 2. Calculate occupancy from ChamberLots (producer's fruit)
         allChamberLots.forEach(chamberLot => {
             if (chamberLot.status === 'Almacenado' && chamberLot.chamberId === targetChamberId && chamberLot.coordinate) {
                 const coordData = getCoord(chamberLot.coordinate);
@@ -108,115 +104,106 @@ function StorageForm({ item, onCancel, allReceptions, allChamberLots }: { item: 
             }
         });
         
-        // Filter available coordinates based on global occupancy and type of unit being stored
         const available = allPossibleCoords.filter(coord => {
-            const occupied = occupancyMap.get(coord);
-            if (!occupied) return true; // Completely empty
-
-            if (item.unit === 'Bins') {
-                return occupied.pallets === 0 && occupied.bins < 6;
-            }
-            if (item.unit === 'Pallets') {
-                return occupied.bins === 0 && occupied.pallets < 2;
-            }
-            return false; // Should not happen
-        }).sort(naturalSort);
-
-        let message = '';
-        if (targetCoordinate) {
-            const currentOccupancy = occupancyMap.get(targetCoordinate);
-            if (currentOccupancy) {
-                const parts = [];
-                if(currentOccupancy.bins > 0) parts.push(`${currentOccupancy.bins} Bins`);
-                if(currentOccupancy.pallets > 0) parts.push(`${currentOccupancy.pallets} Pallets`);
-                if (parts.length > 0) {
-                    message = `Ocupación actual: ${parts.join(', ')}.`;
-                }
-            }
-        }
+            const occupied = currentOccupancyMap.get(coord);
+            if (!occupied) return true;
+            if (item.unit === 'Bins') return occupied.pallets === 0;
+            if (item.unit === 'Pallets') return occupied.bins === 0;
+            return false;
+        });
         
         return { 
             availableCoordinates: available, 
-            occupancyMessage: message,
-            getOccupancyFor: (coord: string) => occupancyMap.get(coord) || {bins: 0, pallets: 0},
+            occupancyMap: currentOccupancyMap,
         };
-    }, [targetChamberId, targetCoordinate, allReceptions, allChamberLots, item.unit]);
+    }, [targetChamberId, allReceptions, allChamberLots, item.unit]);
 
     const handleStoreConfirm = async (values: StoreFormValues) => {
         if (!firestore) return;
-
-        // Validation
-        if(values.quantity > item.quantity) {
-            form.setError('quantity', { message: `No puede exceder la cantidad pendiente (${item.quantity}).` });
+        
+        let quantityPerCoord = values.quantity;
+        if(item.unit === 'Pallets') {
+            quantityPerCoord = 1; // Always 1 for pallets in this flow
+        } else { // Bins
+             if (quantityPerCoord < 1 || quantityPerCoord > 6) {
+                form.setError('quantity', { message: `Para bins, la cantidad debe ser entre 1 y 6.` });
+                return;
+            }
+        }
+        
+        const maxCapacity = item.unit === 'Bins' ? 6 : 2;
+        let pendingToStore = item.quantity;
+        
+        const startIndex = availableCoordinates.indexOf(values.coordinate);
+        if (startIndex === -1) {
+            toast({ variant: 'destructive', title: 'Error', description: 'La coordenada de inicio no está disponible.' });
             return;
         }
 
-        const occupancy = getOccupancyFor(values.coordinate);
-        let maxCapacity: number;
-        let currentStock: number;
-        
-        if (item.unit === 'Bins') {
-            maxCapacity = 6;
-            currentStock = occupancy.bins;
-        } else { // Pallets
-            maxCapacity = 2;
-            currentStock = occupancy.pallets;
-        }
+        const batch = writeBatch(firestore);
+        const receptionDocRef = doc(firestore, 'otherFruitReceptions', item.receptionId);
+        const originalReception = allReceptions.find(r => r.id === item.receptionId);
+        if (!originalReception) return;
+        const updatedItems = JSON.parse(JSON.stringify(originalReception.items));
+        const originalItemToUpdate = updatedItems[item.itemIndex] as OtherFruitReceptionItem;
 
-        if (currentStock + values.quantity > maxCapacity) {
-             form.setError('quantity', { message: `Capacidad excedida. Disponible: ${maxCapacity - currentStock}.` });
-             return;
-        }
-        
-        // Logic
+
         try {
-            const receptionDocRef = doc(firestore, 'otherFruitReceptions', item.receptionId);
-            const originalReception = allReceptions.find(r => r.id === item.receptionId);
-            if (!originalReception) return;
+            for (let i = startIndex; i < availableCoordinates.length && pendingToStore > 0; i++) {
+                const currentCoord = availableCoordinates[i];
+                const occupancy = occupancyMap.get(currentCoord) || { bins: 0, pallets: 0 };
+                const currentStockInCoord = item.unit === 'Bins' ? occupancy.bins : occupancy.pallets;
+                const spaceAvailable = maxCapacity - currentStockInCoord;
 
-            const updatedItems = JSON.parse(JSON.stringify(originalReception.items));
-            const itemToUpdate = updatedItems[item.itemIndex] as OtherFruitReceptionItem;
-
-            const remainingQuantity = itemToUpdate.quantity - values.quantity;
-
-            if (remainingQuantity > 0) {
-                itemToUpdate.quantity = remainingQuantity;
-                
-                const newItem: OtherFruitReceptionItem = {
-                    ...itemToUpdate,
-                    quantity: values.quantity,
-                    status: 'Almacenado',
-                    storageLocation: { chamberId: values.chamberId, coordinate: values.coordinate },
-                    storedAt: new Date(),
-                };
-                updatedItems.push(newItem);
-            } else {
-                itemToUpdate.status = 'Almacenado';
-                itemToUpdate.storageLocation = { chamberId: values.chamberId, coordinate: values.coordinate };
-                itemToUpdate.storedAt = new Date();
+                if (spaceAvailable > 0) {
+                    const amountToStoreInThisCoord = Math.min(pendingToStore, quantityPerCoord, spaceAvailable);
+                    
+                    if (amountToStoreInThisCoord > 0) {
+                        const newItem: OtherFruitReceptionItem = {
+                            ...originalItemToUpdate,
+                            quantity: amountToStoreInThisCoord,
+                            status: 'Almacenado',
+                            storageLocation: { chamberId: values.chamberId, coordinate: currentCoord },
+                            storedAt: new Date(),
+                        };
+                        updatedItems.push(newItem);
+                        pendingToStore -= amountToStoreInThisCoord;
+                    }
+                }
             }
-            
-            const allItemsStored = updatedItems.every((i: OtherFruitReceptionItem) => i.status === 'Almacenado');
-            const newStatus = allItemsStored ? 'Almacenado' : 'Parcialmente Almacenado';
 
-            const updateData = {
-                items: updatedItems,
-                status: newStatus,
-                updatedAt: serverTimestamp(),
-            };
-            
-            await updateDoc(receptionDocRef, updateData);
-            toast({ title: 'Éxito', description: `${values.quantity} ${item.unit} almacenados.` });
-            onCancel();
+            if (pendingToStore > 0) {
+                 toast({ variant: 'destructive', title: 'Espacio Insuficiente', description: `Solo se pudieron almacenar ${item.quantity - pendingToStore} de ${item.quantity}. No hay suficientes coordenadas libres.` });
+            }
+
+            if (pendingToStore < item.quantity) { // If at least one item was stored
+                originalItemToUpdate.quantity = pendingToStore; // Update remaining quantity on original item
+                
+                 if (pendingToStore === 0) {
+                    // if all was stored, we can remove the original pending item
+                     updatedItems.splice(item.itemIndex, 1);
+                }
+                
+                const allItemsStored = updatedItems.every((i: OtherFruitReceptionItem) => i.status === 'Almacenado');
+                const newStatus = pendingToStore === 0 && allItemsStored ? 'Almacenado' : 'Parcialmente Almacenado';
+
+                batch.update(receptionDocRef, { 
+                    items: updatedItems,
+                    status: newStatus,
+                    updatedAt: serverTimestamp() 
+                });
+
+                await batch.commit();
+                toast({ title: 'Éxito', description: `${item.quantity - pendingToStore} ${item.unit} almacenados automáticamente.` });
+                onCancel();
+            } else {
+                 toast({ variant: 'destructive', title: 'Sin espacio', description: 'No se pudo almacenar ningún item. Verifique la disponibilidad.' });
+            }
 
         } catch(error) {
-            console.error("Error storing fruit item:", error);
-            toast({ variant: 'destructive', title: 'Error', description: 'No se pudo actualizar la ubicación.' });
-            const receptionDocRef = doc(firestore, 'otherFruitReceptions', item.receptionId);
-            errorEmitter.emit('permission-error', new FirestorePermissionError({
-                path: receptionDocRef.path,
-                operation: 'update'
-            }));
+            console.error("Error storing fruit item automatically:", error);
+            toast({ variant: 'destructive', title: 'Error', description: 'No se pudo completar el almacenamiento automático.' });
+            errorEmitter.emit('permission-error', new FirestorePermissionError({ path: receptionDocRef.path, operation: 'update' }));
         }
     };
 
@@ -224,7 +211,7 @@ function StorageForm({ item, onCancel, allReceptions, allChamberLots }: { item: 
         <TableRow>
             <TableCell colSpan={6} className="p-0">
                 <div className="p-4 bg-muted/50">
-                    <h4 className="font-semibold mb-4">Almacenar: {item.quantity} {item.unit} de {item.productName}</h4>
+                    <h4 className="font-semibold mb-4">Almacenamiento Automático: {item.quantity} {item.unit} de {item.productName}</h4>
                      <Form {...form}>
                         <form onSubmit={form.handleSubmit(handleStoreConfirm)} className="space-y-4">
                             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -240,7 +227,7 @@ function StorageForm({ item, onCancel, allReceptions, allChamberLots }: { item: 
                                 )}/>
                                 <FormField control={form.control} name="coordinate" render={({ field }) => (
                                     <FormItem>
-                                        <FormLabel>Coordenada</FormLabel>
+                                        <FormLabel>Coordenada de Inicio</FormLabel>
                                         <Select onValueChange={field.onChange} value={field.value} disabled={!targetChamberId}>
                                             <FormControl><SelectTrigger><SelectValue placeholder="Seleccione..." /></SelectTrigger></FormControl>
                                             <SelectContent>
@@ -251,18 +238,16 @@ function StorageForm({ item, onCancel, allReceptions, allChamberLots }: { item: 
                                                 )}
                                             </SelectContent>
                                         </Select>
-                                        <p className="text-xs text-muted-foreground">{occupancyMessage}</p>
                                         <FormMessage />
                                     </FormItem>
                                 )}/>
                                 <FormField control={form.control} name="quantity" render={({ field }) => (
                                     <FormItem>
-                                        <FormLabel>Cantidad a Almacenar</FormLabel>
+                                        <FormLabel>Cantidad por Coordenada</FormLabel>
                                         <FormControl>
                                           <Input 
                                             type="number" 
                                             {...field} 
-                                            max={item.unit === 'Pallets' ? 1 : item.quantity}
                                             readOnly={item.unit === 'Pallets'}
                                           />
                                         </FormControl>
