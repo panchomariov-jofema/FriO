@@ -243,5 +243,20 @@ export interface OtherFruitReception {
   updatedAt?: Timestamp;
 }
 
+export interface OtherFruitMovement {
+  id: string;
+  type: 'entrada' | 'salida';
+  clientId: string;
+  clientName: string;
+  unit: 'Bins' | 'Pallets';
+  document: string;
+  items: {
+    productCode: string;
+    productName: string;
+    quantity: number;
+  }[];
+  createdAt: Timestamp;
+}
+
 
 export type MasterData = Exporter | Producer | BinMaterial | OtherClient | PackagingMaster | UserMaster | Profile | Packing;

@@ -127,3 +127,25 @@ export const otherFruitReceptionSchema = z.object({
     document: z.string().min(1, "El documento es obligatorio."),
     items: z.array(otherFruitReceptionItemSchema).min(1, "Debe agregar al menos un producto."),
 });
+
+const otherFruitExitItemLocationSchema = z.object({
+    locationKey: z.string(),
+    receptionId: z.string(),
+    itemIndex: z.number(),
+    quantityToWithdraw: z.coerce.number().min(0),
+});
+
+export const otherFruitExitItemSchema = z.object({
+    productCode: z.string().min(1, "Debe seleccionar un producto."),
+    productName: z.string(),
+    quantity: z.coerce.number().min(0),
+    locations: z.array(otherFruitExitItemLocationSchema),
+});
+export type OtherFruitExitItem = z.infer<typeof otherFruitExitItemSchema>;
+
+
+export const otherFruitExitSchema = z.object({
+    clientId: z.string().min(1, "Debe seleccionar un cliente."),
+    document: z.string().optional(),
+    items: z.array(otherFruitExitItemSchema).min(1),
+});

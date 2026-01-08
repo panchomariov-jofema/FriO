@@ -5,6 +5,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { OtherFruitReceptionTab } from '@/components/other-fruit/ReceptionTab';
 import { OtherFruitStorageTab } from '@/components/other-fruit/StorageTab';
+import { OtherFruitExitTab } from '@/components/other-fruit/ExitTab';
 
 export default function OtrosHortofruticolasPage() {
     return (
@@ -12,18 +13,23 @@ export default function OtrosHortofruticolasPage() {
             <Card>
                 <CardHeader>
                     <CardTitle>Gestión de Otros Hortofrutícolas</CardTitle>
-                    <CardDescription>Recepción y almacenamiento de fruta de otros clientes.</CardDescription>
+                    <CardDescription>Recepción, almacenamiento y despacho de fruta de otros clientes.</CardDescription>
                 </CardHeader>
             </Card>
 
             <Tabs defaultValue="recepcion" className="w-full">
-                <TabsList className="grid w-full grid-cols-2">
+                <TabsList className="grid w-full grid-cols-3">
                     <TabsTrigger value="recepcion">Recepción</TabsTrigger>
+                    <TabsTrigger value="salidas">Salidas</TabsTrigger>
                     <TabsTrigger value="almacenamiento">Pendientes de Almacenar</TabsTrigger>
                 </TabsList>
                 
                 <TabsContent value="recepcion">
                     <OtherFruitReceptionTab />
+                </TabsContent>
+
+                <TabsContent value="salidas">
+                    <OtherFruitExitTab />
                 </TabsContent>
                 
                 <TabsContent value="almacenamiento">

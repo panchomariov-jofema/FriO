@@ -136,6 +136,15 @@ service cloud.firestore {
     match /otherFruitReceptions/{receptionId} {
         allow read, write: if isSignedIn();
     }
+    
+    /**
+     * @description Collection for fruit movements from other clients.
+     * @path /otherFruitMovements/{movementId}
+     * @allow Any authenticated user can create, read, and update records.
+     */
+    match /otherFruitMovements/{movementId} {
+        allow read, write: if isSignedIn();
+    }
 
     /**
      * @description Collection for packaging movement records.
