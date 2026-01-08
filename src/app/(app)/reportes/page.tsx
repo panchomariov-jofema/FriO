@@ -4,14 +4,17 @@ import * as React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useFirestore } from '@/firebase';
-import type { BinMaterialStock, Exporter, BinMaterialMovement, Producer } from '@/lib/types';
+import type { BinMaterialStock, Exporter, BinMaterialMovement, Producer, ReceptionLot, ProcessingLot, ChamberLot, Dispatch } from '@/lib/types';
 import { collection, onSnapshot, query } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Button } from '@/components/ui/button';
-import { Download } from 'lucide-react';
+import { Download, ChevronRight } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { cn } from '@/lib/utils';
+import { Timestamp } from 'firebase/firestore';
 
 function StockReport() {
     const firestore = useFirestore();
@@ -248,6 +251,222 @@ function KardexReport() {
     );
 }
 
+interface TraceabilityEvent {
+    timestamp: Timestamp;
+    module: 'Recepción' | 'Hidrocooler' | 'Cámara' | 'Despacho';
+    event: string;
+    details: string;
+}
+
+function LotTraceabilityReport() {
+    const { data: receptionLots, loading: l1 } = useFirestoreCollection<ReceptionLot>('receptionLots');
+    const { data: processingLots, loading: l2 } = useFirestoreCollection<ProcessingLot>('processingLots');
+    const { data: chamberLots, loading: l3 } = useFirestoreCollection<ChamberLot>('chamberLots');
+    const { data: dispatches, loading: l4 } = useFirestoreCollection<Dispatch>('dispatches');
+    const { data: exporters, loading: l5 } = useFirestoreCollection<Exporter>('exporters');
+    const { data: producers, loading: l6 } = useFirestoreCollection<Producer>('producers');
+    const isLoading = l1 || l2 || l3 || l4 || l5 || l6;
+
+    const exporterMap = React.useMemo(() => exporters.reduce((acc, e) => ({ ...acc, [e.exporterId]: e.name }), {} as Record<string, string>), [exporters]);
+    const producerMap = React.useMemo(() => producers.reduce((acc, p) => ({ ...acc, [p.producerId]: p.name }), {} as Record<string, string>), [producers]);
+
+    const traceabilityData = React.useMemo(() => {
+        const lotEvents: Record<string, { events: TraceabilityEvent[], lotInfo: any }> = {};
+
+        receptionLots.forEach(lot => {
+            if (!lot.displayLotId) return;
+            if (!lotEvents[lot.displayLotId]) {
+                lotEvents[lot.displayLotId] = {
+                    events: [],
+                    lotInfo: {
+                        exporter: exporterMap[lot.exporterId] || lot.exporterId,
+                        producer: producerMap[lot.producerId] || lot.producerId,
+                        variety: lot.variety,
+                        initialBins: lot.binCount
+                    }
+                };
+            }
+            if (lot.createdAt) {
+                lotEvents[lot.displayLotId].events.push({
+                    timestamp: lot.createdAt,
+                    module: 'Recepción',
+                    event: 'Lote Creado',
+                    details: `${lot.binCount} bins, ${lot.toteCount} totes. Documento: ${lot.document}`
+                });
+            }
+        });
+
+        processingLots.forEach(lot => {
+            if (!lotEvents[lot.displayLotId]) return; // Should not happen if data is consistent
+            lotEvents[lot.displayLotId].events.push({
+                timestamp: lot.createdAt,
+                module: 'Hidrocooler',
+                event: `Inicio Proceso (${lot.status})`,
+                details: `${lot.binCount} bins en ${lot.hidrocooler}`
+            });
+        });
+
+        chamberLots.forEach(lot => {
+            if (!lotEvents[lot.displayLotId]) return;
+            lotEvents[lot.displayLotId].events.push({
+                timestamp: lot.storedAt,
+                module: 'Cámara',
+                event: `Movimiento a Cámara (${lot.status})`,
+                details: `${lot.binCount} bins a ${lot.chamberId || 'N/A'} en coord. ${lot.coordinate || 'N/A'}`
+            });
+        });
+
+        dispatches.forEach(dispatch => {
+            dispatch.bins.forEach(bin => {
+                if (!lotEvents[bin.displayLotId]) return;
+                lotEvents[bin.displayLotId].events.push({
+                    timestamp: dispatch.createdAt,
+                    module: 'Despacho',
+                    event: `Despacho (${dispatch.status})`,
+                    details: `${bin.binCount} bins para ${dispatch.exporterName}`
+                });
+            });
+        });
+
+        // Sort events within each lot
+        Object.values(lotEvents).forEach(item => {
+            item.events.sort((a, b) => a.timestamp.toMillis() - b.timestamp.toMillis());
+        });
+        
+        return Object.entries(lotEvents).sort(([idA], [idB]) => idA.localeCompare(idB));
+
+    }, [receptionLots, processingLots, chamberLots, dispatches, exporterMap, producerMap]);
+    
+    const handleExportCSV = () => {
+        const headers = ['ID Lote', 'Exportador', 'Productor', 'Variedad', 'Fecha/Hora Evento', 'Módulo', 'Evento', 'Detalles'];
+        const csvRows = [headers.join(',')];
+
+        traceabilityData.forEach(([displayLotId, data]) => {
+            data.events.forEach(event => {
+                const date = event.timestamp.toDate();
+                const row = [
+                    `"${displayLotId}"`,
+                    `"${data.lotInfo.exporter}"`,
+                    `"${data.lotInfo.producer}"`,
+                    `"${data.lotInfo.variety}"`,
+                    `"${date.toLocaleString()}"`,
+                    `"${event.module}"`,
+                    `"${event.event}"`,
+                    `"${event.details}"`,
+                ];
+                csvRows.push(row.join(','));
+            });
+        });
+        
+        const csvContent = "data:text/csv;charset=utf-8," + csvRows.join('\n');
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", "reporte_trazabilidad_lotes.csv");
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
+    return (
+        <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+                 <div>
+                    <CardTitle>Trazabilidad de Lotes</CardTitle>
+                    <CardDescription>
+                        Sigue el historial completo de cada lote a través de los módulos de la aplicación.
+                    </CardDescription>
+                </div>
+                <Button onClick={handleExportCSV} disabled={isLoading || traceabilityData.length === 0}>
+                    <Download className="mr-2 h-4 w-4" />
+                    Exportar a CSV
+                </Button>
+            </CardHeader>
+            <CardContent>
+                <div className="rounded-md border max-h-[800px] overflow-y-auto">
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead className="w-12"></TableHead>
+                                <TableHead>ID Lote</TableHead>
+                                <TableHead>Exportador</TableHead>
+                                <TableHead>Productor</TableHead>
+                                <TableHead>Variedad</TableHead>
+                                <TableHead>Fecha Primer Registro</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                             {isLoading ? (
+                                Array.from({ length: 5 }).map((_, i) => (
+                                    <TableRow key={i}>
+                                        <TableCell colSpan={6}><Skeleton className="h-8 w-full" /></TableCell>
+                                    </TableRow>
+                                ))
+                            ) : traceabilityData.length > 0 ? (
+                                traceabilityData.map(([displayLotId, data]) => (
+                                    <Collapsible asChild key={displayLotId}>
+                                        <>
+                                            <TableRow>
+                                                <TableCell>
+                                                    <CollapsibleTrigger asChild>
+                                                        <Button variant="ghost" size="icon">
+                                                            <ChevronRight className="h-4 w-4 transition-transform data-[state=open]:rotate-90" />
+                                                        </Button>
+                                                    </CollapsibleTrigger>
+                                                </TableCell>
+                                                <TableCell className="font-medium">{displayLotId}</TableCell>
+                                                <TableCell>{data.lotInfo.exporter}</TableCell>
+                                                <TableCell>{data.lotInfo.producer}</TableCell>
+                                                <TableCell>{data.lotInfo.variety}</TableCell>
+                                                <TableCell>{data.events[0]?.timestamp.toDate().toLocaleDateString()}</TableCell>
+                                            </TableRow>
+                                            <CollapsibleContent asChild>
+                                                <tr className="bg-muted/50 hover:bg-muted/50">
+                                                    <TableCell colSpan={6} className="p-0">
+                                                        <div className="p-4">
+                                                            <h4 className="font-semibold mb-2">Detalle de Eventos del Lote:</h4>
+                                                            <Table>
+                                                                <TableHeader>
+                                                                    <TableRow>
+                                                                        <TableHead>Fecha / Hora</TableHead>
+                                                                        <TableHead>Módulo</TableHead>
+                                                                        <TableHead>Evento</TableHead>
+                                                                        <TableHead>Detalles</TableHead>
+                                                                    </TableRow>
+                                                                </TableHeader>
+                                                                <TableBody>
+                                                                    {data.events.map((event, index) => (
+                                                                        <TableRow key={index}>
+                                                                            <TableCell>{event.timestamp.toDate().toLocaleString()}</TableCell>
+                                                                            <TableCell><Badge variant="outline">{event.module}</Badge></TableCell>
+                                                                            <TableCell>{event.event}</TableCell>
+                                                                            <TableCell>{event.details}</TableCell>
+                                                                        </TableRow>
+                                                                    ))}
+                                                                </TableBody>
+                                                            </Table>
+                                                        </div>
+                                                    </TableCell>
+                                                </tr>
+                                            </CollapsibleContent>
+                                        </>
+                                    </Collapsible>
+                                ))
+                            ) : (
+                                <TableRow>
+                                    <TableCell colSpan={6} className="h-24 text-center">
+                                        No hay datos de trazabilidad para mostrar.
+                                    </TableCell>
+                                </TableRow>
+                            )}
+                        </TableBody>
+                    </Table>
+                </div>
+            </CardContent>
+        </Card>
+    )
+}
+
 export default function ReportesPage() {
   return (
     <div className="space-y-4">
@@ -266,6 +485,14 @@ export default function ReportesPage() {
                 </AccordionTrigger>
                 <AccordionContent className="pt-4">
                    <KardexReport />
+                </AccordionContent>
+            </AccordionItem>
+            <AccordionItem value="trazabilidad-lotes">
+                <AccordionTrigger className="text-lg font-semibold">
+                    Trazabilidad de Lotes
+                </AccordionTrigger>
+                <AccordionContent className="pt-4">
+                   <LotTraceabilityReport />
                 </AccordionContent>
             </AccordionItem>
         </Accordion>
