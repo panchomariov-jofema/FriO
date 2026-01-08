@@ -43,7 +43,7 @@ export default function DashboardPage() {
         totalBinsInStock, 
         pendingStorage,
         inProcess, 
-        stockByExporter, 
+        kilosPorExportador,
         occupancyByChamber,
         latestReceptions,
         totalEmptyBins,
@@ -68,20 +68,20 @@ export default function DashboardPage() {
             return acc;
         }, {} as Record<string, string>);
         
-        // This chart should always show the global view, so we use all chamber lots
-        const allStoredLots = (chamberLots || []).filter(lot => lot.status === 'Almacenado');
-        const calculatedStockByExporter = allStoredLots.reduce((acc, lot) => {
-            const exporterName = exporterMap[lot.exporterId] || 'No Asignado';
-            if (!acc[exporterName]) {
-                acc[exporterName] = 0;
+        const kilosData = (receptionLots || []).reduce((acc, lot) => {
+            if (lot.totalWeight && lot.totalWeight > 0) {
+                const exporterName = exporterMap[lot.exporterId] || 'No Asignado';
+                 if (!acc[exporterName]) {
+                    acc[exporterName] = 0;
+                }
+                acc[exporterName] += lot.totalWeight;
             }
-            acc[exporterName] += lot.binCount;
             return acc;
         }, {} as Record<string, number>);
 
-        const pieChartData = Object.entries(calculatedStockByExporter).map(([name, value]) => ({
+        const barChartData = Object.entries(kilosData).map(([name, value]) => ({
             name,
-            value,
+            kilos: value,
         }));
         
         // Occupancy is also filtered by exporter
@@ -122,7 +122,7 @@ export default function DashboardPage() {
             totalBinsInStock: calculatedTotalBins,
             pendingStorage: calculatedPendingStorage,
             inProcess: calculatedInProcess,
-            stockByExporter: pieChartData,
+            kilosPorExportador: barChartData,
             occupancyByChamber: calculatedOccupancy,
             latestReceptions: sortedReceptions,
             totalEmptyBins: calculatedEmptyBins,
@@ -141,16 +141,12 @@ export default function DashboardPage() {
         { title: "Pendientes por Almacenar", value: pendingStorage, icon: PackageCheck },
     ];
 
-    const chartConfig: ChartConfig = React.useMemo(() => {
-        const config: ChartConfig = {};
-        stockByExporter.forEach((item, index) => {
-            config[item.name] = {
-                label: item.name,
-                color: CHART_COLORS[index % CHART_COLORS.length],
-            };
-        });
-        return config;
-    }, [stockByExporter]);
+    const chartConfig: ChartConfig = {
+        kilos: {
+            label: "Kilos",
+            color: "hsl(var(--chart-1))",
+        },
+    };
 
 
     return (
@@ -207,29 +203,34 @@ export default function DashboardPage() {
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-5">
                 <Card className="lg:col-span-2">
                     <CardHeader>
-                        <CardTitle>Distribución Global de Stock (Fruta)</CardTitle>
-                        <CardDescription>Porcentaje del stock total por cliente exportador.</CardDescription>
+                        <CardTitle>Kilos Recepcionados por Exportador</CardTitle>
+                        <CardDescription>Total de kilos ingresados a la planta por cada cliente.</CardDescription>
                     </CardHeader>
                     <CardContent>
                         {loading ? (
                              <div className="flex justify-center items-center h-[250px]">
-                                <Skeleton className="h-48 w-48 rounded-full" />
+                                <Skeleton className="h-48 w-full" />
                             </div>
-                        ) : stockByExporter.length > 0 ? (
-                        <ChartContainer config={chartConfig} className="mx-auto aspect-square max-h-[250px]">
-                            <PieChart>
-                                <ChartTooltip content={<ChartTooltipContent nameKey="value" hideLabel />} />
-                                <Pie data={stockByExporter} dataKey="value" nameKey="name" innerRadius={60}>
-                                     {stockByExporter.map((entry, index) => (
-                                        <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
-                                    ))}
-                                </Pie>
-                                <Legend content={<ChartTooltipContent nameKey="name" hideLabel />} />
-                            </PieChart>
+                        ) : kilosPorExportador.length > 0 ? (
+                        <ChartContainer config={chartConfig} className="h-[250px] w-full">
+                           <BarChart data={kilosPorExportador} layout="vertical" margin={{ right: 20 }}>
+                                <XAxis type="number" dataKey="kilos" hide />
+                                <YAxis dataKey="name" type="category" tickLine={false} axisLine={false} tickMargin={10} width={80} />
+                                <ChartTooltip content={<ChartTooltipContent />} />
+                                <Bar dataKey="kilos" layout="vertical" radius={5} fill="var(--color-kilos)">
+                                    <LabelList 
+                                        dataKey="kilos" 
+                                        position="right" 
+                                        offset={8} 
+                                        className="fill-foreground font-semibold"
+                                        formatter={(value: number) => value.toLocaleString('es-CL')}
+                                    />
+                                </Bar>
+                            </BarChart>
                         </ChartContainer>
                         ) : (
                              <div className="flex justify-center items-center h-[250px]">
-                                <p className="text-muted-foreground">No hay stock para mostrar.</p>
+                                <p className="text-muted-foreground">No hay datos de recepción para mostrar.</p>
                             </div>
                         )}
                     </CardContent>
@@ -254,7 +255,7 @@ export default function DashboardPage() {
                                 <XAxis type="number" hide />
                                 <YAxis dataKey="name" type="category" tickLine={false} axisLine={false} tickMargin={10} width={80} />
                                 <ChartTooltip content={<ChartTooltipContent />} />
-                                <Bar dataKey="ocupacion" layout="vertical" radius={5}>
+                                <Bar dataKey="ocupacion" layout="vertical" radius={5} fill="hsl(var(--chart-2))">
                                     <LabelList 
                                         dataKey="percentage" 
                                         position="right" 
