@@ -325,7 +325,10 @@ const handleUndoDispatch = async (dispatchToUndo: Dispatch) => {
   const summaryIsLoading = loadingChamberLots || loadingExporters;
   const sortedDispatches = React.useMemo(() => {
     if (!dispatches) return [];
-    return [...dispatches].sort((a,b) => b.createdAt.toMillis() - a.createdAt.toMillis());
+    return [...dispatches].sort((a, b) => {
+      if (!a.createdAt || !b.createdAt) return 0;
+      return b.createdAt.toMillis() - a.createdAt.toMillis();
+    });
   }, [dispatches]);
 
   return (
