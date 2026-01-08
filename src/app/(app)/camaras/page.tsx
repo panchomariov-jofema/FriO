@@ -44,11 +44,12 @@ export default function CamarasPage() {
 
   const { pendingLots, storedLotsByChamber, chamberOccupancy } = React.useMemo(() => {
     const allChamberLots = chamberLots || [];
-    const pending = allChamberLots
+    
+    const pendingLots = allChamberLots
       .filter((lot) => lot.status === 'Pendiente por Almacenar')
       .sort((a, b) => b.storedAt && a.storedAt ? b.storedAt.toMillis() - a.storedAt.toMillis() : 0);
       
-    const storedByChamber = allChamberLots
+    const storedLotsByChamber = allChamberLots
       .filter((lot) => lot.status === 'Almacenado' && lot.chamberId && lot.coordinate)
       .reduce((acc, lot) => {
         if (!acc[lot.chamberId!]) {
@@ -61,7 +62,7 @@ export default function CamarasPage() {
         return acc;
     }, {} as Record<string, Record<string, ChamberLot[]>>);
 
-    const occupancy = Object.keys(chambersConfig).reduce((acc, chamberId) => {
+    const chamberOccupancy = Object.keys(chambersConfig).reduce((acc, chamberId) => {
         const lotsInChamber = allChamberLots.filter(lot => lot.chamberId === chamberId && lot.status === 'Almacenado');
         const totalBins = lotsInChamber.reduce((sum, lot) => sum + lot.binCount, 0);
         acc[chamberId] = {
@@ -72,7 +73,7 @@ export default function CamarasPage() {
         return acc;
     }, {} as Record<string, {occupied: number; total: number; percentage: number}>);
 
-    return { pendingLots: pending, storedLotsByChamber, chamberOccupancy };
+    return { pendingLots, storedLotsByChamber, chamberOccupancy };
   }, [chamberLots]);
 
 
