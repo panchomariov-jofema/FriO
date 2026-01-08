@@ -23,7 +23,7 @@ export const binMaterialSchema = z.object({
 export const otherClientSchema = z.object({
   clientId: z.string().min(1, 'El ID de cliente es obligatorio'),
   name: z.string().min(1, 'El nombre es obligatorio'),
-  type: z.string().min(1, 'El tipo es obligatorio'),
+  type: z.enum(['embalaje', 'frio_hortofruticola', 'fruta'], { required_error: 'El tipo es obligatorio.'}),
   unit: z.enum(['Bins', 'Pallets'], { required_error: 'La unidad es obligatoria.'}),
 });
 
@@ -114,4 +114,16 @@ export const receptionLotSchema = z.object({
     preHydroTemp: z.number().optional(),
     postHydroTemp: z.number().optional(),
     createdAt: z.any().optional(),
+});
+
+export const otherFruitReceptionItemSchema = z.object({
+    productCode: z.string().min(1, "El código es obligatorio."),
+    productName: z.string().min(1, "El nombre es obligatorio."),
+    quantity: z.coerce.number().min(1, "La cantidad debe ser al menos 1."),
+});
+
+export const otherFruitReceptionSchema = z.object({
+    clientId: z.string().min(1, "Debe seleccionar un cliente."),
+    document: z.string().min(1, "El documento es obligatorio."),
+    items: z.array(otherFruitReceptionItemSchema).min(1, "Debe agregar al menos un producto."),
 });

@@ -54,7 +54,7 @@ export interface OtherClient {
   id: string;
   clientId: string;
   name: string;
-  type: string;
+  type: 'embalaje' | 'frio_hortofruticola' | 'fruta';
   unit: 'Bins' | 'Pallets';
 }
 
@@ -219,7 +219,29 @@ export interface Dispatch {
   }[];
 }
 
+export interface OtherFruitReceptionItem {
+    productCode: string;
+    productName: string;
+    quantity: number;
+    status: 'Pendiente de almacenar' | 'Almacenado';
+    storageLocation?: {
+      chamberId: string;
+      coordinate: string;
+    };
+    storedAt?: Timestamp | Date;
+}
+
+export interface OtherFruitReception {
+  id: string;
+  clientId: string;
+  clientName: string;
+  unit: 'Bins' | 'Pallets';
+  document: string;
+  items: OtherFruitReceptionItem[];
+  status: 'Pendiente de almacenar' | 'Parcialmente Almacenado' | 'Almacenado';
+  createdAt: Timestamp;
+  updatedAt?: Timestamp;
+}
+
 
 export type MasterData = Exporter | Producer | BinMaterial | OtherClient | PackagingMaster | UserMaster | Profile | Packing;
-
-    

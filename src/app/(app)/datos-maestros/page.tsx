@@ -96,7 +96,16 @@ const OtherClientForm = ({ form }: { form: any }) => (
         <FormItem><FormLabel>Nombre</FormLabel><FormControl><Input {...field} autoComplete="off" /></FormControl><FormMessage /></FormItem>
       )} />
       <FormField control={form.control} name="type" render={({ field }) => (
-        <FormItem><FormLabel>Tipo</FormLabel><FormControl><Input {...field} placeholder="Ej: embalajes, frio_hortofruticola" autoComplete="off" /></FormControl><FormMessage /></FormItem>
+        <FormItem><FormLabel>Tipo</FormLabel>
+        <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
+          <FormControl><SelectTrigger><SelectValue placeholder="Seleccione un tipo" /></SelectTrigger></FormControl>
+          <SelectContent>
+            <SelectItem value="embalaje">Embalaje</SelectItem>
+            <SelectItem value="frio_hortofruticola">Frío Hortofrutícola</SelectItem>
+            <SelectItem value="fruta">Fruta</SelectItem>
+          </SelectContent>
+        </Select>
+        <FormMessage /></FormItem>
       )} />
       <FormField control={form.control} name="unit" render={({ field }) => (
         <FormItem><FormLabel>Unidad</FormLabel>
