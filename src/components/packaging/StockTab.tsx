@@ -23,7 +23,7 @@ interface FlattenedStockItem {
 export function StockTab() {
   const { data: allLots, loading: loadingLots } = useFirestoreCollection<PackagingReception>('packagingReceptions');
   const { data: clients, loading: loadingClients } = useFirestoreCollection<OtherClient>('otherClients');
-  const [clientFilter, setClientFilter] = React.useState('');
+  const [clientFilter, setClientFilter] = React.useState('all');
   const [codeFilter, setCodeFilter] = React.useState('');
 
   const flattenedStock = React.useMemo(() => {
@@ -50,7 +50,7 @@ export function StockTab() {
   
   const filteredStock = React.useMemo(() => {
     return flattenedStock.filter(item => {
-        const clientMatch = !clientFilter || item.clientId === clientFilter;
+        const clientMatch = clientFilter === 'all' || item.clientId === clientFilter;
         const codeMatch = !codeFilter || item.code.toLowerCase().includes(codeFilter.toLowerCase());
         return clientMatch && codeMatch;
     });
@@ -77,7 +77,7 @@ export function StockTab() {
                         <SelectValue placeholder="Todos los clientes" />
                     </SelectTrigger>
                     <SelectContent>
-                        <SelectItem value="">Todos los clientes</SelectItem>
+                        <SelectItem value="all">Todos los clientes</SelectItem>
                         {packagingClients.map(c => <SelectItem key={c.id} value={c.clientId}>{c.name}</SelectItem>)}
                     </SelectContent>
                 </Select>
