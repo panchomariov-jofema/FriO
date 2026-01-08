@@ -85,6 +85,20 @@ export interface PackagingReception {
   storedAt?: Timestamp;
 }
 
+export interface PackagingMovement {
+  id: string;
+  type: 'entrada' | 'salida';
+  clientId: string;
+  document: string;
+  items: {
+    packagingMasterId: string;
+    packagingMasterCode: string;
+    packagingMasterName: string;
+    palletCount: number;
+  }[];
+  createdAt: Timestamp;
+}
+
 
 export interface Packing {
   id: string;

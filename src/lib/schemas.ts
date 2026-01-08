@@ -46,6 +46,33 @@ export const packagingReceptionSchema = z.object({
     items: z.array(packagingReceptionItemSchema).min(1, "Debe agregar al menos un artículo."),
 });
 
+export const stockLocationSchema = z.object({
+  receptionId: z.string(),
+  location: z.string(),
+  available: z.number(),
+});
+export type StockLocation = z.infer<typeof stockLocationSchema>;
+
+
+export const packagingExitItemSchema = z.object({
+    packagingMasterId: z.string().min(1, "Debe ingresar un código de artículo válido."),
+    packagingMasterCode: z.string().min(1, "Debe ingresar un código de artículo."),
+    packagingMasterName: z.string(),
+    palletCount: z.coerce.number().min(0),
+    locations: z.array(z.object({
+        receptionId: z.string(),
+        location: z.string(),
+        palletsToWithdraw: z.coerce.number().min(0),
+    })),
+});
+
+export const packagingExitSchema = z.object({
+    clientId: z.string().min(1, "Debe seleccionar un cliente."),
+    document: z.string().min(1, "El documento es obligatorio."),
+    items: z.array(packagingExitItemSchema).min(1),
+});
+
+
 
 export const packingSchema = z.object({
     exporterId: z.string().min(1, 'El exportador es obligatorio'),

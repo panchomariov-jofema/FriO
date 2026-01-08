@@ -277,6 +277,7 @@
             "type": "object",
             "properties": {
               "packagingMasterId": { "type": "string" },
+              "packagingMasterCode": { "type": "string" },
               "packagingMasterName": { "type": "string" },
               "palletCount": { "type": "number" }
             },
@@ -307,6 +308,46 @@
         }
       },
       "required": ["clientId", "clientName", "document", "items", "status", "createdAt"]
+    },
+    "PackagingMovement": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "PackagingMovement",
+      "description": "Records a movement (entry or exit) of packaging materials.",
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["entrada", "salida"],
+          "description": "The type of movement."
+        },
+        "clientId": {
+          "type": "string",
+          "description": "Reference to the 'OtherClient'."
+        },
+        "document": {
+          "type": "string",
+          "description": "Document number for the movement (e.g., shipping guide, consumption voucher)."
+        },
+        "items": {
+          "type": "array",
+          "description": "List of packaging materials and their quantities moved.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "packagingMasterId": { "type": "string" },
+              "packagingMasterCode": { "type": "string" },
+              "packagingMasterName": { "type": "string" },
+              "palletCount": { "type": "number" }
+            },
+            "required": ["packagingMasterId", "packagingMasterCode", "packagingMasterName", "palletCount"]
+          }
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["type", "clientId", "document", "items", "createdAt"]
     },
     "Packing": {
       "$schema": "http://json-schema.org/draft-07/schema#",
@@ -929,8 +970,26 @@
             }
           ]
         }
+      },
+      {
+        "path": "/packagingMovements/{movementId}",
+        "definition": {
+          "entityName": "PackagingMovement",
+          "schema": {
+            "$ref": "#/backend/entities/PackagingMovement"
+          },
+          "description": "Stores records for packaging material movements (in/out).",
+          "params": [
+            {
+              "name": "movementId",
+              "description": "The unique identifier for the packaging movement record."
+            }
+          ]
+        }
       }
     ],
     "reasoning": "The Firestore data structure is designed to support the FrigoManager application, focusing on master data management and related operational modules.  The design prioritizes authorization independence and easy debugging. Each master data entity (Exporter, Producer, BinMaterial, OtherClient, PackagingMaster, UserMaster, Profile) is stored in its own top-level collection. This Structural Segregation ensures a homogeneous security posture for each entity type. The `exporterId`, `producerId`, `clientId`, and `profileId` fields are used as logical keys to relate data between modules, but are not used for access control.  User authentication is handled by Firebase Auth, and user roles can be managed through the `profiles` and `usersMaster` collections.  Since user roles are managed in the database, no custom claims are required. This design inherently supports QAPs because list operations are secured by collection-level rules, and all documents within a collection share the same security requirements.  There are no hierarchical dependencies, so complex filtering within rules is avoided."
   }
 }
+
+    
