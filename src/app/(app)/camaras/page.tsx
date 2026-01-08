@@ -255,8 +255,8 @@ export default function CamarasPage() {
                         <TooltipProvider>
                             <div className="p-4 bg-muted/50 rounded-lg border">
                                  <div className="grid gap-1" style={{gridTemplateColumns: `repeat(${config.columns.length}, minmax(0, 1fr))`}}>
-                                    {config.columns.map(col =>
-                                        config.rows.map(row => {
+                                    {config.rows.map(row =>
+                                        config.columns.map(col => {
                                             const coord = `${col}${row}`;
                                             const lotsInCoord = storedLotsByChamber[chamberId]?.[coord] || [];
                                             const isOccupied = lotsInCoord.length > 0;
