@@ -16,7 +16,7 @@ import { ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent } from "
 import { chambersConfig } from '@/lib/chambers-config';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Boxes, PackageCheck, Truck, Warehouse, Archive } from 'lucide-react';
+import { Boxes, PackageCheck, Truck, Warehouse, Archive, ChevronsLeft } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 
@@ -41,16 +41,15 @@ export default function DashboardPage() {
     
     const { 
         totalBinsInStock, 
-        pendingStorage, 
-        pendingDispatch, 
+        pendingStorage,
         inProcess, 
         stockByExporter, 
         occupancyByChamber,
         latestReceptions,
         totalEmptyBins,
+        pendingReceptionBins,
     } = React.useMemo(() => {
         const filteredChamberLots = (chamberLots || []).filter(lot => !selectedExporterId || lot.exporterId === selectedExporterId);
-        const filteredDispatches = (dispatches || []).filter(d => !selectedExporterId || d.exporterId === selectedExporterId);
         const filteredReceptionLots = (receptionLots || []).filter(lot => !selectedExporterId || lot.exporterId === selectedExporterId);
         
         const exporterDisplayLotIds = new Set(filteredReceptionLots.map(lot => lot.displayLotId));
@@ -61,8 +60,6 @@ export default function DashboardPage() {
         const calculatedTotalBins = storedLots.reduce((sum, lot) => sum + lot.binCount, 0);
         
         const calculatedPendingStorage = filteredChamberLots.filter(lot => lot.status === 'Pendiente por Almacenar').length;
-        
-        const calculatedPendingDispatch = filteredDispatches.filter(d => d.status === 'Pendiente de Salida').length;
         
         const calculatedInProcess = filteredProcessingLots.filter(p => p.status === 'En Proceso').length;
 
@@ -116,16 +113,20 @@ export default function DashboardPage() {
             .filter(s => specificBinCodes.includes(s.binMaterialCode))
             .reduce((sum, s) => sum + s.quantity, 0);
 
+        const calculatedPendingReceptionBins = filteredReceptionLots
+            .filter(lot => lot.status !== 'Cerrado')
+            .reduce((sum, lot) => sum + lot.binCount, 0);
+
 
         return {
             totalBinsInStock: calculatedTotalBins,
             pendingStorage: calculatedPendingStorage,
-            pendingDispatch: calculatedPendingDispatch,
             inProcess: calculatedInProcess,
             stockByExporter: pieChartData,
             occupancyByChamber: calculatedOccupancy,
             latestReceptions: sortedReceptions,
             totalEmptyBins: calculatedEmptyBins,
+            pendingReceptionBins: calculatedPendingReceptionBins,
         };
 
     }, [chamberLots, processingLots, dispatches, exporters, receptionLots, binMaterialStock, selectedExporterId]);
@@ -135,9 +136,9 @@ export default function DashboardPage() {
     const kpiCards = [
         { title: "Total Bins en Cámara (Fruta)", value: totalBinsInStock, icon: Warehouse },
         { title: "Total Bins Vacíos (Stock)", value: totalEmptyBins, icon: Archive },
+        { title: "Bins Pendientes en Recepción", value: pendingReceptionBins, icon: ChevronsLeft },
         { title: "Lotes en Proceso (Hidro)", value: inProcess, icon: Boxes },
         { title: "Pendientes por Almacenar", value: pendingStorage, icon: PackageCheck },
-        { title: "Despachos Pendientes", value: pendingDispatch, icon: Truck }
     ];
 
     const chartConfig: ChartConfig = React.useMemo(() => {
