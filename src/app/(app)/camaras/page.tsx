@@ -9,7 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { StoreInChamberDialog } from '@/components/hidrocooler/StoreInChamberDialog';
-import { doc, writeBatch } from 'firebase/firestore';
+import { collection, doc, writeBatch } from 'firebase/firestore';
 import { useFirestore } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { errorEmitter } from '@/firebase/error-emitter';
@@ -43,13 +43,12 @@ export default function CamarasPage() {
   const { toast } = useToast();
 
   const { pendingLots, storedLotsByChamber, chamberOccupancy } = React.useMemo(() => {
-    if (!chamberLots) return { pendingLots: [], storedLotsByChamber: {}, chamberOccupancy: {} };
-    
-    const pending = chamberLots
+    const allChamberLots = chamberLots || [];
+    const pending = allChamberLots
       .filter((lot) => lot.status === 'Pendiente por Almacenar')
       .sort((a, b) => b.storedAt && a.storedAt ? b.storedAt.toMillis() - a.storedAt.toMillis() : 0);
       
-    const storedByChamber = chamberLots
+    const storedByChamber = allChamberLots
       .filter((lot) => lot.status === 'Almacenado' && lot.chamberId && lot.coordinate)
       .reduce((acc, lot) => {
         if (!acc[lot.chamberId!]) {
@@ -63,7 +62,7 @@ export default function CamarasPage() {
     }, {} as Record<string, Record<string, ChamberLot[]>>);
 
     const occupancy = Object.keys(chambersConfig).reduce((acc, chamberId) => {
-        const lotsInChamber = chamberLots.filter(lot => lot.chamberId === chamberId && lot.status === 'Almacenado');
+        const lotsInChamber = allChamberLots.filter(lot => lot.chamberId === chamberId && lot.status === 'Almacenado');
         const totalBins = lotsInChamber.reduce((sum, lot) => sum + lot.binCount, 0);
         acc[chamberId] = {
             occupied: totalBins,
@@ -73,7 +72,7 @@ export default function CamarasPage() {
         return acc;
     }, {} as Record<string, {occupied: number; total: number; percentage: number}>);
 
-    return { pendingLots: pending, storedLotsByChamber: storedByChamber, chamberOccupancy: occupancy };
+    return { pendingLots: pending, storedLotsByChamber, chamberOccupancy };
   }, [chamberLots]);
 
 
@@ -82,10 +81,11 @@ export default function CamarasPage() {
     setStoreDialogOpen(true);
   };
   
-  const findNextAvailableCoordinate = (chamberId: string, lotToPlace: ChamberLot, allStoredLots: ChamberLot[]): string | null => {
+  const findNextAvailableCoordinate = (chamberId: string, lotToPlace: ChamberLot): string | null => {
       const chamberConfig = chambersConfig[chamberId];
       if (!chamberConfig) return null;
-
+      
+      const allStoredLots = chamberLots || [];
       const storedInChamber = allStoredLots.filter(l => l.chamberId === chamberId && l.coordinate);
       const occupiedCoordinates = storedInChamber.reduce((acc, lot) => {
           if (!acc[lot.coordinate!]) acc[lot.coordinate!] = [];
@@ -124,9 +124,9 @@ export default function CamarasPage() {
   }
 
   const handleStoreInChamber = async ({ chamberId }: { chamberId: string; }) => {
-    if (!lotToStore || !firestore || !chamberLots) return;
+    if (!lotToStore || !firestore) return;
     
-    const coordinate = findNextAvailableCoordinate(chamberId, lotToStore, chamberLots);
+    const coordinate = findNextAvailableCoordinate(chamberId, lotToStore);
 
     if (!coordinate) {
         toast({ variant: 'destructive', title: 'Error', description: `No hay espacio disponible en ${chambersConfig[chamberId].name}.` });
@@ -134,46 +134,17 @@ export default function CamarasPage() {
     }
 
     const originalLotRef = doc(firestore, 'chamberLots', lotToStore.id);
-    const binsToStore = lotToStore.binCount;
-    let remainingBins = binsToStore;
-
+    
     try {
         const batch = writeBatch(firestore);
 
-        const existingLotsInCoord = (storedLotsByChamber[chamberId]?.[coordinate] || []).filter(l => l.displayLotId === lotToStore.displayLotId);
-        const binsInCoord = existingLotsInCoord.reduce((sum, l) => sum + l.binCount, 0);
-        const availableSpace = 6 - binsInCoord;
-
-        if (binsToStore <= availableSpace) {
-            // Fits completely in the coordinate
-            const updateData = {
-              chamberId,
-              coordinate,
-              status: 'Almacenado' as const,
-            };
-            batch.update(originalLotRef, updateData);
-        } else {
-            // Does not fit, split the lot
-            const binsForThisCoord = availableSpace;
-            const binsForNewLot = binsToStore - availableSpace;
-
-            if (binsForThisCoord > 0) {
-              // Create a new lot for the part that fits
-               const newLotForCoordData = {
-                    ...lotToStore,
-                    id: undefined, // Let firestore generate id
-                    binCount: binsForThisCoord,
-                    chamberId,
-                    coordinate,
-                    status: 'Almacenado' as const,
-                };
-                const newLotRef = doc(collection(firestore, 'chamberLots'));
-                batch.set(newLotRef, newLotForCoordData);
-            }
-            
-            // Update the original lot with the remaining bins
-            batch.update(originalLotRef, { binCount: binsForNewLot });
-        }
+        // All bins from the pending lot can be stored in the found coordinate.
+        const updateData = {
+          chamberId,
+          coordinate,
+          status: 'Almacenado' as const,
+        };
+        batch.update(originalLotRef, updateData);
        
         await batch.commit();
         toast({ title: 'Éxito', description: `Lote asignado a ${chambersConfig[chamberId].name} - ${coordinate}.` });
@@ -240,7 +211,7 @@ export default function CamarasPage() {
           <CardDescription>Ocupación y distribución de los lotes en las cámaras de frío.</CardDescription>
         </CardHeader>
         <CardContent>
-          <Accordion type="single" collapsible className="w-full">
+          <Accordion type="single" collapsible className="w-full" defaultValue="CAMARA-1">
             {Object.entries(chambersConfig).map(([chamberId, config]) => (
                 <AccordionItem value={chamberId} key={chamberId}>
                     <AccordionTrigger>
@@ -268,7 +239,7 @@ export default function CamarasPage() {
                                             const firstLot = isOccupied ? lotsInCoord[0] : null;
 
                                             return (
-                                                <Tooltip key={coord}>
+                                                <Tooltip key={coord} delayDuration={100}>
                                                     <TooltipTrigger asChild>
                                                         <div className={cn("h-12 w-full rounded border-2 flex items-center justify-center text-xs font-mono relative overflow-hidden",
                                                             isOccupied ? 'bg-primary/20 border-primary/50' : 'bg-background border-dashed'
@@ -279,7 +250,7 @@ export default function CamarasPage() {
                                                     </TooltipTrigger>
                                                      {isOccupied && firstLot && (
                                                         <TooltipContent>
-                                                            <p>Lote: {firstLot.displayLotId}</p>
+                                                            <p className="font-bold">Lote: {firstLot.displayLotId}</p>
                                                             <p>Productor: {firstLot.producerShortName}</p>
                                                             <p>Bins: {totalBinsInCoord} / 6</p>
                                                         </TooltipContent>
