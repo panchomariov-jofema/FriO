@@ -4,27 +4,43 @@ import * as React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useFirestore } from '@/firebase';
-import type { BinMaterialStock } from '@/lib/types';
-import { collection, onSnapshot, query, where } from 'firebase/firestore';
+import type { BinMaterialStock, Exporter } from '@/lib/types';
+import { collection, onSnapshot, query, where, Query } from 'firebase/firestore';
 import { Skeleton } from '../ui/skeleton';
+import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
 
 interface StockTabProps {
-  exporterId: string;
+  exporterId: string | null;
 }
 
 export function StockTab({ exporterId }: StockTabProps) {
   const firestore = useFirestore();
   const [stock, setStock] = React.useState<BinMaterialStock[]>([]);
   const [loading, setLoading] = React.useState(true);
+  const { data: exporters, loading: loadingExporters } = useFirestoreCollection<Exporter>('exporters');
+
+  const exporterMap = React.useMemo(() => {
+    return exporters.reduce((acc, exporter) => {
+      acc[exporter.exporterId] = exporter.name;
+      return acc;
+    }, {} as Record<string, string>);
+  }, [exporters]);
 
   React.useEffect(() => {
-    if (!firestore || !exporterId) return;
+    if (!firestore) return;
 
     setLoading(true);
-    const stockQuery = query(
-      collection(firestore, 'binMaterialStock'),
-      where('exporterId', '==', exporterId)
-    );
+    let stockQuery: Query;
+    
+    if (exporterId) {
+        stockQuery = query(
+          collection(firestore, 'binMaterialStock'),
+          where('exporterId', '==', exporterId)
+        );
+    } else {
+        stockQuery = query(collection(firestore, 'binMaterialStock'));
+    }
+
 
     const unsubscribe = onSnapshot(stockQuery, (snapshot) => {
       const stockData: BinMaterialStock[] = [];
@@ -41,11 +57,18 @@ export function StockTab({ exporterId }: StockTabProps) {
     return () => unsubscribe();
   }, [firestore, exporterId]);
 
+  const isLoading = loading || loadingExporters;
+
   return (
     <Card>
       <CardHeader>
         <CardTitle>Stock Actual</CardTitle>
-        <CardDescription>Saldos de bins y materiales para el exportador seleccionado.</CardDescription>
+        <CardDescription>
+          {exporterId 
+            ? 'Saldos de bins y materiales para el exportador seleccionado.'
+            : 'Saldos de bins y materiales para todos los exportadores.'
+          }
+        </CardDescription>
       </CardHeader>
       <CardContent>
         <div className="rounded-md border">
@@ -54,16 +77,15 @@ export function StockTab({ exporterId }: StockTabProps) {
               <TableRow>
                 <TableHead>Código</TableHead>
                 <TableHead>Nombre del Material</TableHead>
+                {!exporterId && <TableHead>Exportador</TableHead>}
                 <TableHead className="text-right">Cantidad en Stock</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {loading ? (
+              {isLoading ? (
                 Array.from({ length: 5 }).map((_, i) => (
                   <TableRow key={i}>
-                    <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                    <TableCell><Skeleton className="h-4 w-full" /></TableCell>
-                    <TableCell className="text-right"><Skeleton className="h-4 w-16 ml-auto" /></TableCell>
+                    <TableCell colSpan={exporterId ? 3 : 4}><Skeleton className="h-4 w-full" /></TableCell>
                   </TableRow>
                 ))
               ) : stock.length > 0 ? (
@@ -71,12 +93,15 @@ export function StockTab({ exporterId }: StockTabProps) {
                   <TableRow key={item.id}>
                     <TableCell className="font-mono">{item.binMaterialCode}</TableCell>
                     <TableCell className="font-medium">{item.binMaterialName}</TableCell>
+                    {!exporterId && <TableCell>{exporterMap[item.exporterId] || item.exporterId}</TableCell>}
                     <TableCell className="text-right font-semibold">{item.quantity}</TableCell>
                   </TableRow>
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={3} className="h-24 text-center">No hay stock para el exportador seleccionado.</TableCell>
+                  <TableCell colSpan={exporterId ? 3 : 4} className="h-24 text-center">
+                    {exporterId ? 'No hay stock para el exportador seleccionado.' : 'No hay stock registrado.'}
+                  </TableCell>
                 </TableRow>
               )}
             </TableBody>
@@ -86,4 +111,3 @@ export function StockTab({ exporterId }: StockTabProps) {
     </Card>
   );
 }
-    

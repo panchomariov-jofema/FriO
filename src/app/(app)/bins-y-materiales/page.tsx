@@ -4,7 +4,7 @@ import * as React from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
-import type { Exporter, Producer } from '@/lib/types';
+import type { Exporter } from '@/lib/types';
 import { Label } from '@/components/ui/label';
 import { useProducersByExporter } from '@/hooks/use-producers-by-exporter';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -73,32 +73,39 @@ export default function BinsYMaterialesPage() {
         </CardContent>
       </Card>
       
-      {selectedExporterId && selectedProducerId ? (
-        <Tabs defaultValue="entradas" className="w-full">
-            <TabsList className="grid w-full grid-cols-3">
-                <TabsTrigger value="entradas">Entradas</TabsTrigger>
-                <TabsTrigger value="salidas">Salidas</TabsTrigger>
-                <TabsTrigger value="stock">Stock</TabsTrigger>
-            </TabsList>
-            <TabsContent value="entradas">
+      <Tabs defaultValue="entradas" className="w-full">
+          <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="entradas" disabled={!selectedExporterId || !selectedProducerId}>Entradas</TabsTrigger>
+              <TabsTrigger value="salidas" disabled={!selectedExporterId || !selectedProducerId}>Salidas</TabsTrigger>
+              <TabsTrigger value="stock">Stock</TabsTrigger>
+          </TabsList>
+          <TabsContent value="entradas">
+             {selectedExporterId && selectedProducerId ? (
                 <EntriesTab exporterId={selectedExporterId} producerId={selectedProducerId} />
-            </TabsContent>
-            <TabsContent value="salidas">
+              ) : (
+                <Card className="mt-4 flex items-center justify-center h-64 border-dashed">
+                    <CardContent className="text-center">
+                        <p className="text-muted-foreground">Seleccione un exportador y un productor para registrar entradas.</p>
+                    </CardContent>
+                </Card>
+            )}
+          </TabsContent>
+          <TabsContent value="salidas">
+              {selectedExporterId && selectedProducerId ? (
                 <ExitsTab exporterId={selectedExporterId} producerId={selectedProducerId} />
-            </TabsContent>
-            <TabsContent value="stock">
-                <StockTab exporterId={selectedExporterId} />
-            </TabsContent>
-        </Tabs>
-      ) : (
-        <Card className="mt-4 flex items-center justify-center h-64 border-dashed">
-            <CardContent className="text-center">
-                <p className="text-muted-foreground">Seleccione un exportador y un productor para comenzar.</p>
-            </CardContent>
-        </Card>
-      )}
+               ) : (
+                <Card className="mt-4 flex items-center justify-center h-64 border-dashed">
+                    <CardContent className="text-center">
+                        <p className="text-muted-foreground">Seleccione un exportador y un productor para registrar salidas.</p>
+                    </CardContent>
+                </Card>
+            )}
+          </TabsContent>
+          <TabsContent value="stock">
+              <StockTab exporterId={selectedExporterId} />
+          </TabsContent>
+      </Tabs>
 
     </div>
   );
 }
-    
