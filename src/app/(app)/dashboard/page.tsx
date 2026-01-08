@@ -92,12 +92,9 @@ export default function DashboardPage() {
             .sort((a,b) => b.createdAt!.toMillis() - a.createdAt!.toMillis())
             .slice(0, 5);
 
-        const binMaterialIds = (binMaterials || [])
-            .filter(m => m.type === 'bin')
-            .map(m => m.id);
-        
+        const specificBinCodes = ['10001', '10011', '10007'];
         const calculatedEmptyBins = (binMaterialStock || [])
-            .filter(s => binMaterialIds.includes(s.binMaterialId))
+            .filter(s => specificBinCodes.includes(s.binMaterialCode))
             .reduce((sum, s) => sum + s.quantity, 0);
 
 
@@ -260,4 +257,3 @@ export default function DashboardPage() {
         </div>
     );
 }
-    
