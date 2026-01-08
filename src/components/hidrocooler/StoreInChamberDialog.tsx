@@ -25,8 +25,7 @@ type StoreFormValues = z.infer<typeof storeSchema>;
 
 // Example chambers. In a real app, this might come from a "Chambers" master data collection.
 const chambers = [
-    'CÁMARA 1', 'CÁMARA 2', 'CÁMARA 3', 'CÁMARA 4', 'CÁMARA 5', 
-    'TÚNEL 1', 'TÚNEL 2', 'TÚNEL 3', 'TÚNEL 4',
+    'CÁMARA 1', 'CÁMARA 2', 'CÁMARA 3', 'CÁMARA 4', 'CÁMARA 5', 'CÁMARA 6'
 ];
 
 export function StoreInChamberDialog({ lot, open, onOpenChange, onStore }: StoreInChamberDialogProps) {
