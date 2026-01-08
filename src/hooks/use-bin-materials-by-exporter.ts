@@ -27,6 +27,8 @@ export function useBinMaterialsByExporter(exporterId: string | null) {
       querySnapshot.forEach((doc) => {
         items.push({ id: doc.id, ...doc.data() } as BinMaterial);
       });
+      // Sort materials by product code
+      items.sort((a, b) => a.code.localeCompare(b.code, undefined, { numeric: true }));
       setMaterials(items);
       setLoading(false);
     }, (error) => {
