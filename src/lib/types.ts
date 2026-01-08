@@ -123,6 +123,7 @@ export interface Dispatch {
   id: string;
   exporterId: string;
   exporterName: string;
+  packingId?: string | null;
   totalBins: number;
   status: 'Pendiente de Salida' | 'Completado';
   createdAt: Timestamp;

@@ -29,7 +29,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
-import type { ChamberLot, Dispatch, Exporter } from '@/lib/types';
+import type { ChamberLot, Dispatch, Exporter, Packing } from '@/lib/types';
 import { useFirestore } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { collection, query, where, getDocs, writeBatch, serverTimestamp, doc, addDoc, getDoc, deleteDoc } from 'firebase/firestore';
@@ -50,9 +50,11 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { chambersConfig } from '@/lib/chambers-config';
+import { usePackingsByExporter } from '@/hooks/use-packings-by-exporter';
 
 const dispatchSchema = z.object({
   exporterId: z.string().min(1, 'Debe seleccionar un cliente.'),
+  packingId: z.string().optional(),
   maxBins: z.coerce
     .number({ invalid_type_error: 'Debe ser un número.' })
     .positive('La cantidad de bins debe ser mayor a 0.'),
@@ -88,9 +90,13 @@ export default function DespachosPage() {
     resolver: zodResolver(dispatchSchema),
     defaultValues: {
       exporterId: undefined,
+      packingId: undefined,
       maxBins: 0,
     },
   });
+
+  const selectedExporterId = form.watch('exporterId');
+  const { data: packings, loading: loadingPackings } = usePackingsByExporter(selectedExporterId);
   
   const getExporterName = (exporterId: string) => {
     return exporters?.find(e => e.exporterId === exporterId)?.name || exporterId;
@@ -183,6 +189,7 @@ export default function DespachosPage() {
       const dispatchData = {
         exporterId: selectedExporter.exporterId,
         exporterName: selectedExporter.name,
+        packingId: values.packingId || null,
         totalBins: actualTotalBins,
         status: 'Pendiente de Salida' as const,
         createdAt: serverTimestamp(),
@@ -198,7 +205,7 @@ export default function DespachosPage() {
         title: 'Despacho Creado',
         description: `Se ha creado un despacho con ${actualTotalBins} bins para ${selectedExporter.name}.`,
       });
-      form.reset({ exporterId: undefined, maxBins: 0 });
+      form.reset({ exporterId: undefined, packingId: undefined, maxBins: 0 });
 
     } catch (error: any) {
         console.error("Error creating dispatch:", error);
@@ -394,47 +401,83 @@ const handleUndoDispatch = async (dispatchToUndo: Dispatch) => {
         </CardHeader>
         <CardContent>
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="grid sm:grid-cols-3 gap-4 items-end">
-              <FormField
-                control={form.control}
-                name="exporterId"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Cliente (Exportador)</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value} disabled={loadingExporters}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Seleccione un cliente..." />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {exporters?.map(e => (
-                          <SelectItem key={e.id} value={e.exporterId}>
-                            {e.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="maxBins"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Cantidad Máxima de Bins</FormLabel>
-                    <FormControl>
-                      <Input type="number" {...field} autoComplete="off" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <Button type="submit" disabled={form.formState.isSubmitting}>
-                {form.formState.isSubmitting ? 'Procesando...' : 'Crear Despacho'}
-              </Button>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
+                  <FormField
+                    control={form.control}
+                    name="exporterId"
+                    render={({ field }) => (
+                      <FormItem className="lg:col-span-1">
+                        <FormLabel>Cliente (Exportador)</FormLabel>
+                        <Select
+                          onValueChange={(value) => {
+                            field.onChange(value);
+                            form.setValue('packingId', undefined); // Reset packing when exporter changes
+                          }}
+                          value={field.value}
+                          disabled={loadingExporters}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Seleccione un cliente..." />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {exporters?.map(e => (
+                              <SelectItem key={e.id} value={e.exporterId}>
+                                {e.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                   <FormField
+                    control={form.control}
+                    name="packingId"
+                    render={({ field }) => (
+                      <FormItem className="lg:col-span-1">
+                        <FormLabel>Packing</FormLabel>
+                        <Select
+                          onValueChange={field.onChange}
+                          value={field.value}
+                          disabled={!selectedExporterId || loadingPackings}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder={!selectedExporterId ? 'Seleccione exportador' : 'Seleccione un packing...'} />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {packings?.map(p => (
+                              <SelectItem key={p.id} value={p.id}>
+                                {p.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="maxBins"
+                    render={({ field }) => (
+                      <FormItem className="lg:col-span-1">
+                        <FormLabel>Cantidad Máxima de Bins</FormLabel>
+                        <FormControl>
+                          <Input type="number" {...field} autoComplete="off" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <Button type="submit" disabled={form.formState.isSubmitting} className="lg:col-span-1">
+                    {form.formState.isSubmitting ? 'Procesando...' : 'Crear Despacho'}
+                  </Button>
+              </div>
             </form>
           </Form>
         </CardContent>
