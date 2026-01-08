@@ -25,7 +25,7 @@ interface StockEntry extends PackagingReceptionItem {
 interface AggregatedStock {
   total: number;
   pending: number;
-  locations: Record<string, { totalPallets: number; entries: StockEntry[] }>;
+  storedEntries: StockEntry[];
 }
 
 export function StockTab() {
@@ -41,7 +41,7 @@ export function StockTab() {
     allLots.forEach(lot => {
       lot.items.forEach((item, index) => {
         if (!stock[item.packagingMasterName]) {
-          stock[item.packagingMasterName] = { total: 0, locations: {}, pending: 0 };
+          stock[item.packagingMasterName] = { total: 0, pending: 0, storedEntries: [] };
         }
         
         const currentMaterial = stock[item.packagingMasterName];
@@ -54,12 +54,7 @@ export function StockTab() {
         };
 
         if (item.status === 'Almacenado' && item.storageLocation) {
-          const locationKey = `${item.storageLocation.warehouse} / ${item.storageLocation.aisle}`;
-          if (!currentMaterial.locations[locationKey]) {
-            currentMaterial.locations[locationKey] = { totalPallets: 0, entries: [] };
-          }
-          currentMaterial.locations[locationKey].totalPallets += item.palletCount;
-          currentMaterial.locations[locationKey].entries.push(stockEntry);
+          currentMaterial.storedEntries.push(stockEntry);
         } else if (item.status === 'Pendiente de almacenar') {
           currentMaterial.pending += item.palletCount;
         }
@@ -171,10 +166,9 @@ export function StockTab() {
                                 <TableCell></TableCell>
                             </TableRow>
                         )}
-                        {Object.entries(data.locations).sort().map(([location, locData]) => (
-                          locData.entries.map((entry, index) => (
-                            <TableRow key={`${entry.receptionId}-${entry.itemIndex}`}>
-                                {index === 0 && <TableCell rowSpan={locData.entries.length} className="align-top">{location}</TableCell>}
+                        {data.storedEntries.sort((a,b) => `${a.storageLocation?.warehouse}-${a.storageLocation?.aisle}`.localeCompare(`${b.storageLocation?.warehouse}-${b.storageLocation?.aisle}`)).map((entry) => (
+                           <TableRow key={`${entry.receptionId}-${entry.itemIndex}`}>
+                                <TableCell>{entry.storageLocation?.warehouse} / {entry.storageLocation?.aisle}</TableCell>
                                 <TableCell>{entry.palletCount}</TableCell>
                                 <TableCell className="text-right">
                                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleRelocateClick(entry)}>
@@ -204,7 +198,6 @@ export function StockTab() {
                                     </AlertDialog>
                                 </TableCell>
                             </TableRow>
-                          ))
                         ))}
                       </TableBody>
                     </Table>
