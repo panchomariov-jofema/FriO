@@ -1,33 +1,34 @@
 'use client';
 
 import * as React from 'react';
-import { useFieldArray, useForm } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { useFirestore } from '@/firebase';
 import { collection, query, where, runTransaction, serverTimestamp, getDocs, doc } from 'firebase/firestore';
-import type { BinMaterial, BinMaterialStock } from '@/lib/types';
+import type { BinMaterialStock } from '@/lib/types';
 import { useBinMaterialsByExporter } from '@/hooks/use-bin-materials-by-exporter';
-import { PlusCircle, Trash2 } from 'lucide-react';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
-import { Label } from '@/components/ui/label';
+import { Table, TableBody, TableCell, TableHeader, TableRow, TableHead } from '../ui/table';
+import { Skeleton } from '../ui/skeleton';
 
 const movementItemSchema = z.object({
-  binMaterialId: z.string().min(1, 'Debe seleccionar un material.'),
-  quantity: z.coerce.number().positive('La cantidad debe ser mayor a 0.'),
+  binMaterialId: z.string(),
+  binMaterialCode: z.string(),
+  binMaterialName: z.string(),
+  quantity: z.coerce.number().min(0, 'La cantidad no puede ser negativa.'),
 });
 
 const movementSchema = z.object({
   document: z.string().min(1, 'El documento es obligatorio.'),
-  items: z.array(movementItemSchema).min(1, 'Debe agregar al menos un ítem.'),
+  items: z.array(movementItemSchema),
 });
 
 type MovementFormValues = z.infer<typeof movementSchema>;
@@ -42,65 +43,73 @@ export function ExitsTab({ exporterId, producerId }: ExitsTabProps) {
   const firestore = useFirestore();
   const { materials, loading: loadingMaterials } = useBinMaterialsByExporter(exporterId);
   
-  // We need the stock data to validate quantities
-  const { data: stockData } = useFirestoreCollection<BinMaterialStock>('binMaterialStock');
+  const { data: stockData, loading: loadingStock } = useFirestoreCollection<BinMaterialStock>('binMaterialStock');
 
   const form = useForm<MovementFormValues>({
     resolver: zodResolver(movementSchema),
-    defaultValues: { document: '', items: [{ binMaterialId: '', quantity: 1 }] },
+    defaultValues: { document: '', items: [] },
   });
 
-  const { fields, append, remove } = useFieldArray({
-    control: form.control,
-    name: 'items',
-  });
-  
-  const getStockForMaterial = (binMaterialId: string) => {
+  const getStockForMaterial = React.useCallback((binMaterialId: string) => {
     const stockItem = stockData.find(s => s.exporterId === exporterId && s.binMaterialId === binMaterialId);
     return stockItem?.quantity || 0;
-  }
+  }, [stockData, exporterId]);
+
+
+  React.useEffect(() => {
+    if (materials.length > 0) {
+      form.reset({
+        document: form.getValues('document'),
+        items: materials.map(m => ({
+          binMaterialId: m.id,
+          binMaterialCode: m.code,
+          binMaterialName: m.name,
+          quantity: 0,
+        })),
+      });
+    }
+  }, [materials, form]);
 
   const onSubmit = async (values: MovementFormValues) => {
     if (!firestore) return;
 
-    // Frontend validation for stock
-    for (const item of values.items) {
+    const itemsToProcess = values.items.filter(item => item.quantity > 0);
+
+    if (itemsToProcess.length === 0) {
+      toast({
+        variant: 'destructive',
+        title: 'Sin ítems',
+        description: 'Debe ingresar una cantidad para al menos un material.',
+      });
+      return;
+    }
+
+    for (const item of itemsToProcess) {
         const availableStock = getStockForMaterial(item.binMaterialId);
         if (item.quantity > availableStock) {
-            const material = materials.find(m => m.id === item.binMaterialId);
             toast({
                 variant: 'destructive',
                 title: 'Error de Stock',
-                description: `No hay suficiente stock para "${material?.name}". Disponible: ${availableStock}, Solicitado: ${item.quantity}.`
+                description: `No hay suficiente stock para "${item.binMaterialName}". Disponible: ${availableStock}, Solicitado: ${item.quantity}.`
             });
             return;
         }
     }
 
-
     try {
       await runTransaction(firestore, async (transaction) => {
-        // 1. Add to movements log
         const movementRef = doc(collection(firestore, 'binMaterialMovements'));
         const movementData = {
           type: 'salida' as const,
           document: values.document,
           exporterId,
           producerId,
-          items: values.items.map(item => {
-            const material = materials.find(m => m.id === item.binMaterialId);
-            return {
-              ...item,
-              binMaterialCode: material?.code || '',
-              binMaterialName: material?.name || ''
-            };
-          }),
+          items: itemsToProcess,
           createdAt: serverTimestamp(),
         };
         transaction.set(movementRef, movementData);
         
-        // 2. Update stock for each item
-        for (const item of values.items) {
+        for (const item of itemsToProcess) {
           const stockQuery = query(
             collection(firestore, 'binMaterialStock'),
             where('exporterId', '==', exporterId),
@@ -110,7 +119,7 @@ export function ExitsTab({ exporterId, producerId }: ExitsTabProps) {
           const stockSnap = await getDocs(stockQuery);
 
           if (stockSnap.empty) {
-            throw new Error(`No existe stock para el material con ID ${item.binMaterialId}.`);
+            throw new Error(`No existe stock para el material "${item.binMaterialName}".`);
           }
           
           const stockDoc = stockSnap.docs[0];
@@ -118,8 +127,7 @@ export function ExitsTab({ exporterId, producerId }: ExitsTabProps) {
           const currentQuantity = stockDoc.data().quantity || 0;
 
           if (item.quantity > currentQuantity) {
-            const material = materials.find(m => m.id === item.binMaterialId);
-            throw new Error(`Stock insuficiente para ${material?.name}.`);
+            throw new Error(`Stock insuficiente para "${item.binMaterialName}".`);
           }
 
           transaction.update(stockRef, {
@@ -130,7 +138,13 @@ export function ExitsTab({ exporterId, producerId }: ExitsTabProps) {
       });
 
       toast({ title: 'Éxito', description: 'Salida registrada y stock actualizado.' });
-      form.reset({ document: '', items: [{ binMaterialId: '', quantity: 1 }] });
+      const resetItems = materials.map(m => ({
+        binMaterialId: m.id,
+        binMaterialCode: m.code,
+        binMaterialName: m.name,
+        quantity: 0
+      }));
+      form.reset({ document: '', items: resetItems });
 
     } catch (error: any) {
       console.error('Error processing exit:', error);
@@ -141,12 +155,14 @@ export function ExitsTab({ exporterId, producerId }: ExitsTabProps) {
       }));
     }
   };
+  
+  const isLoading = loadingMaterials || loadingStock;
 
   return (
     <Card>
       <CardHeader>
         <CardTitle>Registrar Salida</CardTitle>
-        <CardDescription>Ingrese un documento y los materiales que salen del inventario.</CardDescription>
+        <CardDescription>Ingrese un documento y las cantidades de los materiales que salen del inventario.</CardDescription>
       </CardHeader>
       <CardContent>
         <Form {...form}>
@@ -163,57 +179,53 @@ export function ExitsTab({ exporterId, producerId }: ExitsTabProps) {
               )}
             />
 
-            <div className="space-y-4">
-              <Label>Materiales</Label>
-              {fields.map((field, index) => {
-                const selectedMaterialId = form.watch(`items.${index}.binMaterialId`);
-                const availableStock = getStockForMaterial(selectedMaterialId);
-
-                return (
-                  <div key={field.id} className="flex items-end gap-2 p-2 border rounded-md">
-                    <FormField
-                      control={form.control}
-                      name={`items.${index}.binMaterialId`}
-                      render={({ field }) => (
-                        <FormItem className="flex-1">
-                          <Select onValueChange={field.onChange} value={field.value} disabled={loadingMaterials}>
-                            <FormControl>
-                              <SelectTrigger><SelectValue placeholder="Seleccione un material..." /></SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {materials.map(m => (
-                                <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name={`items.${index}.quantity`}
-                      render={({ field }) => (
-                        <FormItem className="w-36">
-                          <FormControl><Input type="number" {...field} autoComplete="off" /></FormControl>
-                          <FormMessage />
-                          {selectedMaterialId && <p className="text-xs text-muted-foreground pt-1">Stock: {availableStock}</p>}
-                        </FormItem>
-                      )}
-                    />
-                    <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)} disabled={fields.length <= 1}>
-                      <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
-                  </div>
-                )
-              })}
-              <Button type="button" size="sm" variant="outline" onClick={() => append({ binMaterialId: '', quantity: 1 })}>
-                <PlusCircle className="mr-2 h-4 w-4" /> Agregar Ítem
-              </Button>
+            <div className="space-y-2">
+                <FormLabel>Materiales</FormLabel>
+                 <div className="rounded-md border max-h-96 overflow-y-auto">
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Producto</TableHead>
+                                <TableHead className="w-[200px]">Cantidad</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {isLoading ? (
+                                Array.from({ length: 3 }).map((_, i) => (
+                                    <TableRow key={i}>
+                                        <TableCell><Skeleton className="h-4 w-full" /></TableCell>
+                                        <TableCell><Skeleton className="h-10 w-full" /></TableCell>
+                                    </TableRow>
+                                ))
+                            ) : form.getValues('items').map((item, index) => (
+                                <TableRow key={item.binMaterialId}>
+                                    <TableCell className="font-medium">{item.binMaterialName}</TableCell>
+                                    <TableCell>
+                                        <FormField
+                                            control={form.control}
+                                            name={`items.${index}.quantity`}
+                                            render={({ field }) => (
+                                                <FormItem>
+                                                    <FormControl>
+                                                        <Input type="number" {...field} autoComplete="off" min="0" />
+                                                    </FormControl>
+                                                     <p className="text-xs text-muted-foreground pt-1">
+                                                        Stock: {getStockForMaterial(item.binMaterialId)}
+                                                     </p>
+                                                    <FormMessage />
+                                                </FormItem>
+                                            )}
+                                        />
+                                    </TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </div>
             </div>
 
             <div className="flex justify-end">
-              <Button type="submit" disabled={form.formState.isSubmitting}>
+              <Button type="submit" disabled={form.formState.isSubmitting || isLoading}>
                 {form.formState.isSubmitting ? 'Registrando...' : 'Registrar Salida'}
               </Button>
             </div>
