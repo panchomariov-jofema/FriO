@@ -405,7 +405,7 @@ function LotTraceabilityReport() {
                             ) : traceabilityData.length > 0 ? (
                                 traceabilityData.map(([displayLotId, data]) => (
                                     <Collapsible asChild key={displayLotId}>
-                                        <>
+                                        <React.Fragment key={displayLotId}>
                                             <TableRow>
                                                 <TableCell>
                                                     <CollapsibleTrigger asChild>
@@ -449,7 +449,7 @@ function LotTraceabilityReport() {
                                                     </TableCell>
                                                 </tr>
                                             </CollapsibleContent>
-                                        </>
+                                        </React.Fragment>
                                     </Collapsible>
                                 ))
                             ) : (
