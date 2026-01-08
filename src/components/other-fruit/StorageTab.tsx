@@ -4,7 +4,7 @@ import * as React from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
-import type { OtherFruitReception, OtherFruitReceptionItem } from '@/lib/types';
+import type { ChamberLot, OtherFruitReception, OtherFruitReceptionItem } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -51,7 +51,7 @@ interface PendingItem extends OtherFruitReceptionItem {
     unit: 'Bins' | 'Pallets';
 }
 
-function StorageForm({ item, onCancel, allReceptions }: { item: PendingItem, onCancel: () => void, allReceptions: OtherFruitReception[] }) {
+function StorageForm({ item, onCancel, allReceptions, allChamberLots }: { item: PendingItem, onCancel: () => void, allReceptions: OtherFruitReception[], allChamberLots: ChamberLot[] }) {
     const firestore = useFirestore();
     const { toast } = useToast();
     
@@ -63,51 +63,80 @@ function StorageForm({ item, onCancel, allReceptions }: { item: PendingItem, onC
     const targetChamberId = form.watch('chamberId');
     const targetCoordinate = form.watch('coordinate');
 
-    const { availableCoordinates, occupancyMessage } = React.useMemo(() => {
-        if (!targetChamberId) return { availableCoordinates: [], occupancyMessage: '' };
+    const { availableCoordinates, occupancyMessage, getOccupancyFor } = React.useMemo(() => {
+        if (!targetChamberId) return { availableCoordinates: [], occupancyMessage: '', getOccupancyFor: () => ({bins: 0, pallets: 0}) };
         
         const chamberConfig = chambersConfig[targetChamberId];
-        if (!chamberConfig) return { availableCoordinates: [], occupancyMessage: '' };
+        if (!chamberConfig) return { availableCoordinates: [], occupancyMessage: '', getOccupancyFor: () => ({bins: 0, pallets: 0}) };
         
         const allPossibleCoords = chamberConfig.columns.flatMap(col => chamberConfig.rows.map(row => `${col}${row}`));
+        
+        const occupancyMap = new Map<string, { bins: number, pallets: number }>();
 
-        const occupiedCoords = new Map<string, { bins: number, pallets: number }>();
+        // Function to initialize or get a coordinate from the map
+        const getCoord = (coord: string) => {
+            if (!occupancyMap.has(coord)) {
+                occupancyMap.set(coord, { bins: 0, pallets: 0 });
+            }
+            return occupancyMap.get(coord)!;
+        };
+
+        // 1. Calculate occupancy from OtherFruitReceptions
         allReceptions.forEach(reception => {
-            reception.items.forEach(item => {
-                if (item.status === 'Almacenado' && item.storageLocation?.chamberId === targetChamberId && item.storageLocation?.coordinate) {
-                    const coord = item.storageLocation.coordinate;
-                    if (!occupiedCoords.has(coord)) {
-                        occupiedCoords.set(coord, { bins: 0, pallets: 0 });
-                    }
-                    const current = occupiedCoords.get(coord)!;
+            if (reception.status !== 'Almacenado' && reception.status !== 'Parcialmente Almacenado') return;
+            reception.items.forEach(storedItem => {
+                if (storedItem.status === 'Almacenado' && storedItem.storageLocation?.chamberId === targetChamberId && storedItem.storageLocation.coordinate) {
+                    const coordData = getCoord(storedItem.storageLocation.coordinate);
                     if (reception.unit === 'Bins') {
-                        current.bins += item.quantity;
-                    } else {
-                        current.pallets += item.quantity;
+                        coordData.bins += storedItem.quantity;
+                    } else { // Pallets
+                        coordData.pallets += storedItem.quantity;
                     }
                 }
             });
         });
 
+        // 2. Calculate occupancy from ChamberLots (producer's fruit)
+        allChamberLots.forEach(chamberLot => {
+            if (chamberLot.status === 'Almacenado' && chamberLot.chamberId === targetChamberId && chamberLot.coordinate) {
+                const coordData = getCoord(chamberLot.coordinate);
+                coordData.bins += chamberLot.binCount;
+            }
+        });
+        
+        // Filter available coordinates based on global occupancy and type of unit being stored
         const available = allPossibleCoords.filter(coord => {
-            const occupied = occupiedCoords.get(coord);
+            const occupied = occupancyMap.get(coord);
             if (!occupied) return true; // Completely empty
-            if (occupied.bins >= 6) return false; // Full of bins
-            if (occupied.pallets >= 2) return false; // Full of pallets
-            return true;
+
+            if (item.unit === 'Bins') {
+                return occupied.pallets === 0 && occupied.bins < 6;
+            }
+            if (item.unit === 'Pallets') {
+                return occupied.bins === 0 && occupied.pallets < 2;
+            }
+            return false; // Should not happen
         }).sort(naturalSort);
 
-        const currentOccupancy = occupiedCoords.get(targetCoordinate);
         let message = '';
-        if (targetCoordinate && currentOccupancy) {
-            const parts = [];
-            if(currentOccupancy.bins > 0) parts.push(`${currentOccupancy.bins} Bins`);
-            if(currentOccupancy.pallets > 0) parts.push(`${currentOccupancy.pallets} Pallets`);
-            message = `Ocupación actual: ${parts.join(', ')}.`;
+        if (targetCoordinate) {
+            const currentOccupancy = occupancyMap.get(targetCoordinate);
+            if (currentOccupancy) {
+                const parts = [];
+                if(currentOccupancy.bins > 0) parts.push(`${currentOccupancy.bins} Bins`);
+                if(currentOccupancy.pallets > 0) parts.push(`${currentOccupancy.pallets} Pallets`);
+                if (parts.length > 0) {
+                    message = `Ocupación actual: ${parts.join(', ')}.`;
+                }
+            }
         }
-
-        return { availableCoordinates: available, occupancyMessage: message };
-    }, [targetChamberId, targetCoordinate, allReceptions]);
+        
+        return { 
+            availableCoordinates: available, 
+            occupancyMessage: message,
+            getOccupancyFor: (coord: string) => occupancyMap.get(coord) || {bins: 0, pallets: 0},
+        };
+    }, [targetChamberId, targetCoordinate, allReceptions, allChamberLots, item.unit]);
 
     const handleStoreConfirm = async (values: StoreFormValues) => {
         if (!firestore) return;
@@ -118,14 +147,20 @@ function StorageForm({ item, onCancel, allReceptions }: { item: PendingItem, onC
             return;
         }
 
-        const maxCapacity = item.unit === 'Bins' ? 6 : 2;
-        const receptionDoc = allReceptions.find(r => r.id === item.receptionId);
-        const alreadyInCoordinate = (receptionDoc?.items || [])
-            .filter(i => i.status === 'Almacenado' && i.storageLocation?.chamberId === values.chamberId && i.storageLocation.coordinate === values.coordinate)
-            .reduce((sum, i) => sum + i.quantity, 0);
+        const occupancy = getOccupancyFor(values.coordinate);
+        let maxCapacity: number;
+        let currentStock: number;
         
-        if (alreadyInCoordinate + values.quantity > maxCapacity) {
-             form.setError('quantity', { message: `Capacidad excedida. Disponible: ${maxCapacity - alreadyInCoordinate}.` });
+        if (item.unit === 'Bins') {
+            maxCapacity = 6;
+            currentStock = occupancy.bins;
+        } else { // Pallets
+            maxCapacity = 2;
+            currentStock = occupancy.pallets;
+        }
+
+        if (currentStock + values.quantity > maxCapacity) {
+             form.setError('quantity', { message: `Capacidad excedida. Disponible: ${maxCapacity - currentStock}.` });
              return;
         }
         
@@ -141,8 +176,7 @@ function StorageForm({ item, onCancel, allReceptions }: { item: PendingItem, onC
             const remainingQuantity = itemToUpdate.quantity - values.quantity;
 
             if (remainingQuantity > 0) {
-                // Split the item
-                itemToUpdate.quantity = remainingQuantity; // The original item now has the remaining quantity
+                itemToUpdate.quantity = remainingQuantity;
                 
                 const newItem: OtherFruitReceptionItem = {
                     ...itemToUpdate,
@@ -153,7 +187,6 @@ function StorageForm({ item, onCancel, allReceptions }: { item: PendingItem, onC
                 };
                 updatedItems.push(newItem);
             } else {
-                // Update the whole item
                 itemToUpdate.status = 'Almacenado';
                 itemToUpdate.storageLocation = { chamberId: values.chamberId, coordinate: values.coordinate };
                 itemToUpdate.storedAt = new Date();
@@ -207,7 +240,11 @@ function StorageForm({ item, onCancel, allReceptions }: { item: PendingItem, onC
                                         <Select onValueChange={field.onChange} value={field.value} disabled={!targetChamberId}>
                                             <FormControl><SelectTrigger><SelectValue placeholder="Seleccione..." /></SelectTrigger></FormControl>
                                             <SelectContent>
-                                                {availableCoordinates.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                                                {availableCoordinates.length > 0 ? (
+                                                    availableCoordinates.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)
+                                                ) : (
+                                                    <div className="p-2 text-xs text-center text-muted-foreground">No hay coordenadas disponibles para {item.unit}.</div>
+                                                )}
                                             </SelectContent>
                                         </Select>
                                         <p className="text-xs text-muted-foreground">{occupancyMessage}</p>
@@ -236,11 +273,14 @@ function StorageForm({ item, onCancel, allReceptions }: { item: PendingItem, onC
 
 
 export function OtherFruitStorageTab() {
-  const { data, loading } = useFirestoreCollection<OtherFruitReception>('otherFruitReceptions');
+  const { data: otherFruitReceptions, loading: loadingReceptions } = useFirestoreCollection<OtherFruitReception>('otherFruitReceptions');
+  const { data: chamberLots, loading: loadingChamberLots } = useFirestoreCollection<ChamberLot>('chamberLots');
   const [itemToStore, setItemToStore] = React.useState<PendingItem | null>(null);
 
+  const loading = loadingReceptions || loadingChamberLots;
+
   const pendingItems = React.useMemo(() => {
-    return (data || [])
+    return (otherFruitReceptions || [])
         .filter(lot => lot.status === 'Pendiente de almacenar' || lot.status === 'Parcialmente Almacenado')
         .flatMap((lot) => 
             lot.items
@@ -248,13 +288,13 @@ export function OtherFruitStorageTab() {
                 .filter(item => item.status === 'Pendiente de almacenar')
         )
         .sort((a,b) => {
-            const lotA = data.find(l => l.id === a.receptionId);
-            const lotB = data.find(l => l.id === b.receptionId);
+            const lotA = otherFruitReceptions.find(l => l.id === a.receptionId);
+            const lotB = otherFruitReceptions.find(l => l.id === b.receptionId);
             if (!lotA?.createdAt) return 1;
             if (!lotB?.createdAt) return -1;
             return lotA.createdAt.toMillis() - lotB.createdAt.toMillis();
         });
-  }, [data]);
+  }, [otherFruitReceptions]);
 
 
   return (
@@ -295,7 +335,12 @@ export function OtherFruitStorageTab() {
                             </TableCell>
                         </TableRow>
                         {itemToStore?.receptionId === item.receptionId && itemToStore?.itemIndex === item.itemIndex && (
-                            <StorageForm item={itemToStore} onCancel={() => setItemToStore(null)} allReceptions={data} />
+                            <StorageForm 
+                                item={itemToStore} 
+                                onCancel={() => setItemToStore(null)} 
+                                allReceptions={otherFruitReceptions} 
+                                allChamberLots={chamberLots}
+                            />
                         )}
                    </React.Fragment>
                 ))
