@@ -9,15 +9,14 @@ import {
   CardDescription,
 } from '@/components/ui/card';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
-import type { ChamberLot, Dispatch, Exporter, ProcessingLot, ReceptionLot } from '@/lib/types';
+import type { ChamberLot, Dispatch, Exporter, ProcessingLot, ReceptionLot, BinMaterialStock, BinMaterial } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Bar, BarChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis, Cell, Legend } from 'recharts';
 import { ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { chambersConfig } from '@/lib/chambers-config';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Boxes, PackageCheck, Truck, Warehouse } from 'lucide-react';
-import { useProducersByExporter } from '@/hooks/use-producers-by-exporter';
+import { Boxes, PackageCheck, Truck, Warehouse, Archive } from 'lucide-react';
 
 
 const CHART_COLORS = [
@@ -34,6 +33,8 @@ export default function DashboardPage() {
     const { data: dispatches, loading: loadingDispatches } = useFirestoreCollection<Dispatch>('dispatches');
     const { data: receptionLots, loading: loadingReception } = useFirestoreCollection<ReceptionLot>('receptionLots');
     const { data: exporters, loading: loadingExporters } = useFirestoreCollection<Exporter>('exporters');
+    const { data: binMaterials, loading: loadingBinMaterials } = useFirestoreCollection<BinMaterial>('binMaterials');
+    const { data: binMaterialStock, loading: loadingBinStock } = useFirestoreCollection<BinMaterialStock>('binMaterialStock');
     
     const { 
         totalBinsInStock, 
@@ -42,7 +43,8 @@ export default function DashboardPage() {
         inProcess, 
         stockByExporter, 
         occupancyByChamber,
-        latestReceptions 
+        latestReceptions,
+        totalEmptyBins,
     } = React.useMemo(() => {
         const storedLots = (chamberLots || []).filter(lot => lot.status === 'Almacenado');
         const calculatedTotalBins = storedLots.reduce((sum, lot) => sum + lot.binCount, 0);
@@ -90,6 +92,14 @@ export default function DashboardPage() {
             .sort((a,b) => b.createdAt!.toMillis() - a.createdAt!.toMillis())
             .slice(0, 5);
 
+        const binMaterialIds = (binMaterials || [])
+            .filter(m => m.type === 'bin')
+            .map(m => m.id);
+        
+        const calculatedEmptyBins = (binMaterialStock || [])
+            .filter(s => binMaterialIds.includes(s.binMaterialId))
+            .reduce((sum, s) => sum + s.quantity, 0);
+
 
         return {
             totalBinsInStock: calculatedTotalBins,
@@ -99,14 +109,16 @@ export default function DashboardPage() {
             stockByExporter: pieChartData,
             occupancyByChamber: calculatedOccupancy,
             latestReceptions: sortedReceptions,
+            totalEmptyBins: calculatedEmptyBins,
         };
 
-    }, [chamberLots, processingLots, dispatches, exporters, receptionLots]);
+    }, [chamberLots, processingLots, dispatches, exporters, receptionLots, binMaterials, binMaterialStock]);
 
-    const loading = loadingChamber || loadingProcessing || loadingDispatches || loadingExporters || loadingReception;
+    const loading = loadingChamber || loadingProcessing || loadingDispatches || loadingExporters || loadingReception || loadingBinMaterials || loadingBinStock;
 
     const kpiCards = [
-        { title: "Total Bins en Cámara", value: totalBinsInStock, icon: Warehouse },
+        { title: "Total Bins en Cámara (Fruta)", value: totalBinsInStock, icon: Warehouse },
+        { title: "Total Bins Vacíos (Stock)", value: totalEmptyBins, icon: Archive },
         { title: "Lotes en Proceso (Hidro)", value: inProcess, icon: Boxes },
         { title: "Pendientes por Almacenar", value: pendingStorage, icon: PackageCheck },
         { title: "Despachos Pendientes", value: pendingDispatch, icon: Truck }
@@ -126,7 +138,7 @@ export default function DashboardPage() {
 
     return (
         <div className="space-y-6">
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
                 {kpiCards.map(kpi => (
                     <Card key={kpi.title}>
                         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -147,8 +159,8 @@ export default function DashboardPage() {
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-5">
                 <Card className="lg:col-span-2">
                     <CardHeader>
-                        <CardTitle>Distribución de Stock por Cliente</CardTitle>
-                        <CardDescription>Bins almacenados por cliente exportador.</CardDescription>
+                        <CardTitle>Distribución de Stock por Cliente (Fruta)</CardTitle>
+                        <CardDescription>Bins con fruta almacenados por cliente exportador.</CardDescription>
                     </CardHeader>
                     <CardContent>
                         {loading ? (
@@ -248,3 +260,4 @@ export default function DashboardPage() {
         </div>
     );
 }
+    
