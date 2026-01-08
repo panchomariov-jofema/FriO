@@ -60,6 +60,21 @@ const dispatchSchema = z.object({
 
 type DispatchFormValues = z.infer<typeof dispatchSchema>;
 
+// Helper for natural sorting (e.g., A1, A2, ... A10)
+const naturalSort = (a: string, b: string) => {
+  const re = /(\d+)/;
+  const aNum = parseInt(a.split(re)[1] || '0', 10);
+  const bNum = parseInt(b.split(re)[1] || '0', 10);
+  const aLetter = a.split(re)[0];
+  const bLetter = b.split(re)[0];
+
+  if (aLetter < bLetter) return -1;
+  if (aLetter > bLetter) return 1;
+
+  return aNum - bNum;
+};
+
+
 export default function DespachosPage() {
   const { data: exporters, loading: loadingExporters } = useFirestoreCollection<Exporter>('exporters');
   const { data: dispatches, loading: loadingDispatches } = useFirestoreCollection<Dispatch>('dispatches');
@@ -367,7 +382,7 @@ export default function DespachosPage() {
                                                         </TableRow>
                                                     </TableHeader>
                                                     <TableBody>
-                                                        {dispatch.bins.map((bin, index) => (
+                                                        {[...dispatch.bins].sort((a, b) => naturalSort(a.coordinate, b.coordinate)).map((bin, index) => (
                                                             <TableRow key={index}>
                                                                 <TableCell>{bin.displayLotId}</TableCell>
                                                                 <TableCell>{bin.chamberId}</TableCell>
@@ -398,3 +413,4 @@ export default function DespachosPage() {
       </Card>
     </div>
   );
+}
