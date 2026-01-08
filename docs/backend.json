@@ -371,6 +371,10 @@
           "type": "string",
           "description": "The identifier of the chamber where the lot is stored."
         },
+        "coordinate": {
+            "type": "string",
+            "description": "The specific coordinate within the chamber (e.g., 'A1')."
+        },
         "status": {
           "type": "string",
           "enum": ["Pendiente por Almacenar", "Almacenado"],
@@ -390,6 +394,20 @@
         "status",
         "storedAt"
       ]
+    },
+    "Chamber": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Chamber",
+      "type": "object",
+      "description": "Configuration for a single cooling chamber.",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "capacity": { "type": "number" },
+        "columns": { "type": "array", "items": { "type": "string" } },
+        "rows": { "type": "array", "items": { "type": "number" } }
+      },
+      "required": ["id", "name", "capacity", "columns", "rows"]
     }
   },
   "auth": {

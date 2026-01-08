@@ -97,9 +97,18 @@ export interface ChamberLot {
     producerShortName: string;
     binCount: number;
     hidrocooler: string;
-    chamberId?: string; // Optional because it's not set when pending
+    chamberId?: string;
+    coordinate?: string;
     status: 'Pendiente por Almacenar' | 'Almacenado';
     storedAt: Timestamp;
+}
+
+export interface Chamber {
+    id: string;
+    name: string;
+    capacity: number;
+    columns: string[];
+    rows: number[];
 }
 
 
