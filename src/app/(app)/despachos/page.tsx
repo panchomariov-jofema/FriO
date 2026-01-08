@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -29,10 +30,10 @@ import {
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
-import type { ChamberLot, Dispatch, Exporter, Packing } from '@/lib/types';
+import type { ChamberLot, Dispatch, Exporter } from '@/lib/types';
 import { useFirestore } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
-import { collection, query, where, getDocs, writeBatch, serverTimestamp, doc, addDoc, getDoc, deleteDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, writeBatch, serverTimestamp, doc, addDoc, getDoc } from 'firebase/firestore';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -51,6 +52,8 @@ import {
 } from '@/components/ui/alert-dialog';
 import { chambersConfig } from '@/lib/chambers-config';
 import { usePackingsByExporter } from '@/hooks/use-packings-by-exporter';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ManualDispatchTab } from '@/components/dispatch/ManualDispatchTab';
 
 const dispatchSchema = z.object({
   exporterId: z.string().min(1, 'Debe seleccionar un cliente.'),
@@ -120,7 +123,7 @@ export default function DespachosPage() {
   }, [chamberLots]);
 
   const onSubmit = async (values: DispatchFormValues) => {
-    if (!firestore) return;
+    if (!firestore || !exporters) return;
 
     const selectedExporter = exporters.find(e => e.exporterId === values.exporterId);
     if (!selectedExporter) {
@@ -392,96 +395,113 @@ const handleUndoDispatch = async (dispatchToUndo: Dispatch) => {
         </Card>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Crear Nuevo Despacho</CardTitle>
-          <CardDescription>
-            Seleccione un cliente y la cantidad de bins a despachar. El sistema asignará los lotes más antiguos (FIFO).
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-              <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
-                  <FormField
-                    control={form.control}
-                    name="exporterId"
-                    render={({ field }) => (
-                      <FormItem className="lg:col-span-1">
-                        <FormLabel>Cliente (Exportador)</FormLabel>
-                        <Select
-                          onValueChange={(value) => {
-                            field.onChange(value);
-                            form.setValue('packingId', undefined); // Reset packing when exporter changes
-                          }}
-                          value={field.value}
-                          disabled={loadingExporters}>
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Seleccione un cliente..." />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {exporters?.map(e => (
-                              <SelectItem key={e.id} value={e.exporterId}>
-                                {e.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                   <FormField
-                    control={form.control}
-                    name="packingId"
-                    render={({ field }) => (
-                      <FormItem className="lg:col-span-1">
-                        <FormLabel>Packing</FormLabel>
-                        <Select
-                          onValueChange={field.onChange}
-                          value={field.value}
-                          disabled={!selectedExporterId || loadingPackings}
-                        >
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder={!selectedExporterId ? 'Seleccione exportador' : 'Seleccione un packing...'} />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {packings?.map(p => (
-                              <SelectItem key={p.id} value={p.id}>
-                                {p.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="maxBins"
-                    render={({ field }) => (
-                      <FormItem className="lg:col-span-1">
-                        <FormLabel>Cantidad Máxima de Bins</FormLabel>
-                        <FormControl>
-                          <Input type="number" {...field} autoComplete="off" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <Button type="submit" disabled={form.formState.isSubmitting} className="lg:col-span-1">
-                    {form.formState.isSubmitting ? 'Procesando...' : 'Crear Despacho'}
-                  </Button>
-              </div>
-            </form>
-          </Form>
-        </CardContent>
-      </Card>
+    <Tabs defaultValue="automatico" className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="automatico">Despacho Automático</TabsTrigger>
+            <TabsTrigger value="manual">Despacho Manual</TabsTrigger>
+        </TabsList>
+        <TabsContent value="automatico">
+            <Card>
+                <CardHeader>
+                <CardTitle>Crear Nuevo Despacho Automático</CardTitle>
+                <CardDescription>
+                    Seleccione un cliente y la cantidad de bins a despachar. El sistema asignará los lotes más antiguos (FIFO).
+                </CardDescription>
+                </CardHeader>
+                <CardContent>
+                <Form {...form}>
+                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                    <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
+                        <FormField
+                            control={form.control}
+                            name="exporterId"
+                            render={({ field }) => (
+                            <FormItem className="lg:col-span-1">
+                                <FormLabel>Cliente (Exportador)</FormLabel>
+                                <Select
+                                onValueChange={(value) => {
+                                    field.onChange(value);
+                                    form.setValue('packingId', undefined); // Reset packing when exporter changes
+                                }}
+                                value={field.value}
+                                disabled={loadingExporters}>
+                                <FormControl>
+                                    <SelectTrigger>
+                                    <SelectValue placeholder="Seleccione un cliente..." />
+                                    </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                    {exporters?.map(e => (
+                                    <SelectItem key={e.id} value={e.exporterId}>
+                                        {e.name}
+                                    </SelectItem>
+                                    ))}
+                                </SelectContent>
+                                </Select>
+                                <FormMessage />
+                            </FormItem>
+                            )}
+                        />
+                        <FormField
+                            control={form.control}
+                            name="packingId"
+                            render={({ field }) => (
+                            <FormItem className="lg:col-span-1">
+                                <FormLabel>Packing</FormLabel>
+                                <Select
+                                onValueChange={field.onChange}
+                                value={field.value}
+                                disabled={!selectedExporterId || loadingPackings}
+                                >
+                                <FormControl>
+                                    <SelectTrigger>
+                                    <SelectValue placeholder={!selectedExporterId ? 'Seleccione exportador' : 'Seleccione un packing...'} />
+                                    </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                    {packings?.map(p => (
+                                    <SelectItem key={p.id} value={p.id}>
+                                        {p.name}
+                                    </SelectItem>
+                                    ))}
+                                </SelectContent>
+                                </Select>
+                                <FormMessage />
+                            </FormItem>
+                            )}
+                        />
+                        <FormField
+                            control={form.control}
+                            name="maxBins"
+                            render={({ field }) => (
+                            <FormItem className="lg:col-span-1">
+                                <FormLabel>Cantidad Máxima de Bins</FormLabel>
+                                <FormControl>
+                                <Input type="number" {...field} autoComplete="off" />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                            )}
+                        />
+                        <Button type="submit" disabled={form.formState.isSubmitting} className="lg:col-span-1">
+                            {form.formState.isSubmitting ? 'Procesando...' : 'Crear Despacho'}
+                        </Button>
+                    </div>
+                    </form>
+                </Form>
+                </CardContent>
+            </Card>
+        </TabsContent>
+        <TabsContent value="manual">
+            <ManualDispatchTab 
+              exporters={exporters || []}
+              loadingExporters={loadingExporters}
+              chamberLots={chamberLots || []}
+              loadingChamberLots={loadingChamberLots}
+            />
+        </TabsContent>
+    </Tabs>
+
       
       <Card>
         <CardHeader>
@@ -607,3 +627,5 @@ const handleUndoDispatch = async (dispatchToUndo: Dispatch) => {
     </div>
   );
 }
+
+    

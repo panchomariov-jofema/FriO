@@ -1,0 +1,244 @@
+
+'use client';
+
+import * as React from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Button } from '@/components/ui/button';
+import { useForm } from 'react-hook-form';
+import type { ChamberLot, Exporter, Packing, Variety } from '@/lib/types';
+import { chambersConfig } from '@/lib/chambers-config';
+import { usePackingsByExporter } from '@/hooks/use-packings-by-exporter';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
+import { Checkbox } from '../ui/checkbox';
+import { Skeleton } from '../ui/skeleton';
+import { useToast } from '@/hooks/use-toast';
+import { useFirestore } from '@/firebase';
+import { writeBatch, doc, collection, serverTimestamp } from 'firebase/firestore';
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError } from '@/firebase/errors';
+
+const varieties: Variety[] = ['SANTINA', 'LAPINS', 'REGINA', 'KORDIA', 'SKEENA', 'SWEETHEART', 'SYLVIA', 'SUNBURST'];
+
+
+interface ManualDispatchTabProps {
+    exporters: Exporter[];
+    loadingExporters: boolean;
+    chamberLots: ChamberLot[];
+    loadingChamberLots: boolean;
+}
+
+export function ManualDispatchTab({ exporters, loadingExporters, chamberLots, loadingChamberLots }: ManualDispatchTabProps) {
+    const form = useForm({
+        defaultValues: {
+            exporterId: '',
+            chamberId: '',
+            variety: '',
+            packingId: '',
+        }
+    });
+
+    const [selectedLots, setSelectedLots] = React.useState<Record<string, ChamberLot>>({});
+    const [isSubmitting, setIsSubmitting] = React.useState(false);
+    const { toast } = useToast();
+    const firestore = useFirestore();
+
+    const selectedExporterId = form.watch('exporterId');
+    const { data: packings, loading: loadingPackings } = usePackingsByExporter(selectedExporterId);
+
+    const filteredLots = React.useMemo(() => {
+        const { exporterId, chamberId, variety } = form.getValues();
+        return (chamberLots || []).filter(lot =>
+            lot.status === 'Almacenado' &&
+            (!exporterId || lot.exporterId === exporterId) &&
+            (!chamberId || lot.chamberId === chamberId) &&
+            (!variety || lot.variety === variety)
+        );
+    }, [chamberLots, form.watch()]);
+
+    const handleSelectLot = (lot: ChamberLot, isSelected: boolean) => {
+        setSelectedLots(prev => {
+            const newSelection = { ...prev };
+            if (isSelected) {
+                newSelection[lot.id] = lot;
+            } else {
+                delete newSelection[lot.id];
+            }
+            return newSelection;
+        });
+    };
+    
+    const handleCreateDispatch = async () => {
+        if (Object.keys(selectedLots).length === 0) {
+            toast({ variant: 'destructive', title: 'Error', description: 'Debe seleccionar al menos un lote.' });
+            return;
+        }
+
+        const { exporterId, packingId } = form.getValues();
+        const firstLot = Object.values(selectedLots)[0];
+        const mainExporterId = firstLot.exporterId;
+
+        // Check if all selected lots are from the same exporter
+        if (!Object.values(selectedLots).every(lot => lot.exporterId === mainExporterId)) {
+            toast({ variant: 'destructive', title: 'Error de consistencia', description: 'Todos los lotes seleccionados deben pertenecer al mismo exportador.' });
+            return;
+        }
+        
+        // Use the exporter from the selected lots, not from the filter
+        const selectedExporter = exporters.find(e => e.exporterId === mainExporterId);
+         if (!selectedExporter) {
+            toast({ variant: 'destructive', title: 'Error', description: 'Cliente no encontrado para los lotes seleccionados.' });
+            return;
+        }
+
+
+        setIsSubmitting(true);
+
+        try {
+            const batch = writeBatch(firestore);
+            const binsToDispatch = [];
+            let totalBins = 0;
+
+            for (const lot of Object.values(selectedLots)) {
+                binsToDispatch.push({
+                    chamberLotId: lot.id,
+                    displayLotId: lot.displayLotId,
+                    chamberId: lot.chamberId!,
+                    coordinate: lot.coordinate!,
+                    binCount: lot.binCount,
+                });
+                totalBins += lot.binCount;
+
+                const lotRef = doc(firestore, 'chamberLots', lot.id);
+                batch.update(lotRef, { status: 'Despachado' });
+            }
+
+            const dispatchData = {
+                exporterId: selectedExporter.exporterId,
+                exporterName: selectedExporter.name,
+                packingId: packingId || null,
+                totalBins: totalBins,
+                status: 'Pendiente de Salida' as const,
+                createdAt: serverTimestamp(),
+                bins: binsToDispatch,
+            };
+
+            const dispatchRef = doc(collection(firestore, 'dispatches'));
+            batch.set(dispatchRef, dispatchData);
+
+            await batch.commit();
+            toast({ title: 'Éxito', description: `Despacho manual creado con ${totalBins} bins.` });
+            setSelectedLots({});
+            form.reset();
+
+        } catch (error: any) {
+            console.error("Error creating manual dispatch:", error);
+            toast({ variant: 'destructive', title: 'Error', description: 'Ocurrió un error al crear el despacho manual.' });
+            errorEmitter.emit('permission-error', new FirestorePermissionError({ path: 'dispatches', operation: 'write' }));
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle>Crear Nuevo Despacho Manual</CardTitle>
+                <CardDescription>
+                    Filtre y seleccione los lotes específicos que desea incluir en el despacho.
+                </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+                <Form {...form}>
+                    <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
+                        <FormField control={form.control} name="exporterId" render={({ field }) => (
+                            <FormItem><FormLabel>Exportador</FormLabel><Select onValueChange={field.onChange} value={field.value} disabled={loadingExporters}>
+                                <FormControl><SelectTrigger><SelectValue placeholder="Todos" /></SelectTrigger></FormControl>
+                                <SelectContent>{exporters?.map(e => <SelectItem key={e.id} value={e.exporterId}>{e.name}</SelectItem>)}</SelectContent>
+                            </Select><FormMessage /></FormItem>
+                        )} />
+                        <FormField control={form.control} name="chamberId" render={({ field }) => (
+                            <FormItem><FormLabel>Cámara</FormLabel><Select onValueChange={field.onChange} value={field.value}>
+                                <FormControl><SelectTrigger><SelectValue placeholder="Todas" /></SelectTrigger></FormControl>
+                                <SelectContent>{Object.values(chambersConfig).map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
+                            </Select><FormMessage /></FormItem>
+                        )} />
+                        <FormField control={form.control} name="variety" render={({ field }) => (
+                             <FormItem><FormLabel>Variedad</FormLabel><Select onValueChange={field.onChange} value={field.value}>
+                                <FormControl><SelectTrigger><SelectValue placeholder="Todas" /></SelectTrigger></FormControl>
+                                <SelectContent>{varieties.map(v => <SelectItem key={v} value={v}>{v}</SelectItem>)}</SelectContent>
+                            </Select><FormMessage /></FormItem>
+                        )} />
+                        <FormField control={form.control} name="packingId" render={({ field }) => (
+                            <FormItem><FormLabel>Packing</FormLabel><Select onValueChange={field.onChange} value={field.value} disabled={!selectedExporterId || loadingPackings}>
+                                <FormControl><SelectTrigger><SelectValue placeholder={!selectedExporterId ? 'Seleccione exportador' : 'Opcional...'} /></SelectTrigger></FormControl>
+                                <SelectContent>{packings?.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}</SelectContent>
+                            </Select><FormMessage /></FormItem>
+                        )} />
+                    </div>
+                </Form>
+
+                <div className="rounded-md border max-h-96 overflow-y-auto">
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead className="w-[50px]"><Checkbox
+                                    checked={filteredLots.length > 0 && Object.keys(selectedLots).length === filteredLots.length}
+                                    onCheckedChange={(checked) => {
+                                        const newSelection: Record<string, ChamberLot> = {};
+                                        if (checked) {
+                                            filteredLots.forEach(lot => newSelection[lot.id] = lot);
+                                        }
+                                        setSelectedLots(newSelection);
+                                    }}
+                                /></TableHead>
+                                <TableHead>Lote</TableHead>
+                                <TableHead>Cámara</TableHead>
+                                <TableHead>Coord.</TableHead>
+                                <TableHead>Bins</TableHead>
+                                <TableHead>Productor</TableHead>
+                                <TableHead>Variedad</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {loadingChamberLots ? (
+                                Array.from({ length: 5 }).map((_, i) => <TableRow key={i}><TableCell colSpan={7}><Skeleton className="w-full h-4" /></TableCell></TableRow>)
+                            ) : filteredLots.length > 0 ? (
+                                filteredLots.map(lot => (
+                                    <TableRow key={lot.id} data-state={selectedLots[lot.id] ? 'selected' : ''}>
+                                        <TableCell>
+                                            <Checkbox
+                                                checked={!!selectedLots[lot.id]}
+                                                onCheckedChange={(checked) => handleSelectLot(lot, !!checked)}
+                                            />
+                                        </TableCell>
+                                        <TableCell>{lot.displayLotId}</TableCell>
+                                        <TableCell>{lot.chamberId}</TableCell>
+                                        <TableCell>{lot.coordinate}</TableCell>
+                                        <TableCell>{lot.binCount}</TableCell>
+                                        <TableCell>{lot.producerShortName}</TableCell>
+                                        <TableCell>{lot.variety}</TableCell>
+                                    </TableRow>
+                                ))
+                            ) : (
+                                <TableRow><TableCell colSpan={7} className="h-24 text-center">No se encontraron lotes con los filtros seleccionados.</TableCell></TableRow>
+                            )}
+                        </TableBody>
+                    </Table>
+                </div>
+                 <div className="flex justify-between items-center pt-4">
+                    <div className="text-sm font-medium">
+                        {Object.keys(selectedLots).length} lote(s) seleccionados ({Object.values(selectedLots).reduce((sum, lot) => sum + lot.binCount, 0)} bins)
+                    </div>
+                    <Button onClick={handleCreateDispatch} disabled={isSubmitting || Object.keys(selectedLots).length === 0}>
+                        {isSubmitting ? 'Creando Despacho...' : 'Crear Despacho Manual'}
+                    </Button>
+                </div>
+            </CardContent>
+        </Card>
+    );
+}
+
+    
