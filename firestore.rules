@@ -118,22 +118,13 @@ service cloud.firestore {
     match /dispatches/{dispatchId} {
       allow read, write: if isSignedIn();
     }
-
+    
     /**
      * @description Collection for packaging reception records.
      * @path /packagingReceptions/{receptionId}
      * @allow Any authenticated user can create, read, and update records.
      */
     match /packagingReceptions/{receptionId} {
-        allow read, write: if isSignedIn();
-    }
-    
-    /**
-     * @description Collection for packaging movement records.
-     * @path /packagingMovements/{movementId}
-     * @allow Any authenticated user can create, read, and update records.
-     */
-    match /packagingMovements/{movementId} {
         allow read, write: if isSignedIn();
     }
   }
