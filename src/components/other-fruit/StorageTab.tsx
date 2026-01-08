@@ -60,7 +60,7 @@ function StorageForm({ item, onCancel, allReceptions, allChamberLots }: { item: 
         defaultValues: { 
             chamberId: undefined, 
             coordinate: undefined, 
-            quantity: item.unit === 'Pallets' ? 1 : 2, 
+            quantity: item.unit === 'Pallets' ? 1 : 6, 
         },
     });
 
@@ -121,9 +121,13 @@ function StorageForm({ item, onCancel, allReceptions, allChamberLots }: { item: 
     const handleStoreConfirm = async (values: StoreFormValues) => {
         if (!firestore) return;
         
-        let quantityPerCoord = values.quantity;
-        if(item.unit === 'Pallets') {
-            quantityPerCoord = 1; // Always 1 for pallets in this flow
+        const quantityPerCoord = values.quantity;
+
+        if (item.unit === 'Pallets') {
+            if (quantityPerCoord !== 1 && quantityPerCoord !== 2) {
+                form.setError('quantity', { message: `Para pallets, la cantidad debe ser 1 o 2.` });
+                return;
+            }
         } else { // Bins
              if (quantityPerCoord < 1 || quantityPerCoord > 6) {
                 form.setError('quantity', { message: `Para bins, la cantidad debe ser entre 1 y 6.` });
@@ -159,6 +163,11 @@ function StorageForm({ item, onCancel, allReceptions, allChamberLots }: { item: 
                     const amountToStoreInThisCoord = Math.min(pendingToStore, quantityPerCoord, spaceAvailable);
                     
                     if (amountToStoreInThisCoord > 0) {
+                        // For pallets, if user wants to store 2 but only 1 fits, skip.
+                        if (item.unit === 'Pallets' && quantityPerCoord === 2 && amountToStoreInThisCoord < 2) {
+                            continue;
+                        }
+
                         const newItem: OtherFruitReceptionItem = {
                             ...originalItemToUpdate,
                             quantity: amountToStoreInThisCoord,
@@ -248,7 +257,6 @@ function StorageForm({ item, onCancel, allReceptions, allChamberLots }: { item: 
                                           <Input 
                                             type="number" 
                                             {...field} 
-                                            readOnly={item.unit === 'Pallets'}
                                           />
                                         </FormControl>
                                         <FormMessage />
@@ -335,7 +343,7 @@ export function OtherFruitStorageTab() {
                                 item={itemToStore} 
                                 onCancel={() => setItemToStore(null)} 
                                 allReceptions={otherFruitReceptions} 
-                                allChamberLots={chamberLots}
+                                allChamberLots={chamberLots || []}
                             />
                         )}
                    </React.Fragment>
