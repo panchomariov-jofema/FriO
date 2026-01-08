@@ -14,7 +14,6 @@ import { useFirestore } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
-import { StoreInChamberDialog } from '@/components/hidrocooler/StoreInChamberDialog';
 
 export default function HidrocoolerPage() {
   const { data: pendingLots, loading: loadingPending } = useFirestoreCollection<HidrocoolerLot>('hidrocoolerLots');
@@ -22,9 +21,6 @@ export default function HidrocoolerPage() {
   
   const [lotToProcess, setLotToProcess] = React.useState<HidrocoolerLot | null>(null);
   const [isProcessDialogOpen, setProcessDialogOpen] = React.useState(false);
-
-  const [lotToStore, setLotToStore] = React.useState<ProcessingLot | null>(null);
-  const [isStoreDialogOpen, setStoreDialogOpen] = React.useState(false);
 
   const firestore = useFirestore();
   const { toast } = useToast();
@@ -106,21 +102,15 @@ export default function HidrocoolerPage() {
     }
   };
   
-  const handleFinishProcessingClick = (processingLot: ProcessingLot) => {
-    setLotToStore(processingLot);
-    setStoreDialogOpen(true);
-  };
-
-  const handleStoreInChamber = async ({ chamberId }: { chamberId: string }) => {
-    if (!lotToStore || !firestore) return;
+  const handleFinishProcessingClick = async (processingLot: ProcessingLot) => {
+    if (!firestore) return;
 
     const chamberLotData = {
-        displayLotId: lotToStore.displayLotId,
-        producerShortName: lotToStore.producerShortName,
-        binCount: lotToStore.binCount,
-        hidrocooler: lotToStore.hidrocooler,
-        chamberId: chamberId,
-        status: 'Almacenado' as const,
+        displayLotId: processingLot.displayLotId,
+        producerShortName: processingLot.producerShortName,
+        binCount: processingLot.binCount,
+        hidrocooler: processingLot.hidrocooler,
+        status: 'Pendiente por Almacenar' as const,
         storedAt: serverTimestamp(),
     };
     
@@ -129,13 +119,13 @@ export default function HidrocoolerPage() {
     try {
         await addDoc(chamberLotsRef, chamberLotData);
         
-        const processingLotRef = doc(firestore, 'processingLots', lotToStore.id);
+        const processingLotRef = doc(firestore, 'processingLots', processingLot.id);
         await updateDoc(processingLotRef, { status: 'Finalizado' });
 
-        toast({ title: "Proceso Finalizado", description: `Lote enviado a ${chamberId}.` });
+        toast({ title: "Proceso Finalizado", description: `Lote enviado a Cámaras para ser almacenado.` });
     } catch(error) {
-        console.error("Error al almacenar en cámara: ", error);
-        toast({ variant: 'destructive', title: 'Error', description: 'No se pudo mover el lote a la cámara.' });
+        console.error("Error al finalizar proceso y enviar a cámara: ", error);
+        toast({ variant: 'destructive', title: 'Error', description: 'No se pudo mover el lote a cámaras.' });
         errorEmitter.emit(
             'permission-error',
             new FirestorePermissionError({
@@ -146,6 +136,7 @@ export default function HidrocoolerPage() {
         );
     }
   };
+
 
   const getStatusVariant = (status: string) => {
     switch (status) {
@@ -256,15 +247,6 @@ export default function HidrocoolerPage() {
           open={isProcessDialogOpen}
           onOpenChange={setProcessDialogOpen}
           onProcess={handleStartProcessing}
-        />
-      )}
-      
-      {lotToStore && (
-        <StoreInChamberDialog
-            lot={lotToStore}
-            open={isStoreDialogOpen}
-            onOpenChange={setStoreDialogOpen}
-            onStore={handleStoreInChamber}
         />
       )}
     </div>

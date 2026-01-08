@@ -8,10 +8,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import type { ProcessingLot } from '@/lib/types';
+import type { ChamberLot } from '@/lib/types';
 
 interface StoreInChamberDialogProps {
-  lot: ProcessingLot | null;
+  lot: ChamberLot | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onStore: (data: { chamberId: string }) => void;
@@ -87,7 +87,7 @@ export function StoreInChamberDialog({ lot, open, onOpenChange, onStore }: Store
               <DialogClose asChild>
                 <Button type="button" variant="outline">Cancelar</Button>
               </DialogClose>
-              <Button type="submit">Almacenar en Cámara</Button>
+              <Button type="submit">Confirmar Almacenamiento</Button>
             </DialogFooter>
           </form>
         </Form>

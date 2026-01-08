@@ -97,8 +97,8 @@ export interface ChamberLot {
     producerShortName: string;
     binCount: number;
     hidrocooler: string;
-    chamberId: string;
-    status: 'Almacenado';
+    chamberId?: string; // Optional because it's not set when pending
+    status: 'Pendiente por Almacenar' | 'Almacenado';
     storedAt: Timestamp;
 }
 

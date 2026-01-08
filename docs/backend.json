@@ -373,12 +373,13 @@
         },
         "status": {
           "type": "string",
-          "description": "Status of the lot in the chamber (e.g., 'Almacenado')."
+          "enum": ["Pendiente por Almacenar", "Almacenado"],
+          "description": "Status of the lot in the chamber."
         },
         "storedAt": {
           "type": "string",
           "format": "date-time",
-          "description": "Timestamp of when the lot was stored in the chamber."
+          "description": "Timestamp of when the lot was moved to the chamber module."
         }
       },
       "required": [
@@ -386,7 +387,6 @@
         "producerShortName",
         "binCount",
         "hidrocooler",
-        "chamberId",
         "status",
         "storedAt"
       ]
