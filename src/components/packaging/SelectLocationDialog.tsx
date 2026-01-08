@@ -53,9 +53,11 @@ export function SelectLocationDialog({ itemIndex, onClose, form: exitForm, stock
   
   React.useEffect(() => {
     if (itemIndex !== null) {
-      const existingLocations = exitForm.getValues(`items.${itemIndex}.locations`);
+      const itemData = exitForm.getValues(`items.${itemIndex}`);
+      const availableStockForItem = stockByMaterial[itemData.packagingMasterId] || [];
+      const existingLocations = itemData.locations;
       
-      const enrichedLocations = availableStock.map(stockLoc => {
+      const enrichedLocations = availableStockForItem.map(stockLoc => {
         const existing = existingLocations.find(l => l.receptionId === stockLoc.receptionId);
         return {
           ...stockLoc,
@@ -65,7 +67,7 @@ export function SelectLocationDialog({ itemIndex, onClose, form: exitForm, stock
 
       replace(enrichedLocations);
     }
-  }, [itemIndex, availableStock, replace, exitForm]);
+  }, [itemIndex, stockByMaterial, replace, exitForm]);
 
   const onSubmit = (values: LocationFormValues) => {
     if (itemIndex === null) return;
@@ -135,5 +137,3 @@ export function SelectLocationDialog({ itemIndex, onClose, form: exitForm, stock
     </Dialog>
   );
 }
-
-    
