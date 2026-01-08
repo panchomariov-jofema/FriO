@@ -57,7 +57,11 @@ function StorageForm({ item, onCancel, allReceptions, allChamberLots }: { item: 
     
     const form = useForm<StoreFormValues>({
         resolver: zodResolver(storeSchema),
-        defaultValues: { chamberId: undefined, coordinate: undefined, quantity: item.quantity },
+        defaultValues: { 
+            chamberId: undefined, 
+            coordinate: undefined, 
+            quantity: item.unit === 'Pallets' ? 1 : item.quantity 
+        },
     });
 
     const targetChamberId = form.watch('chamberId');
@@ -254,7 +258,14 @@ function StorageForm({ item, onCancel, allReceptions, allChamberLots }: { item: 
                                 <FormField control={form.control} name="quantity" render={({ field }) => (
                                     <FormItem>
                                         <FormLabel>Cantidad a Almacenar</FormLabel>
-                                        <FormControl><Input type="number" {...field} max={item.quantity} /></FormControl>
+                                        <FormControl>
+                                          <Input 
+                                            type="number" 
+                                            {...field} 
+                                            max={item.unit === 'Pallets' ? 1 : item.quantity}
+                                            readOnly={item.unit === 'Pallets'}
+                                          />
+                                        </FormControl>
                                         <FormMessage />
                                     </FormItem>
                                 )}/>
@@ -290,8 +301,8 @@ export function OtherFruitStorageTab() {
         .sort((a,b) => {
             const lotA = otherFruitReceptions.find(l => l.id === a.receptionId);
             const lotB = otherFruitReceptions.find(l => l.id === b.receptionId);
-            if (!lotA?.createdAt) return 1;
-            if (!lotB?.createdAt) return -1;
+            if (!lotA?.createdAt?.toMillis) return 1;
+            if (!lotB?.createdAt?.toMillis) return -1;
             return lotA.createdAt.toMillis() - lotB.createdAt.toMillis();
         });
   }, [otherFruitReceptions]);
