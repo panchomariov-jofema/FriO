@@ -55,6 +55,7 @@ export interface OtherClient {
   clientId: string;
   name: string;
   type: string;
+  unit: string;
 }
 
 export interface PackagingMaster {
@@ -163,4 +164,5 @@ export interface Dispatch {
 
 
 export type MasterData = Exporter | Producer | BinMaterial | OtherClient | PackagingMaster | UserMaster | Profile | Packing;
+
     

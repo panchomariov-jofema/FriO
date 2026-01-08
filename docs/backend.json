@@ -210,12 +210,17 @@
         "type": {
           "type": "string",
           "description": "Type of client (e.g., embalajes, frio_hortofruticola)."
+        },
+        "unit": {
+          "type": "string",
+          "description": "Business unit associated with the client."
         }
       },
       "required": [
         "clientId",
         "name",
-        "type"
+        "type",
+        "unit"
       ]
     },
     "PackagingMaster": {

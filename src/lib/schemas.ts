@@ -24,6 +24,7 @@ export const otherClientSchema = z.object({
   clientId: z.string().min(1, 'El ID de cliente es obligatorio'),
   name: z.string().min(1, 'El nombre es obligatorio'),
   type: z.string().min(1, 'El tipo es obligatorio'),
+  unit: z.string().min(1, 'La unidad es obligatoria'),
 });
 
 export const packagingMasterSchema = z.object({
