@@ -116,6 +116,7 @@ export default function HidrocoolerPage() {
     const chamberLotData = {
         displayLotId: processingLot.displayLotId,
         producerShortName: processingLot.producerShortName,
+        exporterId: originalReceptionLot.exporterId, // Propagate exporterId
         variety: originalReceptionLot.variety,
         binCount: processingLot.binCount,
         hidrocooler: processingLot.hidrocooler,
@@ -261,3 +262,5 @@ export default function HidrocoolerPage() {
     </div>
   );
 }
+
+    

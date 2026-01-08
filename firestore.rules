@@ -100,5 +100,15 @@ service cloud.firestore {
     match /chamberLots/{lotId} {
       allow read, write: if isSignedIn();
     }
+
+    /**
+     * @description Collection for dispatch records.
+     * @path /dispatches/{dispatchId}
+     * @allow Any authenticated user can create, read, and update dispatches.
+     */
+    match /dispatches/{dispatchId} {
+      allow read, write: if isSignedIn();
+    }
   }
 }
+    

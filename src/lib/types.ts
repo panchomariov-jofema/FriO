@@ -94,13 +94,14 @@ export interface ProcessingLot {
 export interface ChamberLot {
     id: string;
     displayLotId: string;
+    exporterId: string;
     producerShortName: string;
     binCount: number;
     variety: Variety;
     hidrocooler: string;
     chamberId?: string;
     coordinate?: string;
-    status: 'Pendiente por Almacenar' | 'Almacenado';
+    status: 'Pendiente por Almacenar' | 'Almacenado' | 'Despachado';
     storedAt: Timestamp;
 }
 
@@ -112,5 +113,23 @@ export interface Chamber {
     rows: number[];
 }
 
+export interface Dispatch {
+  id: string;
+  exporterId: string;
+  exporterName: string;
+  totalBins: number;
+  status: 'Pendiente de Salida' | 'Completado';
+  createdAt: Timestamp;
+  bins: {
+    chamberLotId: string;
+    displayLotId: string;
+    chamberId: string;
+    coordinate: string;
+    binCount: number;
+  }[];
+}
+
 
 export type MasterData = Exporter | Producer | BinMaterial | OtherClient | PackagingMaster | UserMaster | Profile;
+
+    
