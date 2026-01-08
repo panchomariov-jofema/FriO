@@ -42,9 +42,9 @@ const navItems = [
   { href: '/camaras', label: 'Cámaras', icon: Building2 },
   { href: '/despachos', label: 'Despachos', icon: Truck },
   { href: '/reportes', label: 'Reportes', icon: PieChart },
-  { href: '/datos-maestros', label: 'Datos Maestros', icon: Database },
   { href: '/embalajes', label: 'Embalajes', icon: Package },
   { href: '/otros-hortofruticolas', label: 'Otros Hortofrutícolas', icon: Grape },
+  { href: '/datos-maestros', label: 'Datos Maestros', icon: Database },
 ];
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
