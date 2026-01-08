@@ -19,6 +19,7 @@ import { useToast } from '@/hooks/use-toast';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { usePackagingMastersByClient } from '@/hooks/usePackagingMastersByClient';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '../ui/accordion';
 
 type ExitFormValues = z.infer<typeof otherFruitExitSchema>;
 
@@ -52,13 +53,13 @@ export function OtherFruitExitTab() {
   });
 
   const selectedClientId = form.watch('clientId');
-  const { data: clientProducts, loading: loadingProducts } = usePackagingMastersByClient(selectedClientId);
 
   const fruitClients = React.useMemo(() => {
     return (allClients || []).filter(c => c.type.toUpperCase() === 'FRUTA');
   }, [allClients]);
 
-  const availableStock = React.useMemo(() => {
+  // Restructured stock to be grouped by product, then by lot (FIFO)
+  const availableStockByProductAndLot = React.useMemo(() => {
     if (!selectedClientId || !allReceptions) return {};
 
     type StockLocation = {
@@ -66,33 +67,52 @@ export function OtherFruitExitTab() {
         available: number;
         receptionId: string;
         itemIndex: number;
-        unit: 'Bins' | 'Pallets';
     };
     
-    type StockMap = Record<string, { name: string, locations: Record<string, StockLocation> }>;
+    type LotInfo = {
+        createdAt: number;
+        unit: 'Bins' | 'Pallets';
+        locations: Record<string, StockLocation>;
+        totalAvailable: number;
+    };
 
-    const stockMap: StockMap = {};
+    type ProductStock = Record<string, { name: string, lots: Record<string, LotInfo> }>;
+
+    const productStockMap: ProductStock = {};
 
     allReceptions
       .filter(r => r.clientId === selectedClientId && (r.status === 'Almacenado' || r.status === 'Parcialmente Almacenado'))
       .forEach(reception => {
         reception.items.forEach((item, index) => {
           if (item.status === 'Almacenado' && item.quantity > 0 && item.storageLocation) {
-            if (!stockMap[item.productCode]) {
-              stockMap[item.productCode] = { name: item.productName, locations: {} };
+            const productCode = item.productCode;
+            const lotId = reception.displayLotId || reception.document;
+
+            if (!productStockMap[productCode]) {
+              productStockMap[productCode] = { name: item.productName, lots: {} };
             }
+            if (!productStockMap[productCode].lots[lotId]) {
+              productStockMap[productCode].lots[lotId] = {
+                createdAt: reception.createdAt?.toMillis() || 0,
+                unit: reception.unit,
+                locations: {},
+                totalAvailable: 0,
+              };
+            }
+
             const locationKey = getLocationKey(reception.id, index);
-            stockMap[item.productCode].locations[locationKey] = {
+            productStockMap[productCode].lots[lotId].locations[locationKey] = {
               location: `${item.storageLocation.chamberId} / ${item.storageLocation.coordinate}`,
               available: item.quantity,
               receptionId: reception.id,
               itemIndex: index,
-              unit: reception.unit,
             };
+            productStockMap[productCode].lots[lotId].totalAvailable += item.quantity;
           }
         });
       });
-    return stockMap;
+      
+    return productStockMap;
   }, [selectedClientId, allReceptions]);
 
   const onSubmit = async (values: ExitFormValues) => {
@@ -110,7 +130,6 @@ export function OtherFruitExitTab() {
     try {
         const batch = writeBatch(firestore);
         
-        // 1. Create movement document
         const movementRef = doc(collection(firestore, 'otherFruitMovements'));
         batch.set(movementRef, {
             type: 'salida',
@@ -126,7 +145,6 @@ export function OtherFruitExitTab() {
             createdAt: serverTimestamp(),
         });
 
-        // 2. Update stock in otherFruitReceptions
         for(const item of itemsToProcess) {
             for(const loc of item.locations) {
                 if (loc.quantityToWithdraw > 0) {
@@ -164,7 +182,7 @@ export function OtherFruitExitTab() {
   };
   
   const handleItemCodeChange = (index: number, newCode: string) => {
-    const itemInfo = availableStock[newCode];
+    const itemInfo = availableStockByProductAndLot[newCode];
     if (itemInfo) {
       update(index, {
         ...form.getValues(`items.${index}`),
@@ -176,9 +194,9 @@ export function OtherFruitExitTab() {
     }
   };
 
-  const handleLocationChange = (itemIndex: number, locationKey: string, newQuantity: number) => {
+  const handleLocationChange = (itemIndex: number, lotId: string, locationKey: string, newQuantity: number) => {
     const currentItem = form.getValues(`items.${itemIndex}`);
-    const locationData = availableStock[currentItem.productCode].locations[locationKey];
+    const locationData = availableStockByProductAndLot[currentItem.productCode].lots[lotId].locations[locationKey];
     
     let existingLocations = currentItem.locations || [];
     const existingLocIndex = existingLocations.findIndex(l => l.locationKey === locationKey);
@@ -207,7 +225,7 @@ export function OtherFruitExitTab() {
     });
   };
 
-  const isLoading = loadingClients || loadingReceptions || loadingProducts;
+  const isLoading = loadingClients || loadingReceptions;
 
   return (
     <Card>
@@ -248,66 +266,89 @@ export function OtherFruitExitTab() {
             
             <div className="space-y-4">
               <FormLabel>Productos a Despachar</FormLabel>
-              {fields.map((field, index) => (
-                <div key={field.id} className="flex flex-col gap-3 p-4 border rounded-md">
-                  <div className="flex items-end gap-2">
-                    <div className="flex-1 grid sm:grid-cols-2 gap-4">
-                       <FormField
-                          control={form.control}
-                          name={`items.${index}.productCode`}
-                          render={({ field: itemField }) => (
-                            <FormItem>
-                              <FormLabel>Código de Producto</FormLabel>
-                               <Select onValueChange={(value) => handleItemCodeChange(index, value)} value={itemField.value} disabled={!selectedClientId || Object.keys(availableStock).length === 0}>
-                                  <FormControl><SelectTrigger>
-                                      <SelectValue placeholder={!selectedClientId ? "Seleccione cliente" : "Seleccione un producto"} />
-                                  </SelectTrigger></FormControl>
-                                  <SelectContent>
-                                    {Object.entries(availableStock).map(([code, { name }]) => (
-                                        <SelectItem key={code} value={code}>{code} - {name}</SelectItem>
-                                    ))}
-                                  </SelectContent>
-                               </Select>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                         <div className="space-y-2">
-                            <p className="font-medium text-sm h-10 flex items-center">
-                                Total a sacar: {form.watch(`items.${index}.quantity`)} {fruitClients.find(c => c.clientId === selectedClientId)?.unit || ''}
-                            </p>
-                        </div>
+              {fields.map((field, index) => {
+                const selectedProductCode = form.watch(`items.${index}.productCode`);
+                const productStock = availableStockByProductAndLot[selectedProductCode];
+                const sortedLots = productStock ? Object.entries(productStock.lots).sort(([, a], [, b]) => a.createdAt - b.createdAt) : [];
+                
+                return (
+                  <div key={field.id} className="flex flex-col gap-3 p-4 border rounded-md">
+                    <div className="flex items-end gap-2">
+                      <div className="flex-1 grid sm:grid-cols-2 gap-4">
+                        <FormField
+                            control={form.control}
+                            name={`items.${index}.productCode`}
+                            render={({ field: itemField }) => (
+                              <FormItem>
+                                <FormLabel>Código de Producto</FormLabel>
+                                <Select onValueChange={(value) => handleItemCodeChange(index, value)} value={itemField.value} disabled={!selectedClientId || Object.keys(availableStockByProductAndLot).length === 0}>
+                                    <FormControl><SelectTrigger>
+                                        <SelectValue placeholder={!selectedClientId ? "Seleccione cliente" : "Seleccione un producto"} />
+                                    </SelectTrigger></FormControl>
+                                    <SelectContent>
+                                      {Object.entries(availableStockByProductAndLot).map(([code, { name }]) => (
+                                          <SelectItem key={code} value={code}>{code} - {name}</SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                </Select>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <div className="space-y-2">
+                              <p className="font-medium text-sm h-10 flex items-center">
+                                  Total a sacar: {form.watch(`items.${index}.quantity`)} {fruitClients.find(c => c.clientId === selectedClientId)?.unit || ''}
+                              </p>
+                          </div>
+                      </div>
+                      <Button type="button" variant="destructive" size="icon" onClick={() => remove(index)} disabled={fields.length <= 1}>
+                          <Trash2 className="h-4 w-4" />
+                      </Button>
                     </div>
-                     <Button type="button" variant="destructive" size="icon" onClick={() => remove(index)} disabled={fields.length <= 1}>
-                        <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                  {form.watch(`items.${index}.productCode`) && (
-                     <div className="space-y-2 pl-2 border-l-2">
-                        <FormLabel className="text-xs">Ubicaciones Disponibles</FormLabel>
-                        {(availableStock[form.getValues(`items.${index}.productCode`)]?.locations && Object.keys(availableStock[form.getValues(`items.${index}.productCode`)]?.locations).length > 0) ? (
-                            Object.entries(availableStock[form.getValues(`items.${index}.productCode`)].locations).map(([key, loc]) => (
-                               <div key={key} className="flex items-center gap-2 text-sm p-2 bg-muted/50 rounded">
-                                   <span className="flex-1">{loc.location}</span>
-                                   <span className="w-28">Disp: {loc.available} {loc.unit}</span>
-                                   <Input
-                                       type="number"
-                                       className="w-32 h-8"
-                                       placeholder="Cantidad"
-                                       max={loc.available}
-                                       min={0}
-                                       defaultValue={(form.getValues(`items.${index}.locations`) || []).find(l => l.locationKey === key)?.quantityToWithdraw || 0}
-                                       onChange={(e) => handleLocationChange(index, key, parseInt(e.target.value) || 0)}
-                                   />
-                               </div>
-                            ))
-                        ) : <p className="text-sm text-muted-foreground">No hay ubicaciones con stock para este producto.</p>
-                        }
-                    </div>
-                  )}
 
-                </div>
-              ))}
+                    {selectedProductCode && (
+                       <div className="space-y-2 pl-2 border-l-2">
+                          <FormLabel className="text-xs font-medium">Lotes Disponibles (FIFO)</FormLabel>
+                          {sortedLots.length > 0 ? (
+                            <Accordion type="multiple" className="w-full">
+                              {sortedLots.map(([lotId, lotData]) => (
+                                <AccordionItem value={lotId} key={lotId}>
+                                  <AccordionTrigger>
+                                    <div className="flex justify-between w-full pr-4">
+                                      <span>Lote: <span className="font-mono">{lotId}</span></span>
+                                      <span>Disp: {lotData.totalAvailable} {lotData.unit}</span>
+                                    </div>
+                                  </AccordionTrigger>
+                                  <AccordionContent>
+                                    <div className="space-y-1 p-2">
+                                       {Object.entries(lotData.locations).map(([key, loc]) => (
+                                         <div key={key} className="flex items-center gap-2 text-sm p-2 bg-muted/50 rounded">
+                                             <span className="flex-1">{loc.location}</span>
+                                             <span className="w-28">Disp: {loc.available} {lotData.unit}</span>
+                                             <Input
+                                                 type="number"
+                                                 className="w-32 h-8"
+                                                 placeholder="Cantidad"
+                                                 max={loc.available}
+                                                 min={0}
+                                                 defaultValue={(form.getValues(`items.${index}.locations`) || []).find(l => l.locationKey === key)?.quantityToWithdraw || 0}
+                                                 onChange={(e) => handleLocationChange(index, lotId, key, parseInt(e.target.value) || 0)}
+                                             />
+                                         </div>
+                                      ))}
+                                    </div>
+                                  </AccordionContent>
+                                </AccordionItem>
+                              ))}
+                            </Accordion>
+                          ) : <p className="text-sm text-muted-foreground p-2">No hay lotes con stock para este producto.</p>
+                          }
+                      </div>
+                    )}
+
+                  </div>
+                )
+              })}
               <Button
                 type="button"
                 variant="outline"
