@@ -252,6 +252,62 @@
         "clientId"
       ]
     },
+    "PackagingReception": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "PackagingReception",
+      "description": "Records the reception of packaging materials on pallets.",
+      "type": "object",
+      "properties": {
+        "clientId": {
+          "type": "string",
+          "description": "Reference to the 'OtherClient' providing the packaging."
+        },
+        "clientName": {
+          "type": "string",
+          "description": "Denormalized name of the client for display purposes."
+        },
+        "document": {
+          "type": "string",
+          "description": "The reception document number (e.g., shipping guide)."
+        },
+        "items": {
+          "type": "array",
+          "description": "List of packaging materials and their quantities received in this lot.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "packagingMasterId": { "type": "string" },
+              "packagingMasterName": { "type": "string" },
+              "palletCount": { "type": "number" }
+            },
+            "required": ["packagingMasterId", "packagingMasterName", "palletCount"]
+          }
+        },
+        "status": {
+          "type": "string",
+          "enum": ["Pendiente de almacenar", "Almacenado"],
+          "description": "The current status of the reception lot."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "storageLocation": {
+          "type": "object",
+          "description": "The physical location where the pallets are stored.",
+          "properties": {
+            "warehouse": { "type": "string", "description": "e.g., Almacén 1" },
+            "aisle": { "type": "string", "description": "e.g., Pasillo 5" }
+          }
+        },
+        "storedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp of when the lot was stored."
+        }
+      },
+      "required": ["clientId", "clientName", "document", "items", "status", "createdAt"]
+    },
     "Packing": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Packing",
@@ -854,6 +910,22 @@
             {
               "name": "dispatchId",
               "description": "The unique identifier for the dispatch."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/packagingReceptions/{receptionId}",
+        "definition": {
+          "entityName": "PackagingReception",
+          "schema": {
+            "$ref": "#/backend/entities/PackagingReception"
+          },
+          "description": "Stores records for received packaging materials.",
+          "params": [
+            {
+              "name": "receptionId",
+              "description": "The unique identifier for the packaging reception record."
             }
           ]
         }

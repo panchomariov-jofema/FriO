@@ -33,6 +33,19 @@ export const packagingMasterSchema = z.object({
   clientId: z.string().min(1, 'El ID de cliente es obligatorio'),
 });
 
+export const packagingReceptionItemSchema = z.object({
+    packagingMasterId: z.string().min(1, "Debe seleccionar un material."),
+    packagingMasterName: z.string(),
+    palletCount: z.coerce.number().min(1, "La cantidad debe ser al menos 1."),
+});
+
+export const packagingReceptionSchema = z.object({
+    clientId: z.string().min(1, "Debe seleccionar un cliente."),
+    document: z.string().min(1, "El documento es obligatorio."),
+    items: z.array(packagingReceptionItemSchema).min(1, "Debe agregar al menos un ítem."),
+});
+
+
 export const packingSchema = z.object({
     exporterId: z.string().min(1, 'El exportador es obligatorio'),
     name: z.string().min(1, 'El nombre es obligatorio'),

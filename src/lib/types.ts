@@ -55,7 +55,7 @@ export interface OtherClient {
   clientId: string;
   name: string;
   type: string;
-  unit: string;
+  unit: 'Bins' | 'Pallets';
 }
 
 export interface PackagingMaster {
@@ -64,6 +64,26 @@ export interface PackagingMaster {
   name: string;
   clientId: string;
 }
+
+export interface PackagingReception {
+  id: string;
+  clientId: string;
+  clientName: string;
+  document: string;
+  items: {
+    packagingMasterId: string;
+    packagingMasterName: string;
+    palletCount: number;
+  }[];
+  status: 'Pendiente de almacenar' | 'Almacenado';
+  createdAt: Timestamp;
+  storageLocation?: {
+    warehouse: string;
+    aisle: string;
+  };
+  storedAt?: Timestamp;
+}
+
 
 export interface Packing {
   id: string;
