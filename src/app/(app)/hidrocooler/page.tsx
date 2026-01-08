@@ -119,7 +119,9 @@ export default function HidrocoolerPage() {
     
     addDoc(chamberLotsRef, chamberLotData)
         .then(() => {
-            setProcessingLots(prev => prev.filter(lot => lot.id !== lotToStore.id));
+            setProcessingLots(prev => prev.map(lot => 
+                lot.id === lotToStore.id ? { ...lot, status: 'Finalizado' } : lot
+            ));
             toast({ title: "Proceso Finalizado", description: `Lote enviado a ${chamberId}.` });
         })
         .catch((error) => {
