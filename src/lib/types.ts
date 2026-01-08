@@ -25,6 +25,31 @@ export interface BinMaterial {
   type: string;
 }
 
+export interface BinMaterialMovement {
+  id: string;
+  type: 'entrada' | 'salida';
+  document: string;
+  exporterId: string;
+  producerId: string;
+  items: {
+    binMaterialId: string;
+    binMaterialCode: string;
+    binMaterialName: string;
+    quantity: number;
+  }[];
+  createdAt: Timestamp;
+}
+
+export interface BinMaterialStock {
+  id: string;
+  binMaterialId: string;
+  binMaterialCode: string;
+  binMaterialName: string;
+  exporterId: string;
+  quantity: number;
+  lastUpdatedAt: Timestamp;
+}
+
 export interface OtherClient {
   id: string;
   clientId: string;
@@ -138,6 +163,4 @@ export interface Dispatch {
 
 
 export type MasterData = Exporter | Producer | BinMaterial | OtherClient | PackagingMaster | UserMaster | Profile | Packing;
-
-    
     

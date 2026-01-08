@@ -1,5 +1,104 @@
-import { PlaceholderPage } from "@/components/PlaceholderPage";
+'use client';
+
+import * as React from 'react';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
+import type { Exporter, Producer } from '@/lib/types';
+import { Label } from '@/components/ui/label';
+import { useProducersByExporter } from '@/hooks/use-producers-by-exporter';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { EntriesTab } from '@/components/bins-materials/EntriesTab';
+import { ExitsTab } from '@/components/bins-materials/ExitsTab';
+import { StockTab } from '@/components/bins-materials/StockTab';
 
 export default function BinsYMaterialesPage() {
-    return <PlaceholderPage title="Bins y Materiales" />;
+  const [selectedExporterId, setSelectedExporterId] = React.useState<string | null>(null);
+  const [selectedProducerId, setSelectedProducerId] = React.useState<string | null>(null);
+
+  const { data: exporters, loading: loadingExporters } = useFirestoreCollection<Exporter>('exporters');
+  const { data: producers, loading: loadingProducers } = useProducersByExporter(selectedExporterId);
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardHeader>
+          <CardTitle>Gestión de Bins y Materiales</CardTitle>
+          <CardDescription>Seleccione un exportador y productor para gestionar el inventario.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="exporter-select">Exportador</Label>
+              <Select
+                value={selectedExporterId ?? ''}
+                onValueChange={(value) => {
+                  setSelectedExporterId(value);
+                  setSelectedProducerId(null); // Reset producer when exporter changes
+                }}
+                disabled={loadingExporters}
+              >
+                <SelectTrigger id="exporter-select">
+                  <SelectValue placeholder="Seleccione un exportador..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {exporters.map(e => (
+                    <SelectItem key={e.id} value={e.exporterId}>
+                      {e.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="producer-select">Productor</Label>
+              <Select
+                value={selectedProducerId ?? ''}
+                onValueChange={(value) => setSelectedProducerId(value)}
+                disabled={!selectedExporterId || loadingProducers}
+              >
+                <SelectTrigger id="producer-select">
+                  <SelectValue placeholder="Seleccione un productor..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {producers.map(p => (
+                    <SelectItem key={p.id} value={p.producerId}>
+                      {p.shortName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+      
+      {selectedExporterId && selectedProducerId ? (
+        <Tabs defaultValue="entradas" className="w-full">
+            <TabsList className="grid w-full grid-cols-3">
+                <TabsTrigger value="entradas">Entradas</TabsTrigger>
+                <TabsTrigger value="salidas">Salidas</TabsTrigger>
+                <TabsTrigger value="stock">Stock</TabsTrigger>
+            </TabsList>
+            <TabsContent value="entradas">
+                <EntriesTab exporterId={selectedExporterId} producerId={selectedProducerId} />
+            </TabsContent>
+            <TabsContent value="salidas">
+                <ExitsTab exporterId={selectedExporterId} producerId={selectedProducerId} />
+            </TabsContent>
+            <TabsContent value="stock">
+                <StockTab exporterId={selectedExporterId} />
+            </TabsContent>
+        </Tabs>
+      ) : (
+        <Card className="mt-4 flex items-center justify-center h-64 border-dashed">
+            <CardContent className="text-center">
+                <p className="text-muted-foreground">Seleccione un exportador y un productor para comenzar.</p>
+            </CardContent>
+        </Card>
+      )}
+
+    </div>
+  );
 }
+    

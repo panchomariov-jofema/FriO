@@ -65,6 +65,15 @@ service cloud.firestore {
     // Operational Data Collections
     // ------------------------------------------------------------------------
 
+     /**
+     * @description Collections for bin and material stock and movements.
+     * @paths /binMaterialMovements/{docId}, /binMaterialStock/{docId}
+     * @allow Authenticated users can read and write freely.
+     */
+    match /{collection}/{docId} where collection in ['binMaterialMovements', 'binMaterialStock'] {
+      allow read, write: if isSignedIn();
+    }
+
     /**
      * @description Collection for fruit reception lots.
      * @path /receptionLots/{lotId}

@@ -85,6 +85,114 @@
         "type"
       ]
     },
+    "BinMaterialMovement": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "BinMaterialMovement",
+      "type": "object",
+      "description": "Records an entry or exit movement of bin materials.",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "entrada",
+            "salida"
+          ],
+          "description": "The type of movement."
+        },
+        "document": {
+          "type": "string",
+          "description": "Document number for the movement."
+        },
+        "exporterId": {
+          "type": "string",
+          "description": "Reference to the Exporter."
+        },
+        "producerId": {
+          "type": "string",
+          "description": "Reference to the Producer."
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "binMaterialId": {
+                "type": "string"
+              },
+              "binMaterialCode": {
+                "type": "string"
+              },
+              "binMaterialName": {
+                "type": "string"
+              },
+              "quantity": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "binMaterialId",
+              "binMaterialCode",
+              "binMaterialName",
+              "quantity"
+            ]
+          }
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp of the movement."
+        }
+      },
+      "required": [
+        "type",
+        "document",
+        "exporterId",
+        "producerId",
+        "items",
+        "createdAt"
+      ]
+    },
+    "BinMaterialStock": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "BinMaterialStock",
+      "type": "object",
+      "description": "Represents the current stock of a specific bin material for an exporter.",
+      "properties": {
+        "binMaterialId": {
+          "type": "string",
+          "description": "Reference to the BinMaterial."
+        },
+        "binMaterialCode": {
+          "type": "string",
+          "description": "Denormalized code for easier querying."
+        },
+        "binMaterialName": {
+          "type": "string",
+          "description": "Denormalized name for easier display."
+        },
+        "exporterId": {
+          "type": "string",
+          "description": "Reference to the Exporter."
+        },
+        "quantity": {
+          "type": "number",
+          "description": "Current quantity in stock."
+        },
+        "lastUpdatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp of the last stock update."
+        }
+      },
+      "required": [
+        "binMaterialId",
+        "binMaterialCode",
+        "binMaterialName",
+        "exporterId",
+        "quantity",
+        "lastUpdatedAt"
+      ]
+    },
     "OtherClient": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "OtherClient",
@@ -549,6 +657,34 @@
             {
               "name": "binMaterialId",
               "description": "The unique identifier for the bin material."
+            }
+          ]
+        }
+      },
+       {
+        "path": "/binMaterialMovements/{movementId}",
+        "definition": {
+          "entityName": "BinMaterialMovement",
+          "schema": { "$ref": "#/backend/entities/BinMaterialMovement" },
+          "description": "Stores a log of all bin and material movements (entries/exits).",
+           "params": [
+            {
+              "name": "movementId",
+              "description": "The unique identifier for the movement log."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/binMaterialStock/{stockId}",
+        "definition": {
+          "entityName": "BinMaterialStock",
+          "schema": { "$ref": "#/backend/entities/BinMaterialStock" },
+          "description": "Stores the current aggregated stock for each material, per exporter. Document ID is a composite key or a generated one.",
+           "params": [
+            {
+              "name": "stockId",
+              "description": "The unique identifier for the stock record."
             }
           ]
         }
