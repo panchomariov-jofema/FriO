@@ -18,6 +18,7 @@ import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
+import { Label } from '@/components/ui/label';
 
 type ReceptionFormValues = z.infer<typeof packagingReceptionSchema>;
 
