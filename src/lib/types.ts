@@ -74,8 +74,19 @@ export interface HidrocoolerLot {
   displayLotId: string;
   producerShortName: string;
   binCount: number;
-  status: 'Pendiente de Pre-Hidro' | 'En Proceso' | 'Finalizado';
+  status: 'Pendiente de Pre-Hidro';
   createdAt: Timestamp;
+}
+
+export interface ProcessingLot {
+  id: string; // Combination of originalLotId and timestamp for uniqueness
+  originalLotId: string;
+  displayLotId: string;
+  producerShortName: string;
+  binCount: number;
+  hidrocooler: string;
+  status: 'En Proceso' | 'Finalizado';
+  createdAt: Timestamp | any;
 }
 
 
