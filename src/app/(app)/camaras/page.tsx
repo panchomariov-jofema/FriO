@@ -86,74 +86,95 @@ export default function CamarasPage() {
     setStoreDialogOpen(true);
   };
   
-  const findNextAvailableCoordinate = (chamberId: string, lotToPlace: ChamberLot): string | null => {
-      const chamberConfig = chambersConfig[chamberId];
-      if (!chamberConfig) return null;
-      
-      const allStoredLots = chamberLots || [];
-      const storedInChamber = allStoredLots.filter(l => l.chamberId === chamberId && l.coordinate);
-      const occupiedCoordinates = storedInChamber.reduce((acc, lot) => {
-          if (!acc[lot.coordinate!]) acc[lot.coordinate!] = [];
-          acc[lot.coordinate!].push(lot);
-          return acc;
-      }, {} as Record<string, ChamberLot[]>);
-      
-      const allPossibleCoordinates = chamberConfig.columns
-          .flatMap(col => chamberConfig.rows.map(row => `${col}${row}`))
-          .sort(naturalSort);
-
-      // 1. Try to find a partially filled coordinate with the SAME lot
-      for (const coord of allPossibleCoordinates) {
-          const lotsInCoord = occupiedCoordinates[coord];
-          if (lotsInCoord && lotsInCoord.length > 0) {
-              const isSameLot = lotsInCoord.every(l => l.displayLotId === lotToPlace.displayLotId);
-              if (isSameLot) {
-                  const binsInCoord = lotsInCoord.reduce((sum, l) => sum + l.binCount, 0);
-                  if (binsInCoord + lotToPlace.binCount <= 6) {
-                      return coord;
-                  }
-              }
-          }
-      }
-
-      // 2. If not found, find the first completely empty coordinate
-      for (const coord of allPossibleCoordinates) {
-          if (!occupiedCoordinates[coord]) {
-              if (lotToPlace.binCount <= 6) {
-                return coord;
-              }
-          }
-      }
-
-      return null; // No space found
-  }
-
   const handleStoreInChamber = async ({ chamberId }: { chamberId: string; }) => {
     if (!lotToStore || !firestore) return;
-    
-    const coordinate = findNextAvailableCoordinate(chamberId, lotToStore);
 
-    if (!coordinate) {
-        toast({ variant: 'destructive', title: 'Error', description: `No hay espacio disponible en ${chambersConfig[chamberId].name}.` });
+    const chamberConfig = chambersConfig[chamberId];
+    const currentOccupancy = chamberOccupancy[chamberId]?.occupied ?? 0;
+
+    if (currentOccupancy + lotToStore.binCount > chamberConfig.capacity) {
+        toast({ variant: 'destructive', title: 'Error de capacidad', description: `No hay espacio suficiente en ${chamberConfig.name}.` });
         return;
     }
 
-    const originalLotRef = doc(firestore, 'chamberLots', lotToStore.id);
-    
-    try {
-        const batch = writeBatch(firestore);
+    const allStoredLots = chamberLots || [];
+    const storedInChamber = allStoredLots.filter(l => l.chamberId === chamberId && l.coordinate);
+    const occupiedCoordinates = storedInChamber.reduce((acc, lot) => {
+        if (lot.coordinate) {
+          if (!acc[lot.coordinate]) acc[lot.coordinate] = [];
+           acc[lot.coordinate].push(lot);
+        }
+        return acc;
+    }, {} as Record<string, ChamberLot[]>);
 
-        // All bins from the pending lot can be stored in the found coordinate.
-        const updateData = {
-          chamberId,
-          coordinate,
-          status: 'Almacenado' as const,
-        };
-        batch.update(originalLotRef, updateData);
-       
+    const allPossibleCoordinates = chamberConfig.columns
+        .flatMap(col => chamberConfig.rows.map(row => `${col}${row}`))
+        .sort(naturalSort);
+
+    let binsToStore = lotToStore.binCount;
+    const batch = writeBatch(firestore);
+    
+    // First, try to fill partially filled coordinates of the same lot
+    for (const coord of allPossibleCoordinates) {
+        if (binsToStore === 0) break;
+        
+        const lotsInCoord = occupiedCoordinates[coord];
+        if (lotsInCoord && lotsInCoord.length > 0) {
+            const isSameLot = lotsInCoord.every(l => l.displayLotId === lotToStore.displayLotId);
+            if (isSameLot) {
+                const binsInCoord = lotsInCoord.reduce((sum, l) => sum + l.binCount, 0);
+                const spaceAvailable = 6 - binsInCoord;
+                if (spaceAvailable > 0) {
+                    const binsToAdd = Math.min(binsToStore, spaceAvailable);
+                    
+                    const newLotFractionRef = doc(collection(firestore, 'chamberLots'));
+                    batch.set(newLotFractionRef, {
+                        ...lotToStore,
+                        id: newLotFractionRef.id,
+                        binCount: binsToAdd,
+                        chamberId: chamberId,
+                        coordinate: coord,
+                        status: 'Almacenado'
+                    });
+                    binsToStore -= binsToAdd;
+                }
+            }
+        }
+    }
+    
+    // Then, fill empty coordinates
+    for (const coord of allPossibleCoordinates) {
+        if (binsToStore === 0) break;
+
+        if (!occupiedCoordinates[coord]) {
+            const binsToAdd = Math.min(binsToStore, 6);
+            
+            const newLotFractionRef = doc(collection(firestore, 'chamberLots'));
+            batch.set(newLotFractionRef, {
+                ...lotToStore,
+                id: newLotFractionRef.id,
+                binCount: binsToAdd,
+                chamberId: chamberId,
+                coordinate: coord,
+                status: 'Almacenado'
+            });
+            binsToStore -= binsToAdd;
+        }
+    }
+
+    if (binsToStore > 0) {
+        toast({ variant: 'destructive', title: 'Error de espacio', description: 'No se encontraron coordenadas suficientes para almacenar todos los bins.' });
+        return;
+    }
+
+    // Mark the original pending lot as processed by deleting it
+    const originalLotRef = doc(firestore, 'chamberLots', lotToStore.id);
+    batch.delete(originalLotRef);
+
+    try {
         await batch.commit();
-        toast({ title: 'Éxito', description: `Lote asignado a ${chambersConfig[chamberId].name} - ${coordinate}.` });
-    } catch(e: any) {
+        toast({ title: 'Éxito', description: `Lote ${lotToStore.displayLotId} almacenado en ${chamberConfig.name}.` });
+    } catch (e: any) {
         console.error("Error al almacenar en cámara: ", e);
         toast({ variant: 'destructive', title: 'Error', description: 'Ocurrió un error al guardar.' });
         errorEmitter.emit('permission-error', new FirestorePermissionError({
@@ -161,7 +182,7 @@ export default function CamarasPage() {
             operation: 'write'
         }));
     } finally {
-      setStoreDialogOpen(false);
+        setStoreDialogOpen(false);
     }
   };
   
@@ -234,8 +255,8 @@ export default function CamarasPage() {
                         <TooltipProvider>
                             <div className="p-4 bg-muted/50 rounded-lg border">
                                  <div className="grid gap-1" style={{gridTemplateColumns: `repeat(${config.columns.length}, minmax(0, 1fr))`}}>
-                                    {config.rows.map(row =>
-                                        config.columns.map(col => {
+                                    {config.columns.map(col =>
+                                        config.rows.map(row => {
                                             const coord = `${col}${row}`;
                                             const lotsInCoord = storedLotsByChamber[chamberId]?.[coord] || [];
                                             const isOccupied = lotsInCoord.length > 0;
