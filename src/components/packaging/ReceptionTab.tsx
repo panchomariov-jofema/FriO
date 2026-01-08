@@ -44,7 +44,7 @@ export function ReceptionTab() {
   const selectedClientId = form.watch('clientId');
 
   const packagingClients = React.useMemo(() => {
-    return allClients.filter(c => c.type === 'embalajes' && c.unit === 'Pallets');
+    return allClients.filter(c => c.type === 'embalajes');
   }, [allClients]);
 
   const availableMasters = React.useMemo(() => {
@@ -163,10 +163,14 @@ export function ReceptionTab() {
                       render={({ field: itemField }) => (
                         <FormItem>
                           <FormLabel>Artículo</FormLabel>
-                           <Select onValueChange={(value) => handleMaterialChange(value, index)} value={itemField.value} disabled={!selectedClientId || loadingMasters}>
+                           <Select onValueChange={(value) => handleMaterialChange(value, index)} value={itemField.value} disabled={!selectedClientId || loadingMasters || availableMasters.length === 0}>
                             <FormControl>
                               <SelectTrigger>
-                                <SelectValue placeholder={!selectedClientId ? 'Seleccione un cliente primero' : 'Seleccione un artículo...'} />
+                                <SelectValue placeholder={
+                                    !selectedClientId 
+                                    ? 'Seleccione un cliente primero' 
+                                    : (availableMasters.length === 0 ? 'Cliente sin embalajes configurados' : 'Seleccione un artículo...')
+                                } />
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
