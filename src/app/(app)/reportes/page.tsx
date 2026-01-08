@@ -8,51 +8,83 @@ import type { BinMaterialStock, Exporter } from '@/lib/types';
 import { collection, onSnapshot, query } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { Button } from '@/components/ui/button';
+import { Download } from 'lucide-react';
 
-export default function ReportesPage() {
-  const firestore = useFirestore();
-  const [stock, setStock] = React.useState<BinMaterialStock[]>([]);
-  const [loading, setLoading] = React.useState(true);
-  const { data: exporters, loading: loadingExporters } = useFirestoreCollection<Exporter>('exporters');
+function StockReport() {
+    const firestore = useFirestore();
+    const [stock, setStock] = React.useState<BinMaterialStock[]>([]);
+    const [loading, setLoading] = React.useState(true);
+    const { data: exporters, loading: loadingExporters } = useFirestoreCollection<Exporter>('exporters');
 
-  const exporterMap = React.useMemo(() => {
-    return exporters.reduce((acc, exporter) => {
-      acc[exporter.exporterId] = exporter.name;
-      return acc;
-    }, {} as Record<string, string>);
-  }, [exporters]);
+    const exporterMap = React.useMemo(() => {
+        return exporters.reduce((acc, exporter) => {
+        acc[exporter.exporterId] = exporter.name;
+        return acc;
+        }, {} as Record<string, string>);
+    }, [exporters]);
 
-  React.useEffect(() => {
-    if (!firestore) return;
+    React.useEffect(() => {
+        if (!firestore) return;
 
-    setLoading(true);
-    const stockQuery = query(collection(firestore, 'binMaterialStock'));
+        setLoading(true);
+        const stockQuery = query(collection(firestore, 'binMaterialStock'));
 
-    const unsubscribe = onSnapshot(stockQuery, (snapshot) => {
-      const stockData: BinMaterialStock[] = [];
-      snapshot.forEach(doc => {
-        stockData.push({ id: doc.id, ...doc.data() } as BinMaterialStock);
-      });
-      setStock(stockData.sort((a, b) => a.binMaterialName.localeCompare(b.binMaterialName)));
-      setLoading(false);
-    }, (error) => {
-      console.error('Error fetching stock:', error);
-      setLoading(false);
-    });
+        const unsubscribe = onSnapshot(stockQuery, (snapshot) => {
+        const stockData: BinMaterialStock[] = [];
+        snapshot.forEach(doc => {
+            stockData.push({ id: doc.id, ...doc.data() } as BinMaterialStock);
+        });
+        setStock(stockData.sort((a, b) => a.binMaterialName.localeCompare(b.binMaterialName)));
+        setLoading(false);
+        }, (error) => {
+        console.error('Error fetching stock:', error);
+        setLoading(false);
+        });
 
-    return () => unsubscribe();
-  }, [firestore]);
+        return () => unsubscribe();
+    }, [firestore]);
 
-  const isLoading = loading || loadingExporters;
+    const isLoading = loading || loadingExporters;
 
-  return (
-    <div className="space-y-4">
+    const handleExportCSV = () => {
+        const headers = ['Código', 'Nombre del Material', 'Exportador', 'Cantidad en Stock'];
+        const csvRows = [headers.join(',')];
+
+        stock.forEach(item => {
+            const row = [
+                `"${item.binMaterialCode}"`,
+                `"${item.binMaterialName}"`,
+                `"${exporterMap[item.exporterId] || item.exporterId}"`,
+                item.quantity
+            ];
+            csvRows.push(row.join(','));
+        });
+
+        const csvContent = "data:text/csv;charset=utf-8," + csvRows.join('\n');
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", "reporte_stock_materiales.csv");
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
+    return (
         <Card>
-            <CardHeader>
-                <CardTitle>Reporte de Stock de Materiales</CardTitle>
-                <CardDescription>
-                Muestra los saldos actuales de todos los bins y materiales para todos los exportadores.
-                </CardDescription>
+            <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                    <CardTitle>Reporte de Stock de Materiales</CardTitle>
+                    <CardDescription>
+                        Muestra los saldos actuales de todos los bins y materiales para todos los exportadores.
+                    </CardDescription>
+                </div>
+                <Button onClick={handleExportCSV} disabled={isLoading || stock.length === 0}>
+                    <Download className="mr-2 h-4 w-4" />
+                    Exportar a CSV
+                </Button>
             </CardHeader>
             <CardContent>
                 <div className="rounded-md border">
@@ -93,6 +125,24 @@ export default function ReportesPage() {
                 </div>
             </CardContent>
         </Card>
+    );
+}
+
+
+export default function ReportesPage() {
+  return (
+    <div className="space-y-4">
+        <Accordion type="single" collapsible className="w-full">
+            <AccordionItem value="reporte-stock">
+                <AccordionTrigger className="text-lg font-semibold">
+                    Reporte de Stock de Materiales
+                </AccordionTrigger>
+                <AccordionContent className="pt-4">
+                   <StockReport />
+                </AccordionContent>
+            </AccordionItem>
+            {/* Aquí se pueden agregar futuros reportes */}
+        </Accordion>
     </div>
   );
 }
