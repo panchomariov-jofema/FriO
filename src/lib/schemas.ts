@@ -68,7 +68,7 @@ export const packagingExitItemSchema = z.object({
 
 export const packagingExitSchema = z.object({
     clientId: z.string().min(1, "Debe seleccionar un cliente."),
-    document: z.string().min(1, "El documento es obligatorio."),
+    document: z.string(),
     items: z.array(packagingExitItemSchema).min(1),
 });
 
@@ -112,5 +112,3 @@ export const receptionLotSchema = z.object({
     postHydroTemp: z.number().optional(),
     createdAt: z.any().optional(),
 });
-
-    
