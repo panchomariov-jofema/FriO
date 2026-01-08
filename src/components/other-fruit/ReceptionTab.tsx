@@ -49,7 +49,7 @@ export function OtherFruitReceptionTab() {
   });
 
   const fruitClients = React.useMemo(() => {
-    return (allClients || []).filter(c => c.type === 'fruta');
+    return (allClients || []).filter(c => c.type.toLowerCase() === 'fruta');
   }, [allClients]);
 
   const handleClientChange = (clientId: string) => {
