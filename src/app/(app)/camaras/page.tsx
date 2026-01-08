@@ -19,6 +19,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import { Progress } from '@/components/ui/progress';
+import { RelocateLotDialog } from '@/components/hidrocooler/RelocateLotDialog';
 
 // Helper for natural sorting (e.g., A1, A2, ... A10)
 const naturalSort = (a: string, b: string) => {
@@ -38,7 +39,9 @@ const naturalSort = (a: string, b: string) => {
 export default function CamarasPage() {
   const { data: chamberLots, loading } = useFirestoreCollection<ChamberLot>('chamberLots');
   const [lotToStore, setLotToStore] = React.useState<ChamberLot | null>(null);
+  const [coordToRelocate, setCoordToRelocate] = React.useState<{ chamberId: string; coordinate: string } | null>(null);
   const [isStoreDialogOpen, setStoreDialogOpen] = React.useState(false);
+  const [isRelocateDialogOpen, setRelocateDialogOpen] = React.useState(false);
   const firestore = useFirestore();
   const { toast } = useToast();
 
@@ -86,6 +89,11 @@ export default function CamarasPage() {
     setStoreDialogOpen(true);
   };
   
+  const handleRelocateClick = (chamberId: string, coordinate: string) => {
+    setCoordToRelocate({ chamberId, coordinate });
+    setRelocateDialogOpen(true);
+  }
+
   const handleStoreInChamber = async ({ chamberId }: { chamberId: string; }) => {
     if (!lotToStore || !firestore) return;
 
@@ -185,6 +193,48 @@ export default function CamarasPage() {
         setStoreDialogOpen(false);
     }
   };
+
+  const handleRelocateLot = async ({ targetChamberId, targetCoordinate }: { targetChamberId: string, targetCoordinate: string}) => {
+    if (!coordToRelocate || !firestore) return;
+    
+    const { chamberId: sourceChamberId, coordinate: sourceCoordinate } = coordToRelocate;
+    const lotsToMove = (storedLotsByChamber[sourceChamberId]?.[sourceCoordinate] || []).map(l => l.id);
+    const totalBinsToMove = (storedLotsByChamber[sourceChamberId]?.[sourceCoordinate] || []).reduce((sum, l) => sum + l.binCount, 0);
+
+    // Validate capacity if moving to a different chamber
+    if (sourceChamberId !== targetChamberId) {
+        const targetChamberConfig = chambersConfig[targetChamberId];
+        const targetChamberOccupancy = chamberOccupancy[targetChamberId]?.occupied ?? 0;
+        if (targetChamberOccupancy + totalBinsToMove > targetChamberConfig.capacity) {
+            toast({ variant: 'destructive', title: 'Error de capacidad', description: `No hay espacio para ${totalBinsToMove} bins en ${targetChamberConfig.name}.` });
+            return;
+        }
+    }
+
+    const batch = writeBatch(firestore);
+
+    lotsToMove.forEach(lotId => {
+        const lotRef = doc(firestore, 'chamberLots', lotId);
+        batch.update(lotRef, {
+            chamberId: targetChamberId,
+            coordinate: targetCoordinate,
+        });
+    });
+
+    try {
+        await batch.commit();
+        toast({ title: 'Éxito', description: `Coordenada ${sourceCoordinate} reubicada a ${chambersConfig[targetChamberId].name} - ${targetCoordinate}.` });
+    } catch (e: any) {
+        console.error("Error al reubicar la coordenada: ", e);
+        toast({ variant: 'destructive', title: 'Error', description: 'Ocurrió un error al reubicar.' });
+        errorEmitter.emit('permission-error', new FirestorePermissionError({
+            path: 'chamberLots',
+            operation: 'update'
+        }));
+    } finally {
+        setRelocateDialogOpen(false);
+    }
+  };
   
   return (
     <div className="space-y-6">
@@ -254,38 +304,41 @@ export default function CamarasPage() {
                     <AccordionContent>
                         <TooltipProvider>
                             <div className="p-4 bg-muted/50 rounded-lg border">
-                                 <div className="grid gap-1" style={{gridTemplateColumns: `repeat(${config.columns.length}, minmax(0, 1fr))`}}>
-                                    {config.rows.map(row =>
-                                        config.columns.map(col => {
-                                            const coord = `${col}${row}`;
-                                            const lotsInCoord = storedLotsByChamber[chamberId]?.[coord] || [];
-                                            const isOccupied = lotsInCoord.length > 0;
-                                            const totalBinsInCoord = isOccupied ? lotsInCoord.reduce((sum, lot) => sum + lot.binCount, 0) : 0;
-                                            const occupancyPercentage = isOccupied ? (totalBinsInCoord / 6) * 100 : 0;
-                                            const firstLot = isOccupied ? lotsInCoord[0] : null;
+                                <div className="grid gap-1" style={{ gridTemplateColumns: `repeat(${config.columns.length}, minmax(0, 1fr))` }}>
+                                  {config.rows.map(row =>
+                                    config.columns.map(col => {
+                                      const coord = `${col}${row}`;
+                                      const lotsInCoord = storedLotsByChamber[chamberId]?.[coord] || [];
+                                      const isOccupied = lotsInCoord.length > 0;
+                                      const totalBinsInCoord = isOccupied ? lotsInCoord.reduce((sum, lot) => sum + lot.binCount, 0) : 0;
+                                      const occupancyPercentage = isOccupied ? (totalBinsInCoord / 6) * 100 : 0;
+                                      const firstLot = isOccupied ? lotsInCoord[0] : null;
 
-                                            return (
-                                                <Tooltip key={coord} delayDuration={100}>
-                                                    <TooltipTrigger asChild>
-                                                        <div className={cn("h-12 w-full rounded border-2 flex items-center justify-center text-xs font-mono relative overflow-hidden",
-                                                            isOccupied ? 'bg-primary/20 border-primary/50' : 'bg-background border-dashed'
-                                                        )}>
-                                                          <div className="absolute bottom-0 left-0 top-0 bg-primary/30" style={{ right: `${100 - occupancyPercentage}%` }} />
-                                                          <span className="relative z-10 font-semibold">{coord}</span>
-                                                        </div>
-                                                    </TooltipTrigger>
-                                                     {isOccupied && firstLot && (
-                                                        <TooltipContent>
-                                                            <p className="font-bold">Lote: {firstLot.displayLotId}</p>
-                                                            <p>Productor: {firstLot.producerShortName}</p>
-                                                            <p>Variedad: {firstLot.variety}</p>
-                                                            <p>Bins: {totalBinsInCoord} / 6</p>
-                                                        </TooltipContent>
-                                                    )}
-                                                </Tooltip>
-                                            )
-                                        })
-                                    )}
+                                      return (
+                                        <Tooltip key={coord} delayDuration={100}>
+                                          <TooltipTrigger asChild>
+                                            <div className={cn("h-12 w-full rounded border-2 flex items-center justify-center text-xs font-mono relative overflow-hidden",
+                                                isOccupied ? 'bg-primary/20 border-primary/50' : 'bg-background border-dashed'
+                                            )}>
+                                              <div className="absolute bottom-0 left-0 top-0 bg-primary/30" style={{ right: `${100 - occupancyPercentage}%` }} />
+                                              <span className="relative z-10 font-semibold">{coord}</span>
+                                            </div>
+                                          </TooltipTrigger>
+                                          {isOccupied && firstLot && (
+                                            <TooltipContent className="p-4">
+                                              <div className="space-y-2">
+                                                <p className="font-bold">Lote: {firstLot.displayLotId}</p>
+                                                <p>Productor: {firstLot.producerShortName}</p>
+                                                <p>Variedad: {firstLot.variety}</p>
+                                                <p>Bins: {totalBinsInCoord} / 6</p>
+                                                <Button size="sm" className="w-full mt-2" onClick={() => handleRelocateClick(chamberId, coord)}>Reubicar</Button>
+                                              </div>
+                                            </TooltipContent>
+                                          )}
+                                        </Tooltip>
+                                      );
+                                    })
+                                  )}
                                 </div>
                             </div>
                         </TooltipProvider>
@@ -302,6 +355,18 @@ export default function CamarasPage() {
             open={isStoreDialogOpen}
             onOpenChange={setStoreDialogOpen}
             onStore={handleStoreInChamber}
+        />
+      )}
+
+      {coordToRelocate && (
+        <RelocateLotDialog
+            open={isRelocateDialogOpen}
+            onOpenChange={setRelocateDialogOpen}
+            onRelocate={handleRelocateLot}
+            sourceChamberId={coordToRelocate.chamberId}
+            sourceCoordinate={coordToRelocate.coordinate}
+            lotsInCoordinate={storedLotsByChamber[coordToRelocate.chamberId]?.[coordToRelocate.coordinate] || []}
+            allLots={chamberLots || []}
         />
       )}
     </div>
