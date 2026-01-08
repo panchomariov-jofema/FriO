@@ -65,24 +65,35 @@ export interface PackagingMaster {
   clientId: string;
 }
 
+export interface PackagingReceptionItem {
+    packagingMasterId: string;
+    packagingMasterCode: string;
+    packagingMasterName: string;
+    palletCount: number;
+    status: 'Pendiente de almacenar' | 'Almacenado';
+    storageLocation?: {
+      warehouse: string;
+      aisle: string;
+    };
+    storedAt?: Timestamp;
+}
+
+
 export interface PackagingReception {
   id: string;
   clientId: string;
   clientName: string;
   document: string;
-  items: {
+  items: PackagingReceptionItem[];
+  status: 'Pendiente de almacenar' | 'Parcialmente Almacenado' | 'Almacenado';
+  createdAt: Timestamp;
+}
+
+export interface PackagingMovementItem {
     packagingMasterId: string;
     packagingMasterCode: string;
     packagingMasterName: string;
     palletCount: number;
-  }[];
-  status: 'Pendiente de almacenar' | 'Almacenado';
-  createdAt: Timestamp;
-  storageLocation?: {
-    warehouse: string;
-    aisle: string;
-  };
-  storedAt?: Timestamp;
 }
 
 export interface PackagingMovement {
@@ -90,12 +101,7 @@ export interface PackagingMovement {
   type: 'entrada' | 'salida';
   clientId: string;
   document: string;
-  items: {
-    packagingMasterId: string;
-    packagingMasterCode: string;
-    packagingMasterName: string;
-    palletCount: number;
-  }[];
+  items: PackagingMovementItem[];
   createdAt: Timestamp;
 }
 

@@ -8,11 +8,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import type { PackagingReception } from '@/lib/types';
+import type { PackagingReceptionItem } from '@/lib/types';
 import { packagingStorageConfig } from '@/lib/packaging-storage-config';
 
 interface StorePackagingDialogProps {
-  lot: PackagingReception | null;
+  item: (PackagingReceptionItem & { document?: string }) | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onConfirm: (data: { warehouse: string; aisle: string }) => void;
@@ -25,7 +25,7 @@ const storeSchema = z.object({
 
 type StoreFormValues = z.infer<typeof storeSchema>;
 
-export function StorePackagingDialog({ lot, open, onOpenChange, onConfirm }: StorePackagingDialogProps) {
+export function StorePackagingDialog({ item, open, onOpenChange, onConfirm }: StorePackagingDialogProps) {
   const form = useForm<StoreFormValues>({
     resolver: zodResolver(storeSchema),
     defaultValues: { warehouse: undefined, aisle: undefined },
@@ -41,17 +41,15 @@ export function StorePackagingDialog({ lot, open, onOpenChange, onConfirm }: Sto
     onConfirm(values);
   };
 
-  if (!lot) return null;
-  
-  const totalPallets = lot.items.reduce((sum, item) => sum + item.palletCount, 0);
+  if (!item) return null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Almacenar Pallets de Embalaje</DialogTitle>
+          <DialogTitle>Almacenar Artículo</DialogTitle>
           <DialogDescription>
-            Seleccione la ubicación para los {totalPallets} pallets del documento <span className="font-mono">{lot.document}</span>.
+            Seleccione la ubicación para {item.palletCount} pallets de <span className="font-semibold">{item.packagingMasterName}</span> del documento <span className="font-mono">{item.document}</span>.
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>

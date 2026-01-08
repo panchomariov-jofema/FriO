@@ -21,11 +21,11 @@ export function StockTab() {
             stock[item.packagingMasterName] = { total: 0, locations: {}, pending: 0 };
           }
           
-          if (lot.status === 'Almacenado' && lot.storageLocation) {
+          if (item.status === 'Almacenado' && item.storageLocation) {
             stock[item.packagingMasterName].total += item.palletCount;
-            const locationKey = `${lot.storageLocation.warehouse} / ${lot.storageLocation.aisle}`;
+            const locationKey = `${item.storageLocation.warehouse} / ${item.storageLocation.aisle}`;
             stock[item.packagingMasterName].locations[locationKey] = (stock[item.packagingMasterName].locations[locationKey] || 0) + item.palletCount;
-          } else if (lot.status === 'Pendiente de almacenar') {
+          } else if (item.status === 'Pendiente de almacenar') {
             stock[item.packagingMasterName].pending += item.palletCount;
             stock[item.packagingMasterName].total += item.palletCount;
           }

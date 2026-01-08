@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
-import type { OtherClient, PackagingMaster } from '@/lib/types';
+import type { OtherClient, PackagingMaster, PackagingReceptionItem } from '@/lib/types';
 import { packagingReceptionSchema } from '@/lib/schemas';
 import { PlusCircle, Trash2 } from 'lucide-react';
 import { useFirestore } from '@/firebase';
@@ -63,9 +63,18 @@ export function ReceptionTab() {
         toast({ variant: 'destructive', title: 'Error', description: 'Cliente no válido.' });
         return;
     }
+    
+    // Add status to each item
+    const itemsWithStatus: Omit<PackagingReceptionItem, 'storageLocation' | 'storedAt'>[] = values.items.map(item => ({
+        ...item,
+        status: 'Pendiente de almacenar'
+    }));
+
 
     const receptionData = {
-        ...values,
+        clientId: values.clientId,
+        document: values.document,
+        items: itemsWithStatus,
         clientName: selectedClient.name,
         status: 'Pendiente de almacenar' as const,
         createdAt: serverTimestamp(),

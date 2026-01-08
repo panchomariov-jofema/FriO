@@ -68,7 +68,7 @@ export const packagingExitItemSchema = z.object({
 
 export const packagingExitSchema = z.object({
     clientId: z.string().min(1, "Debe seleccionar un cliente."),
-    document: z.string(),
+    document: z.string().optional(),
     items: z.array(packagingExitItemSchema).min(1),
 });
 
