@@ -11,7 +11,7 @@ import {
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
 import type { ChamberLot, Dispatch, Exporter, ProcessingLot, ReceptionLot, BinMaterialStock, BinMaterial } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Bar, BarChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis, Cell, Legend } from 'recharts';
+import { Bar, BarChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis, Cell, Legend, LabelList } from 'recharts';
 import { ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { chambersConfig } from '@/lib/chambers-config';
 import { Badge } from '@/components/ui/badge';
@@ -249,12 +249,20 @@ export default function DashboardPage() {
                                 <Skeleton className="h-8 w-full" />
                             </div>
                         ) : (
-                        <ChartContainer config={{ ocupacion: { label: 'Ocupación', color: "hsl(var(--chart-1))" } }} className="h-[250px] w-full">
+                        <ChartContainer config={{ ocupacion: { label: 'Ocupación', color: "hsl(var(--chart-2))" } }} className="h-[250px] w-full">
                            <BarChart data={occupancyByChamber} layout="vertical" margin={{ left: 20 }}>
                                 <XAxis type="number" hide />
                                 <YAxis dataKey="name" type="category" tickLine={false} axisLine={false} tickMargin={10} width={80} />
                                 <ChartTooltip content={<ChartTooltipContent />} />
-                                <Bar dataKey="ocupacion" layout="vertical" radius={5} />
+                                <Bar dataKey="ocupacion" layout="vertical" radius={5}>
+                                    <LabelList 
+                                        dataKey="percentage" 
+                                        position="right" 
+                                        offset={8} 
+                                        className="fill-foreground font-semibold"
+                                        formatter={(value: number) => `${value.toFixed(1)}%`}
+                                    />
+                                </Bar>
                             </BarChart>
                         </ChartContainer>
                         )}
