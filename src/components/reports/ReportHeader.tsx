@@ -20,12 +20,10 @@ export function ReportHeader({ title, description, onExport, isExportDisabled = 
             <CardHeader>
                 <div className="flex flex-col sm:flex-row gap-4 justify-between">
                     <div className="flex items-center gap-4">
-                        <Link href="/reportes" legacyBehavior>
-                           <a className="hidden sm:block">
-                             <Button variant="outline" size="icon">
-                                <ArrowLeft className="h-4 w-4" />
-                             </Button>
-                           </a>
+                        <Link href="/reportes" className="hidden sm:block">
+                           <Button variant="outline" size="icon">
+                              <ArrowLeft className="h-4 w-4" />
+                           </Button>
                         </Link>
                         <div>
                             <CardTitle>{title}</CardTitle>
