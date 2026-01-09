@@ -69,27 +69,24 @@ export function EntriesTab({ exporterId, producerId }: EntriesTabProps) {
   const items = form.watch('items');
   
   React.useEffect(() => {
-    if (!exporterId || !items || items.length === 0) return;
-
     const rules = calculationRules[exporterId];
-    if (!rules) return;
-    
-    const binItemIndex = items.findIndex(item => item.binMaterialCode === rules.binCode);
-    if (binItemIndex === -1) return;
+    if (!rules || !items) return;
 
-    const binItem = items[binItemIndex];
-    const isBinManuallyChanged = form.formState.dirtyFields.items?.[binItemIndex]?.quantity;
+    const binItem = items.find(item => item.binMaterialCode === rules.binCode);
+    if (!binItem) return;
+
+    const binQuantity = binItem.quantity;
     
-    if (isBinManuallyChanged) {
-        const binQuantity = binItem.quantity;
-        
-        Object.entries(rules.related).forEach(([relatedCode, multiplier]) => {
-            const relatedItemIndex = items.findIndex(item => item.binMaterialCode === relatedCode);
-            if (relatedItemIndex !== -1) {
-                form.setValue(`items.${relatedItemIndex}.quantity`, binQuantity * multiplier, { shouldDirty: true });
+    Object.entries(rules.related).forEach(([relatedCode, multiplier]) => {
+        const relatedItemIndex = items.findIndex(item => item.binMaterialCode === relatedCode);
+        if (relatedItemIndex !== -1) {
+            const currentVal = items[relatedItemIndex].quantity;
+            const newVal = binQuantity * multiplier;
+            if (currentVal !== newVal) {
+                form.setValue(`items.${relatedItemIndex}.quantity`, newVal);
             }
-        });
-    }
+        }
+    });
 
   }, [items, exporterId, form]);
 
