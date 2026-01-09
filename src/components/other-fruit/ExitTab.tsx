@@ -33,7 +33,7 @@ const defaultItem = {
 const getLocationKey = (receptionId: string, itemIndex: number) => `${receptionId}_${itemIndex}`;
 
 export function OtherFruitExitTab() {
-  const { data: allClients, loading: loadingClients } = useFirestoreCollection<OtherClient>('otherClients');
+  const { data: allClients, loading: loadingClients } = useFirestoreCollection<OtherClient>('clients');
   const { data: allReceptions, loading: loadingReceptions } = useFirestoreCollection<OtherFruitReception>('otherFruitReceptions');
   const firestore = useFirestore();
   const { toast } = useToast();
@@ -224,6 +224,40 @@ export function OtherFruitExitTab() {
       locations: existingLocations,
     });
   };
+  
+  const handleSelectAllInLot = (itemIndex: number, lotId: string) => {
+    const currentItem = form.getValues(`items.${itemIndex}`);
+    const lotData = availableStockByProductAndLot[currentItem.productCode]?.lots[lotId];
+    if (!lotData) return;
+
+    let newLocations = (currentItem.locations || []).filter(loc => {
+        const locationLotId = allReceptions.find(r => r.id === loc.receptionId)?.displayLotId;
+        return locationLotId !== lotId;
+    });
+
+    Object.entries(lotData.locations).forEach(([locationKey, locationDetails]) => {
+        newLocations.push({
+            locationKey: locationKey,
+            receptionId: locationDetails.receptionId,
+            itemIndex: locationDetails.itemIndex,
+            quantityToWithdraw: locationDetails.available,
+        });
+    });
+
+    const totalQuantity = newLocations.reduce((sum, loc) => sum + loc.quantityToWithdraw, 0);
+
+    update(itemIndex, {
+        ...currentItem,
+        quantity: totalQuantity,
+        locations: newLocations,
+    });
+    
+    // We need to force a re-render of the inputs inside the accordion
+    setTimeout(() => {
+        const formValues = form.getValues();
+        form.reset(formValues);
+    }, 0);
+  };
 
   const isLoading = loadingClients || loadingReceptions;
 
@@ -314,13 +348,23 @@ export function OtherFruitExitTab() {
                               {sortedLots.map(([lotId, lotData]) => (
                                 <AccordionItem value={lotId} key={lotId}>
                                   <AccordionTrigger>
-                                    <div className="flex justify-between w-full pr-4">
-                                      <span>Lote: <span className="font-mono">{lotId}</span></span>
-                                      <span>Disp: {lotData.totalAvailable} {lotData.unit}</span>
+                                    <div className="flex justify-between w-full pr-4 items-center">
+                                       <div className="flex flex-col text-left">
+                                           <span>Lote: <span className="font-mono">{lotId}</span></span>
+                                           <span className="text-xs text-muted-foreground">
+                                                Recepción: {new Date(lotData.createdAt).toLocaleDateString()}
+                                            </span>
+                                       </div>
+                                       <span>Disp: {lotData.totalAvailable} {lotData.unit}</span>
                                     </div>
                                   </AccordionTrigger>
                                   <AccordionContent>
-                                    <div className="space-y-1 p-2">
+                                    <div className="space-y-2 p-2">
+                                       <div className="flex justify-end mb-2">
+                                          <Button type="button" size="sm" variant="link" onClick={() => handleSelectAllInLot(index, lotId)}>
+                                              Seleccionar Todo el Lote
+                                          </Button>
+                                       </div>
                                        {Object.entries(lotData.locations).map(([key, loc]) => (
                                          <div key={key} className="flex items-center gap-2 text-sm p-2 bg-muted/50 rounded">
                                              <span className="flex-1">{loc.location}</span>
@@ -331,7 +375,7 @@ export function OtherFruitExitTab() {
                                                  placeholder="Cantidad"
                                                  max={loc.available}
                                                  min={0}
-                                                 defaultValue={(form.getValues(`items.${index}.locations`) || []).find(l => l.locationKey === key)?.quantityToWithdraw || 0}
+                                                 value={(form.getValues(`items.${index}.locations`) || []).find(l => l.locationKey === key)?.quantityToWithdraw || 0}
                                                  onChange={(e) => handleLocationChange(index, lotId, key, parseInt(e.target.value) || 0)}
                                              />
                                          </div>
