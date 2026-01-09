@@ -27,11 +27,13 @@ import { useAuth, useUser } from '@/firebase';
 import { useRouter } from 'next/navigation';
 import {
   createUserWithEmailAndPassword,
+  signInAnonymously,
   signInWithEmailAndPassword,
 } from 'firebase/auth';
 import { useToast } from '@/hooks/use-toast';
 import { FirebaseError } from 'firebase/app';
 import { LoadingScreen } from '@/components/LoadingScreen';
+import { Separator } from '@/components/ui/separator';
 
 const loginSchema = z.object({
   email: z.string().email('Email inválido.'),
@@ -101,6 +103,26 @@ export default function LoginPage() {
     }
   };
   
+  const handleAnonymousSignIn = async () => {
+    if (!auth) return;
+
+    try {
+      await signInAnonymously(auth);
+      toast({ title: '¡Éxito!', description: 'Iniciando sesión como invitado...' });
+      // Redirect is handled by the useEffect
+    } catch (error) {
+       console.error(error);
+       if (error instanceof FirebaseError) {
+         toast({
+          variant: 'destructive',
+          title: 'Error de autenticación',
+          description: 'No se pudo iniciar sesión como invitado.',
+        });
+       }
+    }
+  };
+
+
   if (isUserLoading || user) {
     return <LoadingScreen />;
   }
@@ -122,7 +144,7 @@ export default function LoginPage() {
               : 'Bienvenido a FrigoManager.'}
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
               <FormField
@@ -174,6 +196,22 @@ export default function LoginPage() {
               </Button>
             </form>
           </Form>
+
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <span className="w-full border-t" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-background px-2 text-muted-foreground">
+                O continúa con
+              </span>
+            </div>
+          </div>
+          
+          <Button variant="outline" className="w-full" onClick={handleAnonymousSignIn}>
+            Ingresar como Invitado
+          </Button>
+
         </CardContent>
         <CardFooter className="flex justify-center text-sm">
           <p>
