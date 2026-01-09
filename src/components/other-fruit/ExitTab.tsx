@@ -346,31 +346,31 @@ export function OtherFruitExitTab() {
                             <Accordion type="multiple" className="w-full">
                               {sortedLots.map(([lotId, lotData]) => (
                                 <AccordionItem value={lotId} key={lotId}>
-                                  <AccordionTrigger>
-                                    <div className="flex justify-between w-full pr-4 items-center">
-                                       <div className="flex flex-col text-left">
-                                           <span>Lote: <span className="font-mono">{lotId}</span></span>
-                                           <span className="text-xs text-muted-foreground">
-                                                Recepción: {new Date(lotData.createdAt).toLocaleDateString()}
-                                            </span>
-                                       </div>
-                                       <div className="flex items-center gap-2">
-                                          <span>Disp: {lotData.totalAvailable} {lotData.unit}</span>
-                                          <Button
-                                              type="button"
-                                              size="sm"
-                                              variant="link"
-                                              onClick={(e) => {
-                                                  e.stopPropagation();
-                                                  handleSelectAllInLot(index, lotId);
-                                              }}
-                                              className="p-1 h-auto"
-                                            >
-                                                Seleccionar Todo
+                                    <div className="flex items-center w-full">
+                                        <AccordionTrigger className="flex-1">
+                                            <div className="flex flex-col text-left">
+                                                <span>Lote: <span className="font-mono">{lotId}</span></span>
+                                                <span className="text-xs text-muted-foreground">
+                                                    Recepción: {new Date(lotData.createdAt).toLocaleDateString()}
+                                                </span>
+                                            </div>
+                                        </AccordionTrigger>
+                                        <div className="flex items-center gap-2 pr-4">
+                                            <span>Disp: {lotData.totalAvailable} {lotData.unit}</span>
+                                            <Button
+                                                type="button"
+                                                size="sm"
+                                                variant="link"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleSelectAllInLot(index, lotId);
+                                                }}
+                                                className="p-1 h-auto"
+                                                >
+                                                Seleccionar Todo el Lote
                                             </Button>
-                                       </div>
+                                        </div>
                                     </div>
-                                  </AccordionTrigger>
                                   <AccordionContent>
                                     <div className="space-y-2 p-2">
                                        {Object.entries(lotData.locations).map(([key, loc]) => (
