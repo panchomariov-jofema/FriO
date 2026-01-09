@@ -41,16 +41,19 @@ interface EntriesTabProps {
 // Rules for automatic calculation
 const calculationRules: Record<string, { binCode: string; related: Record<string, number> }> = {
     'SUBSOLE': {
-        binCode: '10001',
-        related: { '10002': 24, '10003': 24 } // totes, láminas
+        binCode: '10001', // BINS GENERICO
+        related: { 
+            '10002': 24, // TOTES PLASTICO
+            '10003': 24  // LAMINA
+        }
     },
     'MEYER': {
         binCode: '10007',
-        related: { '10008': 24, '10009': 24 } // totes verdes, esponjas
+        related: { '10008': 24, '10009': 24 }
     },
     'BLOSSOM': {
         binCode: '10011',
-        related: { '10012': 24, '10013': 24 } // totes, esponjas
+        related: { '10012': 24, '10013': 24 }
     }
 };
 
@@ -71,7 +74,7 @@ export function EntriesTab({ exporterId, producerId }: EntriesTabProps) {
   }, [exporters, exporterId]);
   
   React.useEffect(() => {
-    if (!exporterName || loadingExporters || !items.length) return;
+    if (!exporterName || loadingExporters || !items || items.length === 0) return;
 
     const rules = calculationRules[exporterName];
     if (!rules) return;
