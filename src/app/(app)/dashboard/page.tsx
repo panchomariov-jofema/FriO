@@ -11,7 +11,7 @@ import {
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
 import type { ChamberLot, Dispatch, Exporter, ProcessingLot, ReceptionLot, BinMaterialStock, OtherFruitReception, Profile, UserMaster } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Bar, BarChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis, Cell, Legend, LabelList } from 'recharts';
+import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis, Cell, Legend, LabelList } from 'recharts';
 import { ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { chambersConfig } from '@/lib/chambers-config';
 import { Badge } from '@/components/ui/badge';
@@ -100,11 +100,11 @@ export default function DashboardPage() {
         }, {} as Record<string, string>);
         
         const kilosData = (receptionLots || []).reduce((acc, lot) => {
-            const weight = lot.netWeightPerBin && lot.netWeightPerBin > 0 
-                ? lot.netWeightPerBin * lot.binCount 
-                : lot.totalWeight;
+            const weight = (lot.totalWeight && lot.totalWeight > 0)
+                ? (lot.totalWeight - (lot.binCount * 65) + (lot.noTotes || 0))
+                : 0;
 
-            if (weight && weight > 0) {
+            if (weight > 0) {
                 const exporterName = exporterMap[lot.exporterId] || 'No Asignado';
                  if (!acc[exporterName]) {
                     acc[exporterName] = 0;
@@ -194,7 +194,7 @@ export default function DashboardPage() {
 
     const chartConfig: ChartConfig = {
         kilos: {
-            label: "Kilos",
+            label: "Kilos Netos",
             color: "hsl(var(--chart-1))",
         },
     };
@@ -256,8 +256,8 @@ export default function DashboardPage() {
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-5">
                 <Card className="lg:col-span-2">
                     <CardHeader>
-                        <CardTitle>Kilos Recepcionados por Exportador</CardTitle>
-                        <CardDescription>Total de kilos ingresados a la planta por cada cliente.</CardDescription>
+                        <CardTitle>Kilos Netos Recepcionados por Exportador</CardTitle>
+                        <CardDescription>Total de kilos netos ingresados a la planta por cada cliente.</CardDescription>
                     </CardHeader>
                     <CardContent>
                         {loading ? (
@@ -276,7 +276,7 @@ export default function DashboardPage() {
                                         position="right" 
                                         offset={8} 
                                         className="fill-foreground font-semibold"
-                                        formatter={(value: number) => value.toLocaleString('es-CL')}
+                                        formatter={(value: number) => value.toLocaleString('es-CL', { maximumFractionDigits: 0 })}
                                     />
                                 </Bar>
                             </BarChart>
