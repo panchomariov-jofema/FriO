@@ -189,7 +189,7 @@ export default function DashboardPage() {
         { title: "Total Bins Vacíos (Stock)", value: totalEmptyBins, icon: Archive },
         { title: "Bins Pendientes en Recepción", value: pendingReceptionBins, icon: ChevronsLeft },
         { title: "Lotes en Proceso (Hidro)", value: inProcess, icon: Boxes },
-        { title: "Pendientes por Almacenar", value: pendingStorage, icon: PackageCheck },
+        { title: "Pend. por Almacenar en Camara", value: pendingStorage, icon: PackageCheck },
     ];
 
     const chartConfig: ChartConfig = {
