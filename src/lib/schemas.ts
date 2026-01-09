@@ -133,6 +133,7 @@ export const receptionLotSchema = z.object({
     binCount: z.coerce.number({invalid_type_error: 'Debe ser un número.'}).positive("La cantidad de bins debe ser mayor a 0"),
     toteCount: z.coerce.number({invalid_type_error: 'Debe ser un número.'}).positive("La cantidad de totes debe ser mayor a 0"),
     emptyTotes: z.coerce.number({invalid_type_error: 'Debe ser un número.'}).optional(),
+    noTotes: z.coerce.number({invalid_type_error: 'Debe ser un número.'}).optional(),
     status: z.string().optional(),
     totalWeight: z.number().optional(),
     preHydroTemp: z.number().optional(),

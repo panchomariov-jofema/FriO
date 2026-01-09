@@ -40,6 +40,7 @@ export default function RecepcionPage() {
       binCount: 0,
       toteCount: 0,
       emptyTotes: 0,
+      noTotes: 0,
     },
   });
 
@@ -91,6 +92,7 @@ export default function RecepcionPage() {
           binCount: 0,
           toteCount: 0,
           emptyTotes: 0,
+          noTotes: 0,
         });
         // Keep exporter and producer selected
         form.setValue('exporterId', selectedExporter);
@@ -124,7 +126,7 @@ export default function RecepcionPage() {
         <CardContent>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="exporter-select">Exportador</Label>
                   <Select
@@ -189,6 +191,9 @@ export default function RecepcionPage() {
                 )} />
                 <FormField control={form.control} name="emptyTotes" render={({ field }) => (
                   <FormItem><FormLabel>Totes Vacíos (Opcional)</FormLabel><FormControl><Input type="number" {...field} value={field.value || ''} autoComplete="off" /></FormControl><FormMessage /></FormItem>
+                )} />
+                <FormField control={form.control} name="noTotes" render={({ field }) => (
+                  <FormItem><FormLabel>Sin Totes (Opcional)</FormLabel><FormControl><Input type="number" {...field} value={field.value || ''} autoComplete="off" /></FormControl><FormMessage /></FormItem>
                 )} />
               </div>
               <div className="flex justify-end">

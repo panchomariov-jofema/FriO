@@ -159,6 +159,7 @@ export interface ReceptionLot {
     binCount: number;
     toteCount: number;
     emptyTotes?: number;
+    noTotes?: number;
     status: 'Pendiente de Peso' | 'Pendiente de Pre-Hidro' | 'Pendiente de Post-Hidro' | 'Cerrado';
     totalWeight?: number;
     preHydroTemp?: number;
