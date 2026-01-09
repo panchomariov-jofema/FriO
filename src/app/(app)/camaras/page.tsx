@@ -406,7 +406,7 @@ export default function CamarasPage() {
 
         </CardHeader>
         <CardContent>
-          <Accordion type="single" collapsible className="w-full" defaultValue="CAMARA-1">
+          <Accordion type="single" collapsible className="w-full">
             {Object.entries(chambersConfig).map(([chamberId, config]) => (
                 <AccordionItem value={chamberId} key={chamberId}>
                     <AccordionTrigger>

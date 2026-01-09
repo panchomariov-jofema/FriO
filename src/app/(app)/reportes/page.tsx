@@ -61,7 +61,7 @@ function BinMaterialStockReport() {
 
     return (
         <Card>
-            <Accordion type="single" collapsible defaultValue="item-1">
+            <Accordion type="single" collapsible>
                 <AccordionItem value="item-1" className="border-b-0">
                     <AccordionTrigger className="p-6 hover:no-underline">
                          <div className="flex-1 text-left">
