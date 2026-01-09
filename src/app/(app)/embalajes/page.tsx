@@ -53,47 +53,48 @@ export default function EmbalajesPage() {
 
   return (
     <div className="space-y-4">
-       <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <div>
-            <CardTitle>Gestión de Embalajes</CardTitle>
-            <CardDescription>
-              Recepción y almacenamiento de materiales de embalaje en pallets.
-            </CardDescription>
-          </div>
-           <AlertDialog>
-            <AlertDialogTrigger asChild>
-                <Button variant="destructive" size="icon">
-                    <Trash2 className="h-4 w-4" />
-                    <span className="sr-only">Limpiar Stock</span>
-                </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-                <AlertDialogHeader>
-                    <AlertDialogTitle>¿Está seguro de limpiar todo el stock?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                        Esta acción no se puede deshacer. Se eliminarán permanentemente TODAS las recepciones
-                        de embalajes. Esta herramienta es solo para fines de desarrollo y pruebas.
-                    </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleClearStock} className="bg-destructive hover:bg-destructive/90">
-                        Sí, Limpiar Stock
-                    </AlertDialogAction>
-                </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-        </CardHeader>
-      </Card>
-
       <Tabs defaultValue="recepcion" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 md:grid-cols-4">
-          <TabsTrigger value="recepcion">Recepción</TabsTrigger>
-          <TabsTrigger value="salidas">Salidas</TabsTrigger>
-          <TabsTrigger value="almacenamiento">Pendientes</TabsTrigger>
-          <TabsTrigger value="stock">Stock</TabsTrigger>
-        </TabsList>
+        <Card className="mb-4">
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle>Gestión de Embalajes</CardTitle>
+              <CardDescription>
+                Recepción y almacenamiento de materiales de embalaje en pallets.
+              </CardDescription>
+            </div>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                  <Button variant="destructive" size="icon">
+                      <Trash2 className="h-4 w-4" />
+                      <span className="sr-only">Limpiar Stock</span>
+                  </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                  <AlertDialogHeader>
+                      <AlertDialogTitle>¿Está seguro de limpiar todo el stock?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                          Esta acción no se puede deshacer. Se eliminarán permanentemente TODAS las recepciones
+                          de embalajes. Esta herramienta es solo para fines de desarrollo y pruebas.
+                      </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                      <AlertDialogAction onClick={handleClearStock} className="bg-destructive hover:bg-destructive/90">
+                          Sí, Limpiar Stock
+                      </AlertDialogAction>
+                  </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </CardHeader>
+          <CardContent>
+            <TabsList className="grid w-full grid-cols-2 md:grid-cols-4">
+              <TabsTrigger value="recepcion">Recepción</TabsTrigger>
+              <TabsTrigger value="salidas">Salidas</TabsTrigger>
+              <TabsTrigger value="almacenamiento">Pendientes</TabsTrigger>
+              <TabsTrigger value="stock">Stock</TabsTrigger>
+            </TabsList>
+          </CardContent>
+        </Card>
         
         <TabsContent value="recepcion">
           <ReceptionTab />
