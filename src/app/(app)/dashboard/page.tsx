@@ -94,7 +94,9 @@ export default function DashboardPage() {
             .filter(lot => lot.status === 'Pendiente por Almacenar')
             .reduce((sum, lot) => sum + lot.binCount, 0);
         
-        const calculatedInProcess = filteredProcessingLots.filter(p => p.status === 'En Proceso').length;
+        const calculatedInProcess = filteredProcessingLots
+            .filter(p => p.status === 'En Proceso')
+            .reduce((sum, lot) => sum + lot.binCount, 0);
 
         const exporterMap = (exporters || []).reduce((acc, e) => {
             acc[e.exporterId] = e.name;
@@ -190,7 +192,7 @@ export default function DashboardPage() {
         { title: "Total Bins en Cámara (Fruta)", value: totalBinsInStock, icon: Warehouse },
         { title: "Total Bins Vacíos (Stock)", value: totalEmptyBins, icon: Archive },
         { title: "Bins Pendientes en Recepción", value: pendingReceptionBins, icon: ChevronsLeft },
-        { title: "Lotes en Proceso (Hidro)", value: inProcess, icon: Boxes },
+        { title: "Bins en Proceso (Hidro)", value: inProcess, icon: Boxes },
         { title: "Pend. por Almacenar en Camara", value: pendingStorage, icon: PackageCheck },
     ];
 
