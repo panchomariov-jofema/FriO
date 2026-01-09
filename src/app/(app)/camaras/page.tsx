@@ -73,7 +73,7 @@ export default function CamarasPage() {
       
     const allStoredItems = [
       ...allChamberLots
-        .filter(lot => lot.status === 'Almacenado' && lot.chamberId && lot.coordinate)
+        .filter(lot => lot.status === 'Almacenado' && lot.chamberId && lot.coordinate && lot.binCount > 0)
         .map(lot => ({
             id: lot.id,
             isProducerLot: true,
@@ -87,7 +87,7 @@ export default function CamarasPage() {
         })),
       ...allOtherFruitReceptions
         .flatMap(reception => reception.items
-            .filter(item => item.status === 'Almacenado' && item.storageLocation?.chamberId && item.storageLocation?.coordinate)
+            .filter(item => item.status === 'Almacenado' && item.storageLocation?.chamberId && item.storageLocation?.coordinate && item.quantity > 0)
             .map((item, index) => ({
                 id: `${reception.id}-${index}`,
                 isProducerLot: false,
