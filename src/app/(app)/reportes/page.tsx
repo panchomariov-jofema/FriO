@@ -712,9 +712,9 @@ function OtherFruitKardexReport() {
 
         // Process Receptions (Entradas)
         for (const reception of receptions) {
-            for (const item of reception.items) {
+            for (const [index, item] of reception.items.entries()) {
                 allTransactions.push({
-                    key: `${reception.id}-${item.productCode}`,
+                    key: `${reception.id}-${index}`,
                     type: 'entrada' as const,
                     date: reception.createdAt,
                     clientId: reception.clientId,
@@ -731,9 +731,9 @@ function OtherFruitKardexReport() {
         // Process Movements (Salidas)
         for (const movement of movements) {
             if (movement.type === 'salida') {
-                for (const item of movement.items) {
+                for (const [index, item] of movement.items.entries()) {
                      allTransactions.push({
-                        key: `${movement.id}-${item.productCode}`,
+                        key: `${movement.id}-${index}`,
                         type: 'salida' as const,
                         date: movement.createdAt,
                         clientId: movement.clientId,
