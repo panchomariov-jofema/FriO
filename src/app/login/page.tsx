@@ -22,7 +22,7 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { Leaf } from 'lucide-react';
+import { Apple } from 'lucide-react';
 import { useAuth, useUser } from '@/firebase';
 import { useRouter } from 'next/navigation';
 import {
@@ -133,7 +133,7 @@ export default function LoginPage() {
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <div className="flex justify-center items-center mb-4">
-            <Leaf className="w-10 h-10 text-primary" />
+            <Apple className="w-10 h-10 text-primary" />
           </div>
           <CardTitle className="text-2xl">
             {isSignUp ? 'Crear una cuenta' : 'Iniciar Sesión'}

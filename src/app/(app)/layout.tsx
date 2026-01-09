@@ -9,7 +9,7 @@ import {
   Database,
   Grape,
   LayoutDashboard,
-  Leaf,
+  Apple,
   LogOut,
   Package,
   PanelLeft,
@@ -134,7 +134,7 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
           <SidebarHeader>
             <div className="flex items-center gap-2 p-2">
               <SidebarTrigger className="md:hidden" />
-              <Leaf className="w-8 h-8 text-primary hidden md:block" />
+              <Apple className="w-8 h-8 text-primary hidden md:block" />
               <span className="font-bold text-lg group-data-[collapsible=icon]:hidden">
                 FrigoManager
               </span>

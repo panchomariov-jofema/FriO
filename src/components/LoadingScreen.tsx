@@ -1,4 +1,4 @@
-import { Leaf } from 'lucide-react';
+import { Apple } from 'lucide-react';
 
 export function LoadingScreen() {
   return (
@@ -6,7 +6,7 @@ export function LoadingScreen() {
       <div className="relative flex items-center justify-center w-24 h-24">
         <div className="absolute inline-flex h-full w-full rounded-full bg-primary/20 animate-ping"></div>
         <div className="relative inline-flex items-center justify-center rounded-full h-20 w-20 bg-primary/30">
-            <Leaf className="w-10 h-10 text-primary" />
+            <Apple className="w-10 h-10 text-primary" />
         </div>
       </div>
       <p className="mt-4 text-muted-foreground">Cargando...</p>
