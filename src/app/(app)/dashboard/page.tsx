@@ -9,14 +9,14 @@ import {
   CardDescription,
 } from '@/components/ui/card';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
-import type { ChamberLot, Dispatch, Exporter, ProcessingLot, ReceptionLot, BinMaterialStock, OtherFruitReception, Profile, UserMaster } from '@/lib/types';
+import type { ChamberLot, Dispatch, Exporter, ProcessingLot, ReceptionLot, BinMaterialStock, OtherFruitReception, Profile, UserMaster, HidrocoolerLot } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis, Cell, Legend, LabelList } from 'recharts';
 import { ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { chambersConfig } from '@/lib/chambers-config';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Boxes, PackageCheck, Truck, Warehouse, Archive, ChevronsLeft } from 'lucide-react';
+import { Boxes, PackageCheck, Truck, Warehouse, Archive, ChevronsLeft, Waves } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { useUser } from '@/firebase';
@@ -46,6 +46,8 @@ export default function DashboardPage() {
     const { data: receptionLots, loading: loadingReception } = useFirestoreCollection<ReceptionLot>('receptionLots');
     const { data: exporters, loading: loadingExporters } = useFirestoreCollection<Exporter>('exporters');
     const { data: binMaterialStock, loading: loadingBinStock } = useFirestoreCollection<BinMaterialStock>('binMaterialStock');
+    const { data: hidrocoolerLots, loading: loadingHidroLots } = useFirestoreCollection<HidrocoolerLot>('hidrocoolerLots');
+
     
     React.useEffect(() => {
         if (user && users.length > 0 && profiles.length > 0 && !userProfile) {
@@ -78,13 +80,20 @@ export default function DashboardPage() {
         occupancyByChamber,
         latestReceptions,
         totalEmptyBins,
-        pendingReceptionBins,
+        pendingHidroBins,
     } = React.useMemo(() => {
         const filteredChamberLots = (chamberLots || []).filter(lot => !selectedExporterId || lot.exporterId === selectedExporterId);
         const filteredReceptionLots = (receptionLots || []).filter(lot => !selectedExporterId || lot.exporterId === selectedExporterId);
         
         const exporterDisplayLotIds = new Set(filteredReceptionLots.map(lot => lot.displayLotId));
         const filteredProcessingLots = (processingLots || []).filter(p => exporterDisplayLotIds.has(p.displayLotId));
+
+        // Get the exporterIds associated with the filtered receptions to filter hidrocoolerLots
+        const filteredExporterIds = new Set(filteredReceptionLots.map(lot => lot.exporterId));
+        const filteredHidroLots = (hidrocoolerLots || []).filter(lot => {
+            const originalLot = (receptionLots || []).find(rl => rl.displayLotId === lot.displayLotId);
+            return originalLot && (!selectedExporterId || originalLot.exporterId === selectedExporterId);
+        });
 
 
         const storedLots = filteredChamberLots.filter(lot => lot.status === 'Almacenado');
@@ -168,8 +177,8 @@ export default function DashboardPage() {
             .filter(s => specificBinCodes.includes(s.binMaterialCode))
             .reduce((sum, s) => sum + s.quantity, 0);
 
-        const calculatedPendingReceptionBins = filteredReceptionLots
-            .filter(lot => lot.status !== 'Cerrado')
+        const calculatedPendingHidroBins = filteredHidroLots
+            .filter(lot => lot.status === 'Pendiente de Pre-Hidro')
             .reduce((sum, lot) => sum + lot.binCount, 0);
 
 
@@ -181,17 +190,17 @@ export default function DashboardPage() {
             occupancyByChamber: calculatedOccupancy,
             latestReceptions: sortedReceptions,
             totalEmptyBins: calculatedEmptyBins,
-            pendingReceptionBins: calculatedPendingReceptionBins,
+            pendingHidroBins: calculatedPendingHidroBins,
         };
 
-    }, [chamberLots, otherFruitReceptions, processingLots, dispatches, exporters, receptionLots, binMaterialStock, selectedExporterId]);
+    }, [chamberLots, otherFruitReceptions, processingLots, dispatches, exporters, receptionLots, binMaterialStock, hidrocoolerLots, selectedExporterId]);
 
-    const loading = loadingChamber || loadingOtherFruit || loadingProcessing || loadingDispatches || loadingExporters || loadingReception || loadingBinStock || loadingUsers || loadingProfiles;
+    const loading = loadingChamber || loadingOtherFruit || loadingProcessing || loadingDispatches || loadingExporters || loadingReception || loadingBinStock || loadingUsers || loadingProfiles || loadingHidroLots;
 
     const kpiCards = [
         { title: "Total Bins en Cámara (Fruta)", value: totalBinsInStock, icon: Warehouse },
         { title: "Total Bins Vacíos (Stock)", value: totalEmptyBins, icon: Archive },
-        { title: "Bins Pendientes en Recepción", value: pendingReceptionBins, icon: ChevronsLeft },
+        { title: "Bins Pend. en Hidro", value: pendingHidroBins, icon: Waves },
         { title: "Bins en Proceso (Hidro)", value: inProcess, icon: Boxes },
         { title: "Pend. por Almacenar en Camara", value: pendingStorage, icon: PackageCheck },
     ];
