@@ -3,6 +3,7 @@
 import React, { useMemo, type ReactNode } from 'react';
 import { FirebaseProvider } from '@/firebase/provider';
 import { initializeFirebase } from '@/firebase';
+import { Toaster } from '@/components/ui/toaster';
 
 interface FirebaseClientProviderProps {
   children: ReactNode;
@@ -21,6 +22,7 @@ export function FirebaseClientProvider({ children }: FirebaseClientProviderProps
       firestore={firebaseServices.firestore}
     >
       {children}
+      <Toaster />
     </FirebaseProvider>
   );
 }
