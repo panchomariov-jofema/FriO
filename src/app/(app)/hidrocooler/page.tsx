@@ -14,6 +14,8 @@ import { useFirestore } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
 
 export default function HidrocoolerPage() {
   const { data: pendingLots, loading: loadingPending } = useFirestoreCollection<HidrocoolerLot>('hidrocoolerLots');
@@ -23,6 +25,8 @@ export default function HidrocoolerPage() {
 
   const [lotToProcess, setLotToProcess] = React.useState<HidrocoolerLot | null>(null);
   const [isProcessDialogOpen, setProcessDialogOpen] = React.useState(false);
+  const [showOnlyOpen, setShowOnlyOpen] = React.useState(true);
+
 
   const firestore = useFirestore();
   const { toast } = useToast();
@@ -36,10 +40,14 @@ export default function HidrocoolerPage() {
     });
   }, [pendingLots]);
 
-  const sortedProcessingLots = React.useMemo(() => {
+  const filteredProcessingLots = React.useMemo(() => {
     if (!processingLots) return [];
-    return [...processingLots].sort((a,b) => b.createdAt.toMillis() - a.createdAt.toMillis());
-  }, [processingLots]);
+    const sorted = [...processingLots].sort((a,b) => b.createdAt.toMillis() - a.createdAt.toMillis());
+    if (showOnlyOpen) {
+      return sorted.filter(lot => lot.status === 'En Proceso');
+    }
+    return sorted;
+  }, [processingLots, showOnlyOpen]);
   
   const handleProcessClick = (lot: HidrocoolerLot) => {
     setLotToProcess(lot);
@@ -206,8 +214,16 @@ export default function HidrocoolerPage() {
       
       <Card>
         <CardHeader>
-          <CardTitle>Lotes en Proceso</CardTitle>
-          <CardDescription>Fracciones de lotes que se están enfriando actualmente.</CardDescription>
+            <div className="flex justify-between items-center">
+                <div>
+                    <CardTitle>Lotes en Proceso</CardTitle>
+                    <CardDescription>Fracciones de lotes que se están enfriando actualmente.</CardDescription>
+                </div>
+                <div className="flex items-center space-x-2">
+                    <Checkbox id="show-open-processing" checked={showOnlyOpen} onCheckedChange={(checked) => setShowOnlyOpen(!!checked)} />
+                    <Label htmlFor="show-open-processing">Mostrar solo lotes abiertos</Label>
+                </div>
+            </div>
         </CardHeader>
         <CardContent>
            <div className="rounded-md border">
@@ -226,8 +242,8 @@ export default function HidrocoolerPage() {
                   Array.from({ length: 3 }).map((_, i) => (
                     <TableRow key={i}><TableCell colSpan={5}><Skeleton className="h-4 w-full" /></TableCell></TableRow>
                   ))
-                ) : sortedProcessingLots.length > 0 ? (
-                  sortedProcessingLots.map((lot) => (
+                ) : filteredProcessingLots.length > 0 ? (
+                  filteredProcessingLots.map((lot) => (
                     <TableRow key={lot.id}>
                       <TableCell className="font-medium">{lot.displayLotId}</TableCell>
                       <TableCell>{lot.hidrocooler}</TableCell>
@@ -262,5 +278,3 @@ export default function HidrocoolerPage() {
     </div>
   );
 }
-
-    
