@@ -4,7 +4,7 @@ import * as React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useFirestore } from '@/firebase';
-import type { BinMaterialStock, Exporter, BinMaterialMovement, Producer, ReceptionLot, PackagingReception, OtherClient } from '@/lib/types';
+import type { BinMaterialStock, Exporter, BinMaterialMovement, Producer, ReceptionLot, PackagingReception, OtherClient, OtherFruitReception } from '@/lib/types';
 import { collection, onSnapshot, query } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
@@ -421,7 +421,7 @@ function PackagingStockReport() {
 
   const packagingClients = React.useMemo(() => {
     if (!clients) return [];
-    return clients.filter(c => c.type.toLowerCase() === 'embalajes');
+    return clients.filter(c => c.type.toLowerCase() === 'embalaje');
   }, [clients]);
 
   const isLoading = loadingLots || loadingClients;
@@ -533,6 +533,166 @@ function PackagingStockReport() {
   );
 }
 
+function OtherFruitStockReport() {
+  const { data: allLots, loading: loadingLots } = useFirestoreCollection<OtherFruitReception>('otherFruitReceptions');
+  const { data: clients, loading: loadingClients } = useFirestoreCollection<OtherClient>('otherClients');
+  const [clientFilter, setClientFilter] = React.useState('all');
+  const [codeFilter, setCodeFilter] = React.useState('');
+
+  const { aggregatedStock, fruitClients } = React.useMemo(() => {
+    const fruitClients = (clients || []).filter(c => c.type === 'fruta');
+    const stockMap: Record<string, {
+        clientName: string;
+        clientId: string;
+        productName: string;
+        unit: 'Bins' | 'Pallets';
+        quantity: number;
+    }> = {};
+
+    (allLots || [])
+      .filter(lot => lot.status === 'Almacenado' || lot.status === 'Parcialmente Almacenado')
+      .forEach(lot => {
+        lot.items.forEach(item => {
+          if (item.status === 'Almacenado' && item.quantity > 0) {
+            const key = `${lot.clientId}-${item.productCode}`;
+            if (!stockMap[key]) {
+              stockMap[key] = {
+                clientId: lot.clientId,
+                clientName: lot.clientName,
+                productName: item.productName,
+                unit: lot.unit,
+                quantity: 0,
+              };
+            }
+            stockMap[key].quantity += item.quantity;
+          }
+        });
+      });
+      
+    const stockArray = Object.entries(stockMap).map(([key, value]) => ({
+        key,
+        ...value,
+        productCode: key.split('-')[1]
+    })).sort((a,b) => a.clientName.localeCompare(b.clientName) || a.productCode.localeCompare(b.productCode));
+
+    return { aggregatedStock: stockArray, fruitClients };
+  }, [allLots, clients]);
+  
+  const filteredStock = React.useMemo(() => {
+    return aggregatedStock.filter(item => {
+        const clientMatch = clientFilter === 'all' || item.clientId === clientFilter;
+        const codeMatch = !codeFilter || item.productCode.toLowerCase().includes(codeFilter.toLowerCase());
+        return clientMatch && codeMatch;
+    });
+  }, [aggregatedStock, clientFilter, codeFilter]);
+
+  const isLoading = loadingLots || loadingClients;
+
+  const handleExportCSV = () => {
+    const headers = ['Cliente', 'Código Producto', 'Descripción Producto', 'Cantidad Total', 'Unidad'];
+    const csvRows = [headers.join(',')];
+
+    filteredStock.forEach(item => {
+        const row = [
+            `"${item.clientName}"`,
+            `"${item.productCode}"`,
+            `"${item.productName}"`,
+            item.quantity,
+            `"${item.unit}"`
+        ];
+        csvRows.push(row.join(','));
+    });
+
+    const csvContent = "data:text/csv;charset=utf-8," + csvRows.join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", "reporte_stock_fruta_otros_clientes.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between">
+        <div>
+            <CardTitle>Reporte de Stock de Fruta (Otros Clientes)</CardTitle>
+            <CardDescription>Inventario consolidado de toda la fruta almacenada de otros clientes.</CardDescription>
+        </div>
+        <Button onClick={handleExportCSV} disabled={isLoading || filteredStock.length === 0}>
+            <Download className="mr-2 h-4 w-4" />
+            Exportar a CSV
+        </Button>
+      </CardHeader>
+      <CardContent>
+        <div className="flex flex-col sm:flex-row gap-4 mb-6">
+            <div className="flex-1 space-y-2">
+                <Label htmlFor="fruit-client-filter">Filtrar por Cliente</Label>
+                <Select value={clientFilter} onValueChange={setClientFilter} disabled={isLoading}>
+                    <SelectTrigger id="fruit-client-filter">
+                        <SelectValue placeholder="Todos los clientes" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="all">Todos los clientes</SelectItem>
+                        {fruitClients.map(c => <SelectItem key={c.id} value={c.clientId}>{c.name}</SelectItem>)}
+                    </SelectContent>
+                </Select>
+            </div>
+            <div className="flex-1 space-y-2">
+                 <Label htmlFor="fruit-code-filter">Filtrar por Código</Label>
+                <Input
+                    id="fruit-code-filter"
+                    placeholder="Buscar por código de producto..."
+                    value={codeFilter}
+                    onChange={(e) => setCodeFilter(e.target.value)}
+                    disabled={isLoading}
+                />
+            </div>
+        </div>
+
+        <div className="rounded-md border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Cliente</TableHead>
+                <TableHead>Cód. Producto</TableHead>
+                <TableHead>Descripción</TableHead>
+                <TableHead className="text-right">Cantidad Total</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {isLoading ? (
+                Array.from({ length: 5 }).map((_, i) => (
+                  <TableRow key={i}>
+                    <TableCell colSpan={4}><Skeleton className="h-4 w-full" /></TableCell>
+                  </TableRow>
+                ))
+              ) : filteredStock.length > 0 ? (
+                filteredStock.map((item) => (
+                  <TableRow key={item.key}>
+                    <TableCell className="font-medium">{item.clientName}</TableCell>
+                    <TableCell className="font-mono">{item.productCode}</TableCell>
+                    <TableCell>{item.productName}</TableCell>
+                    <TableCell className="text-right font-semibold">{item.quantity} {item.unit}</TableCell>
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell colSpan={4} className="h-24 text-center">
+                    No se encontró stock con los filtros seleccionados.
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 
 export default function ReportesPage() {
   return (
@@ -552,6 +712,14 @@ export default function ReportesPage() {
                 </AccordionTrigger>
                 <AccordionContent className="pt-4">
                    <PackagingStockReport />
+                </AccordionContent>
+            </AccordionItem>
+             <AccordionItem value="reporte-stock-fruta-otros">
+                <AccordionTrigger className="text-lg font-semibold">
+                    Reporte de Stock de Fruta (Otros Clientes)
+                </AccordionTrigger>
+                <AccordionContent className="pt-4">
+                   <OtherFruitStockReport />
                 </AccordionContent>
             </AccordionItem>
             <AccordionItem value="kardex-movimientos">
