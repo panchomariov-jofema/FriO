@@ -9,7 +9,7 @@ import {
   CardDescription,
 } from '@/components/ui/card';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
-import type { ChamberLot, Dispatch, Exporter, ProcessingLot, ReceptionLot, BinMaterialStock, OtherFruitReception } from '@/lib/types';
+import type { ChamberLot, Dispatch, Exporter, ProcessingLot, ReceptionLot, BinMaterialStock, OtherFruitReception, Profile, UserMaster } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Bar, BarChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis, Cell, Legend, LabelList } from 'recharts';
 import { ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
@@ -19,6 +19,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Boxes, PackageCheck, Truck, Warehouse, Archive, ChevronsLeft } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
+import { useUser } from '@/firebase';
 
 
 const CHART_COLORS = [
@@ -30,7 +31,13 @@ const CHART_COLORS = [
 ];
 
 export default function DashboardPage() {
+    const { user } = useUser();
+    const { data: users, loading: loadingUsers } = useFirestoreCollection<UserMaster>('usersMaster');
+    const { data: profiles, loading: loadingProfiles } = useFirestoreCollection<Profile>('profiles');
+
     const [selectedExporterId, setSelectedExporterId] = React.useState<string | null>(null);
+    const [fixedExporterId, setFixedExporterId] = React.useState<string | null>(null);
+    const [userProfile, setUserProfile] = React.useState<Profile | null>(null);
 
     const { data: chamberLots, loading: loadingChamber } = useFirestoreCollection<ChamberLot>('chamberLots');
     const { data: otherFruitReceptions, loading: loadingOtherFruit } = useFirestoreCollection<OtherFruitReception>('otherFruitReceptions');
@@ -40,6 +47,29 @@ export default function DashboardPage() {
     const { data: exporters, loading: loadingExporters } = useFirestoreCollection<Exporter>('exporters');
     const { data: binMaterialStock, loading: loadingBinStock } = useFirestoreCollection<BinMaterialStock>('binMaterialStock');
     
+    React.useEffect(() => {
+        if (user && users.length > 0 && profiles.length > 0 && !userProfile) {
+            const currentUserMaster = users.find(u => u.userName.toLowerCase() === user.email?.split('@')[0].toLowerCase());
+            if (currentUserMaster) {
+                const profile = profiles.find(p => p.profileId === currentUserMaster.profileId);
+                setUserProfile(profile || null);
+            }
+        }
+    }, [user, users, profiles, userProfile]);
+
+    React.useEffect(() => {
+        if (userProfile) {
+            const dashboardPermission = userProfile.modulesAccess.find(p => typeof p === 'object' && p.name === 'Dashboard');
+            if (dashboardPermission && typeof dashboardPermission === 'object' && 'fixedExporterId' in dashboardPermission) {
+                const exporter = exporters.find(e => e.name === dashboardPermission.fixedExporterId);
+                if (exporter) {
+                    setFixedExporterId(exporter.exporterId);
+                    setSelectedExporterId(exporter.exporterId);
+                }
+            }
+        }
+    }, [userProfile, exporters]);
+
     const { 
         totalBinsInStock, 
         pendingStorage,
@@ -148,7 +178,7 @@ export default function DashboardPage() {
 
     }, [chamberLots, otherFruitReceptions, processingLots, dispatches, exporters, receptionLots, binMaterialStock, selectedExporterId]);
 
-    const loading = loadingChamber || loadingOtherFruit || loadingProcessing || loadingDispatches || loadingExporters || loadingReception || loadingBinStock;
+    const loading = loadingChamber || loadingOtherFruit || loadingProcessing || loadingDispatches || loadingExporters || loadingReception || loadingBinStock || loadingUsers || loadingProfiles;
 
     const kpiCards = [
         { title: "Total Bins en Cámara (Fruta)", value: totalBinsInStock, icon: Warehouse },
@@ -177,6 +207,7 @@ export default function DashboardPage() {
                                 Vista general de los indicadores clave de la operación.
                             </p>
                         </div>
+                        {!fixedExporterId && (
                         <div className="w-full sm:w-auto sm:min-w-[200px]">
                             <Label htmlFor="exporter-filter">Filtrar por Exportador</Label>
                             <Select
@@ -195,6 +226,7 @@ export default function DashboardPage() {
                                 </SelectContent>
                             </Select>
                         </div>
+                        )}
                     </div>
                 </CardContent>
             </Card>

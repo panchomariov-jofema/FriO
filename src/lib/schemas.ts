@@ -87,12 +87,36 @@ export const userMasterSchema = z.object({
   profileId: z.string().min(1, 'El ID de perfil es obligatorio'),
 });
 
+const modulePermissionSchema = z.union([
+  z.string(),
+  z.object({
+    name: z.literal('Dashboard'),
+    fixedExporterId: z.string(),
+  }),
+  z.object({
+      name: z.literal('Embalajes'),
+      allowedTabs: z.array(z.string())
+  }),
+  z.object({
+      name: z.literal('Otros Hortofrutícolas'),
+      allowedTabs: z.array(z.string())
+  })
+]);
+
 export const profileSchema = z.object({
   profileId: z.string().min(1, 'El ID de perfil es obligatorio'),
   name: z.string().min(1, 'El nombre es obligatorio'),
-  modulesAccess: z.any().transform(val => {
+  modulesAccess: z.any().transform((val) => {
     if (Array.isArray(val)) return val;
-    if (typeof val === 'string') return val.split(',').map(s => s.trim());
+    if (typeof val === 'string') {
+      try {
+        // Attempt to parse as JSON for complex rules
+        return JSON.parse(val);
+      } catch (e) {
+        // Fallback for simple comma-separated string
+        return val.split(',').map(s => s.trim());
+      }
+    }
     return [];
   }),
 });

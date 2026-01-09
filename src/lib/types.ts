@@ -134,11 +134,17 @@ export interface UserMaster {
   profileId: string;
 }
 
+export type ModulePermission = 
+  | string 
+  | { name: 'Dashboard', fixedExporterId: string }
+  | { name: 'Embalajes', allowedTabs: string[] }
+  | { name: 'Otros Hortofrutícolas', allowedTabs: string[] };
+
 export interface Profile {
   id: string;
   profileId: string;
   name: string;
-  modulesAccess: string[];
+  modulesAccess: ModulePermission[];
 }
 
 export type Variety = 'SANTINA' | 'LAPINS' | 'REGINA' | 'KORDIA' | 'SKEENA' | 'SWEETHEART' | 'SYLVIA' | 'SUNBURST';

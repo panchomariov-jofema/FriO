@@ -32,25 +32,29 @@ import { Button } from '@/components/ui/button';
 import { useAuth, useUser } from '@/firebase';
 import { signInAnonymously } from 'firebase/auth';
 import { LoadingScreen } from '@/components/LoadingScreen';
+import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
+import type { UserMaster, Profile, ModulePermission } from '@/lib/types';
 
-
-const navItems = [
-  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/bins-y-materiales', label: 'Bins y Materiales', icon: Archive },
-  { href: '/recepcion', label: 'Recepción', icon: ChevronsLeft },
-  { href: '/hidrocooler', label: 'Hidrocooler', icon: Waves },
-  { href: '/camaras', label: 'Cámaras', icon: Building2 },
-  { href: '/despachos', label: 'Despachos', icon: Truck },
-  { href: '/reportes', label: 'Reportes', icon: PieChart },
-  { href: '/embalajes', label: 'Embalajes', icon: Package },
-  { href: '/otros-hortofruticolas', label: 'Otros Hortofrutícolas', icon: Grape },
-  { href: '/datos-maestros', label: 'Datos Maestros', icon: Database },
-];
+const navIcons: { [key: string]: React.ElementType } = {
+  Dashboard: LayoutDashboard,
+  'Bins y Materiales': Archive,
+  Recepción: ChevronsLeft,
+  Hidrocooler: Waves,
+  Cámaras: Building2,
+  Despachos: Truck,
+  Reportes: PieChart,
+  Embalajes: Package,
+  'Otros Hortofrutícolas': Grape,
+  'Datos Maestros': Database,
+};
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const auth = useAuth();
   const { user, isUserLoading } = useUser();
+  const { data: users, loading: loadingUsers } = useFirestoreCollection<UserMaster>('usersMaster');
+  const { data: profiles, loading: loadingProfiles } = useFirestoreCollection<Profile>('profiles');
+  const [navItems, setNavItems] = React.useState<{ href: string; label: string; icon: React.ElementType }[]>([]);
 
   React.useEffect(() => {
     if (!isUserLoading && !user && auth) {
@@ -58,8 +62,39 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     }
   }, [user, isUserLoading, auth]);
 
-  if (isUserLoading || !user) {
+  React.useEffect(() => {
+    if (user && users.length > 0 && profiles.length > 0) {
+      const currentUserMaster = users.find(u => u.userName.toLowerCase() === user.email?.split('@')[0].toLowerCase());
+      if (currentUserMaster) {
+        const userProfile = profiles.find(p => p.profileId === currentUserMaster.profileId);
+        if (userProfile) {
+          const accessibleNavs = userProfile.modulesAccess.map((permission: ModulePermission) => {
+            const moduleName = typeof permission === 'string' ? permission : permission.name;
+            const href = `/${moduleName.toLowerCase().replace(/\s/g, '-')}`;
+            return {
+              href,
+              label: moduleName,
+              icon: navIcons[moduleName] || Leaf,
+            };
+          });
+          setNavItems(accessibleNavs);
+        }
+      } else {
+        // Default to a restricted view or handle no-profile case
+        setNavItems([]);
+      }
+    }
+  }, [user, users, profiles]);
+
+  const loading = isUserLoading || loadingUsers || loadingProfiles;
+
+  if (loading || !user) {
     return <LoadingScreen />;
+  }
+
+  if (navItems.length === 0 && !loading) {
+    // This can be a "no profile assigned" page
+    return <LoadingScreen />; 
   }
 
   return (

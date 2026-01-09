@@ -48,15 +48,15 @@ interface MasterDataShellProps<T extends MasterData> {
 }
 
 const defaultProfiles = [
-  { profileId: 'MAESTRO', name: 'Maestro', modulesAccess: 'Dashboard,Bins y Materiales,Recepción,Hidrocooler,Cámaras,Despachos,Reportes,Embalajes,Otros Hortofrutícolas,Datos Maestros' },
-  { profileId: 'EJECUTIVO', name: 'Ejecutivo', modulesAccess: 'Dashboard,Reportes' },
-  { profileId: 'EXP_SUBSOLE', name: 'Exportador Subsole', modulesAccess: 'Dashboard,Reportes' },
-  { profileId: 'EXP_MEYER', name: 'Exportador Meyer', modulesAccess: 'Dashboard,Reportes' },
-  { profileId: 'EXP_BLOSSOM', name: 'Exportador Blossom', modulesAccess: 'Dashboard,Reportes' },
-  { profileId: 'SUP_PATIO', name: 'Supervisor Patio', modulesAccess: 'Recepción,Hidrocooler,Cámaras' },
-  { profileId: 'SUP_SUBSOLE', name: 'Supervisor Subsole', modulesAccess: 'Recepción,Despachos' },
-  { profileId: 'SUP_HIDRO', name: 'Supervisor Hidrocooler', modulesAccess: 'Hidrocooler' },
-  { profileId: 'GRUERO', name: 'Gruero', modulesAccess: 'Cámaras,Despachos' },
+  { profileId: 'MAESTRO', name: 'Maestro', modulesAccess: ['Dashboard', 'Bins y Materiales', 'Recepción', 'Hidrocooler', 'Cámaras', 'Despachos', 'Reportes', 'Embalajes', 'Otros Hortofrutícolas', 'Datos Maestros'] },
+  { profileId: 'EJECUTIVO', name: 'Ejecutivo', modulesAccess: ['Dashboard', 'Reportes'] },
+  { profileId: 'EXP_SUBSOLE', name: 'Exportador Subsole', modulesAccess: [{ name: 'Dashboard', fixedExporterId: 'SUBSOLE' }] },
+  { profileId: 'EXP_MEYER', name: 'Exportador Meyer', modulesAccess: [{ name: 'Dashboard', fixedExporterId: 'MEYER' }] },
+  { profileId: 'EXP_BLOSSOM', name: 'Exportador Blossom', modulesAccess: [{ name: 'Dashboard', fixedExporterId: 'BLOSSOM' }] },
+  { profileId: 'SUP_PATIO', name: 'Supervisor Patio', modulesAccess: ['Recepción', 'Hidrocooler', 'Cámaras'] },
+  { profileId: 'SUP_SUBSOLE', name: 'Supervisor Subsole', modulesAccess: ['Recepción', 'Despachos'] },
+  { profileId: 'SUP_HIDRO', name: 'Supervisor Hidrocooler', modulesAccess: ['Hidrocooler'] },
+  { profileId: 'GRUERO', name: 'Gruero', modulesAccess: ['Cámaras', { name: 'Embalajes', allowedTabs: ['almacenamiento'] }, { name: 'Otros Hortofrutícolas', allowedTabs: ['almacenamiento'] }] },
 ];
 
 
@@ -90,7 +90,7 @@ export function MasterDataShell<T extends MasterData>({
   const handleEdit = (item: T) => {
     setCurrentItem(item);
     const itemData = typeof (item as any).modulesAccess === 'object' 
-        ? {...item, modulesAccess: (item as any).modulesAccess.join(', ')} 
+        ? {...item, modulesAccess: JSON.stringify((item as any).modulesAccess)} 
         : item;
     form.reset(itemData);
   };
@@ -111,7 +111,11 @@ export function MasterDataShell<T extends MasterData>({
       // If modulesAccess exists and is a string, convert it to an array
       const dataToSave = {...values};
       if (typeof dataToSave.modulesAccess === 'string') {
-        dataToSave.modulesAccess = dataToSave.modulesAccess.split(',').map((s: string) => s.trim());
+        try {
+          dataToSave.modulesAccess = JSON.parse(dataToSave.modulesAccess);
+        } catch (e) {
+          dataToSave.modulesAccess = dataToSave.modulesAccess.split(',').map((s: string) => s.trim());
+        }
       }
       
       if (currentItem?.id) {
@@ -270,11 +274,7 @@ export function MasterDataShell<T extends MasterData>({
     
     defaultProfiles.forEach(profile => {
         const docRef = doc(profilesRef);
-        const dataToSave = {
-            ...profile,
-            modulesAccess: profile.modulesAccess.split(',').map(s => s.trim())
-        };
-        batch.set(docRef, dataToSave);
+        batch.set(docRef, profile);
     });
 
     try {
@@ -367,7 +367,7 @@ export function MasterDataShell<T extends MasterData>({
                     <TableRow key={item.id} className={currentItem?.id === item.id ? 'bg-muted/50' : ''}>
                     {columns.map((col) => (
                         <TableCell key={String(col.key)}>
-                            {Array.isArray(item[col.key]) ? (item[col.key] as string[]).join(', ') : String(item[col.key] ?? '')}
+                            {Array.isArray(item[col.key]) ? JSON.stringify(item[col.key]) : String(item[col.key] ?? '')}
                         </TableCell>
                     ))}
                     <TableCell className="text-right">
