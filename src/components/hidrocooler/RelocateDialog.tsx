@@ -61,7 +61,7 @@ export function RelocateDialog({
   const sourceCoordinate = item?.coordinate;
   const targetChamberId = form.watch('targetChamberId');
 
-  const { allChamberLots, allOtherFruitReceptions } = storedItems;
+  const { allChamberLots = [], allOtherFruitReceptions = [] } = storedItems || {};
 
   const availableCoordinates = React.useMemo(() => {
     if (!targetChamberId) return [];
