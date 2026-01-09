@@ -18,10 +18,9 @@ import { Pencil } from 'lucide-react';
 
 interface LotListProps {
   exporterId: string | null;
-  producerId: string | null;
 }
 
-export function LotList({ exporterId, producerId }: LotListProps) {
+export function LotList({ exporterId }: LotListProps) {
   const firestore = useFirestore();
   const [lots, setLots] = React.useState<ReceptionLot[]>([]);
   const [loading, setLoading] = React.useState(true);
@@ -44,15 +43,14 @@ export function LotList({ exporterId, producerId }: LotListProps) {
     let q: Query;
     const lotsRef = collection(firestore, 'receptionLots');
 
-    if (producerId) {
-      q = query(lotsRef, where('producerId', '==', producerId));
+    if (exporterId) {
+      q = query(lotsRef, where('exporterId', '==', exporterId));
     } else {
       q = query(lotsRef);
     }
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const fetchedLots = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ReceptionLot))
-        .filter(lot => exporterId ? lot.exporterId === exporterId : true)
         .sort((a, b) => {
             if (!b.createdAt) return -1;
             if (!a.createdAt) return 1;
@@ -67,7 +65,7 @@ export function LotList({ exporterId, producerId }: LotListProps) {
     });
 
     return () => unsubscribe();
-  }, [firestore, exporterId, producerId]);
+  }, [firestore, exporterId]);
   
   const handleActionClick = (lot: ReceptionLot) => {
     setSelectedLot(lot);
