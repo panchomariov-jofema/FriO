@@ -16,6 +16,8 @@ import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
+import { EditProcessingLotDialog } from '@/components/hidrocooler/EditProcessingLotDialog';
+import { Pencil } from 'lucide-react';
 
 export default function HidrocoolerPage() {
   const { data: pendingLots, loading: loadingPending } = useFirestoreCollection<HidrocoolerLot>('hidrocoolerLots');
@@ -24,7 +26,9 @@ export default function HidrocoolerPage() {
   const { data: receptionLots } = useFirestoreCollection<ReceptionLot>('receptionLots');
 
   const [lotToProcess, setLotToProcess] = React.useState<HidrocoolerLot | null>(null);
+  const [lotToEdit, setLotToEdit] = React.useState<ProcessingLot | null>(null);
   const [isProcessDialogOpen, setProcessDialogOpen] = React.useState(false);
+  const [isEditDialogOpen, setEditDialogOpen] = React.useState(false);
   const [showOnlyOpen, setShowOnlyOpen] = React.useState(true);
 
 
@@ -52,6 +56,11 @@ export default function HidrocoolerPage() {
   const handleProcessClick = (lot: HidrocoolerLot) => {
     setLotToProcess(lot);
     setProcessDialogOpen(true);
+  };
+  
+  const handleEditClick = (lot: ProcessingLot) => {
+    setLotToEdit(lot);
+    setEditDialogOpen(true);
   };
 
   const handleStartProcessing = async ({ hidrocooler, binCount }: { hidrocooler: string, binCount: number }) => {
@@ -154,6 +163,69 @@ export default function HidrocoolerPage() {
         );
     }
   };
+  
+  const handleUpdateProcessingBinCount = async ({ newBinCount }: { newBinCount: number }) => {
+    if (!lotToEdit || !firestore) return;
+    
+    try {
+        await runTransaction(firestore, async (transaction) => {
+            const processingLotRef = doc(firestore, 'processingLots', lotToEdit.id);
+            const originalPendingLotRef = doc(firestore, 'hidrocoolerLots', lotToEdit.originalLotId);
+
+            const processingLotDoc = await transaction.get(processingLotRef);
+            if (!processingLotDoc.exists()) throw "El lote en proceso no existe.";
+            
+            const originalPendingLotDoc = await transaction.get(originalPendingLotRef);
+            // It might not exist if it was fully consumed, which is fine.
+
+            const currentProcessingBins = processingLotDoc.data().binCount;
+            const currentPendingBins = originalPendingLotDoc.exists() ? originalPendingLotDoc.data().binCount : 0;
+            
+            const difference = newBinCount - currentProcessingBins;
+
+            if (difference > currentPendingBins) {
+                throw `No puede aumentar en ${difference} bins. Solo hay ${currentPendingBins} bins disponibles en el lote pendiente.`;
+            }
+
+            // Update processing lot
+            transaction.update(processingLotRef, { binCount: newBinCount });
+
+            // Update original pending lot
+            const newPendingBinCount = currentPendingBins - difference;
+            if (originalPendingLotDoc.exists()) {
+                 if (newPendingBinCount > 0) {
+                    transaction.update(originalPendingLotRef, { binCount: newPendingBinCount });
+                } else {
+                    transaction.delete(originalPendingLotRef);
+                }
+            } else if (newPendingBinCount > 0) {
+                // The original lot was deleted because it was fully consumed. We need to recreate it.
+                const originalReceptionLot = receptionLots.find(l => l.displayLotId === lotToEdit.displayLotId);
+                if (!originalReceptionLot) throw "No se pudo encontrar el lote de recepción original para recrear el lote pendiente.";
+
+                transaction.set(originalPendingLotRef, {
+                    displayLotId: originalReceptionLot.displayLotId,
+                    producerShortName: originalReceptionLot.producerId, // This might need adjustment if you store the short name elsewhere
+                    binCount: newPendingBinCount,
+                    status: 'Pendiente de Pre-Hidro',
+                    createdAt: originalReceptionLot.createdAt, // Or a new timestamp
+                });
+            }
+        });
+
+        toast({ title: 'Éxito', description: `La cantidad de bins se ha actualizado a ${newBinCount}.` });
+
+    } catch (e: any) {
+        console.error("Error actualizando bins en lote en proceso: ", e);
+        toast({ variant: 'destructive', title: 'Error al actualizar', description: e.toString() });
+        errorEmitter.emit('permission-error', new FirestorePermissionError({
+            path: `processingLots/${lotToEdit.id} or hidrocoolerLots/${lotToEdit.originalLotId}`,
+            operation: 'write',
+        }));
+    } finally {
+        setEditDialogOpen(false);
+    }
+  };
 
 
   const getStatusVariant = (status: string) => {
@@ -251,7 +323,13 @@ export default function HidrocoolerPage() {
                       <TableCell><Badge variant={getStatusVariant(lot.status)}>{lot.status}</Badge></TableCell>
                       <TableCell className="text-right">
                         {lot.status === 'En Proceso' ? (
-                          <Button size="sm" onClick={() => handleFinishProcessingClick(lot)}>Finalizar Proceso</Button>
+                          <div className="flex gap-2 justify-end">
+                            <Button variant="outline" size="icon" onClick={() => handleEditClick(lot)}>
+                              <Pencil className="h-4 w-4" />
+                              <span className="sr-only">Editar</span>
+                            </Button>
+                            <Button size="sm" onClick={() => handleFinishProcessingClick(lot)}>Finalizar Proceso</Button>
+                          </div>
                         ) : (
                            <span className="text-sm text-muted-foreground">Finalizado</span>
                         )}
@@ -273,6 +351,16 @@ export default function HidrocoolerPage() {
           open={isProcessDialogOpen}
           onOpenChange={setProcessDialogOpen}
           onProcess={handleStartProcessing}
+        />
+      )}
+
+      {lotToEdit && (
+        <EditProcessingLotDialog
+          lot={lotToEdit}
+          open={isEditDialogOpen}
+          onOpenChange={setEditDialogOpen}
+          onConfirm={handleUpdateProcessingBinCount}
+          pendingLots={pendingLots}
         />
       )}
     </div>
