@@ -50,6 +50,14 @@ const navIcons: { [key: string]: React.ElementType } = {
 
 const defaultNavItems = [
     { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { href: '/bins-y-materiales', label: 'Bins y Materiales', icon: Archive },
+    { href: '/recepcion', label: 'Recepción', icon: ChevronsLeft },
+    { href: '/hidrocooler', label: 'Hidrocooler', icon: Waves },
+    { href: '/camaras', label: 'Cámaras', icon: Building2 },
+    { href: '/despachos', label: 'Despachos', icon: Truck },
+    { href: '/embalajes', label: 'Embalajes', icon: Package },
+    { href: '/otros-hortofruticolas', label: 'Otros Hortofrutícolas', icon: Grape },
+    { href: '/reportes', label: 'Reportes', icon: PieChart },
     { href: '/datos-maestros', label: 'Datos Maestros', icon: Database },
 ];
 
@@ -70,7 +78,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   React.useEffect(() => {
     if (user && !loadingUsers && !loadingProfiles) {
-      const emailUsername = user.email ? user.email.split('@')[0].toLowerCase() : null;
+      const emailUsername = user.isAnonymous ? null : (user.email ? user.email.split('@')[0].toLowerCase() : null);
       const currentUserMaster = emailUsername ? users.find(u => u.userName.toLowerCase() === emailUsername) : null;
 
       if (currentUserMaster) {
