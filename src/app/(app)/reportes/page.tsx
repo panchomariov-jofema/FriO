@@ -1,930 +1,352 @@
 'use client';
 
 import * as React from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { useFirestore } from '@/firebase';
-import type { BinMaterialStock, Exporter, BinMaterialMovement, Producer, ReceptionLot, PackagingReception, OtherClient, OtherFruitReception, OtherFruitMovement } from '@/lib/types';
-import { collection, onSnapshot, query } from 'firebase/firestore';
-import { Skeleton } from '@/components/ui/skeleton';
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from '@/components/ui/card';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { Button } from '@/components/ui/button';
-import { Download } from 'lucide-react';
+import type { ChamberLot, Dispatch, Exporter, ProcessingLot, ReceptionLot, BinMaterialStock, OtherFruitReception } from '@/lib/types';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis, Cell, Legend, LabelList } from 'recharts';
+import { ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
+import { chambersConfig } from '@/lib/chambers-config';
 import { Badge } from '@/components/ui/badge';
-import { Label } from '@/components/ui/label';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Boxes, PackageCheck, Truck, Warehouse, Archive, ChevronsLeft, Download } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Input } from '@/components/ui/input';
-
-function StockReport() {
-    const firestore = useFirestore();
-    const [stock, setStock] = React.useState<BinMaterialStock[]>([]);
-    const [loading, setLoading] = React.useState(true);
-    const { data: exporters, loading: loadingExporters } = useFirestoreCollection<Exporter>('exporters');
-
-    const exporterMap = React.useMemo(() => {
-        return exporters.reduce((acc, exporter) => {
-        acc[exporter.exporterId] = exporter.name;
-        return acc;
-        }, {} as Record<string, string>);
-    }, [exporters]);
-
-    React.useEffect(() => {
-        if (!firestore) return;
-
-        setLoading(true);
-        const stockQuery = query(collection(firestore, 'binMaterialStock'));
-
-        const unsubscribe = onSnapshot(stockQuery, (snapshot) => {
-        const stockData: BinMaterialStock[] = [];
-        snapshot.forEach(doc => {
-            stockData.push({ id: doc.id, ...doc.data() } as BinMaterialStock);
-        });
-        setStock(stockData.sort((a, b) => a.binMaterialName.localeCompare(b.binMaterialName)));
-        setLoading(false);
-        }, (error) => {
-        console.error('Error fetching stock:', error);
-        setLoading(false);
-        });
-
-        return () => unsubscribe();
-    }, [firestore]);
-
-    const isLoading = loading || loadingExporters;
-
-    const handleExportCSV = () => {
-        const headers = ['Código', 'Nombre del Material', 'Exportador', 'Cantidad en Stock'];
-        const csvRows = [headers.join(',')];
-
-        stock.forEach(item => {
-            const row = [
-                `"${item.binMaterialCode}"`,
-                `"${item.binMaterialName}"`,
-                `"${exporterMap[item.exporterId] || item.exporterId}"`,
-                item.quantity
-            ];
-            csvRows.push(row.join(','));
-        });
-
-        const csvContent = "data:text/csv;charset=utf-8," + csvRows.join('\n');
-        const encodedUri = encodeURI(csvContent);
-        const link = document.createElement("a");
-        link.setAttribute("href", encodedUri);
-        link.setAttribute("download", "reporte_stock_materiales.csv");
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-    };
-
-    return (
-        <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-                <div>
-                    <CardTitle>Reporte de Stock de Materiales</CardTitle>
-                    <CardDescription>
-                        Muestra los saldos actuales de todos los bins y materiales para todos los exportadores.
-                    </CardDescription>
-                </div>
-                <Button onClick={handleExportCSV} disabled={isLoading || stock.length === 0}>
-                    <Download className="mr-2 h-4 w-4" />
-                    Exportar a CSV
-                </Button>
-            </CardHeader>
-            <CardContent>
-                <div className="rounded-md border">
-                <Table>
-                    <TableHeader>
-                    <TableRow>
-                        <TableHead>Código</TableHead>
-                        <TableHead>Nombre del Material</TableHead>
-                        <TableHead>Exportador</TableHead>
-                        <TableHead className="text-right">Cantidad en Stock</TableHead>
-                    </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                    {isLoading ? (
-                        Array.from({ length: 10 }).map((_, i) => (
-                        <TableRow key={i}>
-                            <TableCell colSpan={4}><Skeleton className="h-4 w-full" /></TableCell>
-                        </TableRow>
-                        ))
-                    ) : stock.length > 0 ? (
-                        stock.map(item => (
-                        <TableRow key={item.id}>
-                            <TableCell className="font-mono">{item.binMaterialCode}</TableCell>
-                            <TableCell className="font-medium">{item.binMaterialName}</TableCell>
-                            <TableCell>{exporterMap[item.exporterId] || item.exporterId}</TableCell>
-                            <TableCell className="text-right font-semibold">{item.quantity}</TableCell>
-                        </TableRow>
-                        ))
-                    ) : (
-                        <TableRow>
-                        <TableCell colSpan={4} className="h-24 text-center">
-                            No hay stock registrado.
-                        </TableCell>
-                        </TableRow>
-                    )}
-                    </TableBody>
-                </Table>
-                </div>
-            </CardContent>
-        </Card>
-    );
-}
-
-function KardexReport() {
-    const { data: movements, loading: loadingMovements } = useFirestoreCollection<BinMaterialMovement>('binMaterialMovements');
-    const { data: exporters, loading: loadingExporters } = useFirestoreCollection<Exporter>('exporters');
-    const { data: producers, loading: loadingProducers } = useFirestoreCollection<Producer>('producers');
-
-    const exporterMap = React.useMemo(() => exporters.reduce((acc, e) => ({ ...acc, [e.exporterId]: e.name }), {} as Record<string, string>), [exporters]);
-    const producerMap = React.useMemo(() => producers.reduce((acc, p) => ({ ...acc, [p.producerId]: p.shortName }), {} as Record<string, string>), [producers]);
-
-    const flattenedData = React.useMemo(() => {
-        if (!movements) return [];
-        return movements
-            .flatMap(movement => 
-                movement.items.map(item => ({
-                    ...movement,
-                    ...item,
-                    movementId: movement.id, // Keep a unique key for the row
-                }))
-            )
-            .sort((a, b) => b.createdAt.toMillis() - a.createdAt.toMillis());
-    }, [movements]);
-
-    const isLoading = loadingMovements || loadingExporters || loadingProducers;
-
-    const handleExportCSV = () => {
-        const headers = ['Fecha', 'Hora', 'Tipo', 'Documento', 'Exportador', 'Productor', 'Código', 'Producto', 'Cantidad'];
-        const csvRows = [headers.join(',')];
-
-        flattenedData.forEach(item => {
-            const date = item.createdAt.toDate();
-            const row = [
-                `"${date.toLocaleDateString()}"`,
-                `"${date.toLocaleTimeString()}"`,
-                `"${item.type === 'entrada' ? 'Entrada' : 'Salida'}"`,
-                `"${item.document}"`,
-                `"${exporterMap[item.exporterId] || item.exporterId}"`,
-                `"${producerMap[item.producerId] || item.producerId}"`,
-                `"${item.binMaterialCode}"`,
-                `"${item.binMaterialName}"`,
-                item.type === 'salida' ? -item.quantity : item.quantity,
-            ];
-            csvRows.push(row.join(','));
-        });
-
-        const csvContent = "data:text/csv;charset=utf-8," + csvRows.join('\n');
-        const encodedUri = encodeURI(csvContent);
-        const link = document.createElement("a");
-        link.setAttribute("href", encodedUri);
-        link.setAttribute("download", "reporte_kardex_movimientos.csv");
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-    };
-
-    return (
-        <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-                <div>
-                    <CardTitle>Kardex de Movimientos</CardTitle>
-                    <CardDescription>
-                        Historial de todos los movimientos de entrada y salida de materiales.
-                    </CardDescription>
-                </div>
-                <Button onClick={handleExportCSV} disabled={isLoading || flattenedData.length === 0}>
-                    <Download className="mr-2 h-4 w-4" />
-                    Exportar a CSV
-                </Button>
-            </CardHeader>
-            <CardContent>
-                <div className="rounded-md border max-h-[600px] overflow-y-auto">
-                <Table>
-                    <TableHeader>
-                    <TableRow>
-                        <TableHead>Fecha / Hora</TableHead>
-                        <TableHead>Tipo</TableHead>
-                        <TableHead>Exportador</TableHead>
-                        <TableHead>Productor</TableHead>
-                        <TableHead>Código</TableHead>
-                        <TableHead>Producto</TableHead>
-                        <TableHead className="text-right">Cantidad</TableHead>
-                    </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                    {isLoading ? (
-                        Array.from({ length: 15 }).map((_, i) => (
-                        <TableRow key={i}>
-                            <TableCell colSpan={7}><Skeleton className="h-4 w-full" /></TableCell>
-                        </TableRow>
-                        ))
-                    ) : flattenedData.length > 0 ? (
-                        flattenedData.map((item, index) => (
-                        <TableRow key={`${item.movementId}-${index}`}>
-                            <TableCell>{item.createdAt.toDate().toLocaleString()}</TableCell>
-                            <TableCell>
-                                <Badge variant={item.type === 'entrada' ? 'default' : 'secondary'}>
-                                    {item.type === 'entrada' ? 'Entrada' : 'Salida'}
-                                </Badge>
-                            </TableCell>
-                            <TableCell>{exporterMap[item.exporterId] || item.exporterId}</TableCell>
-                            <TableCell>{producerMap[item.producerId] || item.producerId}</TableCell>
-                            <TableCell className="font-mono">{item.binMaterialCode}</TableCell>
-                            <TableCell className="font-medium">{item.binMaterialName}</TableCell>
-                            <TableCell className="text-right font-semibold">
-                                {item.type === 'salida' ? -item.quantity : item.quantity}
-                            </TableCell>
-                        </TableRow>
-                        ))
-                    ) : (
-                        <TableRow>
-                        <TableCell colSpan={7} className="h-24 text-center">
-                            No hay movimientos registrados.
-                        </TableCell>
-                        </TableRow>
-                    )}
-                    </TableBody>
-                </Table>
-                </div>
-            </CardContent>
-        </Card>
-    );
-}
-
-function ReceptionReport() {
-    const { data: receptionLots, loading: loadingLots } = useFirestoreCollection<ReceptionLot>('receptionLots');
-    const { data: exporters, loading: loadingExporters } = useFirestoreCollection<Exporter>('exporters');
-    const { data: producers, loading: loadingProducers } = useFirestoreCollection<Producer>('producers');
-
-    const exporterMap = React.useMemo(() => exporters.reduce((acc, e) => ({ ...acc, [e.exporterId]: e.name }), {} as Record<string, string>), [exporters]);
-    const producerMap = React.useMemo(() => producers.reduce((acc, p) => ({ ...acc, [p.producerId]: p.shortName }), {} as Record<string, string>), [producers]);
-
-    const sortedData = React.useMemo(() => {
-        if (!receptionLots) return [];
-        return [...receptionLots].sort((a, b) => {
-          if (!a.createdAt || !b.createdAt) return 0;
-          return b.createdAt.toMillis() - a.createdAt.toMillis();
-        });
-    }, [receptionLots]);
-
-    const isLoading = loadingLots || loadingExporters || loadingProducers;
-
-    const handleExportCSV = () => {
-        const headers = ['Fecha', 'Exportador', 'Productor', 'Cantidad de Bins', 'Cantidad de Totes', 'Totes Vacios', 'Variedad', 'Kilos (Peso Total)', 'T° Pre-Hidro', 'T° Post-Hidro', 'Status'];
-        const csvRows = [headers.join(',')];
-
-        sortedData.forEach(lot => {
-            const date = lot.createdAt ? lot.createdAt.toDate().toLocaleDateString() : 'N/A';
-            const row = [
-                `"${date}"`,
-                `"${exporterMap[lot.exporterId] || lot.exporterId}"`,
-                `"${producerMap[lot.producerId] || lot.producerId}"`,
-                lot.binCount,
-                lot.toteCount,
-                lot.emptyTotes || 0,
-                `"${lot.variety}"`,
-                lot.totalWeight || 0,
-                lot.preHydroTemp || '',
-                lot.postHydroTemp || '',
-                `"${lot.status}"`
-            ];
-            csvRows.push(row.join(','));
-        });
-
-        const csvContent = "data:text/csv;charset=utf-8," + csvRows.join('\n');
-        const encodedUri = encodeURI(csvContent);
-        const link = document.createElement("a");
-        link.setAttribute("href", encodedUri);
-        link.setAttribute("download", "reporte_recepcion.csv");
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-    };
-
-    return (
-        <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-                <div>
-                    <CardTitle>Registro de Recepción</CardTitle>
-                    <CardDescription>
-                        Historial de todos los lotes ingresados en el módulo de recepción.
-                    </CardDescription>
-                </div>
-                <Button onClick={handleExportCSV} disabled={isLoading || sortedData.length === 0}>
-                    <Download className="mr-2 h-4 w-4" />
-                    Exportar a CSV
-                </Button>
-            </CardHeader>
-            <CardContent>
-                <div className="rounded-md border max-h-[600px] overflow-y-auto">
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>Fecha</TableHead>
-                                <TableHead>Exportador</TableHead>
-                                <TableHead>Productor</TableHead>
-                                <TableHead>Bins</TableHead>
-                                <TableHead>Totes</TableHead>
-                                <TableHead>Totes Vacíos</TableHead>
-                                <TableHead>Variedad</TableHead>
-                                <TableHead>Kilos</TableHead>
-                                <TableHead>T° Pre</TableHead>
-                                <TableHead>T° Post</TableHead>
-                                <TableHead>Estado</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {isLoading ? (
-                                Array.from({ length: 15 }).map((_, i) => (
-                                    <TableRow key={i}>
-                                        <TableCell colSpan={11}><Skeleton className="h-4 w-full" /></TableCell>
-                                    </TableRow>
-                                ))
-                            ) : sortedData.length > 0 ? (
-                                sortedData.map((lot) => (
-                                    <TableRow key={lot.id}>
-                                        <TableCell>{lot.createdAt ? lot.createdAt.toDate().toLocaleString() : 'N/A'}</TableCell>
-                                        <TableCell>{exporterMap[lot.exporterId] || lot.exporterId}</TableCell>
-                                        <TableCell>{producerMap[lot.producerId] || lot.producerId}</TableCell>
-                                        <TableCell>{lot.binCount}</TableCell>
-                                        <TableCell>{lot.toteCount}</TableCell>
-                                        <TableCell>{lot.emptyTotes || 0}</TableCell>
-                                        <TableCell>{lot.variety}</TableCell>
-                                        <TableCell>{lot.totalWeight?.toFixed(2) ?? '-'}</TableCell>
-                                        <TableCell>{lot.preHydroTemp?.toFixed(1) ?? '-'}</TableCell>
-                                        <TableCell>{lot.postHydroTemp?.toFixed(1) ?? '-'}</TableCell>
-                                        <TableCell><Badge variant="secondary">{lot.status}</Badge></TableCell>
-                                    </TableRow>
-                                ))
-                            ) : (
-                                <TableRow>
-                                    <TableCell colSpan={11} className="h-24 text-center">
-                                        No hay lotes de recepción registrados.
-                                    </TableCell>
-                                </TableRow>
-                            )}
-                        </TableBody>
-                    </Table>
-                </div>
-            </CardContent>
-        </Card>
-    );
-}
-
-interface FlattenedStockItem {
-  key: string;
-  clientName: string;
-  clientId: string;
-  code: string;
-  description: string;
-  quantity: number;
-  location: string;
-}
-
-function PackagingStockReport() {
-  const { data: allLots, loading: loadingLots } = useFirestoreCollection<PackagingReception>('packagingReceptions');
-  const { data: clients, loading: loadingClients } = useFirestoreCollection<OtherClient>('otherClients');
-  const [clientFilter, setClientFilter] = React.useState('all');
-  const [codeFilter, setCodeFilter] = React.useState('');
-
-  const flattenedStock = React.useMemo(() => {
-    const stock: FlattenedStockItem[] = [];
-    (allLots || [])
-      .filter(lot => lot.status === 'Almacenado' || lot.status === 'Parcialmente Almacenado')
-      .forEach(lot => {
-        lot.items.forEach((item, index) => {
-          if (item.status === 'Almacenado' && item.storageLocation) {
-            stock.push({
-              key: `${lot.id}-${index}`,
-              clientName: lot.clientName,
-              clientId: lot.clientId,
-              code: item.packagingMasterCode,
-              description: item.packagingMasterName,
-              quantity: item.palletCount,
-              location: `${item.storageLocation.warehouse} / ${item.storageLocation.aisle}`,
-            });
-          }
-        });
-      });
-    return stock.sort((a,b) => a.code.localeCompare(b.code));
-  }, [allLots]);
-  
-  const filteredStock = React.useMemo(() => {
-    return flattenedStock.filter(item => {
-        const clientMatch = clientFilter === 'all' || item.clientId === clientFilter;
-        const codeMatch = !codeFilter || item.code.toLowerCase().includes(codeFilter.toLowerCase());
-        return clientMatch && codeMatch;
-    });
-  }, [flattenedStock, clientFilter, codeFilter]);
-
-  const packagingClients = React.useMemo(() => {
-    if (!clients) return [];
-    return clients.filter(c => c.type.toLowerCase() === 'embalaje');
-  }, [clients]);
-
-  const isLoading = loadingLots || loadingClients;
-
-  const handleExportCSV = () => {
-    const headers = ['Código', 'Descripción', 'Cliente', 'Ubicación', 'Cantidad (Pallets)'];
-    const csvRows = [headers.join(',')];
-
-    filteredStock.forEach(item => {
-        const row = [
-            `"${item.code}"`,
-            `"${item.description}"`,
-            `"${item.clientName}"`,
-            `"${item.location}"`,
-            item.quantity
-        ];
-        csvRows.push(row.join(','));
-    });
-
-    const csvContent = "data:text/csv;charset=utf-8," + csvRows.join('\n');
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", "reporte_stock_embalajes.csv");
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
+import { Label } from '@/components/ui/label';
 
 
-  return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
-        <div>
-            <CardTitle>Reporte de Stock de Embalajes</CardTitle>
-            <CardDescription>Inventario físico de todos los materiales de embalaje almacenados, con filtros.</CardDescription>
-        </div>
-        <Button onClick={handleExportCSV} disabled={isLoading || filteredStock.length === 0}>
-            <Download className="mr-2 h-4 w-4" />
-            Exportar a CSV
-        </Button>
-      </CardHeader>
-      <CardContent>
-        <div className="flex flex-col sm:flex-row gap-4 mb-6">
-            <div className="flex-1 space-y-2">
-                <Label htmlFor="client-filter">Filtrar por Cliente</Label>
-                <Select value={clientFilter} onValueChange={setClientFilter} disabled={isLoading}>
-                    <SelectTrigger id="client-filter">
-                        <SelectValue placeholder="Todos los clientes" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="all">Todos los clientes</SelectItem>
-                        {packagingClients.map(c => <SelectItem key={c.id} value={c.clientId}>{c.name}</SelectItem>)}
-                    </SelectContent>
-                </Select>
-            </div>
-            <div className="flex-1 space-y-2">
-                 <Label htmlFor="code-filter">Filtrar por Código</Label>
-                <Input
-                    id="code-filter"
-                    placeholder="Buscar por código..."
-                    value={codeFilter}
-                    onChange={(e) => setCodeFilter(e.target.value)}
-                    disabled={isLoading}
-                />
-            </div>
-        </div>
-
-        <div className="rounded-md border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Código</TableHead>
-                <TableHead>Descripción</TableHead>
-                <TableHead>Cliente</TableHead>
-                <TableHead>Ubicación</TableHead>
-                <TableHead className="text-right">Cantidad (Pallets)</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {isLoading ? (
-                Array.from({ length: 5 }).map((_, i) => (
-                  <TableRow key={i}>
-                    <TableCell colSpan={5}><Skeleton className="h-4 w-full" /></TableCell>
-                  </TableRow>
-                ))
-              ) : filteredStock.length > 0 ? (
-                filteredStock.map((item) => (
-                  <TableRow key={item.key}>
-                    <TableCell className="font-mono">{item.code}</TableCell>
-                    <TableCell className="font-medium">{item.description}</TableCell>
-                    <TableCell>{item.clientName}</TableCell>
-                    <TableCell>{item.location}</TableCell>
-                    <TableCell className="text-right font-semibold">{item.quantity}</TableCell>
-                  </TableRow>
-                ))
-              ) : (
-                <TableRow>
-                  <TableCell colSpan={5} className="h-24 text-center">
-                    No se encontró stock con los filtros seleccionados.
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-function OtherFruitStockReport() {
-  const { data: allLots, loading: loadingLots } = useFirestoreCollection<OtherFruitReception>('otherFruitReceptions');
-  const { data: clients, loading: loadingClients } = useFirestoreCollection<OtherClient>('otherClients');
-  const [clientFilter, setClientFilter] = React.useState('all');
-  const [codeFilter, setCodeFilter] = React.useState('');
-
-  const { aggregatedStock, fruitClients } = React.useMemo(() => {
-    const fruitClients = (clients || []).filter(c => c.type === 'fruta');
-    const stockMap: Record<string, {
-        clientName: string;
-        clientId: string;
-        productName: string;
-        unit: 'Bins' | 'Pallets';
-        quantity: number;
-    }> = {};
-
-    (allLots || [])
-      .filter(lot => lot.status === 'Almacenado' || lot.status === 'Parcialmente Almacenado')
-      .forEach(lot => {
-        lot.items.forEach(item => {
-          if (item.status === 'Almacenado' && item.quantity > 0) {
-            const key = `${lot.clientId}-${item.productCode}`;
-            if (!stockMap[key]) {
-              stockMap[key] = {
-                clientId: lot.clientId,
-                clientName: lot.clientName,
-                productName: item.productName,
-                unit: lot.unit,
-                quantity: 0,
-              };
-            }
-            stockMap[key].quantity += item.quantity;
-          }
-        });
-      });
-      
-    const stockArray = Object.entries(stockMap).map(([key, value]) => ({
-        key,
-        ...value,
-        productCode: key.split('-')[1]
-    })).sort((a,b) => a.clientName.localeCompare(b.clientName) || a.productCode.localeCompare(b.productCode));
-
-    return { aggregatedStock: stockArray, fruitClients };
-  }, [allLots, clients]);
-  
-  const filteredStock = React.useMemo(() => {
-    return aggregatedStock.filter(item => {
-        const clientMatch = clientFilter === 'all' || item.clientId === clientFilter;
-        const codeMatch = !codeFilter || item.productCode.toLowerCase().includes(codeFilter.toLowerCase());
-        return clientMatch && codeMatch;
-    });
-  }, [aggregatedStock, clientFilter, codeFilter]);
-
-  const isLoading = loadingLots || loadingClients;
-
-  const handleExportCSV = () => {
-    const headers = ['Cliente', 'Código Producto', 'Descripción Producto', 'Cantidad Total', 'Unidad'];
-    const csvRows = [headers.join(',')];
-
-    filteredStock.forEach(item => {
-        const row = [
-            `"${item.clientName}"`,
-            `"${item.productCode}"`,
-            `"${item.productName}"`,
-            item.quantity,
-            `"${item.unit}"`
-        ];
-        csvRows.push(row.join(','));
-    });
-
-    const csvContent = "data:text/csv;charset=utf-8," + csvRows.join('\n');
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", "reporte_stock_fruta_otros_clientes.csv");
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
-
-  return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
-        <div>
-            <CardTitle>Reporte de Stock de Fruta (Otros Clientes)</CardTitle>
-            <CardDescription>Inventario consolidado de toda la fruta almacenada de otros clientes.</CardDescription>
-        </div>
-        <Button onClick={handleExportCSV} disabled={isLoading || filteredStock.length === 0}>
-            <Download className="mr-2 h-4 w-4" />
-            Exportar a CSV
-        </Button>
-      </CardHeader>
-      <CardContent>
-        <div className="flex flex-col sm:flex-row gap-4 mb-6">
-            <div className="flex-1 space-y-2">
-                <Label htmlFor="fruit-client-filter">Filtrar por Cliente</Label>
-                <Select value={clientFilter} onValueChange={setClientFilter} disabled={isLoading}>
-                    <SelectTrigger id="fruit-client-filter">
-                        <SelectValue placeholder="Todos los clientes" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="all">Todos los clientes</SelectItem>
-                        {fruitClients.map(c => <SelectItem key={c.id} value={c.clientId}>{c.name}</SelectItem>)}
-                    </SelectContent>
-                </Select>
-            </div>
-            <div className="flex-1 space-y-2">
-                 <Label htmlFor="fruit-code-filter">Filtrar por Código</Label>
-                <Input
-                    id="fruit-code-filter"
-                    placeholder="Buscar por código de producto..."
-                    value={codeFilter}
-                    onChange={(e) => setCodeFilter(e.target.value)}
-                    disabled={isLoading}
-                />
-            </div>
-        </div>
-
-        <div className="rounded-md border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Cliente</TableHead>
-                <TableHead>Cód. Producto</TableHead>
-                <TableHead>Descripción</TableHead>
-                <TableHead className="text-right">Cantidad Total</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {isLoading ? (
-                Array.from({ length: 5 }).map((_, i) => (
-                  <TableRow key={i}>
-                    <TableCell colSpan={4}><Skeleton className="h-4 w-full" /></TableCell>
-                  </TableRow>
-                ))
-              ) : filteredStock.length > 0 ? (
-                filteredStock.map((item) => (
-                  <TableRow key={item.key}>
-                    <TableCell className="font-medium">{item.clientName}</TableCell>
-                    <TableCell className="font-mono">{item.productCode}</TableCell>
-                    <TableCell>{item.productName}</TableCell>
-                    <TableCell className="text-right font-semibold">{item.quantity} {item.unit}</TableCell>
-                  </TableRow>
-                ))
-              ) : (
-                <TableRow>
-                  <TableCell colSpan={4} className="h-24 text-center">
-                    No se encontró stock con los filtros seleccionados.
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-function OtherFruitKardexReport() {
-    const { data: receptions, loading: loadingReceptions } = useFirestoreCollection<OtherFruitReception>('otherFruitReceptions');
-    const { data: movements, loading: loadingMovements } = useFirestoreCollection<OtherFruitMovement>('otherFruitMovements');
-    const [clientFilter, setClientFilter] = React.useState('all');
-
-    const fruitClients = React.useMemo(() => {
-        const clients = new Map<string, string>();
-        (receptions || []).forEach(r => clients.set(r.clientId, r.clientName));
-        (movements || []).forEach(m => clients.set(m.clientId, m.clientName));
-        return Array.from(clients, ([id, name]) => ({ id, name }));
-    }, [receptions, movements]);
-
-    const flattenedData = React.useMemo(() => {
-        if (!receptions || !movements) return [];
-
-        const allTransactions = [];
-
-        // Process Receptions (Entradas)
-        for (const reception of receptions) {
-            for (const [index, item] of reception.items.entries()) {
-                allTransactions.push({
-                    key: `${reception.id}-${index}`,
-                    type: 'entrada' as const,
-                    date: reception.createdAt,
-                    clientId: reception.clientId,
-                    clientName: reception.clientName,
-                    document: reception.document,
-                    productCode: item.productCode,
-                    productName: item.productName,
-                    quantity: item.quantity,
-                    unit: reception.unit,
-                });
-            }
-        }
-
-        // Process Movements (Salidas)
-        for (const movement of movements) {
-            if (movement.type === 'salida') {
-                for (const [index, item] of movement.items.entries()) {
-                     allTransactions.push({
-                        key: `${movement.id}-${index}`,
-                        type: 'salida' as const,
-                        date: movement.createdAt,
-                        clientId: movement.clientId,
-                        clientName: movement.clientName,
-                        document: movement.document,
-                        productCode: item.productCode,
-                        productName: item.productName,
-                        quantity: -item.quantity, // Negative for exits
-                        unit: movement.unit,
-                    });
-                }
-            }
-        }
-        
-        return allTransactions.sort((a, b) => b.date.toMillis() - a.date.toMillis());
-    }, [receptions, movements]);
-
-    const filteredData = React.useMemo(() => {
-        if (clientFilter === 'all') return flattenedData;
-        return flattenedData.filter(item => item.clientId === clientFilter);
-    }, [flattenedData, clientFilter]);
-
-    const isLoading = loadingReceptions || loadingMovements;
-
-    const handleExportCSV = () => {
-        const headers = ['Fecha', 'Hora', 'Tipo', 'Cliente', 'Documento', 'Código Producto', 'Nombre Producto', 'Cantidad', 'Unidad'];
-        const csvRows = [headers.join(',')];
-
-        filteredData.forEach(item => {
-            const date = item.date.toDate();
-            const row = [
-                `"${date.toLocaleDateString()}"`,
-                `"${date.toLocaleTimeString()}"`,
-                `"${item.type === 'entrada' ? 'Entrada' : 'Salida'}"`,
-                `"${item.clientName}"`,
-                `"${item.document}"`,
-                `"${item.productCode}"`,
-                `"${item.productName}"`,
-                item.quantity,
-                `"${item.unit}"`,
-            ];
-            csvRows.push(row.join(','));
-        });
-
-        const csvContent = "data:text/csv;charset=utf-8," + csvRows.join('\n');
-        const encodedUri = encodeURI(csvContent);
-        const link = document.createElement("a");
-        link.setAttribute("href", encodedUri);
-        link.setAttribute("download", "reporte_kardex_fruta_otros.csv");
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-    };
-
-    return (
-        <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-                <div>
-                    <CardTitle>Kardex de Movimientos de Fruta (Otros Clientes)</CardTitle>
-                    <CardDescription>
-                        Historial completo de entradas y salidas de fruta de otros clientes.
-                    </CardDescription>
-                </div>
-                <Button onClick={handleExportCSV} disabled={isLoading || filteredData.length === 0}>
-                    <Download className="mr-2 h-4 w-4" />
-                    Exportar a CSV
-                </Button>
-            </CardHeader>
-            <CardContent>
-                <div className="flex flex-col sm:flex-row gap-4 mb-6">
-                    <div className="flex-1 space-y-2">
-                        <Label htmlFor="kardex-client-filter">Filtrar por Cliente</Label>
-                        <Select value={clientFilter} onValueChange={setClientFilter} disabled={isLoading}>
-                            <SelectTrigger id="kardex-client-filter">
-                                <SelectValue placeholder="Todos los clientes" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all">Todos los clientes</SelectItem>
-                                {fruitClients.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-                            </SelectContent>
-                        </Select>
-                    </div>
-                </div>
-
-                <div className="rounded-md border max-h-[600px] overflow-y-auto">
-                <Table>
-                    <TableHeader>
-                    <TableRow>
-                        <TableHead>Fecha / Hora</TableHead>
-                        <TableHead>Tipo</TableHead>
-                        <TableHead>Cliente</TableHead>
-                        <TableHead>Documento</TableHead>
-                        <TableHead>Cód. Producto</TableHead>
-                        <TableHead>Producto</TableHead>
-                        <TableHead className="text-right">Cantidad</TableHead>
-                    </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                    {isLoading ? (
-                        Array.from({ length: 15 }).map((_, i) => (
-                        <TableRow key={i}>
-                            <TableCell colSpan={7}><Skeleton className="h-4 w-full" /></TableCell>
-                        </TableRow>
-                        ))
-                    ) : filteredData.length > 0 ? (
-                        filteredData.map((item) => (
-                        <TableRow key={item.key}>
-                            <TableCell>{item.date.toDate().toLocaleString()}</TableCell>
-                            <TableCell>
-                                <Badge variant={item.type === 'entrada' ? 'default' : 'secondary'}>
-                                    {item.type === 'entrada' ? 'Entrada' : 'Salida'}
-                                </Badge>
-                            </TableCell>
-                            <TableCell>{item.clientName}</TableCell>
-                            <TableCell className="font-mono">{item.document}</TableCell>
-                            <TableCell className="font-mono">{item.productCode}</TableCell>
-                            <TableCell className="font-medium">{item.productName}</TableCell>
-                            <TableCell className="text-right font-semibold">
-                                {item.quantity} {item.unit}
-                            </TableCell>
-                        </TableRow>
-                        ))
-                    ) : (
-                        <TableRow>
-                        <TableCell colSpan={7} className="h-24 text-center">
-                            No hay movimientos registrados para este cliente.
-                        </TableCell>
-                        </TableRow>
-                    )}
-                    </TableBody>
-                </Table>
-                </div>
-            </CardContent>
-        </Card>
-    );
-}
-
+const CHART_COLORS = [
+  "hsl(var(--chart-1))",
+  "hsl(var(--chart-2))",
+  "hsl(var(--chart-3))",
+  "hsl(var(--chart-4))",
+  "hsl(var(--chart-5))",
+];
 
 export default function ReportesPage() {
-  return (
-    <div className="space-y-4">
-        <Accordion type="single" collapsible className="w-full" defaultValue='reporte-stock'>
-            <AccordionItem value="reporte-stock">
-                <AccordionTrigger className="text-lg font-semibold">
-                    Reporte de Stock de Bins y Materiales
-                </AccordionTrigger>
-                <AccordionContent className="pt-4">
-                   <StockReport />
-                </AccordionContent>
-            </AccordionItem>
-            <AccordionItem value="reporte-stock-embalajes">
-                <AccordionTrigger className="text-lg font-semibold">
-                    Reporte de Stock de Embalajes
-                </AccordionTrigger>
-                <AccordionContent className="pt-4">
-                   <PackagingStockReport />
-                </AccordionContent>
-            </AccordionItem>
-             <AccordionItem value="reporte-stock-fruta-otros">
-                <AccordionTrigger className="text-lg font-semibold">
-                    Reporte de Stock de Fruta (Otros Clientes)
-                </AccordionTrigger>
-                <AccordionContent className="pt-4">
-                   <OtherFruitStockReport />
-                </AccordionContent>
-            </AccordionItem>
-            <AccordionItem value="kardex-movimientos">
-                <AccordionTrigger className="text-lg font-semibold">
-                    Kardex de Movimientos de Bins y Materiales
-                </AccordionTrigger>
-                <AccordionContent className="pt-4">
-                   <KardexReport />
-                </AccordionContent>
-            </AccordionItem>
-             <AccordionItem value="kardex-fruta-otros">
-                <AccordionTrigger className="text-lg font-semibold">
-                    Kardex de Movimientos de Fruta (Otros Clientes)
-                </AccordionTrigger>
-                <AccordionContent className="pt-4">
-                   <OtherFruitKardexReport />
-                </AccordionContent>
-            </AccordionItem>
-            <AccordionItem value="registro-recepcion">
-                <AccordionTrigger className="text-lg font-semibold">
-                    Registro de Recepción de Fruta
-                </AccordionTrigger>
-                <AccordionContent className="pt-4">
-                   <ReceptionReport />
-                </AccordionContent>
-            </AccordionItem>
-        </Accordion>
-    </div>
-  );
+    const [selectedExporterId, setSelectedExporterId] = React.useState<string | null>(null);
+
+    const { data: chamberLots, loading: loadingChamber } = useFirestoreCollection<ChamberLot>('chamberLots');
+    const { data: otherFruitReceptions, loading: loadingOtherFruit } = useFirestoreCollection<OtherFruitReception>('otherFruitReceptions');
+    const { data: processingLots, loading: loadingProcessing } = useFirestoreCollection<ProcessingLot>('processingLots');
+    const { data: dispatches, loading: loadingDispatches } = useFirestoreCollection<Dispatch>('dispatches');
+    const { data: receptionLots, loading: loadingReception } = useFirestoreCollection<ReceptionLot>('receptionLots');
+    const { data: exporters, loading: loadingExporters } = useFirestoreCollection<Exporter>('exporters');
+    const { data: binMaterialStock, loading: loadingBinStock } = useFirestoreCollection<BinMaterialStock>('binMaterialStock');
+    
+    const { 
+        totalBinsInStock, 
+        pendingStorage,
+        inProcess, 
+        kilosPorExportador,
+        occupancyByChamber,
+        latestReceptions,
+        totalEmptyBins,
+        pendingReceptionBins,
+    } = React.useMemo(() => {
+        const filteredChamberLots = (chamberLots || []).filter(lot => !selectedExporterId || lot.exporterId === selectedExporterId);
+        const filteredReceptionLots = (receptionLots || []).filter(lot => !selectedExporterId || lot.exporterId === selectedExporterId);
+        
+        const exporterDisplayLotIds = new Set(filteredReceptionLots.map(lot => lot.displayLotId));
+        const filteredProcessingLots = (processingLots || []).filter(p => exporterDisplayLotIds.has(p.displayLotId));
+
+
+        const storedLots = filteredChamberLots.filter(lot => lot.status === 'Almacenado');
+        const calculatedTotalBins = storedLots.reduce((sum, lot) => sum + lot.binCount, 0);
+        
+        const calculatedPendingStorage = filteredChamberLots.filter(lot => lot.status === 'Pendiente por Almacenar').length;
+        
+        const calculatedInProcess = filteredProcessingLots.filter(p => p.status === 'En Proceso').length;
+
+        const exporterMap = (exporters || []).reduce((acc, e) => {
+            acc[e.exporterId] = e.name;
+            return acc;
+        }, {} as Record<string, string>);
+        
+        const kilosData = (receptionLots || []).reduce((acc, lot) => {
+            if (lot.totalWeight && lot.totalWeight > 0) {
+                const exporterName = exporterMap[lot.exporterId] || 'No Asignado';
+                 if (!acc[exporterName]) {
+                    acc[exporterName] = 0;
+                }
+                acc[exporterName] += lot.totalWeight;
+            }
+            return acc;
+        }, {} as Record<string, number>);
+
+        const barChartData = Object.entries(kilosData).map(([name, value]) => ({
+            name,
+            kilos: value,
+        }));
+        
+        const calculatedOccupancy = Object.keys(chambersConfig).map(chamberId => {
+            const chamber = chambersConfig[chamberId];
+            const totalCapacity = chamber.capacity;
+
+            const binsInChamber = (chamberLots || [])
+                .filter(lot => lot.status === 'Almacenado' && lot.chamberId === chamberId)
+                .reduce((sum, lot) => sum + lot.binCount, 0);
+
+            const otherFruitInChamber = (otherFruitReceptions || [])
+                .flatMap(r => r.items.map(item => ({ ...item, unit: r.unit, chamberId: item.storageLocation?.chamberId })))
+                .filter(item => item.status === 'Almacenado' && item.chamberId === chamberId);
+
+            const otherBins = otherFruitInChamber
+                .filter(item => item.unit === 'Bins')
+                .reduce((sum, item) => sum + item.quantity, 0);
+
+            const otherPallets = otherFruitInChamber
+                .filter(item => item.unit === 'Pallets')
+                .reduce((sum, item) => sum + item.quantity, 0);
+            
+            const occupiedEquivalentBins = binsInChamber + otherBins + (otherPallets * 2);
+
+            return {
+                name: chamber.name,
+                ocupacion: occupiedEquivalentBins, // The value for the bar chart
+                total: totalCapacity,
+                percentage: totalCapacity > 0 ? (occupiedEquivalentBins / totalCapacity) * 100 : 0
+            };
+        });
+
+        const sortedReceptions = filteredReceptionLots
+            .filter(lot => lot.createdAt)
+            .sort((a,b) => b.createdAt!.toMillis() - a.createdAt!.toMillis())
+            .slice(0, 5);
+        
+        const specificBinCodes = ['10001', '10011', '10007'];
+        let stockForEmptyBins = binMaterialStock || [];
+        if (selectedExporterId) {
+            stockForEmptyBins = (binMaterialStock || []).filter(s => s.exporterId === selectedExporterId);
+        }
+
+        const calculatedEmptyBins = stockForEmptyBins
+            .filter(s => specificBinCodes.includes(s.binMaterialCode))
+            .reduce((sum, s) => sum + s.quantity, 0);
+
+        const calculatedPendingReceptionBins = filteredReceptionLots
+            .filter(lot => lot.status !== 'Cerrado')
+            .reduce((sum, lot) => sum + lot.binCount, 0);
+
+
+        return {
+            totalBinsInStock: calculatedTotalBins,
+            pendingStorage: calculatedPendingStorage,
+            inProcess: calculatedInProcess,
+            kilosPorExportador: barChartData,
+            occupancyByChamber: calculatedOccupancy,
+            latestReceptions: sortedReceptions,
+            totalEmptyBins: calculatedEmptyBins,
+            pendingReceptionBins: calculatedPendingReceptionBins,
+        };
+
+    }, [chamberLots, otherFruitReceptions, processingLots, dispatches, exporters, receptionLots, binMaterialStock, selectedExporterId]);
+
+    const loading = loadingChamber || loadingOtherFruit || loadingProcessing || loadingDispatches || loadingExporters || loadingReception || loadingBinStock;
+
+    const kpiCards = [
+        { title: "Total Bins en Cámara (Fruta)", value: totalBinsInStock, icon: Warehouse },
+        { title: "Total Bins Vacíos (Stock)", value: totalEmptyBins, icon: Archive },
+        { title: "Bins Pendientes en Recepción", value: pendingReceptionBins, icon: ChevronsLeft },
+        { title: "Lotes en Proceso (Hidro)", value: inProcess, icon: Boxes },
+        { title: "Pendientes por Almacenar", value: pendingStorage, icon: PackageCheck },
+    ];
+
+    const chartConfig: ChartConfig = {
+        kilos: {
+            label: "Kilos",
+            color: "hsl(var(--chart-1))",
+        },
+    };
+
+
+    return (
+        <div className="space-y-6">
+            <Card>
+                <CardContent className="pt-6">
+                    <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+                         <div className="flex-1">
+                            <h2 className="text-2xl font-bold tracking-tight">Dashboard Ejecutivo</h2>
+                            <p className="text-muted-foreground">
+                                Vista general de los indicadores clave de la operación.
+                            </p>
+                        </div>
+                        <div className="w-full sm:w-auto sm:min-w-[200px]">
+                            <Label htmlFor="exporter-filter">Filtrar por Exportador</Label>
+                            <Select
+                                value={selectedExporterId ?? 'all'}
+                                onValueChange={(value) => setSelectedExporterId(value === 'all' ? null : value)}
+                                disabled={loadingExporters}
+                            >
+                                <SelectTrigger id="exporter-filter">
+                                    <SelectValue placeholder="Seleccione..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">Ver Todos</SelectItem>
+                                    {exporters.map(e => (
+                                        <SelectItem key={e.id} value={e.exporterId}>{e.name}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    </div>
+                </CardContent>
+            </Card>
+
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+                {kpiCards.map(kpi => (
+                    <Card key={kpi.title}>
+                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                            <CardTitle className="text-sm font-medium">{kpi.title}</CardTitle>
+                            <kpi.icon className="h-4 w-4 text-muted-foreground" />
+                        </CardHeader>
+                        <CardContent>
+                            {loading ? (
+                                <Skeleton className="h-8 w-1/2" />
+                            ) : (
+                                <div className="text-4xl font-bold">{kpi.value}</div>
+                            )}
+                        </CardContent>
+                    </Card>
+                ))}
+            </div>
+
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-5">
+                <Card className="lg:col-span-2">
+                    <CardHeader>
+                        <CardTitle>Kilos Recepcionados por Exportador</CardTitle>
+                        <CardDescription>Total de kilos ingresados a la planta por cada cliente.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        {loading ? (
+                             <div className="flex justify-center items-center h-[250px]">
+                                <Skeleton className="h-48 w-full" />
+                            </div>
+                        ) : kilosPorExportador.length > 0 ? (
+                        <ChartContainer config={chartConfig} className="h-[250px] w-full">
+                           <BarChart data={kilosPorExportador} layout="vertical" margin={{ right: 20 }}>
+                                <XAxis type="number" dataKey="kilos" hide />
+                                <YAxis dataKey="name" type="category" tickLine={false} axisLine={false} tickMargin={10} width={80} />
+                                <ChartTooltip content={<ChartTooltipContent />} />
+                                <Bar dataKey="kilos" layout="vertical" radius={5} fill="var(--color-kilos)">
+                                    <LabelList 
+                                        dataKey="kilos" 
+                                        position="right" 
+                                        offset={8} 
+                                        className="fill-foreground font-semibold"
+                                        formatter={(value: number) => value.toLocaleString('es-CL')}
+                                    />
+                                </Bar>
+                            </BarChart>
+                        </ChartContainer>
+                        ) : (
+                             <div className="flex justify-center items-center h-[250px]">
+                                <p className="text-muted-foreground">No hay datos de recepción para mostrar.</p>
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
+
+                <Card className="lg:col-span-3">
+                    <CardHeader>
+                        <CardTitle>Ocupación por Cámara</CardTitle>
+                        <CardDescription>Porcentaje de capacidad de bins equivalentes utilizada en cada cámara.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                         {loading ? (
+                            <div className="h-[250px] w-full p-4 space-y-4">
+                                <Skeleton className="h-8 w-full" />
+                                <Skeleton className="h-8 w-full" />
+                                <Skeleton className="h-8 w-full" />
+                                <Skeleton className="h-8 w-full" />
+                            </div>
+                        ) : (
+                        <ChartContainer config={{ ocupacion: { label: 'Bins Equivalentes', color: "hsl(var(--chart-2))" } }} className="h-[250px] w-full">
+                           <BarChart data={occupancyByChamber} layout="vertical" margin={{ left: 20 }}>
+                                <XAxis type="number" hide />
+                                <YAxis dataKey="name" type="category" tickLine={false} axisLine={false} tickMargin={10} width={80} />
+                                <ChartTooltip 
+                                    formatter={(value, name, props) => {
+                                        const { payload } = props;
+                                        return [`${value} / ${payload.total} Bins`, name];
+                                    }}
+                                    content={<ChartTooltipContent />} 
+                                />
+                                <Bar dataKey="ocupacion" layout="vertical" radius={5} fill="hsl(var(--chart-2))">
+                                    <LabelList 
+                                        dataKey="percentage" 
+                                        position="right" 
+                                        offset={8} 
+                                        className="fill-foreground font-semibold"
+                                        formatter={(value: number) => `${value.toFixed(1)}%`}
+                                    />
+                                </Bar>
+                            </BarChart>
+                        </ChartContainer>
+                        )}
+                    </CardContent>
+                </Card>
+            </div>
+            
+             <Card>
+                <CardHeader>
+                    <CardTitle>Últimos Lotes Ingresados (Recepción)</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <div className="rounded-md border">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Fecha y Hora</TableHead>
+                                    <TableHead>ID Lote</TableHead>
+                                    <TableHead>Productor</TableHead>
+                                    <TableHead>Variedad</TableHead>
+                                    <TableHead>N° Bins</TableHead>
+                                    <TableHead>Estado</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {loading ? (
+                                    Array.from({ length: 5 }).map((_, i) => <TableRow key={i}><TableCell colSpan={6}><Skeleton className="h-4 w-full" /></TableCell></TableRow>)
+                                ) : latestReceptions.length > 0 ? (
+                                    latestReceptions.map(lot => (
+                                        <TableRow key={lot.id}>
+                                            <TableCell>{lot.createdAt?.toDate().toLocaleString()}</TableCell>
+                                            <TableCell className="font-mono">{lot.displayLotId}</TableCell>
+                                            <TableCell>{lot.producerId}</TableCell>
+                                            <TableCell>{lot.variety}</TableCell>
+                                            <TableCell>{lot.binCount}</TableCell>
+                                            <TableCell><Badge variant="secondary">{lot.status}</Badge></TableCell>
+                                        </TableRow>
+                                    ))
+                                ) : (
+                                    <TableRow>
+                                        <TableCell colSpan={6} className="h-24 text-center">
+                                            No hay registros de recepción recientes.
+                                        </TableCell>
+                                    </TableRow>
+                                )}
+                            </TableBody>
+                        </Table>
+                    </div>
+                </CardContent>
+            </Card>
+
+             <Card>
+                <CardHeader>
+                    <CardTitle>Reportes Detallados</CardTitle>
+                    <CardDescription>Accede a reportes tabulares para un análisis más profundo y exportación de datos.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                     <p className="text-muted-foreground">Esta sección contendrá los reportes tabulares detallados que estaban antes.</p>
+                </CardContent>
+            </Card>
+        </div>
+    );
 }
