@@ -52,7 +52,7 @@ export function TemperatureForm({ lot, open, onOpenChange, onTempSaved }: Temper
   const showPreHydro = lot.status === 'Pendiente de Pre-Hidro';
   const showPostHydro = lot.status === 'Pendiente de Post-Hidro';
   
-  const handleSaveTempOnly = (values: TempFormValues) => {
+  const handleSavePreHydro = (values: TempFormValues) => {
     if (!firestore) return;
     const lotRef = doc(firestore, 'receptionLots', lot.id);
 
@@ -80,31 +80,6 @@ export function TemperatureForm({ lot, open, onOpenChange, onTempSaved }: Temper
               requestResourceData: updateData,
             })
           );
-        });
-
-    } else if (showPostHydro) {
-        if (typeof values.postHydroTemp !== 'number') {
-            form.setError('postHydroTemp', { message: 'Debe ingresar un valor.'});
-            return;
-        }
-        const updateData = {
-            postHydroTemp: values.postHydroTemp,
-        };
-
-        updateDoc(lotRef, updateData)
-        .then(() => {
-            toast({ title: 'Éxito', description: 'Temperatura Post-Hidro guardada.' });
-            onTempSaved();
-        })
-        .catch((error) => {
-            errorEmitter.emit(
-                'permission-error',
-                new FirestorePermissionError({
-                path: lotRef.path,
-                operation: 'update',
-                requestResourceData: updateData,
-                })
-            );
         });
     }
   };
@@ -159,7 +134,7 @@ export function TemperatureForm({ lot, open, onOpenChange, onTempSaved }: Temper
                 )} />
                 <DialogFooter>
                   <DialogClose asChild><Button type="button" variant="outline">Cancelar</Button></DialogClose>
-                  <Button type="button" onClick={form.handleSubmit(handleSaveTempOnly)}>Guardar y Continuar</Button>
+                  <Button type="button" onClick={form.handleSubmit(handleSavePreHydro)}>Guardar y Continuar</Button>
                 </DialogFooter>
               </div>
             )}
@@ -174,7 +149,6 @@ export function TemperatureForm({ lot, open, onOpenChange, onTempSaved }: Temper
                 )} />
                 <DialogFooter>
                     <DialogClose asChild><Button type="button" variant="outline">Cancelar</Button></DialogClose>
-                    <Button type="button" variant="secondary" onClick={form.handleSubmit(handleSaveTempOnly)} disabled={form.formState.isSubmitting}>Guardar Temperatura</Button>
                     <Button type="button" onClick={form.handleSubmit(handleSaveAndFinish)} disabled={form.formState.isSubmitting}>Guardar y Terminar Lote</Button>
                 </DialogFooter>
               </div>
