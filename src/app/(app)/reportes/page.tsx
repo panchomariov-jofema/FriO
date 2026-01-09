@@ -289,8 +289,17 @@ function ReceptionLogReport() {
     const { data: receptionLots, loading } = useFirestoreCollection<ReceptionLot>('receptionLots');
 
      const handleExport = () => {
-        const headers = ['createdAt', 'displayLotId', 'producerId', 'variety', 'binCount', 'status', 'totalWeight'];
-        const csv = convertToCSV(receptionLots, headers);
+        const headers = ['createdAt', 'displayLotId', 'producerId', 'variety', 'binCount', 'status', 'totalWeight', 'pesoNeto'];
+        const dataForExport = receptionLots.map(lot => {
+            const pesoNeto = (lot.totalWeight && lot.totalWeight > 0)
+                ? (lot.totalWeight - (lot.binCount * 65) + (lot.noTotes || 0))
+                : null;
+            return {
+                ...lot,
+                pesoNeto: pesoNeto !== null ? pesoNeto.toFixed(2) : ''
+            };
+        });
+        const csv = convertToCSV(dataForExport, headers);
         downloadCSV(csv, 'registro_recepcion_fruta.csv');
     };
     
@@ -321,15 +330,21 @@ function ReceptionLogReport() {
                                             <TableHead>Productor</TableHead>
                                             <TableHead>Variedad</TableHead>
                                             <TableHead>N° Bins</TableHead>
-                                            <TableHead>Peso (kg)</TableHead>
+                                            <TableHead>Peso Total (kg)</TableHead>
+                                            <TableHead>Peso Neto (kg)</TableHead>
                                             <TableHead>Estado</TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
                                         {loading ? (
-                                            Array.from({ length: 5 }).map((_, i) => <TableRow key={i}><TableCell colSpan={7}><Skeleton className="h-4 w-full" /></TableCell></TableRow>)
+                                            Array.from({ length: 5 }).map((_, i) => <TableRow key={i}><TableCell colSpan={8}><Skeleton className="h-4 w-full" /></TableCell></TableRow>)
                                         ) : receptionLots.length > 0 ? (
-                                            receptionLots.map(lot => (
+                                            receptionLots.map(lot => {
+                                                const pesoNeto = (lot.totalWeight && lot.totalWeight > 0)
+                                                    ? (lot.totalWeight - (lot.binCount * 65) + (lot.noTotes || 0))
+                                                    : null;
+
+                                                return (
                                                 <TableRow key={lot.id}>
                                                     <TableCell>{lot.createdAt?.toDate().toLocaleString()}</TableCell>
                                                     <TableCell>{lot.displayLotId}</TableCell>
@@ -337,13 +352,15 @@ function ReceptionLogReport() {
                                                     <TableCell>{lot.variety}</TableCell>
                                                     <TableCell>{lot.binCount}</TableCell>
                                                     <TableCell>{lot.totalWeight?.toFixed(2)}</TableCell>
+                                                    <TableCell>{pesoNeto !== null ? pesoNeto.toFixed(2) : '-'}</TableCell>
                                                     <TableCell>
                                                         <Badge variant={lot.status === 'Cerrado' ? 'default' : 'secondary'}>{lot.status}</Badge>
                                                     </TableCell>
                                                 </TableRow>
-                                            ))
+                                                )
+                                            })
                                         ) : (
-                                            <TableRow><TableCell colSpan={7} className="h-24 text-center">No hay lotes de recepción.</TableCell></TableRow>
+                                            <TableRow><TableCell colSpan={8} className="h-24 text-center">No hay lotes de recepción.</TableCell></TableRow>
                                         )}
                                     </TableBody>
                                 </Table>
