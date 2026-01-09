@@ -16,7 +16,6 @@ import {
   PieChart,
   Truck,
   Waves,
-  ChevronsLeft,
 } from 'lucide-react';
 import {
   Sidebar,
@@ -41,7 +40,7 @@ import { signOut } from 'firebase/auth';
 const navIcons: { [key: string]: React.ElementType } = {
   Dashboard: LayoutDashboard,
   'Bins y Materiales': Archive,
-  Recepción: ChevronsLeft,
+  Recepción: PanelLeft,
   Hidrocooler: Waves,
   Cámaras: Building2,
   Despachos: Truck,
@@ -54,7 +53,7 @@ const navIcons: { [key: string]: React.ElementType } = {
 const defaultNavItems = [
     { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { href: '/bins-y-materiales', label: 'Bins y Materiales', icon: Archive },
-    { href: '/recepcion', label: 'Recepción', icon: ChevronsLeft },
+    { href: '/recepcion', label: 'Recepción', icon: PanelLeft },
     { href: '/hidrocooler', label: 'Hidrocooler', icon: Waves },
     { href: '/camaras', label: 'Cámaras', icon: Building2 },
     { href: '/despachos', label: 'Despachos', icon: Truck },
@@ -164,7 +163,7 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
         </Sidebar>
         <SidebarInset>
            <header className="flex items-center justify-between h-14 px-4 border-b">
-              <SidebarTrigger className="md:hidden" />
+              <SidebarTrigger />
               <div className="flex-1" />
               <Button variant="ghost" size="sm" onClick={handleSignOut}>
                   <LogOut className="mr-2 h-4 w-4" />
@@ -182,7 +181,7 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
-    <SidebarProvider>
+    <SidebarProvider defaultOpen={false}>
       <AppLayoutContent>{children}</AppLayoutContent>
     </SidebarProvider>
   )
