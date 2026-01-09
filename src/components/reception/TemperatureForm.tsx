@@ -89,6 +89,7 @@ export function TemperatureForm({ lot, open, onOpenChange, onTempSaved }: Temper
         }
         const updateData = {
             postHydroTemp: values.postHydroTemp,
+            status: 'Cerrado' as const,
         };
 
         updateDoc(lotRef, updateData)
