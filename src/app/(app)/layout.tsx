@@ -48,13 +48,19 @@ const navIcons: { [key: string]: React.ElementType } = {
   'Datos Maestros': Database,
 };
 
+const defaultNavItems = [
+    { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { href: '/datos-maestros', label: 'Datos Maestros', icon: Database },
+];
+
+
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const auth = useAuth();
   const { user, isUserLoading } = useUser();
   const { data: users, loading: loadingUsers } = useFirestoreCollection<UserMaster>('usersMaster');
   const { data: profiles, loading: loadingProfiles } = useFirestoreCollection<Profile>('profiles');
-  const [navItems, setNavItems] = React.useState<{ href: string; label: string; icon: React.ElementType }[]>([]);
+  const [navItems, setNavItems] = React.useState<{ href: string; label: string; icon: React.ElementType }[] | null>(null);
 
   React.useEffect(() => {
     if (!isUserLoading && !user && auth) {
@@ -63,14 +69,16 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }, [user, isUserLoading, auth]);
 
   React.useEffect(() => {
-    if (user && users.length > 0 && profiles.length > 0) {
-      const currentUserMaster = users.find(u => u.userName.toLowerCase() === user.email?.split('@')[0].toLowerCase());
+    if (user && !loadingUsers && !loadingProfiles) {
+      const emailUsername = user.email ? user.email.split('@')[0].toLowerCase() : null;
+      const currentUserMaster = emailUsername ? users.find(u => u.userName.toLowerCase() === emailUsername) : null;
+
       if (currentUserMaster) {
         const userProfile = profiles.find(p => p.profileId === currentUserMaster.profileId);
         if (userProfile) {
           const accessibleNavs = userProfile.modulesAccess.map((permission: ModulePermission) => {
             const moduleName = typeof permission === 'string' ? permission : permission.name;
-            const href = `/${moduleName.toLowerCase().replace(/\s/g, '-')}`;
+            const href = `/${moduleName.toLowerCase().replace(/\s/g, '-').replace(/y-/, '-')}`;
             return {
               href,
               label: moduleName,
@@ -78,23 +86,20 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             };
           });
           setNavItems(accessibleNavs);
+        } else {
+             setNavItems(defaultNavItems); // Profile referenced but not found
         }
       } else {
-        // Default to a restricted view or handle no-profile case
-        setNavItems([]);
+        // Handle anonymous users or users without a profile
+        setNavItems(defaultNavItems);
       }
     }
-  }, [user, users, profiles]);
+  }, [user, users, profiles, loadingUsers, loadingProfiles]);
 
-  const loading = isUserLoading || loadingUsers || loadingProfiles;
+  const loading = isUserLoading || navItems === null;
 
   if (loading || !user) {
     return <LoadingScreen />;
-  }
-
-  if (navItems.length === 0 && !loading) {
-    // This can be a "no profile assigned" page
-    return <LoadingScreen />; 
   }
 
   return (
