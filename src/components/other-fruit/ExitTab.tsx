@@ -143,26 +143,46 @@ export function OtherFruitExitTab() {
             createdAt: serverTimestamp(),
         });
 
+        // Group updates by receptionId to process them efficiently
+        const receptionUpdates = new Map<string, any[]>();
+
         for(const item of itemsToProcess) {
             for(const loc of item.locations) {
                 if (loc.quantityToWithdraw > 0) {
-                    const receptionDoc = allReceptions.find(r => r.id === loc.receptionId);
-                    if (receptionDoc) {
-                        const receptionRef = doc(firestore, 'otherFruitReceptions', loc.receptionId);
-                        const newItems = [...receptionDoc.items];
-                        const itemToUpdate = newItems[loc.itemIndex];
-
-                        if (itemToUpdate && itemToUpdate.quantity >= loc.quantityToWithdraw) {
+                     if (!receptionUpdates.has(loc.receptionId)) {
+                        const originalReception = allReceptions.find(r => r.id === loc.receptionId);
+                        if (originalReception) {
+                             receptionUpdates.set(loc.receptionId, JSON.parse(JSON.stringify(originalReception.items)));
+                        }
+                    }
+                    
+                    const updatedItems = receptionUpdates.get(loc.receptionId);
+                    if(updatedItems) {
+                        const itemToUpdate = updatedItems.find((_, i) => i === loc.itemIndex);
+                         if (itemToUpdate && itemToUpdate.quantity >= loc.quantityToWithdraw) {
                             itemToUpdate.quantity -= loc.quantityToWithdraw;
                         }
-                        batch.update(receptionRef, { items: newItems, updatedAt: serverTimestamp() });
                     }
                 }
             }
         }
         
+        receptionUpdates.forEach((items, receptionId) => {
+            const receptionRef = doc(firestore, 'otherFruitReceptions', receptionId);
+            const finalItems = items.filter(item => item.quantity > 0); // Remove items with 0 quantity
+            const newStatus = finalItems.every(i => i.status === 'Almacenado') && finalItems.length > 0
+                ? 'Almacenado'
+                : 'Parcialmente Almacenado';
+            
+            if (finalItems.length === 0) {
+                 batch.update(receptionRef, { items: [], status: 'Almacenado' }); // Or delete if empty
+            } else {
+                 batch.update(receptionRef, { items: finalItems, status: newStatus, updatedAt: serverTimestamp() });
+            }
+        });
+        
         await batch.commit();
-        toast({ title: 'Éxito', description: 'Salida de fruta registrada correctamente.' });
+        toast({ title: 'Éxito', description: 'Salida de fruta registrada y stock actualizado.' });
         form.reset({ clientId: '', document: '', items: [defaultItem] });
 
     } catch (error) {
