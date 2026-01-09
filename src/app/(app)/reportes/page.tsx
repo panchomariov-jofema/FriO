@@ -458,7 +458,7 @@ function OtherFruitKardexReport() {
         receptions.forEach(reception => {
             reception.items.forEach((item, index) => {
                 allMovements.push({
-                    key: `${reception.id}-${index}`,
+                    key: `${reception.id}-E-${index}`,
                     date: reception.createdAt,
                     type: 'entrada',
                     clientName: reception.clientName,
@@ -474,7 +474,7 @@ function OtherFruitKardexReport() {
             if (movement.type !== 'salida') return;
             movement.items.forEach((item, index) => {
                  allMovements.push({
-                    key: `${movement.id}-${index}`,
+                    key: `${movement.id}-S-${index}`,
                     date: movement.createdAt,
                     type: 'salida',
                     clientName: movement.clientName,
@@ -606,42 +606,54 @@ export default function ReportesPage() {
                 </CardHeader>
             </Card>
 
-            <Accordion type="single" collapsible className="w-full space-y-4" defaultValue="item-1">
-                <AccordionItem value="item-1">
-                    <AccordionTrigger className="bg-muted px-4 rounded-md text-base font-semibold hover:no-underline">Stock de Bins y Materiales</AccordionTrigger>
+            <Accordion type="single" collapsible className="w-full space-y-4">
+                <AccordionItem value="item-1" className="border-b-0">
+                    <AccordionTrigger className="flex w-full items-center justify-between rounded-md bg-muted px-4 py-4 text-base font-semibold transition-all hover:no-underline [&[data-state=open]>svg]:rotate-180">
+                        Stock de Bins y Materiales
+                    </AccordionTrigger>
                     <AccordionContent className="pt-4">
                         <BinMaterialStockReport />
                     </AccordionContent>
                 </AccordionItem>
 
-                 <AccordionItem value="item-2">
-                    <AccordionTrigger className="bg-muted px-4 rounded-md text-base font-semibold hover:no-underline">Stock de Embalajes</AccordionTrigger>
+                 <AccordionItem value="item-2" className="border-b-0">
+                    <AccordionTrigger className="flex w-full items-center justify-between rounded-md bg-muted px-4 py-4 text-base font-semibold transition-all hover:no-underline [&[data-state=open]>svg]:rotate-180">
+                        Stock de Embalajes
+                    </AccordionTrigger>
                     <AccordionContent className="pt-4">
                         <PackagingStockReport />
                     </AccordionContent>
                 </AccordionItem>
                 
-                 <AccordionItem value="item-3">
-                    <AccordionTrigger className="bg-muted px-4 rounded-md text-base font-semibold hover:no-underline">Kardex de Bins y Materiales</AccordionTrigger>
+                 <AccordionItem value="item-3" className="border-b-0">
+                    <AccordionTrigger className="flex w-full items-center justify-between rounded-md bg-muted px-4 py-4 text-base font-semibold transition-all hover:no-underline [&[data-state=open]>svg]:rotate-180">
+                        Kardex de Bins y Materiales
+                    </AccordionTrigger>
                     <AccordionContent className="pt-4">
                         <BinMaterialKardexReport />
                     </AccordionContent>
                 </AccordionItem>
                 
-                <AccordionItem value="item-4">
-                    <AccordionTrigger className="bg-muted px-4 rounded-md text-base font-semibold hover:no-underline">Registro de Recepción de Fruta</AccordionTrigger>
+                <AccordionItem value="item-4" className="border-b-0">
+                    <AccordionTrigger className="flex w-full items-center justify-between rounded-md bg-muted px-4 py-4 text-base font-semibold transition-all hover:no-underline [&[data-state=open]>svg]:rotate-180">
+                        Registro de Recepción de Fruta
+                    </AccordionTrigger>
                     <AccordionContent className="pt-4">
                         <ReceptionLogReport />
                     </AccordionContent>
                 </AccordionItem>
-                 <AccordionItem value="item-5">
-                    <AccordionTrigger className="bg-muted px-4 rounded-md text-base font-semibold hover:no-underline">Reporte de Stock de Fruta (Otros Clientes)</AccordionTrigger>
+                 <AccordionItem value="item-5" className="border-b-0">
+                    <AccordionTrigger className="flex w-full items-center justify-between rounded-md bg-muted px-4 py-4 text-base font-semibold transition-all hover:no-underline [&[data-state=open]>svg]:rotate-180">
+                        Reporte de Stock de Fruta (Otros Clientes)
+                    </AccordionTrigger>
                     <AccordionContent className="pt-4">
                         <OtherFruitStockReport />
                     </AccordionContent>
                 </AccordionItem>
-                 <AccordionItem value="item-6">
-                    <AccordionTrigger className="bg-muted px-4 rounded-md text-base font-semibold hover:no-underline">Kardex de Movimientos de Fruta (Otros Clientes)</AccordionTrigger>
+                 <AccordionItem value="item-6" className="border-b-0">
+                    <AccordionTrigger className="flex w-full items-center justify-between rounded-md bg-muted px-4 py-4 text-base font-semibold transition-all hover:no-underline [&[data-state=open]>svg]:rotate-180">
+                        Kardex de Movimientos de Fruta (Otros Clientes)
+                    </AccordionTrigger>
                     <AccordionContent className="pt-4">
                         <OtherFruitKardexReport />
                     </AccordionContent>
