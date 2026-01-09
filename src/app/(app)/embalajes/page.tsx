@@ -88,11 +88,11 @@ export default function EmbalajesPage() {
       </Card>
 
       <Tabs defaultValue="recepcion" className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-2 md:grid-cols-4">
           <TabsTrigger value="recepcion">Recepción</TabsTrigger>
           <TabsTrigger value="salidas">Salidas</TabsTrigger>
-          <TabsTrigger value="almacenamiento">Pendientes de Almacenar</TabsTrigger>
-          <TabsTrigger value="stock">Stock y Reubicación</TabsTrigger>
+          <TabsTrigger value="almacenamiento">Pendientes</TabsTrigger>
+          <TabsTrigger value="stock">Stock</TabsTrigger>
         </TabsList>
         
         <TabsContent value="recepcion">
