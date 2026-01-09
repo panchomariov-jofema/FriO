@@ -167,17 +167,19 @@ export function ExitsTab({ exporterId, producerId }: ExitsTabProps) {
       <CardContent>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-            <FormField
-              control={form.control}
-              name="document"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Documento de Salida</FormLabel>
-                  <FormControl><Input {...field} placeholder="Ej: Vale de Consumo 456" autoComplete="off" /></FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            <div className="md:w-1/3">
+                <FormField
+                control={form.control}
+                name="document"
+                render={({ field }) => (
+                    <FormItem>
+                    <FormLabel>Documento de Salida</FormLabel>
+                    <FormControl><Input {...field} placeholder="Ej: Vale de Consumo 456" autoComplete="off" /></FormControl>
+                    <FormMessage />
+                    </FormItem>
+                )}
+                />
+            </div>
 
             <div className="space-y-2">
                 <FormLabel>Materiales</FormLabel>
