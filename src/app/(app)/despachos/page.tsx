@@ -30,7 +30,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
-import type { ChamberLot, Dispatch, Exporter, ReceptionLot } from '@/lib/types';
+import type { ChamberLot, Dispatch, Exporter, Producer, ReceptionLot } from '@/lib/types';
 import { useFirestore } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { collection, query, where, getDocs, writeBatch, serverTimestamp, doc, addDoc, getDoc } from 'firebase/firestore';
@@ -118,6 +118,7 @@ export default function DespachosPage() {
   const { data: dispatches, loading: loadingDispatches } = useFirestoreCollection<Dispatch>('dispatches');
   const { data: chamberLots, loading: loadingChamberLots } = useFirestoreCollection<ChamberLot>('chamberLots');
   const { data: receptionLots, loading: loadingReceptionLots } = useFirestoreCollection<ReceptionLot>('receptionLots');
+  const { data: producers, loading: loadingProducers } = useFirestoreCollection<Producer>('producers');
   const firestore = useFirestore();
   const { toast } = useToast();
   const [isConfirming, setIsConfirming] = React.useState(false);
@@ -356,21 +357,37 @@ const handleUndoDispatch = async (dispatchToUndo: Dispatch) => {
 };
 
   const handleExportDispatch = (dispatch: Dispatch) => {
-    if (!receptionLots) {
-        toast({ variant: 'destructive', title: 'Error', description: 'Los datos de recepción aún no están cargados.' });
+    if (!receptionLots || !producers) {
+        toast({ variant: 'destructive', title: 'Error', description: 'Los datos de recepción o productores aún no están cargados.' });
         return;
     }
+    
+    // Group bins by displayLotId
+    const groupedBins = dispatch.bins.reduce((acc, bin) => {
+        if (!acc[bin.displayLotId]) {
+            acc[bin.displayLotId] = {
+                totalBins: 0,
+                displayLotId: bin.displayLotId,
+            };
+        }
+        acc[bin.displayLotId].totalBins += bin.binCount;
+        return acc;
+    }, {} as Record<string, { totalBins: number, displayLotId: string }>);
 
-    const dataToExport = dispatch.bins.map(bin => {
-        const originalReception = receptionLots.find(lot => lot.displayLotId === bin.displayLotId);
+
+    const dataToExport = Object.values(groupedBins).map(groupedBin => {
+        const originalReception = receptionLots.find(lot => lot.displayLotId === groupedBin.displayLotId);
+        const producer = producers.find(p => p.producerId === originalReception?.producerId);
+
         const netWeight = (originalReception?.totalWeight && originalReception.totalWeight > 0)
             ? (originalReception.totalWeight - (originalReception.binCount * 65) + (originalReception.noTotes || 0))
             : null;
 
         return {
-            'Cantidad de Bins': bin.binCount,
+            'Cantidad de Bins': groupedBin.totalBins,
             'Cantidad de Totes': originalReception?.toteCount ?? '',
             'Productor': originalReception?.producerId ?? '',
+            'Nombre Productor': producer?.name ?? '',
             'Variedad': originalReception?.variety ?? '',
             'Kilos Netos': netWeight?.toFixed(2) ?? '',
             'Fecha de Recepción': originalReception?.createdAt?.toDate().toLocaleDateString() ?? '',
@@ -378,7 +395,7 @@ const handleUndoDispatch = async (dispatchToUndo: Dispatch) => {
         };
     });
 
-    const headers = ['Cantidad de Bins', 'Cantidad de Totes', 'Productor', 'Variedad', 'Kilos Netos', 'Fecha de Recepción', 'N° Documento de recepcion'];
+    const headers = ['Cantidad de Bins', 'Cantidad de Totes', 'Productor', 'Nombre Productor', 'Variedad', 'Kilos Netos', 'Fecha de Recepción', 'N° Documento de recepcion'];
     const csv = convertToCSV(dataToExport, headers);
     const date = dispatch.createdAt.toDate().toISOString().split('T')[0];
     downloadCSV(csv, `despacho_${dispatch.exporterName}_${date}.csv`);
@@ -684,7 +701,7 @@ const handleUndoDispatch = async (dispatchToUndo: Dispatch) => {
                                                 variant="outline" 
                                                 size="sm"
                                                 onClick={() => handleExportDispatch(dispatch)}
-                                                disabled={loadingReceptionLots}
+                                                disabled={loadingReceptionLots || loadingProducers}
                                             >
                                                 <Download className="mr-2 h-4 w-4" />
                                                 Exportar
