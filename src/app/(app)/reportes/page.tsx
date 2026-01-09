@@ -654,7 +654,7 @@ export default function ReportesPage() {
                 </CardHeader>
             </Card>
             
-            <Accordion type="multiple" className="w-full space-y-4">
+            <Accordion type="multiple" className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <BinMaterialStockReport />
                 <PackagingStockReport />
                 <BinMaterialKardexReport />
