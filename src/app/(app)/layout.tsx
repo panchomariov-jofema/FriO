@@ -29,6 +29,7 @@ import {
   SidebarInset,
   SidebarTrigger,
   SidebarFooter,
+  useSidebar,
 } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
 import { useAuth, useUser } from '@/firebase';
@@ -63,8 +64,7 @@ const defaultNavItems = [
     { href: '/datos-maestros', label: 'Datos Maestros', icon: Database },
 ];
 
-
-export default function AppLayout({ children }: { children: React.ReactNode }) {
+function AppLayoutContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const auth = useAuth();
@@ -72,6 +72,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { data: users, loading: loadingUsers } = useFirestoreCollection<UserMaster>('usersMaster');
   const { data: profiles, loading: loadingProfiles } = useFirestoreCollection<Profile>('profiles');
   const [navItems, setNavItems] = React.useState<{ href: string; label: string; icon: React.ElementType }[] | null>(null);
+  const { setOpenMobile } = useSidebar();
 
   React.useEffect(() => {
     if (!isUserLoading && !user) {
@@ -128,53 +129,61 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     }
   }
 
+  return (
+      <>
+        <Sidebar>
+          <SidebarHeader>
+            <div className="flex items-center gap-2 p-2">
+              <SidebarTrigger className="md:hidden" />
+              <Leaf className="w-8 h-8 text-primary hidden md:block" />
+              <span className="font-bold text-lg group-data-[collapsible=icon]:hidden">
+                FrigoManager
+              </span>
+            </div>
+          </SidebarHeader>
+          <SidebarContent>
+            <SidebarMenu>
+              {navItems.map((item) => (
+                <SidebarMenuItem key={item.href} onClick={() => setOpenMobile(false)}>
+                  <Link href={item.href}>
+                    <SidebarMenuButton
+                      isActive={pathname.startsWith(item.href)}
+                      tooltip={item.label}
+                    >
+                      <item.icon />
+                      <span>{item.label}</span>
+                    </SidebarMenuButton>
+                  </Link>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarContent>
+          <SidebarFooter className='group-data-[collapsible=icon]:hidden'>
+            <p className="text-xs text-muted-foreground text-center">© 2024 FrigoManager</p>
+          </SidebarFooter>
+        </Sidebar>
+        <SidebarInset>
+           <header className="flex items-center justify-between h-14 px-4 border-b">
+              <SidebarTrigger className="md:hidden" />
+              <div className="flex-1" />
+              <Button variant="ghost" size="sm" onClick={handleSignOut}>
+                  <LogOut className="mr-2 h-4 w-4" />
+                  Cerrar Sesión
+              </Button>
+          </header>
+          <main className="p-4">
+              {children}
+          </main>
+        </SidebarInset>
+      </>
+  );
+}
 
+
+export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <SidebarProvider>
-      <Sidebar>
-        <SidebarHeader>
-          <div className="flex items-center gap-2 p-2">
-            <SidebarTrigger className="md:hidden" />
-            <Leaf className="w-8 h-8 text-primary hidden md:block" />
-            <span className="font-bold text-lg group-data-[collapsible=icon]:hidden">
-              FrigoManager
-            </span>
-          </div>
-        </SidebarHeader>
-        <SidebarContent>
-          <SidebarMenu>
-            {navItems.map((item) => (
-              <SidebarMenuItem key={item.href}>
-                <Link href={item.href}>
-                  <SidebarMenuButton
-                    isActive={pathname.startsWith(item.href)}
-                    tooltip={item.label}
-                  >
-                    <item.icon />
-                    <span>{item.label}</span>
-                  </SidebarMenuButton>
-                </Link>
-              </SidebarMenuItem>
-            ))}
-          </SidebarMenu>
-        </SidebarContent>
-        <SidebarFooter className='group-data-[collapsible=icon]:hidden'>
-          <p className="text-xs text-muted-foreground text-center">© 2024 FrigoManager</p>
-        </SidebarFooter>
-      </Sidebar>
-      <SidebarInset>
-         <header className="flex items-center justify-between h-14 px-4 border-b">
-            <SidebarTrigger className="md:hidden" />
-            <div className="flex-1" />
-            <Button variant="ghost" size="sm" onClick={handleSignOut}>
-                <LogOut className="mr-2 h-4 w-4" />
-                Cerrar Sesión
-            </Button>
-        </header>
-        <main className="p-4">
-            {children}
-        </main>
-      </SidebarInset>
+      <AppLayoutContent>{children}</AppLayoutContent>
     </SidebarProvider>
-  );
+  )
 }
