@@ -76,7 +76,8 @@ export default function HidrocoolerPage() {
                 throw "El lote original no existe.";
             }
 
-            const currentBinCount = lotDoc.data().binCount;
+            const currentLotData = lotDoc.data();
+            const currentBinCount = currentLotData.binCount;
             if (binCount > currentBinCount) {
                 throw "La cantidad de bins a procesar excede la disponible.";
             }
@@ -95,6 +96,7 @@ export default function HidrocoolerPage() {
                 producerShortName: lotToProcess.producerShortName,
                 binCount: binCount,
                 hidrocooler,
+                netWeightPerBin: currentLotData.netWeightPerBin || 0, // Propagate net weight
                 status: 'En Proceso' as const,
                 createdAt: serverTimestamp(),
             };
@@ -137,6 +139,7 @@ export default function HidrocoolerPage() {
         variety: originalReceptionLot.variety,
         binCount: processingLot.binCount,
         hidrocooler: processingLot.hidrocooler,
+        netWeightPerBin: processingLot.netWeightPerBin || 0, // Propagate net weight
         status: 'Pendiente por Almacenar' as const,
         storedAt: serverTimestamp(),
     };
@@ -208,6 +211,7 @@ export default function HidrocoolerPage() {
                     producerShortName: originalReceptionLot.producerId, // This might need adjustment if you store the short name elsewhere
                     binCount: newPendingBinCount,
                     status: 'Pendiente de Pre-Hidro',
+                    netWeightPerBin: lotToEdit.netWeightPerBin, // Carry over net weight
                     createdAt: originalReceptionLot.createdAt, // Or a new timestamp
                 });
             }
@@ -254,6 +258,7 @@ export default function HidrocoolerPage() {
                   <TableHead>ID Lote</TableHead>
                   <TableHead>Productor</TableHead>
                   <TableHead>Cantidad de Bins</TableHead>
+                  <TableHead>Peso Neto/Bin (kg)</TableHead>
                   <TableHead>Estado</TableHead>
                   <TableHead className="text-right">Acciones</TableHead>
                 </TableRow>
@@ -261,7 +266,7 @@ export default function HidrocoolerPage() {
               <TableBody>
                 {loadingPending ? (
                   Array.from({ length: 3 }).map((_, i) => (
-                    <TableRow key={i}><TableCell colSpan={5}><Skeleton className="h-4 w-full" /></TableCell></TableRow>
+                    <TableRow key={i}><TableCell colSpan={6}><Skeleton className="h-4 w-full" /></TableCell></TableRow>
                   ))
                 ) : sortedPendingLots.length > 0 ? (
                   sortedPendingLots.map((lot) => (
@@ -269,6 +274,7 @@ export default function HidrocoolerPage() {
                       <TableCell className="font-medium">{lot.displayLotId}</TableCell>
                       <TableCell>{lot.producerShortName}</TableCell>
                       <TableCell>{lot.binCount}</TableCell>
+                      <TableCell>{lot.netWeightPerBin?.toFixed(2) ?? '-'}</TableCell>
                       <TableCell><Badge variant={getStatusVariant(lot.status)}>{lot.status}</Badge></TableCell>
                       <TableCell className="text-right">
                         <Button size="sm" onClick={() => handleProcessClick(lot)}>Procesar</Button>
@@ -276,7 +282,7 @@ export default function HidrocoolerPage() {
                     </TableRow>
                   ))
                 ) : (
-                  <TableRow><TableCell colSpan={5} className="h-24 text-center">No hay lotes pendientes.</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={6} className="h-24 text-center">No hay lotes pendientes.</TableCell></TableRow>
                 )}
               </TableBody>
             </Table>
@@ -305,6 +311,7 @@ export default function HidrocoolerPage() {
                   <TableHead>ID Lote</TableHead>
                   <TableHead>Hidrocooler</TableHead>
                   <TableHead>Cantidad de Bins</TableHead>
+                  <TableHead>Peso Neto/Bin (kg)</TableHead>
                   <TableHead>Estado</TableHead>
                   <TableHead className="text-right">Acciones</TableHead>
                 </TableRow>
@@ -312,7 +319,7 @@ export default function HidrocoolerPage() {
               <TableBody>
                  {loadingProcessing ? (
                   Array.from({ length: 3 }).map((_, i) => (
-                    <TableRow key={i}><TableCell colSpan={5}><Skeleton className="h-4 w-full" /></TableCell></TableRow>
+                    <TableRow key={i}><TableCell colSpan={6}><Skeleton className="h-4 w-full" /></TableCell></TableRow>
                   ))
                 ) : filteredProcessingLots.length > 0 ? (
                   filteredProcessingLots.map((lot) => (
@@ -320,6 +327,7 @@ export default function HidrocoolerPage() {
                       <TableCell className="font-medium">{lot.displayLotId}</TableCell>
                       <TableCell>{lot.hidrocooler}</TableCell>
                       <TableCell>{lot.binCount}</TableCell>
+                      <TableCell>{lot.netWeightPerBin?.toFixed(2) ?? '-'}</TableCell>
                       <TableCell><Badge variant={getStatusVariant(lot.status)}>{lot.status}</Badge></TableCell>
                       <TableCell className="text-right">
                         {lot.status === 'En Proceso' ? (
@@ -337,7 +345,7 @@ export default function HidrocoolerPage() {
                     </TableRow>
                   ))
                 ) : (
-                  <TableRow><TableCell colSpan={5} className="h-24 text-center">No hay lotes en proceso.</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={6} className="h-24 text-center">No hay lotes en proceso.</TableCell></TableRow>
                 )}
               </TableBody>
             </Table>

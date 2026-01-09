@@ -100,12 +100,16 @@ export default function DashboardPage() {
         }, {} as Record<string, string>);
         
         const kilosData = (receptionLots || []).reduce((acc, lot) => {
-            if (lot.totalWeight && lot.totalWeight > 0) {
+            const weight = lot.netWeightPerBin && lot.netWeightPerBin > 0 
+                ? lot.netWeightPerBin * lot.binCount 
+                : lot.totalWeight;
+
+            if (weight && weight > 0) {
                 const exporterName = exporterMap[lot.exporterId] || 'No Asignado';
                  if (!acc[exporterName]) {
                     acc[exporterName] = 0;
                 }
-                acc[exporterName] += lot.totalWeight;
+                acc[exporterName] += weight;
             }
             return acc;
         }, {} as Record<string, number>);

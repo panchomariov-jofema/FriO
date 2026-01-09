@@ -162,6 +162,7 @@ export interface ReceptionLot {
     noTotes?: number;
     status: 'Pendiente de Peso' | 'Pendiente de Pre-Hidro' | 'Pendiente de Post-Hidro' | 'Cerrado';
     totalWeight?: number;
+    netWeightPerBin?: number;
     preHydroTemp?: number;
     postHydroTemp?: number;
     createdAt: Timestamp | null;
@@ -173,6 +174,7 @@ export interface HidrocoolerLot {
   producerShortName: string;
   binCount: number;
   status: 'Pendiente de Pre-Hidro';
+  netWeightPerBin?: number;
   createdAt: Timestamp;
 }
 
@@ -184,6 +186,7 @@ export interface ProcessingLot {
   binCount: number;
   hidrocooler: string;
   status: 'En Proceso' | 'Finalizado';
+  netWeightPerBin?: number;
   createdAt: Timestamp;
 }
 
@@ -197,6 +200,7 @@ export interface ChamberLot {
     hidrocooler: string;
     chamberId?: string;
     coordinate?: string;
+    netWeightPerBin?: number;
     status: 'Pendiente por Almacenar' | 'Almacenado' | 'Despachado';
     storedAt: Timestamp;
 }

@@ -69,12 +69,17 @@ export function WeightCalculator({ lot, open, onOpenChange, onWeightSaved }: Wei
     
     const displayLotId = `${producer.shortName}-${lot.document}`;
 
+    // Calculate net weight per bin
+    const netWeight = totalWeight - (lot.binCount * 65) + (lot.noTotes || 0);
+    const netWeightPerBin = netWeight > 0 && lot.binCount > 0 ? netWeight / lot.binCount : 0;
+
     const batch = writeBatch(firestore);
 
     // 1. Update reception lot
     const lotRef = doc(firestore, 'receptionLots', lot.id);
     const receptionUpdate = {
         totalWeight,
+        netWeightPerBin,
         status: 'Pendiente de Pre-Hidro' as const,
         displayLotId: displayLotId,
     };
@@ -86,6 +91,7 @@ export function WeightCalculator({ lot, open, onOpenChange, onWeightSaved }: Wei
         displayLotId: displayLotId,
         producerShortName: producer.shortName,
         binCount: lot.binCount,
+        netWeightPerBin: netWeightPerBin,
         status: 'Pendiente de Pre-Hidro' as const,
         createdAt: serverTimestamp(),
     };
