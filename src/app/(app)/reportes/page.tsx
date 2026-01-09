@@ -4,7 +4,7 @@ import * as React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useFirestore } from '@/firebase';
-import type { BinMaterialStock, Exporter, BinMaterialMovement, Producer, ReceptionLot, PackagingReception, OtherClient, OtherFruitReception } from '@/lib/types';
+import type { BinMaterialStock, Exporter, BinMaterialMovement, Producer, ReceptionLot, PackagingReception, OtherClient, OtherFruitReception, OtherFruitMovement } from '@/lib/types';
 import { collection, onSnapshot, query } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
@@ -693,6 +693,184 @@ function OtherFruitStockReport() {
   );
 }
 
+function OtherFruitKardexReport() {
+    const { data: receptions, loading: loadingReceptions } = useFirestoreCollection<OtherFruitReception>('otherFruitReceptions');
+    const { data: movements, loading: loadingMovements } = useFirestoreCollection<OtherFruitMovement>('otherFruitMovements');
+    const [clientFilter, setClientFilter] = React.useState('all');
+
+    const fruitClients = React.useMemo(() => {
+        const clients = new Map<string, string>();
+        (receptions || []).forEach(r => clients.set(r.clientId, r.clientName));
+        (movements || []).forEach(m => clients.set(m.clientId, m.clientName));
+        return Array.from(clients, ([id, name]) => ({ id, name }));
+    }, [receptions, movements]);
+
+    const flattenedData = React.useMemo(() => {
+        if (!receptions || !movements) return [];
+
+        const allTransactions = [];
+
+        // Process Receptions (Entradas)
+        for (const reception of receptions) {
+            for (const item of reception.items) {
+                allTransactions.push({
+                    key: `${reception.id}-${item.productCode}`,
+                    type: 'entrada' as const,
+                    date: reception.createdAt,
+                    clientId: reception.clientId,
+                    clientName: reception.clientName,
+                    document: reception.document,
+                    productCode: item.productCode,
+                    productName: item.productName,
+                    quantity: item.quantity,
+                    unit: reception.unit,
+                });
+            }
+        }
+
+        // Process Movements (Salidas)
+        for (const movement of movements) {
+            if (movement.type === 'salida') {
+                for (const item of movement.items) {
+                     allTransactions.push({
+                        key: `${movement.id}-${item.productCode}`,
+                        type: 'salida' as const,
+                        date: movement.createdAt,
+                        clientId: movement.clientId,
+                        clientName: movement.clientName,
+                        document: movement.document,
+                        productCode: item.productCode,
+                        productName: item.productName,
+                        quantity: -item.quantity, // Negative for exits
+                        unit: movement.unit,
+                    });
+                }
+            }
+        }
+        
+        return allTransactions.sort((a, b) => b.date.toMillis() - a.date.toMillis());
+    }, [receptions, movements]);
+
+    const filteredData = React.useMemo(() => {
+        if (clientFilter === 'all') return flattenedData;
+        return flattenedData.filter(item => item.clientId === clientFilter);
+    }, [flattenedData, clientFilter]);
+
+    const isLoading = loadingReceptions || loadingMovements;
+
+    const handleExportCSV = () => {
+        const headers = ['Fecha', 'Hora', 'Tipo', 'Cliente', 'Documento', 'Código Producto', 'Nombre Producto', 'Cantidad', 'Unidad'];
+        const csvRows = [headers.join(',')];
+
+        filteredData.forEach(item => {
+            const date = item.date.toDate();
+            const row = [
+                `"${date.toLocaleDateString()}"`,
+                `"${date.toLocaleTimeString()}"`,
+                `"${item.type === 'entrada' ? 'Entrada' : 'Salida'}"`,
+                `"${item.clientName}"`,
+                `"${item.document}"`,
+                `"${item.productCode}"`,
+                `"${item.productName}"`,
+                item.quantity,
+                `"${item.unit}"`,
+            ];
+            csvRows.push(row.join(','));
+        });
+
+        const csvContent = "data:text/csv;charset=utf-8," + csvRows.join('\n');
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", "reporte_kardex_fruta_otros.csv");
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
+    return (
+        <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                    <CardTitle>Kardex de Movimientos de Fruta (Otros Clientes)</CardTitle>
+                    <CardDescription>
+                        Historial completo de entradas y salidas de fruta de otros clientes.
+                    </CardDescription>
+                </div>
+                <Button onClick={handleExportCSV} disabled={isLoading || filteredData.length === 0}>
+                    <Download className="mr-2 h-4 w-4" />
+                    Exportar a CSV
+                </Button>
+            </CardHeader>
+            <CardContent>
+                <div className="flex flex-col sm:flex-row gap-4 mb-6">
+                    <div className="flex-1 space-y-2">
+                        <Label htmlFor="kardex-client-filter">Filtrar por Cliente</Label>
+                        <Select value={clientFilter} onValueChange={setClientFilter} disabled={isLoading}>
+                            <SelectTrigger id="kardex-client-filter">
+                                <SelectValue placeholder="Todos los clientes" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">Todos los clientes</SelectItem>
+                                {fruitClients.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                </div>
+
+                <div className="rounded-md border max-h-[600px] overflow-y-auto">
+                <Table>
+                    <TableHeader>
+                    <TableRow>
+                        <TableHead>Fecha / Hora</TableHead>
+                        <TableHead>Tipo</TableHead>
+                        <TableHead>Cliente</TableHead>
+                        <TableHead>Documento</TableHead>
+                        <TableHead>Cód. Producto</TableHead>
+                        <TableHead>Producto</TableHead>
+                        <TableHead className="text-right">Cantidad</TableHead>
+                    </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                    {isLoading ? (
+                        Array.from({ length: 15 }).map((_, i) => (
+                        <TableRow key={i}>
+                            <TableCell colSpan={7}><Skeleton className="h-4 w-full" /></TableCell>
+                        </TableRow>
+                        ))
+                    ) : filteredData.length > 0 ? (
+                        filteredData.map((item) => (
+                        <TableRow key={item.key}>
+                            <TableCell>{item.date.toDate().toLocaleString()}</TableCell>
+                            <TableCell>
+                                <Badge variant={item.type === 'entrada' ? 'default' : 'secondary'}>
+                                    {item.type === 'entrada' ? 'Entrada' : 'Salida'}
+                                </Badge>
+                            </TableCell>
+                            <TableCell>{item.clientName}</TableCell>
+                            <TableCell className="font-mono">{item.document}</TableCell>
+                            <TableCell className="font-mono">{item.productCode}</TableCell>
+                            <TableCell className="font-medium">{item.productName}</TableCell>
+                            <TableCell className="text-right font-semibold">
+                                {item.quantity} {item.unit}
+                            </TableCell>
+                        </TableRow>
+                        ))
+                    ) : (
+                        <TableRow>
+                        <TableCell colSpan={7} className="h-24 text-center">
+                            No hay movimientos registrados para este cliente.
+                        </TableCell>
+                        </TableRow>
+                    )}
+                    </TableBody>
+                </Table>
+                </div>
+            </CardContent>
+        </Card>
+    );
+}
+
 
 export default function ReportesPage() {
   return (
@@ -728,6 +906,14 @@ export default function ReportesPage() {
                 </AccordionTrigger>
                 <AccordionContent className="pt-4">
                    <KardexReport />
+                </AccordionContent>
+            </AccordionItem>
+             <AccordionItem value="kardex-fruta-otros">
+                <AccordionTrigger className="text-lg font-semibold">
+                    Kardex de Movimientos de Fruta (Otros Clientes)
+                </AccordionTrigger>
+                <AccordionContent className="pt-4">
+                   <OtherFruitKardexReport />
                 </AccordionContent>
             </AccordionItem>
             <AccordionItem value="registro-recepcion">
