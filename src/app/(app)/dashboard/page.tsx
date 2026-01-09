@@ -85,31 +85,33 @@ export default function DashboardPage() {
             kilos: value,
         }));
         
-        const allStoredItems = [
-          ...filteredChamberLots
-            .filter(lot => lot.status === 'Almacenado' && lot.chamberId && lot.coordinate && lot.binCount > 0)
-            .map(lot => ({ chamberId: lot.chamberId!, coordinate: lot.coordinate! })),
-          ...(otherFruitReceptions || [])
-            .flatMap(reception => reception.items
-                .filter(item => item.status === 'Almacenado' && item.storageLocation?.chamberId && item.storageLocation?.coordinate && item.quantity > 0)
-                .map(item => ({ chamberId: item.storageLocation!.chamberId, coordinate: item.storageLocation!.coordinate }))
-            )
-        ];
-
         const calculatedOccupancy = Object.keys(chambersConfig).map(chamberId => {
             const chamber = chambersConfig[chamberId];
-            const totalCoordinates = chamber.columns.length * chamber.rows.length;
-            const occupiedCoordinates = new Set(
-                allStoredItems
-                .filter(item => item.chamberId === chamberId)
-                .map(item => item.coordinate)
-            ).size;
+            const totalCapacity = chamber.capacity;
+
+            const binsInChamber = (chamberLots || [])
+                .filter(lot => lot.status === 'Almacenado' && lot.chamberId === chamberId)
+                .reduce((sum, lot) => sum + lot.binCount, 0);
+
+            const otherFruitInChamber = (otherFruitReceptions || [])
+                .flatMap(r => r.items.map(item => ({ ...item, unit: r.unit, chamberId: item.storageLocation?.chamberId })))
+                .filter(item => item.status === 'Almacenado' && item.chamberId === chamberId);
+
+            const otherBins = otherFruitInChamber
+                .filter(item => item.unit === 'Bins')
+                .reduce((sum, item) => sum + item.quantity, 0);
+
+            const otherPallets = otherFruitInChamber
+                .filter(item => item.unit === 'Pallets')
+                .reduce((sum, item) => sum + item.quantity, 0);
+            
+            const occupiedEquivalentBins = binsInChamber + otherBins + (otherPallets * 2);
 
             return {
                 name: chamber.name,
-                ocupacion: occupiedCoordinates, // The value for the bar chart
-                total: totalCoordinates,
-                percentage: totalCoordinates > 0 ? (occupiedCoordinates / totalCoordinates) * 100 : 0
+                ocupacion: occupiedEquivalentBins, // The value for the bar chart
+                total: totalCapacity,
+                percentage: totalCapacity > 0 ? (occupiedEquivalentBins / totalCapacity) * 100 : 0
             };
         });
 
@@ -254,7 +256,7 @@ export default function DashboardPage() {
                 <Card className="lg:col-span-3">
                     <CardHeader>
                         <CardTitle>Ocupación por Cámara</CardTitle>
-                        <CardDescription>Porcentaje de coordenadas utilizadas en cada cámara.</CardDescription>
+                        <CardDescription>Porcentaje de capacidad de bins equivalentes utilizada en cada cámara.</CardDescription>
                     </CardHeader>
                     <CardContent>
                          {loading ? (
@@ -265,14 +267,14 @@ export default function DashboardPage() {
                                 <Skeleton className="h-8 w-full" />
                             </div>
                         ) : (
-                        <ChartContainer config={{ ocupacion: { label: 'Coordenadas', color: "hsl(var(--chart-2))" } }} className="h-[250px] w-full">
+                        <ChartContainer config={{ ocupacion: { label: 'Bins Equivalentes', color: "hsl(var(--chart-2))" } }} className="h-[250px] w-full">
                            <BarChart data={occupancyByChamber} layout="vertical" margin={{ left: 20 }}>
                                 <XAxis type="number" hide />
                                 <YAxis dataKey="name" type="category" tickLine={false} axisLine={false} tickMargin={10} width={80} />
                                 <ChartTooltip 
                                     formatter={(value, name, props) => {
                                         const { payload } = props;
-                                        return [`${value} / ${payload.total} Coords.`, name];
+                                        return [`${value} / ${payload.total} Bins`, name];
                                     }}
                                     content={<ChartTooltipContent />} 
                                 />

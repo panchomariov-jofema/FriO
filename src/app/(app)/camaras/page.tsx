@@ -116,18 +116,30 @@ export default function CamarasPage() {
 
     const calculatedChamberOccupancy = Object.keys(chambersConfig).reduce((acc, chamberId) => {
         const chamberConfig = chambersConfig[chamberId];
-        const totalCoordinates = chamberConfig.columns.length * chamberConfig.rows.length;
+        const totalCapacity = chamberConfig.capacity;
+
+        const binsInChamber = allChamberLots
+            .filter(lot => lot.status === 'Almacenado' && lot.chamberId === chamberId)
+            .reduce((sum, lot) => sum + lot.binCount, 0);
+
+        const otherFruitInChamber = allOtherFruitReceptions
+            .flatMap(r => r.items.map(item => ({ ...item, unit: r.unit, chamberId: item.storageLocation?.chamberId })))
+            .filter(item => item.status === 'Almacenado' && item.chamberId === chamberId);
+
+        const otherBins = otherFruitInChamber
+            .filter(item => item.unit === 'Bins')
+            .reduce((sum, item) => sum + item.quantity, 0);
+
+        const otherPallets = otherFruitInChamber
+            .filter(item => item.unit === 'Pallets')
+            .reduce((sum, item) => sum + item.quantity, 0);
         
-        const occupiedCoordinates = new Set(
-          allStoredItems
-            .filter(item => item.chamberId === chamberId && item.quantity > 0)
-            .map(item => item.coordinate)
-        ).size;
-        
+        const occupiedEquivalentBins = binsInChamber + otherBins + (otherPallets * 2);
+
         acc[chamberId] = {
-            occupied: occupiedCoordinates,
-            total: totalCoordinates,
-            percentage: totalCoordinates > 0 ? (occupiedCoordinates / totalCoordinates) * 100 : 0,
+            occupied: occupiedEquivalentBins,
+            total: totalCapacity,
+            percentage: totalCapacity > 0 ? (occupiedEquivalentBins / totalCapacity) * 100 : 0,
         };
         return acc;
     }, {} as Record<string, {occupied: number; total: number; percentage: number}>);
@@ -161,14 +173,7 @@ export default function CamarasPage() {
     if (!lotToStore || !firestore) return;
 
     const chamberConfig = chambersConfig[chamberId];
-    const currentOccupancy = chamberOccupancy[chamberId]?.occupied ?? 0;
-    const totalCoordinates = chamberOccupancy[chamberId]?.total ?? 0;
-
-    // This is a rough check, a more precise one is done inside the loop
-    if (currentOccupancy >= totalCoordinates) {
-        toast({ variant: 'destructive', title: 'Error de capacidad', description: `No hay coordenadas disponibles en ${chamberConfig.name}.` });
-        return;
-    }
+    const totalCapacity = chamberOccupancy[chamberId]?.total ?? 0;
 
     const allStoredLots = chamberLots || [];
     const storedInChamber = allStoredLots.filter(l => l.chamberId === chamberId && l.coordinate);
@@ -415,7 +420,7 @@ export default function CamarasPage() {
                             <span className="text-lg font-semibold">{config.name}</span>
                             <div className="text-right">
                                 <p className={cn("font-mono font-semibold", (chamberOccupancy[chamberId]?.percentage ?? 0) > 50 ? 'text-destructive' : 'text-foreground')}>
-                                    {chamberOccupancy[chamberId]?.occupied ?? 0} / {chamberOccupancy[chamberId]?.total ?? 0} Coords.
+                                    {chamberOccupancy[chamberId]?.occupied ?? 0} / {chamberOccupancy[chamberId]?.total ?? 0} Bins
                                     ({(chamberOccupancy[chamberId]?.percentage ?? 0).toFixed(1)}%)
                                 </p>
                                 <Progress value={chamberOccupancy[chamberId]?.percentage ?? 0} className="w-48 h-2 mt-1" />
@@ -435,7 +440,7 @@ export default function CamarasPage() {
                                       const totalBins = itemsInCoord.filter(i => i.unit === 'Bins').reduce((s, i) => s + i.quantity, 0);
                                       const totalPallets = itemsInCoord.filter(i => i.unit === 'Pallets').reduce((s, i) => s + i.quantity, 0);
                                       
-                                      const occupancyPercentage = isOccupied ? (totalBins + totalPallets * 3) / 6 * 100 : 0; // Approx. 1 pallet = 3 bins for display
+                                      const occupancyPercentage = isOccupied ? (totalBins + totalPallets * 2) / 6 * 100 : 0; // Approx. 1 pallet = 2 bins
                                       const firstItem = isOccupied ? itemsInCoord[0] : null;
 
                                       return (
@@ -505,3 +510,4 @@ export default function CamarasPage() {
     
 
     
+
