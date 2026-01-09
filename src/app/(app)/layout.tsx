@@ -82,9 +82,8 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
   React.useEffect(() => {
     if (user && !loadingUsers && !loadingProfiles) {
       if (user.isAnonymous) {
-        // Anonymous users have restricted access
-        const restrictedNavs = defaultNavItems.filter(item => item.href !== '/datos-maestros');
-        setNavItems(restrictedNavs);
+        // Anonymous users get full access for this dev build
+        setNavItems(defaultNavItems);
         return;
       }
       
