@@ -253,8 +253,8 @@ export default function DashboardPage() {
                 ))}
             </div>
 
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-5">
-                <Card className="lg:col-span-2">
+            <div className="grid gap-6 md:grid-cols-2">
+                <Card>
                     <CardHeader>
                         <CardTitle>Kilos Netos Recepcionados por Exportador</CardTitle>
                         <CardDescription>Total de kilos netos ingresados a la planta por cada cliente.</CardDescription>
@@ -266,7 +266,7 @@ export default function DashboardPage() {
                             </div>
                         ) : kilosPorExportador.length > 0 ? (
                         <ChartContainer config={chartConfig} className="h-[250px] w-full">
-                           <BarChart data={kilosPorExportador} layout="vertical" margin={{ right: 80 }}>
+                           <BarChart data={kilosPorExportador} layout="vertical" margin={{ right: 80, left: 20 }}>
                                 <XAxis type="number" dataKey="kilos" hide />
                                 <YAxis dataKey="name" type="category" tickLine={false} axisLine={false} tickMargin={10} width={80} />
                                 <ChartTooltip content={<ChartTooltipContent />} />
@@ -289,7 +289,7 @@ export default function DashboardPage() {
                     </CardContent>
                 </Card>
 
-                <Card className="lg:col-span-3">
+                <Card>
                     <CardHeader>
                         <CardTitle>Ocupación por Cámara</CardTitle>
                         <CardDescription>Porcentaje de capacidad de bins equivalentes utilizada en cada cámara.</CardDescription>
@@ -304,7 +304,7 @@ export default function DashboardPage() {
                             </div>
                         ) : (
                         <ChartContainer config={{ ocupacion: { label: 'Bins Equivalentes', color: "hsl(var(--chart-2))" } }} className="h-[250px] w-full">
-                           <BarChart data={occupancyByChamber} layout="vertical" margin={{ left: 20 }}>
+                           <BarChart data={occupancyByChamber} layout="vertical" margin={{ left: 20, right: 80 }}>
                                 <XAxis type="number" hide />
                                 <YAxis dataKey="name" type="category" tickLine={false} axisLine={false} tickMargin={10} width={80} />
                                 <ChartTooltip 
