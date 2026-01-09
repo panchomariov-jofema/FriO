@@ -16,7 +16,6 @@ import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { Table, TableBody, TableCell, TableHeader, TableRow, TableHead } from '../ui/table';
 import { Skeleton } from '../ui/skeleton';
-import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
 import type { Exporter } from '@/lib/types';
 
 const movementItemSchema = z.object({
@@ -40,18 +39,18 @@ interface EntriesTabProps {
 
 // Rules for automatic calculation
 const calculationRules: Record<string, { binCode: string; related: Record<string, number> }> = {
-    'SUBSOLE': {
+    'SUBSOLE': { // Exporter ID
         binCode: '10001', // BINS GENERICO
         related: { 
             '10002': 24, // TOTES PLASTICO
             '10003': 24  // LAMINA
         }
     },
-    'MEYER': {
+    'MEYER': { // Exporter ID
         binCode: '10007',
         related: { '10008': 24, '10009': 24 }
     },
-    'BLOSSOM': {
+    'BLOSSOM': { // Exporter ID
         binCode: '10011',
         related: { '10012': 24, '10013': 24 }
     }
@@ -61,7 +60,6 @@ export function EntriesTab({ exporterId, producerId }: EntriesTabProps) {
   const { toast } = useToast();
   const firestore = useFirestore();
   const { materials, loading: loadingMaterials } = useBinMaterialsByExporter(exporterId);
-  const { data: exporters, loading: loadingExporters } = useFirestoreCollection<Exporter>('exporters');
 
   const form = useForm<MovementFormValues>({
     resolver: zodResolver(movementSchema),
@@ -69,37 +67,31 @@ export function EntriesTab({ exporterId, producerId }: EntriesTabProps) {
   });
 
   const items = form.watch('items');
-  const exporterName = React.useMemo(() => {
-    return exporters.find(e => e.exporterId === exporterId)?.name;
-  }, [exporters, exporterId]);
   
   React.useEffect(() => {
-    if (!exporterName || loadingExporters || !items || items.length === 0) return;
+    if (!exporterId || !items || items.length === 0) return;
 
-    const rules = calculationRules[exporterName];
+    const rules = calculationRules[exporterId];
     if (!rules) return;
     
-    // Find index of the primary bin for the current rule set
     const binItemIndex = items.findIndex(item => item.binMaterialCode === rules.binCode);
     if (binItemIndex === -1) return;
 
     const binItem = items[binItemIndex];
     const isBinManuallyChanged = form.formState.dirtyFields.items?.[binItemIndex]?.quantity;
-
-    // Only proceed if the main bin's quantity was changed by the user
+    
     if (isBinManuallyChanged) {
         const binQuantity = binItem.quantity;
         
         Object.entries(rules.related).forEach(([relatedCode, multiplier]) => {
             const relatedItemIndex = items.findIndex(item => item.binMaterialCode === relatedCode);
             if (relatedItemIndex !== -1) {
-                // Force update the related item's quantity
                 form.setValue(`items.${relatedItemIndex}.quantity`, binQuantity * multiplier, { shouldDirty: true });
             }
         });
     }
 
-  }, [items, exporterName, form, loadingExporters]);
+  }, [items, exporterId, form]);
 
 
   React.useEffect(() => {
