@@ -16,6 +16,7 @@ import { FirestorePermissionError } from '@/firebase/errors';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
 import type { PackagingReception } from '@/lib/types';
 import { ExitTab } from '@/components/packaging/ExitTab';
+import { StockAndRelocationTab } from '@/components/packaging/StockAndRelocationTab';
 
 export default function EmbalajesPage() {
   const firestore = useFirestore();
@@ -87,10 +88,11 @@ export default function EmbalajesPage() {
       </Card>
 
       <Tabs defaultValue="recepcion" className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="recepcion">Recepción</TabsTrigger>
           <TabsTrigger value="salidas">Salidas</TabsTrigger>
           <TabsTrigger value="almacenamiento">Pendientes de Almacenar</TabsTrigger>
+          <TabsTrigger value="stock">Stock y Reubicación</TabsTrigger>
         </TabsList>
         
         <TabsContent value="recepcion">
@@ -103,6 +105,10 @@ export default function EmbalajesPage() {
 
         <TabsContent value="almacenamiento">
           <StorageTab />
+        </TabsContent>
+
+        <TabsContent value="stock">
+            <StockAndRelocationTab />
         </TabsContent>
       </Tabs>
     </div>

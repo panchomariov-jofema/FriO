@@ -259,5 +259,20 @@ export interface OtherFruitMovement {
   createdAt: Timestamp;
 }
 
+// Unified type for any stored item in a chamber
+export type StoredItem = {
+  id: string;
+  type: 'producerLot' | 'otherFruit'; // Differentiator
+  displayId: string; // e.g., displayLotId or productName
+  ownerName: string; // e.g., producerShortName or clientName
+  varietyOrProduct: string;
+  quantity: number;
+  unit: 'Bins' | 'Pallets';
+  chamberId: string;
+  coordinate: string;
+  receptionId: string | null; // ID of the parent document (e.g., otherFruitReceptions)
+  itemIndex: number; // Index of the item within the parent document's `items` array
+}
+
 
 export type MasterData = Exporter | Producer | BinMaterial | OtherClient | PackagingMaster | UserMaster | Profile | Packing;

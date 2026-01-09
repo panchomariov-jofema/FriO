@@ -4,12 +4,12 @@ import * as React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
-import type { ChamberLot, OtherFruitReception } from '@/lib/types';
+import type { ChamberLot, OtherFruitReception, StoredItem } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { StoreInChamberDialog } from '@/components/hidrocooler/StoreInChamberDialog';
-import { collection, doc, writeBatch, getDocs } from 'firebase/firestore';
+import { collection, doc, writeBatch, getDocs, updateDoc, getDoc } from 'firebase/firestore';
 import { useFirestore } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { errorEmitter } from '@/firebase/error-emitter';
@@ -19,7 +19,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import { Progress } from '@/components/ui/progress';
-import { RelocateLotDialog } from '@/components/hidrocooler/RelocateLotDialog';
+import { RelocateDialog } from '@/components/hidrocooler/RelocateDialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Trash2 } from 'lucide-react';
 
@@ -37,25 +37,12 @@ const naturalSort = (a: string, b: string) => {
   return aNum - bNum;
 };
 
-// Unified type for any stored item
-type StoredItem = {
-  id: string;
-  isProducerLot: boolean; // Differentiator
-  displayId: string; // e.g., displayLotId or productName
-  ownerName: string; // e.g., producerShortName or clientName
-  varietyOrProduct: string;
-  quantity: number;
-  unit: 'Bins' | 'Pallets';
-  chamberId: string;
-  coordinate: string;
-}
-
 
 export default function CamarasPage() {
   const { data: chamberLots, loading: loadingChamberLots } = useFirestoreCollection<ChamberLot>('chamberLots');
   const { data: otherFruitReceptions, loading: loadingOtherFruit } = useFirestoreCollection<OtherFruitReception>('otherFruitReceptions');
   const [lotToStore, setLotToStore] = React.useState<ChamberLot | null>(null);
-  const [coordToRelocate, setCoordToRelocate] = React.useState<{ chamberId: string; coordinate: string } | null>(null);
+  const [itemToRelocate, setItemToRelocate] = React.useState<StoredItem | null>(null);
   const [isStoreDialogOpen, setStoreDialogOpen] = React.useState(false);
   const [isRelocateDialogOpen, setRelocateDialogOpen] = React.useState(false);
   const firestore = useFirestore();
@@ -71,12 +58,12 @@ export default function CamarasPage() {
       .filter((lot) => lot.status === 'Pendiente por Almacenar')
       .sort((a, b) => b.storedAt && a.storedAt ? b.storedAt.toMillis() - a.storedAt.toMillis() : 0);
       
-    const allStoredItems = [
+    const allStoredItems: StoredItem[] = [
       ...allChamberLots
         .filter(lot => lot.status === 'Almacenado' && lot.chamberId && lot.coordinate && lot.binCount > 0)
         .map(lot => ({
             id: lot.id,
-            isProducerLot: true,
+            type: 'producerLot' as const,
             displayId: lot.displayLotId,
             ownerName: lot.producerShortName,
             varietyOrProduct: lot.variety,
@@ -84,13 +71,15 @@ export default function CamarasPage() {
             unit: 'Bins' as const,
             chamberId: lot.chamberId!,
             coordinate: lot.coordinate!,
+            receptionId: null, // Not applicable for producer lots
+            itemIndex: -1, // Not applicable
         })),
       ...allOtherFruitReceptions
         .flatMap(reception => reception.items
             .filter(item => item.status === 'Almacenado' && item.storageLocation?.chamberId && item.storageLocation?.coordinate && item.quantity > 0)
             .map((item, index) => ({
                 id: `${reception.id}-${index}`,
-                isProducerLot: false,
+                type: 'otherFruit' as const,
                 displayId: item.productCode,
                 ownerName: reception.clientName,
                 varietyOrProduct: item.productName,
@@ -98,6 +87,8 @@ export default function CamarasPage() {
                 unit: reception.unit,
                 chamberId: item.storageLocation!.chamberId,
                 coordinate: item.storageLocation!.coordinate,
+                receptionId: reception.id,
+                itemIndex: index,
             }))
         )
     ];
@@ -119,12 +110,12 @@ export default function CamarasPage() {
         const totalCapacity = chamberConfig.capacity;
 
         const binsInChamber = allChamberLots
-            .filter(lot => lot.status === 'Almacenado' && lot.chamberId === chamberId)
+            .filter(lot => lot.status === 'Almacenado' && lot.chamberId === chamberId && lot.binCount > 0)
             .reduce((sum, lot) => sum + lot.binCount, 0);
 
         const otherFruitInChamber = allOtherFruitReceptions
             .flatMap(r => r.items.map(item => ({ ...item, unit: r.unit, chamberId: item.storageLocation?.chamberId })))
-            .filter(item => item.status === 'Almacenado' && item.chamberId === chamberId);
+            .filter(item => item.status === 'Almacenado' && item.chamberId === chamberId && item.quantity > 0);
 
         const otherBins = otherFruitInChamber
             .filter(item => item.unit === 'Bins')
@@ -158,15 +149,9 @@ export default function CamarasPage() {
     setStoreDialogOpen(true);
   };
   
-  const handleRelocateClick = (chamberId: string, coordinate: string) => {
-    // Relocation for other fruit is not implemented in this view
-    const lotsInCoord = storedItemsByChamber[chamberId]?.[coordinate] || [];
-    if (lotsInCoord.every(l => l.isProducerLot)) {
-        setCoordToRelocate({ chamberId, coordinate });
-        setRelocateDialogOpen(true);
-    } else {
-        toast({ title: "Acción no disponible", description: "La reubicación de lotes de otros clientes debe hacerse desde su módulo específico."})
-    }
+  const handleRelocateClick = (item: StoredItem) => {
+    setItemToRelocate(item);
+    setRelocateDialogOpen(true);
   }
 
   const handleStoreInChamber = async ({ chamberId }: { chamberId: string; }) => {
@@ -264,33 +249,42 @@ export default function CamarasPage() {
     }
   };
 
-  const handleRelocateLot = async ({ targetChamberId, targetCoordinate }: { targetChamberId: string, targetCoordinate: string}) => {
-    if (!coordToRelocate || !firestore) return;
+  const handleRelocate = async ({ targetChamberId, targetCoordinate }: { targetChamberId: string, targetCoordinate: string}) => {
+    if (!itemToRelocate || !firestore) return;
     
-    const { chamberId: sourceChamberId, coordinate: sourceCoordinate } = coordToRelocate;
-    const itemsInCoord = storedItemsByChamber[sourceChamberId]?.[sourceCoordinate] || [];
-    
-    // This logic is simplified for producer lots only as per handleRelocateClick logic
-    const lotsToMove = itemsInCoord.filter(item => item.isProducerLot).map(l => l.id);
-    
-    const batch = writeBatch(firestore);
-
-    lotsToMove.forEach(lotId => {
-        const lotRef = doc(firestore, 'chamberLots', lotId);
-        batch.update(lotRef, {
-            chamberId: targetChamberId,
-            coordinate: targetCoordinate,
-        });
-    });
-
     try {
-        await batch.commit();
-        toast({ title: 'Éxito', description: `Coordenada ${sourceCoordinate} reubicada a ${chambersConfig[targetChamberId].name} - ${targetCoordinate}.` });
+        if (itemToRelocate.type === 'producerLot') {
+            const lotRef = doc(firestore, 'chamberLots', itemToRelocate.id);
+            await updateDoc(lotRef, {
+                chamberId: targetChamberId,
+                coordinate: targetCoordinate,
+            });
+        } else if (itemToRelocate.type === 'otherFruit') {
+            const receptionRef = doc(firestore, 'otherFruitReceptions', itemToRelocate.receptionId!);
+            const receptionDoc = await getDoc(receptionRef);
+            if (!receptionDoc.exists()) throw new Error("Recepción no encontrada");
+            
+            const updatedItems = [...receptionDoc.data().items];
+            const itemToUpdate = updatedItems[itemToRelocate.itemIndex!];
+            
+            if (itemToUpdate) {
+                itemToUpdate.storageLocation = {
+                    chamberId: targetChamberId,
+                    coordinate: targetCoordinate,
+                };
+                await updateDoc(receptionRef, { items: updatedItems });
+            } else {
+                 throw new Error("Ítem no encontrado en la recepción");
+            }
+        }
+        
+        toast({ title: 'Éxito', description: `Coordenada ${itemToRelocate.coordinate} reubicada a ${chambersConfig[targetChamberId].name} - ${targetCoordinate}.` });
+
     } catch (e: any) {
-        console.error("Error al reubicar la coordenada: ", e);
+        console.error("Error al reubicar: ", e);
         toast({ variant: 'destructive', title: 'Error', description: 'Ocurrió un error al reubicar.' });
         errorEmitter.emit('permission-error', new FirestorePermissionError({
-            path: 'chamberLots',
+            path: 'chamberLots or otherFruitReceptions',
             operation: 'update'
         }));
     } finally {
@@ -457,15 +451,15 @@ export default function CamarasPage() {
                                             <TooltipContent className="p-4">
                                               <div className="space-y-2">
                                                 <p className="font-bold">
-                                                  {firstItem.isProducerLot ? `Lote: ${firstItem.displayId}` : `Producto: ${firstItem.displayId}`}
+                                                  {firstItem.type === 'producerLot' ? `Lote: ${firstItem.displayId}` : `Producto: ${firstItem.displayId}`}
                                                 </p>
                                                 <p>
-                                                  {firstItem.isProducerLot ? `Productor: ${firstItem.ownerName}` : `Cliente: ${firstItem.ownerName}`}
+                                                  {firstItem.type === 'producerLot' ? `Productor: ${firstItem.ownerName}` : `Cliente: ${firstItem.ownerName}`}
                                                 </p>
                                                 <p>Variedad/Producto: {firstItem.varietyOrProduct}</p>
                                                 <p>Bins: {totalBins}</p>
                                                 <p>Pallets: {totalPallets}</p>
-                                                <Button size="sm" className="w-full mt-2" onClick={() => handleRelocateClick(chamberId, coord)}>Reubicar</Button>
+                                                <Button size="sm" className="w-full mt-2" onClick={() => handleRelocateClick(firstItem)}>Reubicar</Button>
                                               </div>
                                             </TooltipContent>
                                           )}
@@ -492,22 +486,18 @@ export default function CamarasPage() {
         />
       )}
 
-      {coordToRelocate && (
-        <RelocateLotDialog
+      {itemToRelocate && (
+        <RelocateDialog
+            item={itemToRelocate}
             open={isRelocateDialogOpen}
             onOpenChange={setRelocateDialogOpen}
-            onRelocate={handleRelocateLot}
-            sourceChamberId={coordToRelocate.chamberId}
-            sourceCoordinate={coordToRelocate.coordinate}
-            lotsInCoordinate={(chamberLots || []).filter(l => l.chamberId === coordToRelocate.chamberId && l.coordinate === coordToRelocate.coordinate)}
-            allLots={chamberLots || []}
+            onRelocate={handleRelocate}
+            storedItems={{
+                chamberLots: chamberLots || [],
+                otherFruitReceptions: otherFruitReceptions || [],
+            }}
         />
       )}
     </div>
   );
 }
-
-    
-
-    
-
