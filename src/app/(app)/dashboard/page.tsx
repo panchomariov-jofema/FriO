@@ -90,7 +90,9 @@ export default function DashboardPage() {
         const storedLots = filteredChamberLots.filter(lot => lot.status === 'Almacenado');
         const calculatedTotalBins = storedLots.reduce((sum, lot) => sum + lot.binCount, 0);
         
-        const calculatedPendingStorage = filteredChamberLots.filter(lot => lot.status === 'Pendiente por Almacenar').length;
+        const calculatedPendingStorage = filteredChamberLots
+            .filter(lot => lot.status === 'Pendiente por Almacenar')
+            .reduce((sum, lot) => sum + lot.binCount, 0);
         
         const calculatedInProcess = filteredProcessingLots.filter(p => p.status === 'En Proceso').length;
 
