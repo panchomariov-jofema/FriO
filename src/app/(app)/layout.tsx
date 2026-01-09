@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import {
   Archive,
   Building2,
@@ -10,6 +10,7 @@ import {
   Grape,
   LayoutDashboard,
   Leaf,
+  LogOut,
   Package,
   PieChart,
   Truck,
@@ -30,10 +31,10 @@ import {
 } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
 import { useAuth, useUser } from '@/firebase';
-import { signInAnonymously } from 'firebase/auth';
 import { LoadingScreen } from '@/components/LoadingScreen';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
 import type { UserMaster, Profile, ModulePermission } from '@/lib/types';
+import { signOut } from 'firebase/auth';
 
 const navIcons: { [key: string]: React.ElementType } = {
   Dashboard: LayoutDashboard,
@@ -64,6 +65,7 @@ const defaultNavItems = [
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
   const auth = useAuth();
   const { user, isUserLoading } = useUser();
   const { data: users, loading: loadingUsers } = useFirestoreCollection<UserMaster>('usersMaster');
@@ -71,36 +73,38 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [navItems, setNavItems] = React.useState<{ href: string; label: string; icon: React.ElementType }[] | null>(null);
 
   React.useEffect(() => {
-    if (!isUserLoading && !user && auth) {
-      signInAnonymously(auth);
+    if (!isUserLoading && !user) {
+      router.push('/login');
     }
-  }, [user, isUserLoading, auth]);
+  }, [user, isUserLoading, router]);
 
   React.useEffect(() => {
     if (user && !loadingUsers && !loadingProfiles) {
-      const emailUsername = user.isAnonymous ? null : (user.email ? user.email.split('@')[0].toLowerCase() : null);
-      const currentUserMaster = emailUsername ? users.find(u => u.userName.toLowerCase() === emailUsername) : null;
-
-      if (currentUserMaster) {
-        const userProfile = profiles.find(p => p.profileId === currentUserMaster.profileId);
-        if (userProfile) {
-          const accessibleNavs = userProfile.modulesAccess.map((permission: ModulePermission) => {
-            const moduleName = typeof permission === 'string' ? permission : permission.name;
-            const href = `/${moduleName.toLowerCase().replace(/\s/g, '-').replace(/y-/, '-')}`;
-            return {
-              href,
-              label: moduleName,
-              icon: navIcons[moduleName] || Leaf,
-            };
-          });
-          setNavItems(accessibleNavs);
+        const emailUsername = user.isAnonymous ? null : (user.email ? user.email.split('@')[0].toLowerCase() : null);
+        
+        if (emailUsername) {
+            const currentUserMaster = users.find(u => u.userName.toLowerCase() === emailUsername);
+            if (currentUserMaster) {
+                const userProfile = profiles.find(p => p.profileId === currentUserMaster.profileId);
+                if (userProfile) {
+                const accessibleNavs = userProfile.modulesAccess
+                    .map((permission: ModulePermission) => {
+                        const moduleName = typeof permission === 'string' ? permission : permission.name;
+                        const href = `/${moduleName.toLowerCase().replace(/\s/g, '-').replace(/y-/, '-')}`;
+                        return defaultNavItems.find(item => item.href === href);
+                    })
+                    .filter(Boolean) as { href: string; label: string; icon: React.ElementType }[];
+                setNavItems(accessibleNavs);
+                } else {
+                    setNavItems(defaultNavItems); // Profile referenced but not found, grant all
+                }
+            } else {
+                 setNavItems(defaultNavItems); // User not in master list, grant all
+            }
         } else {
-             setNavItems(defaultNavItems); // Profile referenced but not found
+            // Anonymous user or user without email
+             setNavItems(defaultNavItems);
         }
-      } else {
-        // Handle anonymous users or users without a profile
-        setNavItems(defaultNavItems);
-      }
     }
   }, [user, users, profiles, loadingUsers, loadingProfiles]);
 
@@ -109,6 +113,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   if (loading || !user) {
     return <LoadingScreen />;
   }
+  
+  const handleSignOut = async () => {
+    if (auth) {
+        await signOut(auth);
+        router.push('/login');
+    }
+  }
+
 
   return (
     <SidebarProvider>
@@ -147,8 +159,16 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           <p className="text-xs text-muted-foreground text-center">© 2024 FrigoManager</p>
         </SidebarFooter>
       </Sidebar>
-      <SidebarInset className="p-4">
-        {children}
+      <SidebarInset>
+         <header className="flex items-center justify-end h-14 px-4 border-b">
+            <Button variant="ghost" size="sm" onClick={handleSignOut}>
+                <LogOut className="mr-2 h-4 w-4" />
+                Cerrar Sesión
+            </Button>
+        </header>
+        <main className="p-4">
+            {children}
+        </main>
       </SidebarInset>
     </SidebarProvider>
   );
