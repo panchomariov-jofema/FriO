@@ -26,7 +26,7 @@ import { Form } from '@/components/ui/form';
 import { z } from 'zod';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
 import type { MasterData } from '@/lib/types';
-import { addDoc, collection, deleteDoc, doc, updateDoc } from 'firebase/firestore';
+import { addDoc, collection, deleteDoc, doc, updateDoc, writeBatch } from 'firebase/firestore';
 import { useFirestore } from '@/firebase';
 import { Download, Pencil, Trash2, Upload } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -46,6 +46,19 @@ interface MasterDataShellProps<T extends MasterData> {
   csvTemplateFileName: string;
   formProps?: Record<string, any>;
 }
+
+const defaultProfiles = [
+  { profileId: 'MAESTRO', name: 'Maestro', modulesAccess: 'Dashboard,Bins y Materiales,Recepción,Hidrocooler,Cámaras,Despachos,Reportes,Embalajes,Otros Hortofrutícolas,Datos Maestros' },
+  { profileId: 'EJECUTIVO', name: 'Ejecutivo', modulesAccess: 'Dashboard,Reportes' },
+  { profileId: 'EXP_SUBSOLE', name: 'Exportador Subsole', modulesAccess: 'Dashboard,Reportes' },
+  { profileId: 'EXP_MEYER', name: 'Exportador Meyer', modulesAccess: 'Dashboard,Reportes' },
+  { profileId: 'EXP_BLOSSOM', name: 'Exportador Blossom', modulesAccess: 'Dashboard,Reportes' },
+  { profileId: 'SUP_PATIO', name: 'Supervisor Patio', modulesAccess: 'Recepción,Hidrocooler,Cámaras' },
+  { profileId: 'SUP_SUBSOLE', name: 'Supervisor Subsole', modulesAccess: 'Recepción,Despachos' },
+  { profileId: 'SUP_HIDRO', name: 'Supervisor Hidrocooler', modulesAccess: 'Hidrocooler' },
+  { profileId: 'GRUERO', name: 'Gruero', modulesAccess: 'Cámaras,Despachos' },
+];
+
 
 export function MasterDataShell<T extends MasterData>({
   title,
@@ -248,6 +261,37 @@ export function MasterDataShell<T extends MasterData>({
     link.click();
     document.body.removeChild(link);
   };
+  
+  const handleSeedProfiles = async () => {
+    if (!firestore || collectionName !== 'profiles') return;
+
+    const batch = writeBatch(firestore);
+    const profilesRef = collection(firestore, 'profiles');
+    
+    defaultProfiles.forEach(profile => {
+        const docRef = doc(profilesRef);
+        const dataToSave = {
+            ...profile,
+            modulesAccess: profile.modulesAccess.split(',').map(s => s.trim())
+        };
+        batch.set(docRef, dataToSave);
+    });
+
+    try {
+        await batch.commit();
+        toast({
+            title: 'Éxito',
+            description: 'Perfiles de ejemplo cargados correctamente.'
+        });
+    } catch (error) {
+        console.error("Error seeding profiles: ", error);
+        toast({
+            title: 'Error al cargar perfiles',
+            description: 'No se pudieron guardar los perfiles de ejemplo.',
+            variant: 'destructive'
+        });
+    }
+  };
 
 
   return (
@@ -277,6 +321,11 @@ export function MasterDataShell<T extends MasterData>({
       </div>
       <div className="md:col-span-2">
         <div className="flex justify-end gap-2 mb-4">
+            {collectionName === 'profiles' && data.length === 0 && !loading && (
+              <Button variant="outline" onClick={handleSeedProfiles}>
+                Cargar Perfiles de Ejemplo
+              </Button>
+            )}
             <Button variant="outline" onClick={() => fileInputRef.current?.click()}>
                 <Upload className="mr-2 h-4 w-4" />
                 Importar CSV
