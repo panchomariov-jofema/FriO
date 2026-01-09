@@ -9,7 +9,7 @@ import {
   CardDescription,
 } from '@/components/ui/card';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
-import type { ChamberLot, Dispatch, Exporter, ProcessingLot, ReceptionLot, BinMaterialStock, BinMaterial } from '@/lib/types';
+import type { ChamberLot, Dispatch, Exporter, ProcessingLot, ReceptionLot, BinMaterialStock, OtherFruitReception } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Bar, BarChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis, Cell, Legend, LabelList } from 'recharts';
 import { ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
@@ -33,6 +33,7 @@ export default function DashboardPage() {
     const [selectedExporterId, setSelectedExporterId] = React.useState<string | null>(null);
 
     const { data: chamberLots, loading: loadingChamber } = useFirestoreCollection<ChamberLot>('chamberLots');
+    const { data: otherFruitReceptions, loading: loadingOtherFruit } = useFirestoreCollection<OtherFruitReception>('otherFruitReceptions');
     const { data: processingLots, loading: loadingProcessing } = useFirestoreCollection<ProcessingLot>('processingLots');
     const { data: dispatches, loading: loadingDispatches } = useFirestoreCollection<Dispatch>('dispatches');
     const { data: receptionLots, loading: loadingReception } = useFirestoreCollection<ReceptionLot>('receptionLots');
@@ -84,17 +85,31 @@ export default function DashboardPage() {
             kilos: value,
         }));
         
-        // Occupancy is also filtered by exporter
+        const allStoredItems = [
+          ...filteredChamberLots
+            .filter(lot => lot.status === 'Almacenado' && lot.chamberId && lot.coordinate && lot.binCount > 0)
+            .map(lot => ({ chamberId: lot.chamberId!, coordinate: lot.coordinate! })),
+          ...(otherFruitReceptions || [])
+            .flatMap(reception => reception.items
+                .filter(item => item.status === 'Almacenado' && item.storageLocation?.chamberId && item.storageLocation?.coordinate && item.quantity > 0)
+                .map(item => ({ chamberId: item.storageLocation!.chamberId, coordinate: item.storageLocation!.coordinate }))
+            )
+        ];
+
         const calculatedOccupancy = Object.keys(chambersConfig).map(chamberId => {
             const chamber = chambersConfig[chamberId];
-            const binsInChamber = storedLots
-                .filter(lot => lot.chamberId === chamberId)
-                .reduce((sum, lot) => sum + lot.binCount, 0);
+            const totalCoordinates = chamber.columns.length * chamber.rows.length;
+            const occupiedCoordinates = new Set(
+                allStoredItems
+                .filter(item => item.chamberId === chamberId)
+                .map(item => item.coordinate)
+            ).size;
+
             return {
                 name: chamber.name,
-                ocupacion: binsInChamber,
-                total: chamber.capacity,
-                percentage: (binsInChamber / chamber.capacity) * 100
+                ocupacion: occupiedCoordinates, // The value for the bar chart
+                total: totalCoordinates,
+                percentage: totalCoordinates > 0 ? (occupiedCoordinates / totalCoordinates) * 100 : 0
             };
         });
 
@@ -129,9 +144,9 @@ export default function DashboardPage() {
             pendingReceptionBins: calculatedPendingReceptionBins,
         };
 
-    }, [chamberLots, processingLots, dispatches, exporters, receptionLots, binMaterialStock, selectedExporterId]);
+    }, [chamberLots, otherFruitReceptions, processingLots, dispatches, exporters, receptionLots, binMaterialStock, selectedExporterId]);
 
-    const loading = loadingChamber || loadingProcessing || loadingDispatches || loadingExporters || loadingReception || loadingBinStock;
+    const loading = loadingChamber || loadingOtherFruit || loadingProcessing || loadingDispatches || loadingExporters || loadingReception || loadingBinStock;
 
     const kpiCards = [
         { title: "Total Bins en Cámara (Fruta)", value: totalBinsInStock, icon: Warehouse },
@@ -239,7 +254,7 @@ export default function DashboardPage() {
                 <Card className="lg:col-span-3">
                     <CardHeader>
                         <CardTitle>Ocupación por Cámara</CardTitle>
-                        <CardDescription>Capacidad utilizada en cada cámara según el filtro aplicado.</CardDescription>
+                        <CardDescription>Porcentaje de coordenadas utilizadas en cada cámara.</CardDescription>
                     </CardHeader>
                     <CardContent>
                          {loading ? (
@@ -250,11 +265,17 @@ export default function DashboardPage() {
                                 <Skeleton className="h-8 w-full" />
                             </div>
                         ) : (
-                        <ChartContainer config={{ ocupacion: { label: 'Ocupación', color: "hsl(var(--chart-2))" } }} className="h-[250px] w-full">
+                        <ChartContainer config={{ ocupacion: { label: 'Coordenadas', color: "hsl(var(--chart-2))" } }} className="h-[250px] w-full">
                            <BarChart data={occupancyByChamber} layout="vertical" margin={{ left: 20 }}>
                                 <XAxis type="number" hide />
                                 <YAxis dataKey="name" type="category" tickLine={false} axisLine={false} tickMargin={10} width={80} />
-                                <ChartTooltip content={<ChartTooltipContent />} />
+                                <ChartTooltip 
+                                    formatter={(value, name, props) => {
+                                        const { payload } = props;
+                                        return [`${value} / ${payload.total} Coords.`, name];
+                                    }}
+                                    content={<ChartTooltipContent />} 
+                                />
                                 <Bar dataKey="ocupacion" layout="vertical" radius={5} fill="hsl(var(--chart-2))">
                                     <LabelList 
                                         dataKey="percentage" 

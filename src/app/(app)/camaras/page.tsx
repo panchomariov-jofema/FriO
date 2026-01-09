@@ -115,15 +115,19 @@ export default function CamarasPage() {
 
 
     const calculatedChamberOccupancy = Object.keys(chambersConfig).reduce((acc, chamberId) => {
-        // We only count Bins towards total capacity for this view
-        const totalBins = allStoredItems
-            .filter(item => item.chamberId === chamberId && item.unit === 'Bins')
-            .reduce((sum, item) => sum + item.quantity, 0);
-
+        const chamberConfig = chambersConfig[chamberId];
+        const totalCoordinates = chamberConfig.columns.length * chamberConfig.rows.length;
+        
+        const occupiedCoordinates = new Set(
+          allStoredItems
+            .filter(item => item.chamberId === chamberId && item.quantity > 0)
+            .map(item => item.coordinate)
+        ).size;
+        
         acc[chamberId] = {
-            occupied: totalBins,
-            total: chambersConfig[chamberId].capacity,
-            percentage: (totalBins / chambersConfig[chamberId].capacity) * 100,
+            occupied: occupiedCoordinates,
+            total: totalCoordinates,
+            percentage: totalCoordinates > 0 ? (occupiedCoordinates / totalCoordinates) * 100 : 0,
         };
         return acc;
     }, {} as Record<string, {occupied: number; total: number; percentage: number}>);
@@ -158,9 +162,11 @@ export default function CamarasPage() {
 
     const chamberConfig = chambersConfig[chamberId];
     const currentOccupancy = chamberOccupancy[chamberId]?.occupied ?? 0;
+    const totalCoordinates = chamberOccupancy[chamberId]?.total ?? 0;
 
-    if (currentOccupancy + lotToStore.binCount > chamberConfig.capacity) {
-        toast({ variant: 'destructive', title: 'Error de capacidad', description: `No hay espacio suficiente en ${chamberConfig.name}.` });
+    // This is a rough check, a more precise one is done inside the loop
+    if (currentOccupancy >= totalCoordinates) {
+        toast({ variant: 'destructive', title: 'Error de capacidad', description: `No hay coordenadas disponibles en ${chamberConfig.name}.` });
         return;
     }
 
@@ -261,18 +267,7 @@ export default function CamarasPage() {
     
     // This logic is simplified for producer lots only as per handleRelocateClick logic
     const lotsToMove = itemsInCoord.filter(item => item.isProducerLot).map(l => l.id);
-    const totalBinsToMove = itemsInCoord.filter(item => item.isProducerLot).reduce((sum, l) => sum + l.quantity, 0);
-
-    // Validate capacity if moving to a different chamber
-    if (sourceChamberId !== targetChamberId) {
-        const targetChamberConfig = chambersConfig[targetChamberId];
-        const targetChamberOccupancy = chamberOccupancy[targetChamberId]?.occupied ?? 0;
-        if (targetChamberOccupancy + totalBinsToMove > targetChamberConfig.capacity) {
-            toast({ variant: 'destructive', title: 'Error de capacidad', description: `No hay espacio para ${totalBinsToMove} bins en ${targetChamberConfig.name}.` });
-            return;
-        }
-    }
-
+    
     const batch = writeBatch(firestore);
 
     lotsToMove.forEach(lotId => {
@@ -420,7 +415,7 @@ export default function CamarasPage() {
                             <span className="text-lg font-semibold">{config.name}</span>
                             <div className="text-right">
                                 <p className={cn("font-mono font-semibold", (chamberOccupancy[chamberId]?.percentage ?? 0) > 50 ? 'text-destructive' : 'text-foreground')}>
-                                    {chamberOccupancy[chamberId]?.occupied ?? 0} / {config.capacity} Bins
+                                    {chamberOccupancy[chamberId]?.occupied ?? 0} / {chamberOccupancy[chamberId]?.total ?? 0} Coords.
                                     ({(chamberOccupancy[chamberId]?.percentage ?? 0).toFixed(1)}%)
                                 </p>
                                 <Progress value={chamberOccupancy[chamberId]?.percentage ?? 0} className="w-48 h-2 mt-1" />
