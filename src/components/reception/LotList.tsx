@@ -154,6 +154,7 @@ export function LotList({ exporterId, producerId }: LotListProps) {
                   <TableHead>Totes</TableHead>
                   <TableHead>Estado</TableHead>
                   <TableHead>Peso Total</TableHead>
+                  <TableHead>Peso Neto</TableHead>
                   <TableHead>T° Pre</TableHead>
                   <TableHead>T° Post</TableHead>
                   <TableHead className="text-right">Acciones</TableHead>
@@ -163,11 +164,16 @@ export function LotList({ exporterId, producerId }: LotListProps) {
                 {loading ? (
                   Array.from({ length: 3 }).map((_, i) => (
                     <TableRow key={i}>
-                      <TableCell colSpan={9}><Skeleton className="h-4 w-full" /></TableCell>
+                      <TableCell colSpan={10}><Skeleton className="h-4 w-full" /></TableCell>
                     </TableRow>
                   ))
                 ) : filteredLots.length > 0 ? (
-                  filteredLots.map((lot) => (
+                  filteredLots.map((lot) => {
+                    const pesoNeto = (lot.totalWeight && lot.totalWeight > 0)
+                      ? (lot.totalWeight - (lot.binCount * 65) + (lot.noTotes || 0))
+                      : null;
+                    
+                    return (
                     <TableRow key={lot.id}>
                       <TableCell className="font-medium">{lot.displayLotId || lot.id}</TableCell>
                       <TableCell>{lot.variety}</TableCell>
@@ -177,6 +183,7 @@ export function LotList({ exporterId, producerId }: LotListProps) {
                         <Badge variant={getStatusVariant(lot.status)}>{lot.status}</Badge>
                       </TableCell>
                       <TableCell>{renderCellContent(lot, 'totalWeight')}</TableCell>
+                      <TableCell>{pesoNeto !== null ? `${pesoNeto.toFixed(2)} kg` : '-'}</TableCell>
                       <TableCell>{renderCellContent(lot, 'preHydroTemp')}</TableCell>
                       <TableCell>{renderCellContent(lot, 'postHydroTemp')}</TableCell>
                        <TableCell className="text-right">
@@ -186,10 +193,11 @@ export function LotList({ exporterId, producerId }: LotListProps) {
                         </Button>
                       </TableCell>
                     </TableRow>
-                  ))
+                    )
+                  })
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={9} className="h-24 text-center">
+                    <TableCell colSpan={10} className="h-24 text-center">
                       No se encontraron lotes para esta selección.
                     </TableCell>
                   </TableRow>
