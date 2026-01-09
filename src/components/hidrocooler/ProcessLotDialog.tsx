@@ -33,12 +33,39 @@ export function ProcessLotDialog({ lot, open, onOpenChange, onProcess }: Process
       binCount: lot?.binCount,
     },
   });
-  
+
+  const selectedHidrocooler = form.watch('hidrocooler');
+
   React.useEffect(() => {
     if (lot) {
+      // Set default bin count based on selected hidrocooler
+      let defaultBinCount = lot.binCount;
+      if (selectedHidrocooler === 'HIDROCOOLER 1') {
+        defaultBinCount = 10;
+      } else if (selectedHidrocooler === 'HIDROCOOLER 2') {
+        defaultBinCount = 8;
+      }
+      
+      // Ensure default does not exceed available
+      const finalBinCount = Math.min(defaultBinCount, lot.binCount);
+
+      // Only update if the hidrocooler has been selected, to avoid overwriting initial state
+      if(selectedHidrocooler) {
+          form.setValue('binCount', finalBinCount);
+      } else {
+         form.reset({ hidrocooler: undefined, binCount: lot.binCount });
+      }
+
+    }
+  }, [selectedHidrocooler, lot, form]);
+  
+  React.useEffect(() => {
+    // Reset form when dialog opens
+    if (open && lot) {
       form.reset({ hidrocooler: undefined, binCount: lot.binCount });
     }
-  }, [lot, form, open]);
+  }, [open, lot, form]);
+
 
   const onSubmit = (values: ProcessFormValues) => {
     if (!lot) return;
@@ -69,7 +96,7 @@ export function ProcessLotDialog({ lot, open, onOpenChange, onProcess }: Process
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Hidrocooler</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="Seleccione un hidrocooler" />
