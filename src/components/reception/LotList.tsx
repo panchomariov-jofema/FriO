@@ -13,6 +13,8 @@ import { WeightCalculator } from './WeightCalculator';
 import { TemperatureForm } from './TemperatureForm';
 import { Checkbox } from '../ui/checkbox';
 import { Label } from '../ui/label';
+import { EditLotDialog } from './EditLotDialog';
+import { Pencil } from 'lucide-react';
 
 interface LotListProps {
   exporterId: string | null;
@@ -27,6 +29,7 @@ export function LotList({ exporterId, producerId }: LotListProps) {
   
   const [isWeightOpen, setWeightOpen] = React.useState(false);
   const [isTempOpen, setTempOpen] = React.useState(false);
+  const [isEditOpen, setEditOpen] = React.useState(false);
   const [selectedLot, setSelectedLot] = React.useState<ReceptionLot | null>(null);
 
   React.useEffect(() => {
@@ -75,9 +78,15 @@ export function LotList({ exporterId, producerId }: LotListProps) {
     }
   };
 
+  const handleEditClick = (lot: ReceptionLot) => {
+    setSelectedLot(lot);
+    setEditOpen(true);
+  }
+
   const closeDialogs = () => {
     setWeightOpen(false);
     setTempOpen(false);
+    setEditOpen(false);
     setSelectedLot(null);
   }
 
@@ -147,13 +156,14 @@ export function LotList({ exporterId, producerId }: LotListProps) {
                   <TableHead>Peso Total</TableHead>
                   <TableHead>T° Pre</TableHead>
                   <TableHead>T° Post</TableHead>
+                  <TableHead className="text-right">Acciones</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {loading ? (
                   Array.from({ length: 3 }).map((_, i) => (
                     <TableRow key={i}>
-                      <TableCell colSpan={8}><Skeleton className="h-4 w-full" /></TableCell>
+                      <TableCell colSpan={9}><Skeleton className="h-4 w-full" /></TableCell>
                     </TableRow>
                   ))
                 ) : filteredLots.length > 0 ? (
@@ -169,11 +179,17 @@ export function LotList({ exporterId, producerId }: LotListProps) {
                       <TableCell>{renderCellContent(lot, 'totalWeight')}</TableCell>
                       <TableCell>{renderCellContent(lot, 'preHydroTemp')}</TableCell>
                       <TableCell>{renderCellContent(lot, 'postHydroTemp')}</TableCell>
+                       <TableCell className="text-right">
+                        <Button variant="ghost" size="icon" onClick={() => handleEditClick(lot)}>
+                          <Pencil className="h-4 w-4" />
+                          <span className="sr-only">Editar</span>
+                        </Button>
+                      </TableCell>
                     </TableRow>
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={8} className="h-24 text-center">
+                    <TableCell colSpan={9} className="h-24 text-center">
                       No se encontraron lotes para esta selección.
                     </TableCell>
                   </TableRow>
@@ -197,6 +213,12 @@ export function LotList({ exporterId, producerId }: LotListProps) {
                 open={isTempOpen}
                 onOpenChange={setTempOpen}
                 onTempSaved={closeDialogs}
+            />
+            <EditLotDialog
+                lot={selectedLot}
+                open={isEditOpen}
+                onOpenChange={setEditOpen}
+                onLotUpdated={closeDialogs}
             />
         </>
       )}
