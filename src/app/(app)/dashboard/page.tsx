@@ -266,7 +266,7 @@ export default function DashboardPage() {
                             </div>
                         ) : kilosPorExportador.length > 0 ? (
                         <ChartContainer config={chartConfig} className="h-[250px] w-full">
-                           <BarChart data={kilosPorExportador} layout="vertical" margin={{ right: 20 }}>
+                           <BarChart data={kilosPorExportador} layout="vertical" margin={{ right: 80 }}>
                                 <XAxis type="number" dataKey="kilos" hide />
                                 <YAxis dataKey="name" type="category" tickLine={false} axisLine={false} tickMargin={10} width={80} />
                                 <ChartTooltip content={<ChartTooltipContent />} />
