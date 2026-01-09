@@ -80,31 +80,37 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   React.useEffect(() => {
     if (user && !loadingUsers && !loadingProfiles) {
-        const emailUsername = user.isAnonymous ? null : (user.email ? user.email.split('@')[0].toLowerCase() : null);
-        
-        if (emailUsername) {
-            const currentUserMaster = users.find(u => u.userName.toLowerCase() === emailUsername);
-            if (currentUserMaster) {
-                const userProfile = profiles.find(p => p.profileId === currentUserMaster.profileId);
-                if (userProfile) {
-                const accessibleNavs = userProfile.modulesAccess
-                    .map((permission: ModulePermission) => {
-                        const moduleName = typeof permission === 'string' ? permission : permission.name;
-                        const href = `/${moduleName.toLowerCase().replace(/\s/g, '-').replace(/y-/, '-')}`;
-                        return defaultNavItems.find(item => item.href === href);
-                    })
-                    .filter(Boolean) as { href: string; label: string; icon: React.ElementType }[];
-                setNavItems(accessibleNavs);
-                } else {
-                    setNavItems(defaultNavItems); // Profile referenced but not found, grant all
-                }
-            } else {
-                 setNavItems(defaultNavItems); // User not in master list, grant all
-            }
+      if (user.isAnonymous) {
+        // Anonymous users have restricted access
+        const restrictedNavs = defaultNavItems.filter(item => item.href !== '/datos-maestros');
+        setNavItems(restrictedNavs);
+        return;
+      }
+      
+      const emailUsername = user.email ? user.email.split('@')[0].toLowerCase() : null;
+      if (emailUsername) {
+        const currentUserMaster = users.find(u => u.userName.toLowerCase() === emailUsername);
+        if (currentUserMaster) {
+          const userProfile = profiles.find(p => p.profileId === currentUserMaster.profileId);
+          if (userProfile) {
+            const accessibleNavs = userProfile.modulesAccess
+              .map((permission: ModulePermission) => {
+                const moduleName = typeof permission === 'string' ? permission : permission.name;
+                const href = `/${moduleName.toLowerCase().replace(/\s/g, '-').replace(/y-/, '-')}`;
+                return defaultNavItems.find(item => item.href === href);
+              })
+              .filter(Boolean) as { href: string; label: string; icon: React.ElementType }[];
+            setNavItems(accessibleNavs);
+          } else {
+            setNavItems(defaultNavItems); // Profile referenced but not found, grant all
+          }
         } else {
-            // Anonymous user or user without email
-             setNavItems(defaultNavItems);
+          setNavItems(defaultNavItems); // User not in master list, grant all
         }
+      } else {
+        // Fallback for users without email (should not happen for non-anonymous)
+        setNavItems([]);
+      }
     }
   }, [user, users, profiles, loadingUsers, loadingProfiles]);
 
