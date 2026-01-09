@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -59,7 +58,6 @@ export function OtherFruitExitTab() {
     return (allClients || []).filter(c => c.type.toUpperCase() === 'FRUTA');
   }, [allClients]);
 
-  // Restructured stock to be grouped by product, then by lot (FIFO)
   const availableStockByProductAndLot = React.useMemo(() => {
     if (!selectedClientId || !allReceptions) return {};
 
@@ -232,7 +230,8 @@ export function OtherFruitExitTab() {
     if (!lotData) return;
 
     let newLocations = (currentItem.locations || []).filter(loc => {
-        const locationLotId = allReceptions.find(r => r.id === loc.receptionId)?.displayLotId;
+        const locationReception = allReceptions.find(r => r.id === loc.receptionId);
+        const locationLotId = locationReception?.displayLotId || locationReception?.document;
         return locationLotId !== lotId;
     });
 
@@ -253,7 +252,6 @@ export function OtherFruitExitTab() {
         locations: newLocations,
     });
     
-    // We need to force a re-render of the inputs inside the accordion
     setTimeout(() => {
         const formValues = form.getValues();
         form.reset(formValues);
@@ -356,16 +354,25 @@ export function OtherFruitExitTab() {
                                                 Recepción: {new Date(lotData.createdAt).toLocaleDateString()}
                                             </span>
                                        </div>
-                                       <span>Disp: {lotData.totalAvailable} {lotData.unit}</span>
+                                       <div className="flex items-center gap-2">
+                                          <span>Disp: {lotData.totalAvailable} {lotData.unit}</span>
+                                          <Button
+                                              type="button"
+                                              size="sm"
+                                              variant="link"
+                                              onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  handleSelectAllInLot(index, lotId);
+                                              }}
+                                              className="p-1 h-auto"
+                                            >
+                                                Seleccionar Todo
+                                            </Button>
+                                       </div>
                                     </div>
                                   </AccordionTrigger>
                                   <AccordionContent>
                                     <div className="space-y-2 p-2">
-                                       <div className="flex justify-end mb-2">
-                                          <Button type="button" size="sm" variant="link" onClick={() => handleSelectAllInLot(index, lotId)}>
-                                              Seleccionar Todo el Lote
-                                          </Button>
-                                       </div>
                                        {Object.entries(lotData.locations).map(([key, loc]) => (
                                          <div key={key} className="flex items-center gap-2 text-sm p-2 bg-muted/50 rounded">
                                              <span className="flex-1">{loc.location}</span>
