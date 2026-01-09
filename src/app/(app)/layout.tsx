@@ -12,6 +12,7 @@ import {
   Leaf,
   LogOut,
   Package,
+  PanelLeft,
   PieChart,
   Truck,
   Waves,
@@ -133,12 +134,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <Sidebar>
         <SidebarHeader>
           <div className="flex items-center gap-2 p-2">
-            <Button variant="ghost" size="icon" className="md:hidden" asChild>
-                <SidebarTrigger>
-                    <ChevronsLeft />
-                </SidebarTrigger>
-            </Button>
-            <Leaf className="w-8 h-8 text-primary" />
+            <SidebarTrigger className="md:hidden" />
+            <Leaf className="w-8 h-8 text-primary hidden md:block" />
             <span className="font-bold text-lg group-data-[collapsible=icon]:hidden">
               FrigoManager
             </span>
@@ -166,7 +163,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </SidebarFooter>
       </Sidebar>
       <SidebarInset>
-         <header className="flex items-center justify-end h-14 px-4 border-b">
+         <header className="flex items-center justify-between h-14 px-4 border-b">
+            <SidebarTrigger className="md:hidden" />
+            <div className="flex-1" />
             <Button variant="ghost" size="sm" onClick={handleSignOut}>
                 <LogOut className="mr-2 h-4 w-4" />
                 Cerrar Sesión
