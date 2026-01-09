@@ -65,13 +65,13 @@ function BinMaterialStockReport() {
                         <CardDescription className="pt-2">Inventario actual de todos los bins y materiales.</CardDescription>
                     </div>
                 </AccordionTrigger>
-                <div className="px-6 pb-6">
-                     <Button variant="outline" size="sm" onClick={handleExport} disabled={loading || data.length === 0}>
-                        <Download className="mr-2 h-4 w-4" />
-                        Exportar CSV
-                    </Button>
-                </div>
                 <AccordionContent>
+                    <div className="px-6 pb-6">
+                         <Button variant="outline" size="sm" onClick={handleExport} disabled={loading || data.length === 0}>
+                            <Download className="mr-2 h-4 w-4" />
+                            Exportar CSV
+                        </Button>
+                    </div>
                     <CardContent>
                         <div className="rounded-md border">
                             <Table>
@@ -143,13 +143,13 @@ function PackagingStockReport() {
                         <CardDescription className="pt-2">Inventario de pallets de embalaje almacenados.</CardDescription>
                     </div>
                 </AccordionTrigger>
-                 <div className="px-6 pb-6">
-                     <Button variant="outline" size="sm" onClick={handleExport} disabled={loading || flattenedData.length === 0}>
-                        <Download className="mr-2 h-4 w-4" />
-                        Exportar CSV
-                    </Button>
-                </div>
                 <AccordionContent>
+                    <div className="px-6 pb-6">
+                         <Button variant="outline" size="sm" onClick={handleExport} disabled={loading || flattenedData.length === 0}>
+                            <Download className="mr-2 h-4 w-4" />
+                            Exportar CSV
+                        </Button>
+                    </div>
                     <CardContent>
                         <div className="rounded-md border">
                             <Table>
@@ -221,13 +221,13 @@ function BinMaterialKardexReport() {
                         <CardDescription className="pt-2">Historial de entradas y salidas.</CardDescription>
                     </div>
                 </AccordionTrigger>
-                <div className="px-6 pb-6">
-                     <Button variant="outline" size="sm" onClick={handleExport} disabled={loading || kardexData.length === 0}>
-                        <Download className="mr-2 h-4 w-4" />
-                        Exportar CSV
-                    </Button>
-                </div>
                 <AccordionContent>
+                    <div className="px-6 pb-6">
+                         <Button variant="outline" size="sm" onClick={handleExport} disabled={loading || kardexData.length === 0}>
+                            <Download className="mr-2 h-4 w-4" />
+                            Exportar CSV
+                        </Button>
+                    </div>
                     <CardContent>
                         <div className="rounded-md border">
                             <Table>
@@ -303,13 +303,13 @@ function ReceptionLogReport() {
                         <CardDescription className="pt-2">Listado de todos los lotes ingresados.</CardDescription>
                     </div>
                 </AccordionTrigger>
-                 <div className="px-6 pb-6">
-                    <Button variant="outline" size="sm" onClick={handleExport} disabled={loading || receptionLots.length === 0}>
-                        <Download className="mr-2 h-4 w-4" />
-                        Exportar CSV
-                    </Button>
-                </div>
                 <AccordionContent>
+                    <div className="px-6 pb-6">
+                        <Button variant="outline" size="sm" onClick={handleExport} disabled={loading || receptionLots.length === 0}>
+                            <Download className="mr-2 h-4 w-4" />
+                            Exportar CSV
+                        </Button>
+                    </div>
                     <CardContent>
                         <div className="rounded-md border">
                             <Table>
@@ -364,7 +364,7 @@ function ReceptionLogReport() {
 
 function OtherFruitStockReport() {
     const { data: receptions, loading: loadingReceptions } = useFirestoreCollection<OtherFruitReception>('otherFruitReceptions');
-    const [clientFilter, setClientFilter] = React.useState('');
+    const [clientFilter, setClientFilter] = React.useState('all');
     const [productFilter, setProductFilter] = React.useState('');
 
     const stockData = React.useMemo(() => {
@@ -400,7 +400,7 @@ function OtherFruitStockReport() {
     
     const filteredData = React.useMemo(() => {
         return stockData.filter(item => {
-            const clientMatch = clientFilter ? item.clientName.toLowerCase().includes(clientFilter.toLowerCase()) : true;
+            const clientMatch = clientFilter !== 'all' ? item.clientName.toLowerCase().includes(clientFilter.toLowerCase()) : true;
             const productMatch = productFilter ? item.productCode.toLowerCase().includes(productFilter.toLowerCase()) : true;
             return clientMatch && productMatch;
         });
@@ -432,27 +432,27 @@ function OtherFruitStockReport() {
                         <CardDescription className="pt-2">Inventario consolidado de fruta de clientes externos en cámara.</CardDescription>
                     </div>
                 </AccordionTrigger>
-                <div className="px-6 pb-6">
-                    <div className="flex flex-col sm:flex-row gap-4">
-                        <Select onValueChange={(value) => setClientFilter(value === 'all' ? '' : value)} value={clientFilter || 'all'}>
-                            <SelectTrigger><SelectValue placeholder="Filtrar por cliente..." /></SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all">Todos los Clientes</SelectItem>
-                                {clientOptions.map(client => <SelectItem key={client} value={client}>{client}</SelectItem>)}
-                            </SelectContent>
-                        </Select>
-                        <Input 
-                            placeholder="Filtrar por código de producto..."
-                            value={productFilter}
-                            onChange={(e) => setProductFilter(e.target.value)}
-                        />
-                        <Button variant="outline" size="sm" onClick={handleExport} disabled={loadingReceptions || filteredData.length === 0} className="w-full sm:w-auto">
-                            <Download className="mr-2 h-4 w-4" />
-                            Exportar CSV
-                        </Button>
-                    </div>
-                </div>
                 <AccordionContent>
+                    <div className="px-6 pb-6">
+                        <div className="flex flex-col sm:flex-row gap-4">
+                            <Select onValueChange={setClientFilter} value={clientFilter}>
+                                <SelectTrigger><SelectValue placeholder="Filtrar por cliente..." /></SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">Todos los Clientes</SelectItem>
+                                    {clientOptions.map(client => <SelectItem key={client} value={client}>{client}</SelectItem>)}
+                                </SelectContent>
+                            </Select>
+                            <Input 
+                                placeholder="Filtrar por código de producto..."
+                                value={productFilter}
+                                onChange={(e) => setProductFilter(e.target.value)}
+                            />
+                            <Button variant="outline" size="sm" onClick={handleExport} disabled={loadingReceptions || filteredData.length === 0} className="w-full sm:w-auto">
+                                <Download className="mr-2 h-4 w-4" />
+                                Exportar CSV
+                            </Button>
+                        </div>
+                    </div>
                     <CardContent>
                         <div className="rounded-md border">
                             <Table>
@@ -532,12 +532,12 @@ function OtherFruitKardexReport() {
         return allMovements.sort((a,b) => b.date.toMillis() - a.date.toMillis());
     }, [receptions, movements]);
 
-    const [clientFilter, setClientFilter] = React.useState('');
+    const [clientFilter, setClientFilter] = React.useState('all');
     const [productFilter, setProductFilter] = React.useState('');
     
      const filteredData = React.useMemo(() => {
         return kardexData.filter(item => {
-            const clientMatch = clientFilter ? item.clientName.toLowerCase().includes(clientFilter.toLowerCase()) : true;
+            const clientMatch = clientFilter !== 'all' ? item.clientName.toLowerCase().includes(clientFilter.toLowerCase()) : true;
             const productMatch = productFilter ? item.productCode.toLowerCase().includes(productFilter.toLowerCase()) : true;
             return clientMatch && productMatch;
         });
@@ -574,27 +574,27 @@ function OtherFruitKardexReport() {
                         <CardDescription className="pt-2">Historial de entradas y salidas de fruta de clientes externos.</CardDescription>
                     </div>
                 </AccordionTrigger>
-                <div className="px-6 pb-6">
-                    <div className="flex flex-col sm:flex-row gap-4">
-                        <Select onValueChange={(value) => setClientFilter(value === 'all' ? '' : value)} value={clientFilter || 'all'}>
-                            <SelectTrigger><SelectValue placeholder="Filtrar por cliente..." /></SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all">Todos los Clientes</SelectItem>
-                                {clientOptions.map(client => <SelectItem key={client} value={client}>{client}</SelectItem>)}
-                            </SelectContent>
-                        </Select>
-                        <Input 
-                            placeholder="Filtrar por código de producto..."
-                            value={productFilter}
-                            onChange={(e) => setProductFilter(e.target.value)}
-                        />
-                        <Button variant="outline" size="sm" onClick={handleExport} disabled={loading || filteredData.length === 0}>
-                            <Download className="mr-2 h-4 w-4" />
-                            Exportar CSV
-                        </Button>
-                    </div>
-                </div>
                 <AccordionContent>
+                    <div className="px-6 pb-6">
+                        <div className="flex flex-col sm:flex-row gap-4">
+                            <Select onValueChange={setClientFilter} value={clientFilter}>
+                                <SelectTrigger><SelectValue placeholder="Filtrar por cliente..." /></SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">Todos los Clientes</SelectItem>
+                                    {clientOptions.map(client => <SelectItem key={client} value={client}>{client}</SelectItem>)}
+                                </SelectContent>
+                            </Select>
+                            <Input 
+                                placeholder="Filtrar por código de producto..."
+                                value={productFilter}
+                                onChange={(e) => setProductFilter(e.target.value)}
+                            />
+                            <Button variant="outline" size="sm" onClick={handleExport} disabled={loading || filteredData.length === 0}>
+                                <Download className="mr-2 h-4 w-4" />
+                                Exportar CSV
+                            </Button>
+                        </div>
+                    </div>
                     <CardContent>
                         <div className="rounded-md border">
                             <Table>
@@ -654,7 +654,7 @@ export default function ReportesPage() {
                 </CardHeader>
             </Card>
             
-            <Accordion type="multiple" className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <Accordion type="multiple" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 <BinMaterialStockReport />
                 <PackagingStockReport />
                 <BinMaterialKardexReport />
