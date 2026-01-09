@@ -11,14 +11,13 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
 import type { OtherClient, OtherFruitReception } from '@/lib/types';
-import { otherFruitExitSchema, type OtherFruitExitItem as ExitItemSchema } from '@/lib/schemas';
+import { otherFruitExitSchema } from '@/lib/schemas';
 import { PlusCircle, Trash2 } from 'lucide-react';
 import { useFirestore } from '@/firebase';
 import { addDoc, collection, doc, writeBatch, serverTimestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
-import { usePackagingMastersByClient } from '@/hooks/usePackagingMastersByClient';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '../ui/accordion';
 
 type ExitFormValues = z.infer<typeof otherFruitExitSchema>;
@@ -305,48 +304,49 @@ export function OtherFruitExitTab() {
                 const sortedLots = productStock ? Object.entries(productStock.lots).sort(([, a], [, b]) => a.createdAt - b.createdAt) : [];
                 
                 return (
-                  <div key={field.id} className="flex flex-col gap-3 p-4 border rounded-md">
-                    <div className="flex items-end gap-2">
-                      <div className="flex-1 grid sm:grid-cols-2 gap-4">
-                        <FormField
-                            control={form.control}
-                            name={`items.${index}.productCode`}
-                            render={({ field: itemField }) => (
-                              <FormItem>
-                                <FormLabel>Código de Producto</FormLabel>
-                                <Select onValueChange={(value) => handleItemCodeChange(index, value)} value={itemField.value} disabled={!selectedClientId || Object.keys(availableStockByProductAndLot).length === 0}>
-                                    <FormControl><SelectTrigger>
-                                        <SelectValue placeholder={!selectedClientId ? "Seleccione cliente" : "Seleccione un producto"} />
-                                    </SelectTrigger></FormControl>
-                                    <SelectContent>
-                                      {Object.entries(availableStockByProductAndLot).map(([code, { name }]) => (
-                                          <SelectItem key={code} value={code}>{code} - {name}</SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                </Select>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                          <div className="space-y-2">
-                              <p className="font-medium text-sm h-10 flex items-center">
-                                  Total a sacar: {form.watch(`items.${index}.quantity`)} {fruitClients.find(c => c.clientId === selectedClientId)?.unit || ''}
-                              </p>
-                          </div>
-                      </div>
-                      <Button type="button" variant="destructive" size="icon" onClick={() => remove(index)} disabled={fields.length <= 1}>
+                  <Card key={field.id} className="overflow-hidden">
+                    <CardHeader className="flex flex-row items-center justify-between p-4 bg-muted/50">
+                        <div className="flex-1 grid sm:grid-cols-2 gap-4">
+                            <FormField
+                                control={form.control}
+                                name={`items.${index}.productCode`}
+                                render={({ field: itemField }) => (
+                                <FormItem>
+                                    <FormLabel>Código de Producto</FormLabel>
+                                    <Select onValueChange={(value) => handleItemCodeChange(index, value)} value={itemField.value} disabled={!selectedClientId || Object.keys(availableStockByProductAndLot).length === 0}>
+                                        <FormControl><SelectTrigger>
+                                            <SelectValue placeholder={!selectedClientId ? "Seleccione cliente" : "Seleccione un producto"} />
+                                        </SelectTrigger></FormControl>
+                                        <SelectContent>
+                                        {Object.entries(availableStockByProductAndLot).map(([code, { name }]) => (
+                                            <SelectItem key={code} value={code}>{code} - {name}</SelectItem>
+                                        ))}
+                                        </SelectContent>
+                                    </Select>
+                                    <FormMessage />
+                                </FormItem>
+                                )}
+                            />
+                            <div className="space-y-2">
+                                <FormLabel>Total a Sacar</FormLabel>
+                                <p className="font-semibold text-lg h-10 flex items-center">
+                                    {form.watch(`items.${index}.quantity`)} {fruitClients.find(c => c.clientId === selectedClientId)?.unit || ''}
+                                </p>
+                            </div>
+                        </div>
+                         <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)} disabled={fields.length <= 1}>
                           <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-
-                    {selectedProductCode && (
-                       <div className="space-y-2 pl-2 border-l-2">
-                          <FormLabel className="text-xs font-medium">Lotes Disponibles (FIFO)</FormLabel>
-                          {sortedLots.length > 0 ? (
-                            <Accordion type="multiple" className="w-full">
-                              {sortedLots.map(([lotId, lotData]) => (
-                                <AccordionItem value={lotId} key={lotId}>
-                                    <div className="flex items-center w-full">
+                        </Button>
+                    </CardHeader>
+                    <CardContent className="p-4">
+                        {selectedProductCode && (
+                        <div className="space-y-2">
+                            <FormLabel className="text-xs font-medium">Lotes Disponibles (FIFO)</FormLabel>
+                            {sortedLots.length > 0 ? (
+                                <Accordion type="multiple" className="w-full">
+                                {sortedLots.map(([lotId, lotData]) => (
+                                    <AccordionItem value={lotId} key={lotId}>
+                                      <div className="flex items-center w-full">
                                         <AccordionTrigger className="flex-1">
                                             <div className="flex flex-col text-left">
                                                 <span>Lote: <span className="font-mono">{lotId}</span></span>
@@ -356,7 +356,7 @@ export function OtherFruitExitTab() {
                                             </div>
                                         </AccordionTrigger>
                                         <div className="flex items-center gap-2 pr-4">
-                                            <span>Disp: {lotData.totalAvailable} {lotData.unit}</span>
+                                            <span className="text-sm font-medium">Disp: {lotData.totalAvailable} {lotData.unit}</span>
                                             <Button
                                                 type="button"
                                                 size="sm"
@@ -365,40 +365,40 @@ export function OtherFruitExitTab() {
                                                     e.stopPropagation();
                                                     handleSelectAllInLot(index, lotId);
                                                 }}
-                                                className="p-1 h-auto"
+                                                className="p-1 h-auto text-sm"
                                                 >
                                                 Seleccionar Todo el Lote
                                             </Button>
                                         </div>
-                                    </div>
-                                  <AccordionContent>
-                                    <div className="space-y-2 p-2">
-                                       {Object.entries(lotData.locations).map(([key, loc]) => (
-                                         <div key={key} className="flex items-center gap-2 text-sm p-2 bg-muted/50 rounded">
-                                             <span className="flex-1">{loc.location}</span>
-                                             <span className="w-28">Disp: {loc.available} {lotData.unit}</span>
-                                             <Input
-                                                 type="number"
-                                                 className="w-32 h-8"
-                                                 placeholder="Cantidad"
-                                                 max={loc.available}
-                                                 min={0}
-                                                 value={(form.getValues(`items.${index}.locations`) || []).find(l => l.locationKey === key)?.quantityToWithdraw || 0}
-                                                 onChange={(e) => handleLocationChange(index, lotId, key, parseInt(e.target.value) || 0)}
-                                             />
-                                         </div>
-                                      ))}
-                                    </div>
-                                  </AccordionContent>
-                                </AccordionItem>
-                              ))}
-                            </Accordion>
-                          ) : <p className="text-sm text-muted-foreground p-2">No hay lotes con stock para este producto.</p>
-                          }
-                      </div>
-                    )}
-
-                  </div>
+                                      </div>
+                                    <AccordionContent className="pt-2">
+                                        <div className="space-y-2 p-2 border-t">
+                                        {Object.entries(lotData.locations).map(([key, loc]) => (
+                                            <div key={key} className="flex items-center gap-4 text-sm p-2 bg-background rounded">
+                                                <span className="flex-1 font-mono">{loc.location}</span>
+                                                <span className="w-28">Disp: {loc.available} {lotData.unit}</span>
+                                                <Input
+                                                    type="number"
+                                                    className="w-32 h-8"
+                                                    placeholder="Cantidad"
+                                                    max={loc.available}
+                                                    min={0}
+                                                    value={(form.getValues(`items.${index}.locations`) || []).find(l => l.locationKey === key)?.quantityToWithdraw || 0}
+                                                    onChange={(e) => handleLocationChange(index, lotId, key, parseInt(e.target.value) || 0)}
+                                                />
+                                            </div>
+                                        ))}
+                                        </div>
+                                    </AccordionContent>
+                                    </AccordionItem>
+                                ))}
+                                </Accordion>
+                            ) : <p className="text-sm text-muted-foreground p-2">No hay lotes con stock para este producto.</p>
+                            }
+                        </div>
+                        )}
+                    </CardContent>
+                  </Card>
                 )
               })}
               <Button
