@@ -30,7 +30,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
-import type { ChamberLot, Dispatch, Exporter } from '@/lib/types';
+import type { ChamberLot, Dispatch, Exporter, ReceptionLot } from '@/lib/types';
 import { useFirestore } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { collection, query, where, getDocs, writeBatch, serverTimestamp, doc, addDoc, getDoc } from 'firebase/firestore';
@@ -54,6 +54,7 @@ import { chambersConfig } from '@/lib/chambers-config';
 import { usePackingsByExporter } from '@/hooks/use-packings-by-exporter';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ManualDispatchTab } from '@/components/dispatch/ManualDispatchTab';
+import { Download } from 'lucide-react';
 
 const dispatchSchema = z.object({
   exporterId: z.string().min(1, 'Debe seleccionar un cliente.'),
@@ -79,11 +80,44 @@ const naturalSort = (a: string, b: string) => {
   return aNum - bNum;
 };
 
+// Helper to convert array of objects to CSV
+function convertToCSV(data: any[], headers: string[]) {
+    const headerRow = headers.join(';');
+    const rows = data.map(row => 
+        headers.map(header => {
+            let value = row[header];
+            if (value instanceof Date) {
+                value = value.toLocaleString();
+            } else if (typeof value === 'object' && value !== null && value?.toDate) { // Firebase Timestamp
+                value = value.toDate().toLocaleString();
+            }
+            const stringValue = String(value ?? '');
+            return `"${stringValue.replace(/"/g, '""')}"`;
+        }).join(';')
+    );
+    return [headerRow, ...rows].join('\n');
+}
+
+function downloadCSV(csvString: string, filename: string) {
+    const blob = new Blob([`\uFEFF${csvString}`], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    if (link.download !== undefined) {
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        link.setAttribute('download', filename);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+}
+
 
 export default function DespachosPage() {
   const { data: exporters, loading: loadingExporters } = useFirestoreCollection<Exporter>('exporters');
   const { data: dispatches, loading: loadingDispatches } = useFirestoreCollection<Dispatch>('dispatches');
   const { data: chamberLots, loading: loadingChamberLots } = useFirestoreCollection<ChamberLot>('chamberLots');
+  const { data: receptionLots, loading: loadingReceptionLots } = useFirestoreCollection<ReceptionLot>('receptionLots');
   const firestore = useFirestore();
   const { toast } = useToast();
   const [isConfirming, setIsConfirming] = React.useState(false);
@@ -319,6 +353,35 @@ const handleUndoDispatch = async (dispatchToUndo: Dispatch) => {
     } finally {
         setIsUndoing(false);
     }
+};
+
+  const handleExportDispatch = (dispatch: Dispatch) => {
+    if (!receptionLots) {
+        toast({ variant: 'destructive', title: 'Error', description: 'Los datos de recepción aún no están cargados.' });
+        return;
+    }
+
+    const dataToExport = dispatch.bins.map(bin => {
+        const originalReception = receptionLots.find(lot => lot.displayLotId === bin.displayLotId);
+        const netWeight = (originalReception?.totalWeight && originalReception.totalWeight > 0)
+            ? (originalReception.totalWeight - (originalReception.binCount * 65) + (originalReception.noTotes || 0))
+            : null;
+
+        return {
+            'Cantidad de Bins': bin.binCount,
+            'Cantidad de Totes': originalReception?.toteCount ?? '',
+            'Productor': originalReception?.producerId ?? '',
+            'Variedad': originalReception?.variety ?? '',
+            'Kilos Netos': netWeight?.toFixed(2) ?? '',
+            'Fecha de Recepción': originalReception?.createdAt?.toDate().toLocaleDateString() ?? '',
+            'N° Documento de recepcion': originalReception?.document ?? '',
+        };
+    });
+
+    const headers = ['Cantidad de Bins', 'Cantidad de Totes', 'Productor', 'Variedad', 'Kilos Netos', 'Fecha de Recepción', 'N° Documento de recepcion'];
+    const csv = convertToCSV(dataToExport, headers);
+    const date = dispatch.createdAt.toDate().toISOString().split('T')[0];
+    downloadCSV(csv, `despacho_${dispatch.exporterName}_${date}.csv`);
 };
 
 
@@ -615,6 +678,17 @@ const handleUndoDispatch = async (dispatchToUndo: Dispatch) => {
                                                 </AlertDialogContent>
                                             </AlertDialog>
                                             </>
+                                        )}
+                                        {dispatch.status === 'Completado' && (
+                                            <Button 
+                                                variant="outline" 
+                                                size="sm"
+                                                onClick={() => handleExportDispatch(dispatch)}
+                                                disabled={loadingReceptionLots}
+                                            >
+                                                <Download className="mr-2 h-4 w-4" />
+                                                Exportar
+                                            </Button>
                                         )}
                                     </TableCell>
                                 </TableRow>
