@@ -66,7 +66,7 @@ export function RelocateDialog({
   const { allChamberLots = [], allOtherFruitReceptions = [] } = storedItems || {};
 
   const { availableCoordinates, occupancyMap } = React.useMemo(() => {
-    if (!targetChamberId) return { availableCoordinates: [], occupancyMap: new Map() };
+    if (!targetChamberId || !item) return { availableCoordinates: [], occupancyMap: new Map() };
     
     const chamberConfig = chambersConfig[targetChamberId];
     if (!chamberConfig) return { availableCoordinates: [], occupancyMap: new Map() };
@@ -82,14 +82,14 @@ export function RelocateDialog({
       return currentOccupancyMap.get(coord)!;
     };
     
-    (allChamberLots || []).forEach(lot => {
+    allChamberLots.forEach(lot => {
         if (lot.status === 'Almacenado' && lot.chamberId === targetChamberId && lot.coordinate) {
             const coordData = getCoord(lot.coordinate);
             coordData.bins += lot.binCount;
         }
     });
 
-    (allOtherFruitReceptions || []).forEach(reception => {
+    allOtherFruitReceptions.forEach(reception => {
         reception.items.forEach(fruitItem => {
             if(fruitItem.status === 'Almacenado' && fruitItem.storageLocation?.chamberId === targetChamberId && fruitItem.storageLocation.coordinate) {
                 const coordData = getCoord(fruitItem.storageLocation.coordinate);
@@ -103,28 +103,32 @@ export function RelocateDialog({
     });
     
     const available = allPossibleCoords.filter(coord => {
-      // If we are relocating within the same chamber, the source coordinate is technically available
+      // The source coordinate is always a valid target for relocation within the same chamber
       if (targetChamberId === sourceChamberId && coord === sourceCoordinate) {
           return true;
       }
         
       const occupied = currentOccupancyMap.get(coord);
-      if (!occupied) return true; // If no record, it's empty
+      if (!occupied) return true; // If no record, it's empty and valid for both
 
-      if (item?.unit === 'Pallets') {
-          return occupied.bins === 0 && occupied.pallets < 2;
+      if (item.unit === 'Pallets') {
+        // Can only move to a coordinate with 0 bins and less than 2 pallets.
+        return occupied.bins === 0 && occupied.pallets < 2;
       }
-      if (item?.unit === 'Bins') {
-          return occupied.pallets === 0 && occupied.bins < 6;
+      
+      if (item.unit === 'Bins') {
+        // Can only move to a coordinate with 0 pallets and less than 6 bins.
+        return occupied.pallets === 0 && occupied.bins < 6;
       }
-      return false;
+      
+      return false; // Should not happen
     });
 
     return { 
         availableCoordinates: available,
         occupancyMap: currentOccupancyMap,
     };
-  }, [targetChamberId, allChamberLots, allOtherFruitReceptions, sourceChamberId, sourceCoordinate, item?.unit]);
+  }, [targetChamberId, allChamberLots, allOtherFruitReceptions, sourceChamberId, sourceCoordinate, item]);
 
 
   React.useEffect(() => {
@@ -137,18 +141,34 @@ export function RelocateDialog({
   }, [open, form]);
 
   const onSubmit = (values: RelocateFormValues) => {
+    if (!item) return;
+
     // Re-check capacity on submit to prevent race conditions
     const targetOccupancy = occupancyMap.get(values.targetCoordinate);
-    if (item?.unit === 'Pallets' && targetOccupancy) {
-        if (targetOccupancy.bins > 0) {
-            toast({ variant: 'destructive', title: 'Error de Capacidad', description: 'La coordenada de destino ya contiene bins.'});
-            return;
-        }
-        if (targetOccupancy.pallets >= 2) {
-            toast({ variant: 'destructive', title: 'Error de Capacidad', description: 'La coordenada de destino ya tiene 2 pallets.'});
-            return;
-        }
+
+    if (targetOccupancy) {
+      if (item.unit === 'Pallets') {
+          if (targetOccupancy.bins > 0) {
+              toast({ variant: 'destructive', title: 'Error de Capacidad', description: 'La coordenada de destino ya contiene bins.'});
+              return;
+          }
+          if (values.targetCoordinate !== sourceCoordinate && targetOccupancy.pallets >= 2) {
+              toast({ variant: 'destructive', title: 'Error de Capacidad', description: 'La coordenada de destino ya tiene 2 pallets.'});
+              return;
+          }
+      }
+       if (item.unit === 'Bins') {
+          if (targetOccupancy.pallets > 0) {
+              toast({ variant: 'destructive', title: 'Error de Capacidad', description: 'La coordenada de destino ya contiene pallets.'});
+              return;
+          }
+          if (values.targetCoordinate !== sourceCoordinate && targetOccupancy.bins >= 6) {
+              toast({ variant: 'destructive', title: 'Error de Capacidad', description: 'La coordenada de destino ya tiene 6 bins.'});
+              return;
+          }
+      }
     }
+
 
     onRelocate(values);
   };
