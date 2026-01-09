@@ -196,10 +196,17 @@ export default function DashboardPage() {
         { title: "Pend. por Almacenar en Camara", value: pendingStorage, icon: PackageCheck },
     ];
 
-    const chartConfig: ChartConfig = {
+    const kpiChartConfig: ChartConfig = {
         kilos: {
             label: "Kilos Netos",
             color: "hsl(var(--chart-1))",
+        },
+    };
+    
+    const occupancyChartConfig: ChartConfig = {
+        ocupacion: {
+            label: "Bins Equivalentes",
+            color: "hsl(var(--chart-2))",
         },
     };
 
@@ -269,7 +276,7 @@ export default function DashboardPage() {
                                 <Skeleton className="h-48 w-full" />
                             </div>
                         ) : kilosPorExportador.length > 0 ? (
-                        <ChartContainer config={chartConfig} className="h-[250px] w-full">
+                        <ChartContainer config={kpiChartConfig} className="h-[250px] w-full">
                            <BarChart data={kilosPorExportador} layout="vertical" margin={{ right: 80, left: 20 }}>
                                 <XAxis type="number" dataKey="kilos" hide />
                                 <YAxis dataKey="name" type="category" tickLine={false} axisLine={false} tickMargin={10} width={80} />
@@ -307,7 +314,7 @@ export default function DashboardPage() {
                                 <Skeleton className="h-8 w-full" />
                             </div>
                         ) : (
-                        <ChartContainer config={{ ocupacion: { label: 'Bins Equivalentes', color: "hsl(var(--chart-2))" } }} className="h-[250px] w-full">
+                        <ChartContainer config={occupancyChartConfig} className="h-[250px] w-full">
                            <BarChart data={occupancyByChamber} layout="vertical" margin={{ left: 20, right: 80 }}>
                                 <XAxis type="number" hide />
                                 <YAxis dataKey="name" type="category" tickLine={false} axisLine={false} tickMargin={10} width={80} />
@@ -318,7 +325,7 @@ export default function DashboardPage() {
                                     }}
                                     content={<ChartTooltipContent />} 
                                 />
-                                <Bar dataKey="ocupacion" layout="vertical" radius={5} fill="hsl(var(--chart-2))">
+                                <Bar dataKey="ocupacion" layout="vertical" radius={5} fill="var(--color-ocupacion)">
                                     <LabelList 
                                         dataKey="percentage" 
                                         position="right" 
