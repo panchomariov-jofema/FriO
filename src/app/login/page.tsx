@@ -141,7 +141,7 @@ export default function LoginPage() {
           <CardDescription>
             {isSignUp
               ? 'Ingrese sus datos para registrarse.'
-              : 'Bienvenido a FrigoManager.'}
+              : 'Bienvenido a FÑO.'}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

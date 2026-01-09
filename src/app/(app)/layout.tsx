@@ -136,7 +136,7 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
               <SidebarTrigger className="md:hidden" />
               <Apple className="w-8 h-8 text-primary hidden md:block" />
               <span className="font-bold text-lg group-data-[collapsible=icon]:hidden">
-                FrigoManager
+                FÑO
               </span>
             </div>
           </SidebarHeader>
@@ -158,7 +158,7 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
             </SidebarMenu>
           </SidebarContent>
           <SidebarFooter className='group-data-[collapsible=icon]:hidden'>
-            <p className="text-xs text-muted-foreground text-center">© 2024 FrigoManager</p>
+            <p className="text-xs text-muted-foreground text-center">© 2024 FÑO</p>
           </SidebarFooter>
         </Sidebar>
         <SidebarInset>
