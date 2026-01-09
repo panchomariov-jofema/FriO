@@ -188,41 +188,30 @@ export default function DespachosPage() {
         return;
       }
       
-      let binsToDispatch = [];
-      let binsCount = 0;
-
+      const binsToDispatch = [];
+      let accumulatedBins = 0;
       const batch = writeBatch(firestore);
 
       for (const lot of availableLots) {
-        if (binsCount >= values.maxBins) break;
+        if (accumulatedBins + lot.binCount <= values.maxBins) {
+            binsToDispatch.push({
+                chamberLotId: lot.id,
+                displayLotId: lot.displayLotId,
+                chamberId: lot.chamberId!,
+                coordinate: lot.coordinate!,
+                binCount: lot.binCount,
+            });
+            accumulatedBins += lot.binCount;
 
-        const binsNeeded = values.maxBins - binsCount;
-        const binsFromThisLot = Math.min(lot.binCount, binsNeeded);
-        
-        binsToDispatch.push({
-            chamberLotId: lot.id,
-            displayLotId: lot.displayLotId,
-            chamberId: lot.chamberId!,
-            coordinate: lot.coordinate!,
-            binCount: binsFromThisLot,
-        });
-        
-        const lotRef = doc(firestore, 'chamberLots', lot.id);
-        const remainingBins = lot.binCount - binsFromThisLot;
-
-        if (remainingBins > 0) {
-            batch.update(lotRef, { binCount: remainingBins });
-        } else {
+            // Mark the entire lot as dispatched
+            const lotRef = doc(firestore, 'chamberLots', lot.id);
             batch.update(lotRef, { status: 'Despachado' });
         }
-
-        binsCount += binsFromThisLot;
       }
 
-      const actualTotalBins = binsToDispatch.reduce((sum, bin) => sum + bin.binCount, 0);
 
-      if (actualTotalBins === 0) {
-        toast({ variant: 'destructive', title: 'Sin Stock', description: 'No se encontraron bins para despachar.' });
+      if (binsToDispatch.length === 0) {
+        toast({ variant: 'destructive', title: 'Sin Stock suficiente', description: 'No se encontraron lotes completos que se ajusten a la cantidad solicitada.' });
         return;
       }
 
@@ -230,7 +219,7 @@ export default function DespachosPage() {
         exporterId: selectedExporter.exporterId,
         exporterName: selectedExporter.name,
         packingId: values.packingId || null,
-        totalBins: actualTotalBins,
+        totalBins: accumulatedBins,
         status: 'Pendiente de Salida' as const,
         createdAt: serverTimestamp(),
         bins: binsToDispatch,
@@ -243,7 +232,7 @@ export default function DespachosPage() {
       
       toast({
         title: 'Despacho Creado',
-        description: `Se ha creado un despacho con ${actualTotalBins} bins para ${selectedExporter.name}.`,
+        description: `Se ha creado un despacho con ${accumulatedBins} bins para ${selectedExporter.name}.`,
       });
       form.reset({ exporterId: undefined, packingId: undefined, maxBins: 0 });
 
@@ -321,7 +310,7 @@ const handleUndoDispatch = async (dispatchToUndo: Dispatch) => {
                     // If it was fully dispatched, just revert status
                     batch.update(lotRef, { status: 'Almacenado' });
                 } else {
-                    // If it was partially dispatched, add back the bins
+                    // This case is now less likely as we don't split lots, but keep as safeguard
                     batch.update(lotRef, { binCount: currentLot.binCount + bin.binCount });
                 }
             } else {
@@ -490,7 +479,7 @@ const handleUndoDispatch = async (dispatchToUndo: Dispatch) => {
                 <CardHeader>
                 <CardTitle>Crear Nuevo Despacho Automático</CardTitle>
                 <CardDescription>
-                    Seleccione un cliente y la cantidad de bins a despachar. El sistema asignará los lotes más antiguos (FIFO).
+                    Seleccione un cliente y la cantidad de bins a despachar. El sistema asignará los lotes más antiguos (FIFO) sin dividirlos.
                 </CardDescription>
                 </CardHeader>
                 <CardContent>
