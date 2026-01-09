@@ -4,7 +4,7 @@ import * as React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
-import type { BinMaterialStock, PackagingReception, ReceptionLot, OtherFruitReception, OtherFruitMovement } from '@/lib/types';
+import type { BinMaterialStock, PackagingReception, ReceptionLot, OtherFruitReception, OtherFruitMovement, BinMaterialMovement } from '@/lib/types';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
@@ -28,7 +28,7 @@ function convertToCSV(data: any[], headers: string[]) {
             const stringValue = String(value ?? '');
             // Escape commas and quotes
             if (stringValue.includes(',')) {
-                return `"${stringValue}"`;
+                return `"${stringValue.replace(/"/g, '""')}"`;
             }
             return stringValue;
         }).join(',')
@@ -37,7 +37,7 @@ function convertToCSV(data: any[], headers: string[]) {
 }
 
 function downloadCSV(csvString: string, filename: string) {
-    const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+    const blob = new Blob([`\uFEFF${csvString}`], { type: 'text/csv;charset=utf-8;' }); // Add BOM for Excel
     const link = document.createElement('a');
     if (link.download !== undefined) {
         const url = URL.createObjectURL(blob);
@@ -181,13 +181,12 @@ function PackagingStockReport() {
 }
 
 function BinMaterialKardexReport() {
-    const { materials } = useBinMaterialsByExporter(null); // Fetch all materials to map names
-    const { data: movements, loading } = useFirestoreCollection('binMaterialMovements');
+    const { data: movements, loading } = useFirestoreCollection<BinMaterialMovement>('binMaterialMovements');
 
     const kardexData = React.useMemo(() => {
         return movements.flatMap(mov => 
-            mov.items.map((item: any) => ({
-                key: `${mov.id}-${item.binMaterialCode}`,
+            mov.items.map((item: any, index: number) => ({
+                key: `${mov.id}-${index}`,
                 date: mov.createdAt.toDate(),
                 type: mov.type,
                 document: mov.document,
@@ -603,46 +602,46 @@ export default function ReportesPage() {
              <Card>
                 <CardHeader>
                     <CardTitle>Módulo de Reportes</CardTitle>
-                    <CardDescription>Accede a reportes tabulares para un análisis más profundo y exportación de datos.</CardDescription>
+                    <CardDescription>Acceda a reportes tabulares para un análisis más profundo y exportación de datos.</CardDescription>
                 </CardHeader>
             </Card>
 
             <Accordion type="single" collapsible className="w-full space-y-4" defaultValue="item-1">
                 <AccordionItem value="item-1">
-                    <AccordionTrigger className="bg-muted px-4 rounded-md">Stock de Bins y Materiales</AccordionTrigger>
+                    <AccordionTrigger className="bg-muted px-4 rounded-md text-base font-semibold hover:no-underline">Stock de Bins y Materiales</AccordionTrigger>
                     <AccordionContent className="pt-4">
                         <BinMaterialStockReport />
                     </AccordionContent>
                 </AccordionItem>
 
                  <AccordionItem value="item-2">
-                    <AccordionTrigger className="bg-muted px-4 rounded-md">Stock de Embalajes</AccordionTrigger>
+                    <AccordionTrigger className="bg-muted px-4 rounded-md text-base font-semibold hover:no-underline">Stock de Embalajes</AccordionTrigger>
                     <AccordionContent className="pt-4">
                         <PackagingStockReport />
                     </AccordionContent>
                 </AccordionItem>
                 
                  <AccordionItem value="item-3">
-                    <AccordionTrigger className="bg-muted px-4 rounded-md">Kardex de Bins y Materiales</AccordionTrigger>
+                    <AccordionTrigger className="bg-muted px-4 rounded-md text-base font-semibold hover:no-underline">Kardex de Bins y Materiales</AccordionTrigger>
                     <AccordionContent className="pt-4">
                         <BinMaterialKardexReport />
                     </AccordionContent>
                 </AccordionItem>
                 
                 <AccordionItem value="item-4">
-                    <AccordionTrigger className="bg-muted px-4 rounded-md">Registro de Recepción de Fruta</AccordionTrigger>
+                    <AccordionTrigger className="bg-muted px-4 rounded-md text-base font-semibold hover:no-underline">Registro de Recepción de Fruta</AccordionTrigger>
                     <AccordionContent className="pt-4">
                         <ReceptionLogReport />
                     </AccordionContent>
                 </AccordionItem>
                  <AccordionItem value="item-5">
-                    <AccordionTrigger className="bg-muted px-4 rounded-md">Reporte de Stock de Fruta de Otros Clientes</AccordionTrigger>
+                    <AccordionTrigger className="bg-muted px-4 rounded-md text-base font-semibold hover:no-underline">Reporte de Stock de Fruta (Otros Clientes)</AccordionTrigger>
                     <AccordionContent className="pt-4">
                         <OtherFruitStockReport />
                     </AccordionContent>
                 </AccordionItem>
                  <AccordionItem value="item-6">
-                    <AccordionTrigger className="bg-muted px-4 rounded-md">Kardex de Movimientos de Fruta (Otros Clientes)</AccordionTrigger>
+                    <AccordionTrigger className="bg-muted px-4 rounded-md text-base font-semibold hover:no-underline">Kardex de Movimientos de Fruta (Otros Clientes)</AccordionTrigger>
                     <AccordionContent className="pt-4">
                         <OtherFruitKardexReport />
                     </AccordionContent>
