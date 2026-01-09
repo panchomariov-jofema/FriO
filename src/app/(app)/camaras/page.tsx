@@ -390,9 +390,9 @@ export default function CamarasPage() {
           </div>
           <div className="text-right">
               <p className="text-sm text-muted-foreground">Peso Neto Total en Cámaras</p>
-              <p className="text-2xl font-bold">
+              <div className="text-2xl font-bold">
                   {loading ? <Skeleton className="h-8 w-32" /> : `${totalNetWeightInStock.toLocaleString('es-CL', {maximumFractionDigits: 0})} kg`}
-              </p>
+              </div>
           </div>
           <AlertDialog>
             <AlertDialogTrigger asChild>
