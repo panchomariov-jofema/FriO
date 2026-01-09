@@ -601,19 +601,21 @@ const handleUndoDispatch = async (dispatchToUndo: Dispatch) => {
                             <TableHead>Cliente</TableHead>
                             <TableHead>Fecha</TableHead>
                             <TableHead>Total Bins</TableHead>
+                            <TableHead>Peso Neto</TableHead>
                             <TableHead>Estado</TableHead>
                             <TableHead className="text-right">Acciones</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                         {loadingDispatches ? (
-                             Array.from({ length: 3 }).map((_, i) => <TableRow key={i}><TableCell colSpan={5}><Skeleton className="h-4 w-full" /></TableCell></TableRow>)
+                             Array.from({ length: 3 }).map((_, i) => <TableRow key={i}><TableCell colSpan={6}><Skeleton className="h-4 w-full" /></TableCell></TableRow>)
                         ) : sortedDispatches.length > 0 ? (
                             sortedDispatches.map(dispatch => (
                                 <TableRow key={dispatch.id}>
                                     <TableCell className="font-medium">{dispatch.exporterName}</TableCell>
                                     <TableCell>{dispatch.createdAt?.toDate().toLocaleDateString()}</TableCell>
                                     <TableCell>{dispatch.totalBins}</TableCell>
+                                    <TableCell>{dispatch.totalNetWeight ? `${dispatch.totalNetWeight.toFixed(2)} kg` : '-'}</TableCell>
                                     <TableCell><Badge variant={dispatch.status === 'Completado' ? 'default' : 'secondary'}>{dispatch.status}</Badge></TableCell>
                                     <TableCell className="text-right space-x-2">
                                        <AlertDialog>
@@ -712,7 +714,7 @@ const handleUndoDispatch = async (dispatchToUndo: Dispatch) => {
                             ))
                         ) : (
                             <TableRow>
-                                <TableCell colSpan={5} className="h-24 text-center">No hay despachos creados.</TableCell>
+                                <TableCell colSpan={6} className="h-24 text-center">No hay despachos creados.</TableCell>
                             </TableRow>
                         )}
                     </TableBody>

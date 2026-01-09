@@ -99,6 +99,7 @@ export function ManualDispatchTab({ exporters, loadingExporters, chamberLots, lo
             const batch = writeBatch(firestore);
             const binsToDispatch = [];
             let totalBins = 0;
+            let totalNetWeight = 0;
 
             for (const lot of Object.values(selectedLots)) {
                 binsToDispatch.push({
@@ -109,6 +110,9 @@ export function ManualDispatchTab({ exporters, loadingExporters, chamberLots, lo
                     binCount: lot.binCount,
                 });
                 totalBins += lot.binCount;
+                if (lot.netWeightPerBin && lot.netWeightPerBin > 0) {
+                    totalNetWeight += lot.binCount * lot.netWeightPerBin;
+                }
 
                 const lotRef = doc(firestore, 'chamberLots', lot.id);
                 batch.update(lotRef, { status: 'Despachado' });
@@ -119,6 +123,7 @@ export function ManualDispatchTab({ exporters, loadingExporters, chamberLots, lo
                 exporterName: selectedExporter.name,
                 packingId: packingId || null,
                 totalBins: totalBins,
+                totalNetWeight: totalNetWeight,
                 status: 'Pendiente de Salida' as const,
                 createdAt: serverTimestamp(),
                 bins: binsToDispatch,
@@ -140,6 +145,13 @@ export function ManualDispatchTab({ exporters, loadingExporters, chamberLots, lo
             setIsSubmitting(false);
         }
     };
+    
+    const { totalSelectedBins, totalSelectedNetWeight } = React.useMemo(() => {
+        const lots = Object.values(selectedLots);
+        const bins = lots.reduce((sum, lot) => sum + lot.binCount, 0);
+        const weight = lots.reduce((sum, lot) => sum + (lot.binCount * (lot.netWeightPerBin || 0)), 0);
+        return { totalSelectedBins: bins, totalSelectedNetWeight: weight };
+    }, [selectedLots]);
 
 
     return (
@@ -230,7 +242,8 @@ export function ManualDispatchTab({ exporters, loadingExporters, chamberLots, lo
                 </div>
                  <div className="flex justify-between items-center pt-4">
                     <div className="text-sm font-medium">
-                        {Object.keys(selectedLots).length} lote(s) seleccionados ({Object.values(selectedLots).reduce((sum, lot) => sum + lot.binCount, 0)} bins)
+                        {Object.keys(selectedLots).length} lote(s) seleccionados ({totalSelectedBins} bins). 
+                        <span className="font-semibold"> Peso Neto Total: {totalSelectedNetWeight.toFixed(2)} kg</span>
                     </div>
                     <Button onClick={handleCreateDispatch} disabled={isSubmitting || Object.keys(selectedLots).length === 0}>
                         {isSubmitting ? 'Creando Despacho...' : 'Crear Despacho Manual'}

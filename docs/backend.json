@@ -425,7 +425,10 @@
             "required": ["productCode", "productName", "quantity"]
           }
         },
-        "createdAt": { "type": "string", "format": "date-time" }
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
       },
       "required": ["type", "clientId", "clientName", "unit", "document", "items", "createdAt"]
     },
@@ -754,6 +757,10 @@
         "totalBins": {
           "type": "number",
           "description": "Total number of bins in the dispatch."
+        },
+        "totalNetWeight": {
+          "type": "number",
+          "description": "Total net weight of the dispatch."
         },
         "status": {
           "type": "string",

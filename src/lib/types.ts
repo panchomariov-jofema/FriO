@@ -219,6 +219,7 @@ export interface Dispatch {
   exporterName: string;
   packingId?: string | null;
   totalBins: number;
+  totalNetWeight?: number;
   status: 'Pendiente de Salida' | 'Completado';
   createdAt: Timestamp;
   bins: {
