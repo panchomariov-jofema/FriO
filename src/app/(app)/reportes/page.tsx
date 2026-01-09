@@ -50,18 +50,16 @@ export default function ReportesPage() {
             
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {reportList.map(report => (
-                    <Link href={report.href} key={report.href} legacyBehavior>
-                        <a className="block">
-                            <Card className="hover:border-primary/80 hover:shadow-md transition-all h-full">
-                                <CardHeader>
-                                    <div className='flex justify-between items-start'>
-                                        <CardTitle className="text-lg">{report.title}</CardTitle>
-                                        <ChevronRight className="h-5 w-5 text-muted-foreground" />
-                                    </div>
-                                    <CardDescription className="pt-2">{report.description}</CardDescription>
-                                </CardHeader>
-                            </Card>
-                        </a>
+                    <Link href={report.href} key={report.href} className="block">
+                        <Card className="hover:border-primary/80 hover:shadow-md transition-all h-full">
+                            <CardHeader>
+                                <div className='flex justify-between items-start'>
+                                    <CardTitle className="text-lg">{report.title}</CardTitle>
+                                    <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                                </div>
+                                <CardDescription className="pt-2">{report.description}</CardDescription>
+                            </CardHeader>
+                        </Card>
                     </Link>
                 ))}
             </div>
