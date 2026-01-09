@@ -50,7 +50,7 @@ export default function CamarasPage() {
 
   const loading = loadingChamberLots || loadingOtherFruit;
 
-  const { pendingLots, storedItemsByChamber, chamberOccupancy } = React.useMemo(() => {
+  const { pendingLots, storedItemsByChamber, chamberOccupancy, totalNetWeightInStock } = React.useMemo(() => {
     const allChamberLots = chamberLots || [];
     const allOtherFruitReceptions = otherFruitReceptions || [];
 
@@ -73,6 +73,7 @@ export default function CamarasPage() {
             coordinate: lot.coordinate!,
             receptionId: null, // Not applicable for producer lots
             itemIndex: -1, // Not applicable
+            netWeightPerBin: lot.netWeightPerBin || 0,
         })),
       ...allOtherFruitReceptions
         .flatMap(reception => reception.items
@@ -89,9 +90,15 @@ export default function CamarasPage() {
                 coordinate: item.storageLocation!.coordinate,
                 receptionId: reception.id,
                 itemIndex: index,
+                netWeightPerBin: 0, // Other fruit don't have this concept for now
             }))
         )
     ];
+    
+    const calculatedTotalNetWeight = allStoredItems
+        .filter(item => item.type === 'producerLot')
+        .reduce((sum, item) => sum + (item.quantity * (item.netWeightPerBin || 0)), 0);
+
 
     const calculatedStoredItemsByChamber = allStoredItems.reduce((acc, item) => {
         if (!acc[item.chamberId]) {
@@ -139,7 +146,8 @@ export default function CamarasPage() {
     return { 
         pendingLots: calculatedPendingLots, 
         storedItemsByChamber: calculatedStoredItemsByChamber, 
-        chamberOccupancy: calculatedChamberOccupancy 
+        chamberOccupancy: calculatedChamberOccupancy,
+        totalNetWeightInStock: calculatedTotalNetWeight
     };
   }, [chamberLots, otherFruitReceptions]);
 
@@ -380,6 +388,12 @@ export default function CamarasPage() {
             <CardTitle>Estado de Cámaras</CardTitle>
             <CardDescription>Ocupación y distribución de los lotes en las cámaras de frío.</CardDescription>
           </div>
+          <div className="text-right">
+              <p className="text-sm text-muted-foreground">Peso Neto Total en Cámaras</p>
+              <p className="text-2xl font-bold">
+                  {loading ? <Skeleton className="h-8 w-32" /> : `${totalNetWeightInStock.toLocaleString('es-CL', {maximumFractionDigits: 0})} kg`}
+              </p>
+          </div>
           <AlertDialog>
             <AlertDialogTrigger asChild>
                 <Button variant="destructive" size="icon">
@@ -414,7 +428,7 @@ export default function CamarasPage() {
                             <span className="text-lg font-semibold">{config.name}</span>
                             <div className="text-right">
                                 <p className={cn("font-mono font-semibold", (chamberOccupancy[chamberId]?.percentage ?? 0) > 50 ? 'text-destructive' : 'text-foreground')}>
-                                    {chamberOccupancy[chamberId]?.occupied ?? 0} / {chamberOccupancy[chamberId]?.total ?? 0} Bins
+                                    {chamberOccupancy[chamberId]?.occupied ?? 0} / {chamberOccupancy[chamberId]?.total ?? 0} Bins Equiv.
                                     ({(chamberOccupancy[chamberId]?.percentage ?? 0).toFixed(1)}%)
                                 </p>
                                 <Progress value={chamberOccupancy[chamberId]?.percentage ?? 0} className="w-48 h-2 mt-1" />
@@ -433,6 +447,8 @@ export default function CamarasPage() {
                                       
                                       const totalBins = itemsInCoord.filter(i => i.unit === 'Bins').reduce((s, i) => s + i.quantity, 0);
                                       const totalPallets = itemsInCoord.filter(i => i.unit === 'Pallets').reduce((s, i) => s + i.quantity, 0);
+                                      const totalNetWeight = itemsInCoord.reduce((sum, i) => sum + (i.quantity * (i.netWeightPerBin || 0)), 0);
+
                                       
                                       const occupancyPercentage = isOccupied ? (totalBins + totalPallets * 2) / 6 * 100 : 0; // Approx. 1 pallet = 2 bins
                                       const firstItem = isOccupied ? itemsInCoord[0] : null;
@@ -448,7 +464,7 @@ export default function CamarasPage() {
                                             </div>
                                           </TooltipTrigger>
                                           {isOccupied && firstItem && (
-                                            <TooltipContent className="p-4">
+                                            <TooltipContent className="p-4 w-64">
                                               <div className="space-y-2">
                                                 <p className="font-bold">
                                                   {firstItem.type === 'producerLot' ? `Lote: ${firstItem.displayId}` : `Producto: ${firstItem.displayId}`}
@@ -457,8 +473,11 @@ export default function CamarasPage() {
                                                   {firstItem.type === 'producerLot' ? `Productor: ${firstItem.ownerName}` : `Cliente: ${firstItem.ownerName}`}
                                                 </p>
                                                 <p>Variedad/Producto: {firstItem.varietyOrProduct}</p>
-                                                <p>Bins: {totalBins}</p>
-                                                <p>Pallets: {totalPallets}</p>
+                                                <div className="grid grid-cols-2 gap-x-4">
+                                                    <p>Bins: {totalBins}</p>
+                                                    <p>Pallets: {totalPallets}</p>
+                                                    {totalNetWeight > 0 && <p className="col-span-2">Peso Neto: {totalNetWeight.toFixed(1)} kg</p>}
+                                                </div>
                                                 <Button size="sm" className="w-full mt-2" onClick={() => handleRelocateClick(firstItem)}>Reubicar</Button>
                                               </div>
                                             </TooltipContent>

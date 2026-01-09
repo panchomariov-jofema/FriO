@@ -283,6 +283,7 @@ export type StoredItem = {
   coordinate: string;
   receptionId: string | null; // ID of the parent document (e.g., otherFruitReceptions)
   itemIndex: number; // Index of the item within the parent document's `items` array
+  netWeightPerBin?: number;
 }
 
 
