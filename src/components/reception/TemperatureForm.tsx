@@ -4,7 +4,7 @@ import * as React from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { doc, updateDoc } from 'firebase/firestore';
+import { doc, updateDoc, writeBatch } from 'firebase/firestore';
 import { useFirestore } from '@/firebase';
 import type { ReceptionLot } from '@/lib/types';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
@@ -52,7 +52,8 @@ export function TemperatureForm({ lot, open, onOpenChange, onTempSaved }: Temper
   const showPreHydro = lot.status === 'Pendiente de Pre-Hidro';
   const showPostHydro = lot.status === 'Pendiente de Post-Hidro';
   
-  const onSubmit = (values: TempFormValues) => {
+  const handleSaveTempOnly = (values: TempFormValues) => {
+    if (!firestore) return;
     const lotRef = doc(firestore, 'receptionLots', lot.id);
 
     if (showPreHydro) {
@@ -93,7 +94,7 @@ export function TemperatureForm({ lot, open, onOpenChange, onTempSaved }: Temper
         updateDoc(lotRef, updateData)
         .then(() => {
             toast({ title: 'Éxito', description: 'Temperatura Post-Hidro guardada.' });
-            // No cerramos el diálogo aquí, el usuario debe hacer clic en TERMINAR
+            onTempSaved();
         })
         .catch((error) => {
             errorEmitter.emit(
@@ -108,14 +109,21 @@ export function TemperatureForm({ lot, open, onOpenChange, onTempSaved }: Temper
     }
   };
 
-  const handleFinish = () => {
+  const handleSaveAndFinish = (values: TempFormValues) => {
+    if (!firestore) return;
+     if (typeof values.postHydroTemp !== 'number') {
+        form.setError('postHydroTemp', { message: 'Debe ingresar un valor para guardar y terminar.'});
+        return;
+    }
+
     const lotRef = doc(firestore, 'receptionLots', lot.id);
     const updateData = {
+        postHydroTemp: values.postHydroTemp,
         status: 'Cerrado' as const,
     };
     updateDoc(lotRef, updateData)
         .then(() => {
-            toast({ title: 'Éxito', description: 'Lote cerrado correctamente.' });
+            toast({ title: 'Lote Terminado', description: 'Temperatura guardada y lote cerrado correctamente.' });
             onTempSaved();
         })
         .catch((error) => {
@@ -136,10 +144,10 @@ export function TemperatureForm({ lot, open, onOpenChange, onTempSaved }: Temper
       <DialogContent>
         <DialogHeader>
             <DialogTitle>Registro de Temperatura</DialogTitle>
-            <DialogDescription>Lote ID: <span className="font-mono">{lot.id}</span></DialogDescription>
+            <DialogDescription>ID Lote: <span className="font-mono">{lot.displayLotId || lot.id}</span></DialogDescription>
         </DialogHeader>
         <Form {...form}>
-          <form className="space-y-4" onSubmit={form.handleSubmit(onSubmit)}>
+          <form className="space-y-4">
             {showPreHydro && (
               <div className="space-y-4">
                 <FormField control={form.control} name="preHydroTemp" render={({ field }) => (
@@ -151,7 +159,7 @@ export function TemperatureForm({ lot, open, onOpenChange, onTempSaved }: Temper
                 )} />
                 <DialogFooter>
                   <DialogClose asChild><Button type="button" variant="outline">Cancelar</Button></DialogClose>
-                  <Button type="submit">Guardar y Continuar</Button>
+                  <Button type="button" onClick={form.handleSubmit(handleSaveTempOnly)}>Guardar y Continuar</Button>
                 </DialogFooter>
               </div>
             )}
@@ -165,9 +173,9 @@ export function TemperatureForm({ lot, open, onOpenChange, onTempSaved }: Temper
                   </FormItem>
                 )} />
                 <DialogFooter>
-                    <DialogClose asChild><Button type="button" variant="outline">Cerrar</Button></DialogClose>
-                    <Button type="submit" disabled={form.formState.isSubmitting}>Guardar Temperatura</Button>
-                    <Button onClick={handleFinish} disabled={typeof lot.postHydroTemp !== 'number'}>TERMINAR</Button>
+                    <DialogClose asChild><Button type="button" variant="outline">Cancelar</Button></DialogClose>
+                    <Button type="button" variant="secondary" onClick={form.handleSubmit(handleSaveTempOnly)} disabled={form.formState.isSubmitting}>Guardar Temperatura</Button>
+                    <Button type="button" onClick={form.handleSubmit(handleSaveAndFinish)} disabled={form.formState.isSubmitting}>Guardar y Terminar Lote</Button>
                 </DialogFooter>
               </div>
             )}
