@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -226,7 +227,7 @@ export function OtherFruitExitTab() {
   };
   
   const handleSelectAllInLot = (itemIndex: number, lotId: string) => {
-    const currentItem = form.getValues(`items.${index}`);
+    const currentItem = form.getValues(`items.${itemIndex}`);
     const lotData = availableStockByProductAndLot[currentItem.productCode]?.lots[lotId];
     if (!lotData) return;
 
