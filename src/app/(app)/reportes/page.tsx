@@ -404,10 +404,10 @@ function OtherFruitStockReport() {
                 <CardTitle>Reporte de Stock de Fruta (Otros Clientes)</CardTitle>
                 <CardDescription className="pt-2">Inventario consolidado de fruta de clientes externos en cámara.</CardDescription>
                 <div className="flex flex-col sm:flex-row gap-4 pt-4">
-                    <Select onValueChange={setClientFilter} value={clientFilter}>
+                    <Select onValueChange={(value) => setClientFilter(value === 'all' ? '' : value)} value={clientFilter || 'all'}>
                         <SelectTrigger><SelectValue placeholder="Filtrar por cliente..." /></SelectTrigger>
                         <SelectContent>
-                            <SelectItem value="">Todos los Clientes</SelectItem>
+                            <SelectItem value="all">Todos los Clientes</SelectItem>
                             {clientOptions.map(client => <SelectItem key={client} value={client}>{client}</SelectItem>)}
                         </SelectContent>
                     </Select>
@@ -538,10 +538,10 @@ function OtherFruitKardexReport() {
                 <CardTitle>Kardex de Movimientos de Fruta (Otros Clientes)</CardTitle>
                 <CardDescription className="pt-2">Historial de entradas y salidas de fruta de clientes externos.</CardDescription>
                  <div className="flex flex-col sm:flex-row gap-4 pt-4">
-                    <Select onValueChange={setClientFilter} value={clientFilter}>
+                    <Select onValueChange={(value) => setClientFilter(value === 'all' ? '' : value)} value={clientFilter || 'all'}>
                         <SelectTrigger><SelectValue placeholder="Filtrar por cliente..." /></SelectTrigger>
                         <SelectContent>
-                            <SelectItem value="">Todos los Clientes</SelectItem>
+                            <SelectItem value="all">Todos los Clientes</SelectItem>
                             {clientOptions.map(client => <SelectItem key={client} value={client}>{client}</SelectItem>)}
                         </SelectContent>
                     </Select>
