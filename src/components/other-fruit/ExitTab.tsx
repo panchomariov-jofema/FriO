@@ -304,7 +304,7 @@ export function OtherFruitExitTab() {
                 const sortedLots = productStock ? Object.entries(productStock.lots).sort(([, a], [, b]) => a.createdAt - b.createdAt) : [];
                 
                 return (
-                  <Card key={field.id} className="overflow-hidden">
+                   <Card key={field.id} className="overflow-hidden">
                     <CardHeader className="flex flex-row items-center justify-between p-4 bg-muted/50">
                         <div className="flex-1 grid sm:grid-cols-2 gap-4">
                             <FormField
@@ -346,8 +346,8 @@ export function OtherFruitExitTab() {
                                 <Accordion type="multiple" className="w-full">
                                 {sortedLots.map(([lotId, lotData]) => (
                                     <AccordionItem value={lotId} key={lotId}>
-                                      <div className="flex items-center w-full">
-                                        <AccordionTrigger className="flex-1">
+                                      <div className="flex items-center w-full gap-4 pr-4">
+                                        <AccordionTrigger className="flex-1 py-2">
                                             <div className="flex flex-col text-left">
                                                 <span>Lote: <span className="font-mono">{lotId}</span></span>
                                                 <span className="text-xs text-muted-foreground">
@@ -355,8 +355,8 @@ export function OtherFruitExitTab() {
                                                 </span>
                                             </div>
                                         </AccordionTrigger>
-                                        <div className="flex items-center gap-2 pr-4">
-                                            <span className="text-sm font-medium">Disp: {lotData.totalAvailable} {lotData.unit}</span>
+                                        <div className="flex items-center gap-4 text-sm">
+                                            <span className="font-medium">Disp: {lotData.totalAvailable} {lotData.unit}</span>
                                             <Button
                                                 type="button"
                                                 size="sm"
