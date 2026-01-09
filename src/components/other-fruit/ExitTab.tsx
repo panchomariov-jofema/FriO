@@ -33,7 +33,7 @@ const defaultItem = {
 const getLocationKey = (receptionId: string, itemIndex: number) => `${receptionId}_${itemIndex}`;
 
 export function OtherFruitExitTab() {
-  const { data: allClients, loading: loadingClients } = useFirestoreCollection<OtherClient>('clients');
+  const { data: allClients, loading: loadingClients } = useFirestoreCollection<OtherClient>('otherClients');
   const { data: allReceptions, loading: loadingReceptions } = useFirestoreCollection<OtherFruitReception>('otherFruitReceptions');
   const firestore = useFirestore();
   const { toast } = useToast();
@@ -226,7 +226,7 @@ export function OtherFruitExitTab() {
   };
   
   const handleSelectAllInLot = (itemIndex: number, lotId: string) => {
-    const currentItem = form.getValues(`items.${itemIndex}`);
+    const currentItem = form.getValues(`items.${index}`);
     const lotData = availableStockByProductAndLot[currentItem.productCode]?.lots[lotId];
     if (!lotData) return;
 
