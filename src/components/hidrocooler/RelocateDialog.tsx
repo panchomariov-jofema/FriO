@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import type { ChamberLot, OtherFruitReception, StoredItem } from '@/lib/types';
 import { chambersConfig } from '@/lib/chambers-config';
 import { Alert, AlertDescription } from '../ui/alert';
+import { useToast } from '@/hooks/use-toast';
 
 interface RelocateDialogProps {
   item: StoredItem | null;
@@ -49,6 +50,7 @@ export function RelocateDialog({
   onRelocate,
   storedItems
 }: RelocateDialogProps) {
+  const { toast } = useToast();
   const form = useForm<RelocateFormValues>({
     resolver: zodResolver(relocateSchema),
     defaultValues: {
@@ -63,37 +65,67 @@ export function RelocateDialog({
 
   const { allChamberLots = [], allOtherFruitReceptions = [] } = storedItems || {};
 
-  const availableCoordinates = React.useMemo(() => {
-    if (!targetChamberId) return [];
+  const { availableCoordinates, occupancyMap } = React.useMemo(() => {
+    if (!targetChamberId) return { availableCoordinates: [], occupancyMap: new Map() };
     
     const chamberConfig = chambersConfig[targetChamberId];
-    if (!chamberConfig) return [];
+    if (!chamberConfig) return { availableCoordinates: [], occupancyMap: new Map() };
     
-    const allPossibleCoords = chamberConfig.columns.flatMap(col => chamberConfig.rows.map(row => `${col}${row}`));
+    const allPossibleCoords = chamberConfig.columns.flatMap(col => chamberConfig.rows.map(row => `${col}${row}`)).sort(naturalSort);
     
-    const occupiedCoords = new Set<string>();
+    const currentOccupancyMap = new Map<string, { bins: number, pallets: number }>();
+
+    const getCoord = (coord: string) => {
+      if (!currentOccupancyMap.has(coord)) {
+        currentOccupancyMap.set(coord, { bins: 0, pallets: 0 });
+      }
+      return currentOccupancyMap.get(coord)!;
+    };
     
-    allChamberLots.forEach(lot => {
+    (allChamberLots || []).forEach(lot => {
         if (lot.status === 'Almacenado' && lot.chamberId === targetChamberId && lot.coordinate) {
-            occupiedCoords.add(lot.coordinate);
+            const coordData = getCoord(lot.coordinate);
+            coordData.bins += lot.binCount;
         }
     });
 
-    allOtherFruitReceptions.forEach(reception => {
+    (allOtherFruitReceptions || []).forEach(reception => {
         reception.items.forEach(fruitItem => {
             if(fruitItem.status === 'Almacenado' && fruitItem.storageLocation?.chamberId === targetChamberId && fruitItem.storageLocation.coordinate) {
-                occupiedCoords.add(fruitItem.storageLocation.coordinate);
+                const coordData = getCoord(fruitItem.storageLocation.coordinate);
+                if (reception.unit === 'Bins') {
+                    coordData.bins += fruitItem.quantity;
+                } else {
+                    coordData.pallets += fruitItem.quantity;
+                }
             }
         });
     });
     
-    // Allow selecting the source coordinate if moving within the same chamber
-    if (sourceChamberId === targetChamberId && sourceCoordinate) {
-        occupiedCoords.delete(sourceCoordinate);
-    }
-    
-    return allPossibleCoords.filter(coord => !occupiedCoords.has(coord)).sort(naturalSort);
-  }, [targetChamberId, allChamberLots, allOtherFruitReceptions, sourceChamberId, sourceCoordinate]);
+    const available = allPossibleCoords.filter(coord => {
+      // If we are relocating within the same chamber, the source coordinate is technically available
+      if (targetChamberId === sourceChamberId && coord === sourceCoordinate) {
+          return true;
+      }
+        
+      const occupied = currentOccupancyMap.get(coord);
+      if (!occupied) return true; // If no record, it's empty
+
+      if (item?.unit === 'Pallets') {
+          return occupied.bins === 0 && occupied.pallets < 2;
+      }
+      if (item?.unit === 'Bins') {
+          return occupied.pallets === 0 && occupied.bins < 6;
+      }
+      return false;
+    });
+
+    return { 
+        availableCoordinates: available,
+        occupancyMap: currentOccupancyMap,
+    };
+  }, [targetChamberId, allChamberLots, allOtherFruitReceptions, sourceChamberId, sourceCoordinate, item?.unit]);
+
 
   React.useEffect(() => {
     if (open) {
@@ -105,6 +137,19 @@ export function RelocateDialog({
   }, [open, form]);
 
   const onSubmit = (values: RelocateFormValues) => {
+    // Re-check capacity on submit to prevent race conditions
+    const targetOccupancy = occupancyMap.get(values.targetCoordinate);
+    if (item?.unit === 'Pallets' && targetOccupancy) {
+        if (targetOccupancy.bins > 0) {
+            toast({ variant: 'destructive', title: 'Error de Capacidad', description: 'La coordenada de destino ya contiene bins.'});
+            return;
+        }
+        if (targetOccupancy.pallets >= 2) {
+            toast({ variant: 'destructive', title: 'Error de Capacidad', description: 'La coordenada de destino ya tiene 2 pallets.'});
+            return;
+        }
+    }
+
     onRelocate(values);
   };
 
@@ -167,20 +212,27 @@ export function RelocateDialog({
               name="targetCoordinate"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Coordenada de Destino (Solo vacías)</FormLabel>
+                  <FormLabel>Coordenada de Destino</FormLabel>
                   <Select onValueChange={field.onChange} value={field.value} disabled={!targetChamberId || availableCoordinates.length === 0}>
                     <FormControl>
                       <SelectTrigger>
-                        <SelectValue placeholder={!targetChamberId ? "Seleccione una cámara primero" : "Seleccione una coordenada vacía"} />
+                        <SelectValue placeholder={!targetChamberId ? "Seleccione una cámara primero" : "Seleccione una coordenada"} />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
                       {availableCoordinates.length > 0 ? (
                         availableCoordinates.map(coord => (
-                          <SelectItem key={coord} value={coord}>{coord}</SelectItem>
+                          <SelectItem key={coord} value={coord}>
+                              {coord}
+                              {occupancyMap.has(coord) && (
+                                  <span className="text-muted-foreground ml-2 text-xs">
+                                      (Ocup: {occupancyMap.get(coord)?.bins} Bins, {occupancyMap.get(coord)?.pallets} Pallets)
+                                  </span>
+                              )}
+                          </SelectItem>
                         ))
                       ) : (
-                        <div className="p-4 text-sm text-center text-muted-foreground">No hay coordenadas vacías.</div>
+                        <div className="p-4 text-sm text-center text-muted-foreground">No hay coordenadas válidas disponibles.</div>
                       )}
                     </SelectContent>
                   </Select>
