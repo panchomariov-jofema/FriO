@@ -22,6 +22,7 @@ import { Progress } from '@/components/ui/progress';
 import { RelocateDialog } from '@/components/hidrocooler/RelocateDialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Trash2 } from 'lucide-react';
+import { ExternalReceptionUploader } from '@/components/hidrocooler/ExternalReceptionUploader';
 
 // Helper for natural sorting (e.g., A1, A2, ... A10)
 const naturalSort = (a: string, b: string) => {
@@ -340,9 +341,12 @@ export default function CamarasPage() {
   return (
     <div className="space-y-6">
       <Card>
-        <CardHeader>
-          <CardTitle>Lotes de Productor Pendientes</CardTitle>
-          <CardDescription>Lotes que finalizaron el proceso de hidrocooler y esperan ser asignados a una cámara.</CardDescription>
+        <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle>Lotes de Productor Pendientes</CardTitle>
+              <CardDescription>Lotes que esperan ser asignados a una cámara.</CardDescription>
+            </div>
+            <ExternalReceptionUploader />
         </CardHeader>
         <CardContent>
           <div className="rounded-md border">
@@ -352,7 +356,7 @@ export default function CamarasPage() {
                   <TableHead>ID Lote</TableHead>
                   <TableHead>Productor</TableHead>
                   <TableHead>N° Bins</TableHead>
-                  <TableHead>Del Hidrocooler</TableHead>
+                  <TableHead>Origen</TableHead>
                   <TableHead>Estado</TableHead>
                   <TableHead className="text-right">Acciones</TableHead>
                 </TableRow>
