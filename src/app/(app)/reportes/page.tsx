@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import Link from 'next/link';
 import { ChevronRight } from 'lucide-react';
 
@@ -35,6 +35,11 @@ const reportList = [
         title: 'Kardex de Movimientos de Fruta (Otros Clientes)', 
         description: 'Historial de entradas y salidas de fruta de clientes externos.',
         href: '/reportes/kardex-fruta-otros-clientes'
+    },
+    { 
+        title: 'Reporte de Despachos', 
+        description: 'Listado de todos los despachos de fruta creados.',
+        href: '/reportes/despachos'
     },
 ];
 
