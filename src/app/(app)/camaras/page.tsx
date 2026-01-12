@@ -16,7 +16,7 @@ import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { chambersConfig } from '@/lib/chambers-config';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 import { Progress } from '@/components/ui/progress';
 import { RelocateDialog } from '@/components/hidrocooler/RelocateDialog';
@@ -448,68 +448,66 @@ export default function CamarasPage() {
                         </div>
                     </AccordionTrigger>
                     <AccordionContent>
-                        <TooltipProvider>
-                            <div className="p-4 bg-muted/50 rounded-lg border">
-                                <div className="grid gap-1" style={{ gridTemplateColumns: `repeat(${config.columns.length}, minmax(0, 1fr))` }}>
-                                  {config.rows.map(row =>
-                                    config.columns.map(col => {
-                                      const coord = `${col}${row}`;
-                                      const isBlocked = config.blocked?.includes(coord);
-                                      const itemsInCoord = storedItemsByChamber[chamberId]?.[coord] || [];
-                                      const isOccupied = itemsInCoord.length > 0;
-                                      
-                                      const totalBins = itemsInCoord.filter(i => i.unit === 'Bins').reduce((s, i) => s + i.quantity, 0);
-                                      const totalPallets = itemsInCoord.filter(i => i.unit === 'Pallets').reduce((s, i) => s + i.quantity, 0);
-                                      const totalNetWeight = itemsInCoord.reduce((sum, i) => sum + (i.quantity * (i.netWeightPerBin || 0)), 0);
+                        <div className="p-4 bg-muted/50 rounded-lg border">
+                            <div className="grid gap-1" style={{ gridTemplateColumns: `repeat(${config.columns.length}, minmax(0, 1fr))` }}>
+                              {config.rows.map(row =>
+                                config.columns.map(col => {
+                                  const coord = `${col}${row}`;
+                                  const isBlocked = config.blocked?.includes(coord);
+                                  const itemsInCoord = storedItemsByChamber[chamberId]?.[coord] || [];
+                                  const isOccupied = itemsInCoord.length > 0;
+                                  
+                                  const totalBins = itemsInCoord.filter(i => i.unit === 'Bins').reduce((s, i) => s + i.quantity, 0);
+                                  const totalPallets = itemsInCoord.filter(i => i.unit === 'Pallets').reduce((s, i) => s + i.quantity, 0);
+                                  const totalNetWeight = itemsInCoord.reduce((sum, i) => sum + (i.quantity * (i.netWeightPerBin || 0)), 0);
 
-                                      
-                                      const occupancyPercentage = isOccupied ? (totalBins + totalPallets * 2) / 6 * 100 : 0; // Approx. 1 pallet = 2 bins
-                                      const firstItem = isOccupied ? itemsInCoord[0] : null;
+                                  
+                                  const occupancyPercentage = isOccupied ? (totalBins + totalPallets * 2) / 6 * 100 : 0; // Approx. 1 pallet = 2 bins
+                                  const firstItem = isOccupied ? itemsInCoord[0] : null;
 
-                                      if (isBlocked) {
-                                        return (
-                                          <div key={coord} className="h-12 w-full rounded border-2 bg-gray-200 dark:bg-gray-700 relative">
-                                            <div className="absolute inset-0 bg-repeat bg-[length:10px_10px]" style={{backgroundImage: "repeating-linear-gradient(-45deg, #a0aec0, #a0aec0 1px, transparent 1px, transparent 5px)"}} />
-                                          </div>
-                                        )
-                                      }
+                                  if (isBlocked) {
+                                    return (
+                                      <div key={coord} className="h-12 w-full rounded border-2 bg-gray-200 dark:bg-gray-700 relative">
+                                        <div className="absolute inset-0 bg-repeat bg-[length:10px_10px]" style={{backgroundImage: "repeating-linear-gradient(-45deg, #a0aec0, #a0aec0 1px, transparent 1px, transparent 5px)"}} />
+                                      </div>
+                                    )
+                                  }
 
-                                      return (
-                                        <Tooltip key={coord} delayDuration={100}>
-                                          <TooltipTrigger asChild>
-                                            <div className={cn("h-12 w-full rounded border-2 flex items-center justify-center text-xs font-mono relative overflow-hidden",
-                                                isOccupied ? 'bg-primary/20 border-primary/50' : 'bg-background border-dashed'
-                                            )}>
-                                              <div className="absolute bottom-0 left-0 top-0 bg-primary/30" style={{ right: `${100 - occupancyPercentage}%` }} />
-                                              <span className="relative z-10 font-semibold">{coord}</span>
+                                  return (
+                                    <Popover key={coord}>
+                                      <PopoverTrigger asChild>
+                                        <div className={cn("h-12 w-full rounded border-2 flex items-center justify-center text-xs font-mono relative overflow-hidden cursor-pointer",
+                                            isOccupied ? 'bg-primary/20 border-primary/50' : 'bg-background border-dashed'
+                                        )}>
+                                          <div className="absolute bottom-0 left-0 top-0 bg-primary/30" style={{ right: `${100 - occupancyPercentage}%` }} />
+                                          <span className="relative z-10 font-semibold">{coord}</span>
+                                        </div>
+                                      </PopoverTrigger>
+                                      {isOccupied && firstItem && (
+                                        <PopoverContent className="p-4 w-64" side="bottom" align="center">
+                                          <div className="space-y-2">
+                                            <p className="font-bold">
+                                              {firstItem.type === 'producerLot' ? `Lote: ${firstItem.displayId}` : `Producto: ${firstItem.displayId}`}
+                                            </p>
+                                            <p>
+                                              {firstItem.type === 'producerLot' ? `Productor: ${firstItem.ownerName}` : `Cliente: ${firstItem.ownerName}`}
+                                            </p>
+                                            <p>Variedad/Producto: {firstItem.varietyOrProduct}</p>
+                                            <div className="grid grid-cols-2 gap-x-4">
+                                                <p>Bins: {totalBins}</p>
+                                                <p>Pallets: {totalPallets}</p>
+                                                {totalNetWeight > 0 && <p className="col-span-2">Peso Neto: {totalNetWeight.toFixed(1)} kg</p>}
                                             </div>
-                                          </TooltipTrigger>
-                                          {isOccupied && firstItem && (
-                                            <TooltipContent className="p-4 w-64">
-                                              <div className="space-y-2">
-                                                <p className="font-bold">
-                                                  {firstItem.type === 'producerLot' ? `Lote: ${firstItem.displayId}` : `Producto: ${firstItem.displayId}`}
-                                                </p>
-                                                <p>
-                                                  {firstItem.type === 'producerLot' ? `Productor: ${firstItem.ownerName}` : `Cliente: ${firstItem.ownerName}`}
-                                                </p>
-                                                <p>Variedad/Producto: {firstItem.varietyOrProduct}</p>
-                                                <div className="grid grid-cols-2 gap-x-4">
-                                                    <p>Bins: {totalBins}</p>
-                                                    <p>Pallets: {totalPallets}</p>
-                                                    {totalNetWeight > 0 && <p className="col-span-2">Peso Neto: {totalNetWeight.toFixed(1)} kg</p>}
-                                                </div>
-                                                <Button size="sm" className="w-full mt-2" onClick={() => handleRelocateClick(firstItem)}>Reubicar</Button>
-                                              </div>
-                                            </TooltipContent>
-                                          )}
-                                        </Tooltip>
-                                      );
-                                    })
-                                  )}
-                                </div>
+                                            <Button size="sm" className="w-full mt-2" onClick={() => handleRelocateClick(firstItem)}>Reubicar</Button>
+                                          </div>
+                                        </PopoverContent>
+                                      )}
+                                    </Popover>
+                                  );
+                                })
+                              )}
                             </div>
-                        </TooltipProvider>
+                        </div>
                     </AccordionContent>
                 </AccordionItem>
             ))}
@@ -541,5 +539,3 @@ export default function CamarasPage() {
     </div>
   );
 }
-
-    
