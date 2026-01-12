@@ -99,17 +99,16 @@ export default function DashboardPage() {
         pendingHidroBins,
     } = React.useMemo(() => {
         
-        const isDateInRange = (date: Date) => {
-            if (!dateRange?.from || !dateRange?.to) return true;
-            return date >= dateRange.from && date <= addDays(dateRange.to, 1);
+        const isDateInRange = (date: Date | null | undefined) => {
+            if (!date) return false;
+            if (!dateRange?.from) return true; // If no start date, include everything
+            const toDate = dateRange.to ? addDays(dateRange.to, 1) : addDays(dateRange.from, 1);
+            return date >= dateRange.from && date < toDate;
         };
         
         const filteredReceptionLots = (receptionLots || [])
             .filter(lot => (!selectedExporterId || lot.exporterId === selectedExporterId) && lot.createdAt && isDateInRange(lot.createdAt.toDate()));
         
-        // This is not time-based, it's a current state
-        const allChamberLots = chamberLots || [];
-
         const exporterDisplayLotIds = new Set(filteredReceptionLots.map(lot => lot.displayLotId));
         
         const filteredProcessingLots = (processingLots || []).filter(p => exporterDisplayLotIds.has(p.displayLotId));
@@ -119,12 +118,14 @@ export default function DashboardPage() {
             return originalLot && (!selectedExporterId || originalLot.exporterId === selectedExporterId) && originalLot.createdAt && isDateInRange(originalLot.createdAt.toDate());
         });
 
+        const filteredChamberLots = (chamberLots || []).filter(lot => lot.storedAt && isDateInRange(lot.storedAt.toDate()));
 
-        const storedLots = allChamberLots.filter(lot => lot.status === 'Almacenado');
-        const calculatedTotalBins = storedLots.reduce((sum, lot) => sum + lot.binCount, 0);
+        const calculatedTotalBins = filteredChamberLots
+            .filter(lot => lot.status === 'Almacenado')
+            .reduce((sum, lot) => sum + lot.binCount, 0);
         
-        const calculatedPendingStorage = allChamberLots
-            .filter(lot => lot.status === 'Pendiente por Almacenar' && lot.storedAt && isDateInRange(lot.storedAt.toDate()))
+        const calculatedPendingStorage = filteredChamberLots
+            .filter(lot => lot.status === 'Pendiente por Almacenar')
             .reduce((sum, lot) => sum + lot.binCount, 0);
         
         const calculatedInProcess = filteredProcessingLots
@@ -160,7 +161,7 @@ export default function DashboardPage() {
             const chamber = chambersConfig[chamberId];
             const totalCapacity = chamber.capacity;
 
-            const binsInChamber = allChamberLots
+            const binsInChamber = (chamberLots || [])
                 .filter(lot => lot.status === 'Almacenado' && lot.chamberId === chamberId)
                 .reduce((sum, lot) => sum + lot.binCount, 0);
 
@@ -190,10 +191,9 @@ export default function DashboardPage() {
             .sort((a,b) => b.createdAt!.toMillis() - a.createdAt!.toMillis())
             .slice(0, 5);
         
-        // Stock is not time-based, it's a current snapshot
-        let stockForEmptyBins = binMaterialStock || [];
+        let stockForEmptyBins = (binMaterialStock || []).filter(s => s.lastUpdatedAt && isDateInRange(s.lastUpdatedAt.toDate()));
         if (selectedExporterId) {
-            stockForEmptyBins = (binMaterialStock || []).filter(s => s.exporterId === selectedExporterId);
+            stockForEmptyBins = stockForEmptyBins.filter(s => s.exporterId === selectedExporterId);
         }
         
         const specificBinCodes = ['10001', '10011', '10007'];
