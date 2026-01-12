@@ -1,6 +1,9 @@
 'use client';
 
 import * as React from 'react';
+import { DateRange } from "react-day-picker"
+import { addDays, format } from "date-fns"
+import { Calendar as CalendarIcon } from "lucide-react"
 import {
   Card,
   CardContent,
@@ -20,6 +23,14 @@ import { Boxes, PackageCheck, Truck, Warehouse, Archive, ChevronsLeft, Waves } f
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { useUser } from '@/firebase';
+import { Button } from "@/components/ui/button"
+import { Calendar } from "@/components/ui/calendar"
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
+import { cn } from "@/lib/utils"
 
 
 const CHART_COLORS = [
@@ -38,6 +49,11 @@ export default function DashboardPage() {
     const [selectedExporterId, setSelectedExporterId] = React.useState<string | null>(null);
     const [fixedExporterId, setFixedExporterId] = React.useState<string | null>(null);
     const [userProfile, setUserProfile] = React.useState<Profile | null>(null);
+    const [dateRange, setDateRange] = React.useState<DateRange | undefined>({
+        from: addDays(new Date(), -7),
+        to: new Date(),
+    });
+
 
     const { data: chamberLots, loading: loadingChamber } = useFirestoreCollection<ChamberLot>('chamberLots');
     const { data: otherFruitReceptions, loading: loadingOtherFruit } = useFirestoreCollection<OtherFruitReception>('otherFruitReceptions');
@@ -82,25 +98,33 @@ export default function DashboardPage() {
         totalEmptyBins,
         pendingHidroBins,
     } = React.useMemo(() => {
-        const filteredChamberLots = (chamberLots || []).filter(lot => !selectedExporterId || lot.exporterId === selectedExporterId);
-        const filteredReceptionLots = (receptionLots || []).filter(lot => !selectedExporterId || lot.exporterId === selectedExporterId);
         
+        const isDateInRange = (date: Date) => {
+            if (!dateRange?.from || !dateRange?.to) return true;
+            return date >= dateRange.from && date <= addDays(dateRange.to, 1);
+        };
+        
+        const filteredReceptionLots = (receptionLots || [])
+            .filter(lot => (!selectedExporterId || lot.exporterId === selectedExporterId) && lot.createdAt && isDateInRange(lot.createdAt.toDate()));
+        
+        // This is not time-based, it's a current state
+        const allChamberLots = chamberLots || [];
+
         const exporterDisplayLotIds = new Set(filteredReceptionLots.map(lot => lot.displayLotId));
+        
         const filteredProcessingLots = (processingLots || []).filter(p => exporterDisplayLotIds.has(p.displayLotId));
 
-        // Get the exporterIds associated with the filtered receptions to filter hidrocoolerLots
-        const filteredExporterIds = new Set(filteredReceptionLots.map(lot => lot.exporterId));
         const filteredHidroLots = (hidrocoolerLots || []).filter(lot => {
             const originalLot = (receptionLots || []).find(rl => rl.displayLotId === lot.displayLotId);
-            return originalLot && (!selectedExporterId || originalLot.exporterId === selectedExporterId);
+            return originalLot && (!selectedExporterId || originalLot.exporterId === selectedExporterId) && originalLot.createdAt && isDateInRange(originalLot.createdAt.toDate());
         });
 
 
-        const storedLots = filteredChamberLots.filter(lot => lot.status === 'Almacenado');
+        const storedLots = allChamberLots.filter(lot => lot.status === 'Almacenado');
         const calculatedTotalBins = storedLots.reduce((sum, lot) => sum + lot.binCount, 0);
         
-        const calculatedPendingStorage = filteredChamberLots
-            .filter(lot => lot.status === 'Pendiente por Almacenar')
+        const calculatedPendingStorage = allChamberLots
+            .filter(lot => lot.status === 'Pendiente por Almacenar' && lot.storedAt && isDateInRange(lot.storedAt.toDate()))
             .reduce((sum, lot) => sum + lot.binCount, 0);
         
         const calculatedInProcess = filteredProcessingLots
@@ -112,7 +136,7 @@ export default function DashboardPage() {
             return acc;
         }, {} as Record<string, string>);
         
-        const kilosData = (receptionLots || []).reduce((acc, lot) => {
+        const kilosData = filteredReceptionLots.reduce((acc, lot) => {
             const weight = (lot.totalWeight && lot.totalWeight > 0)
                 ? (lot.totalWeight - (lot.binCount * 65) + (lot.noTotes || 0))
                 : 0;
@@ -136,7 +160,7 @@ export default function DashboardPage() {
             const chamber = chambersConfig[chamberId];
             const totalCapacity = chamber.capacity;
 
-            const binsInChamber = (chamberLots || [])
+            const binsInChamber = allChamberLots
                 .filter(lot => lot.status === 'Almacenado' && lot.chamberId === chamberId)
                 .reduce((sum, lot) => sum + lot.binCount, 0);
 
@@ -163,16 +187,16 @@ export default function DashboardPage() {
         });
 
         const sortedReceptions = filteredReceptionLots
-            .filter(lot => lot.createdAt)
             .sort((a,b) => b.createdAt!.toMillis() - a.createdAt!.toMillis())
             .slice(0, 5);
         
-        const specificBinCodes = ['10001', '10011', '10007'];
+        // Stock is not time-based, it's a current snapshot
         let stockForEmptyBins = binMaterialStock || [];
         if (selectedExporterId) {
             stockForEmptyBins = (binMaterialStock || []).filter(s => s.exporterId === selectedExporterId);
         }
-
+        
+        const specificBinCodes = ['10001', '10011', '10007'];
         const calculatedEmptyBins = stockForEmptyBins
             .filter(s => specificBinCodes.includes(s.binMaterialCode))
             .reduce((sum, s) => sum + s.quantity, 0);
@@ -193,7 +217,7 @@ export default function DashboardPage() {
             pendingHidroBins: calculatedPendingHidroBins,
         };
 
-    }, [chamberLots, otherFruitReceptions, processingLots, dispatches, exporters, receptionLots, binMaterialStock, hidrocoolerLots, selectedExporterId]);
+    }, [chamberLots, otherFruitReceptions, processingLots, exporters, receptionLots, binMaterialStock, hidrocoolerLots, selectedExporterId, dateRange]);
 
     const loading = loadingChamber || loadingOtherFruit || loadingProcessing || loadingDispatches || loadingExporters || loadingReception || loadingBinStock || loadingUsers || loadingProfiles || loadingHidroLots;
 
@@ -231,26 +255,68 @@ export default function DashboardPage() {
                                 Vista general de los indicadores clave de la operación.
                             </p>
                         </div>
-                        {!fixedExporterId && (
-                        <div className="w-full sm:w-auto sm:min-w-[200px]">
-                            <Label htmlFor="exporter-filter">Filtrar por Exportador</Label>
-                            <Select
-                                value={selectedExporterId ?? 'all'}
-                                onValueChange={(value) => setSelectedExporterId(value === 'all' ? null : value)}
-                                disabled={loadingExporters}
-                            >
-                                <SelectTrigger id="exporter-filter">
-                                    <SelectValue placeholder="Seleccione..." />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">Ver Todos</SelectItem>
-                                    {exporters.map(e => (
-                                        <SelectItem key={e.id} value={e.exporterId}>{e.name}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
+                        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                            <div className="w-full sm:w-auto sm:min-w-[200px]">
+                                <Label htmlFor="date-range-picker">Filtrar por Fecha</Label>
+                                 <Popover>
+                                    <PopoverTrigger asChild>
+                                    <Button
+                                        id="date-range-picker"
+                                        variant={"outline"}
+                                        className={cn(
+                                        "w-full justify-start text-left font-normal",
+                                        !dateRange && "text-muted-foreground"
+                                        )}
+                                    >
+                                        <CalendarIcon className="mr-2 h-4 w-4" />
+                                        {dateRange?.from ? (
+                                        dateRange.to ? (
+                                            <>
+                                            {format(dateRange.from, "LLL dd, y")} -{" "}
+                                            {format(dateRange.to, "LLL dd, y")}
+                                            </>
+                                        ) : (
+                                            format(dateRange.from, "LLL dd, y")
+                                        )
+                                        ) : (
+                                        <span>Seleccione un rango</span>
+                                        )}
+                                    </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-auto p-0" align="end">
+                                    <Calendar
+                                        initialFocus
+                                        mode="range"
+                                        defaultMonth={dateRange?.from}
+                                        selected={dateRange}
+                                        onSelect={setDateRange}
+                                        numberOfMonths={2}
+                                        showWeekNumber
+                                    />
+                                    </PopoverContent>
+                                </Popover>
+                            </div>
+                            {!fixedExporterId && (
+                            <div className="w-full sm:w-auto sm:min-w-[200px]">
+                                <Label htmlFor="exporter-filter">Filtrar por Exportador</Label>
+                                <Select
+                                    value={selectedExporterId ?? 'all'}
+                                    onValueChange={(value) => setSelectedExporterId(value === 'all' ? null : value)}
+                                    disabled={loadingExporters}
+                                >
+                                    <SelectTrigger id="exporter-filter">
+                                        <SelectValue placeholder="Seleccione..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="all">Ver Todos</SelectItem>
+                                        {exporters.map(e => (
+                                            <SelectItem key={e.id} value={e.exporterId}>{e.name}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            )}
                         </div>
-                        )}
                     </div>
                 </CardContent>
             </Card>
@@ -266,7 +332,7 @@ export default function DashboardPage() {
                             {loading ? (
                                 <Skeleton className="h-8 w-1/2" />
                             ) : (
-                                <div className="text-4xl font-bold">{kpi.value}</div>
+                                <div className="text-4xl font-bold">{kpi.value.toLocaleString('es-CL')}</div>
                             )}
                         </CardContent>
                     </Card>
