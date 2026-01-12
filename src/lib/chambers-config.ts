@@ -24,6 +24,14 @@ const blockedCoordsC4C5 = [
     ...Array.from({ length: 5 }, (_, i) => `K${i + 9}`), // K9-K13
 ];
 
+const blockedCoordsC6 = [
+    ...Array.from({ length: 5 }, (_, i) => `K${i + 9}`), // K9-K13
+    ...Array.from({ length: 5 }, (_, i) => `L${i + 9}`), // L9-L13
+    ...Array.from({ length: 5 }, (_, i) => `M${i + 9}`), // M9-M13
+    ...Array.from({ length: 5 }, (_, i) => `N${i + 9}`), // N9-N13
+    ...Array.from({ length: 5 }, (_, i) => `O${i + 9}`), // O9-O13
+];
+
 
 export const chambersConfig: ChambersConfig = {
     'CAMARA-1': {
@@ -72,5 +80,6 @@ export const chambersConfig: ChambersConfig = {
         capacity: 1500,
         columns: columns4to6,
         rows,
+        blocked: blockedCoordsC6,
     },
 };
