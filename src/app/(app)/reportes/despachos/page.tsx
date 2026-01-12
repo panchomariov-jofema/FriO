@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
-import type { Dispatch } from '@/lib/types';
+import type { Dispatch, Producer, ReceptionLot } from '@/lib/types';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ReportHeader } from '@/components/reports/ReportHeader';
@@ -14,10 +14,12 @@ function convertToCSV(data: any[], headers: string[]) {
     const rows = data.map(row => 
         headers.map(header => {
             let value = row[header];
-            if (value instanceof Date) {
+             if (value instanceof Date) {
                 value = value.toLocaleString();
-            } else if (typeof value === 'object' && value !== null && value.toDate) {
+            } else if (typeof value === 'object' && value !== null && value?.toDate) {
                 value = value.toDate().toLocaleString();
+            } else if (Array.isArray(value)) {
+                value = value.join(', ');
             }
             const stringValue = String(value ?? '');
             return `"${stringValue.replace(/"/g, '""')}"`;
@@ -41,12 +43,52 @@ function downloadCSV(csvString: string, filename: string) {
 }
 
 export default function DispatchReportPage() {
-    const { data: dispatches, loading } = useFirestoreCollection<Dispatch>('dispatches');
+    const { data: dispatches, loading: loadingDispatches } = useFirestoreCollection<Dispatch>('dispatches');
+    const { data: receptionLots, loading: loadingReceptions } = useFirestoreCollection<ReceptionLot>('receptionLots');
+    const { data: producers, loading: loadingProducers } = useFirestoreCollection<Producer>('producers');
+    
+    const loading = loadingDispatches || loadingReceptions || loadingProducers;
+
+    const producerMap = React.useMemo(() => {
+        return (producers || []).reduce((acc, producer) => {
+            acc[producer.producerId] = producer.shortName;
+            return acc;
+        }, {} as Record<string, string>);
+    }, [producers]);
+    
+    const receptionLotMap = React.useMemo(() => {
+        return (receptionLots || []).reduce((acc, lot) => {
+            acc[lot.displayLotId] = lot;
+            return acc;
+        }, {} as Record<string, ReceptionLot>);
+    }, [receptionLots]);
+
+    const reportData = React.useMemo(() => {
+        return (dispatches || []).map(dispatch => {
+            const producersInDispatch = new Set<string>();
+            const varietiesInDispatch = new Set<string>();
+
+            dispatch.bins.forEach(bin => {
+                const receptionLot = receptionLotMap[bin.displayLotId];
+                if (receptionLot) {
+                    producersInDispatch.add(producerMap[receptionLot.producerId] || receptionLot.producerId);
+                    varietiesInDispatch.add(receptionLot.variety);
+                }
+            });
+
+            return {
+                ...dispatch,
+                producers: Array.from(producersInDispatch),
+                varieties: Array.from(varietiesInDispatch),
+            }
+        });
+    }, [dispatches, receptionLotMap, producerMap]);
+
 
      const handleExport = () => {
-        if (!dispatches) return;
-        const headers = ['createdAt', 'exporterName', 'totalBins', 'totalNetWeight', 'status'];
-        const dataForExport = dispatches.map(dispatch => ({
+        if (!reportData) return;
+        const headers = ['createdAt', 'exporterName', 'totalBins', 'totalNetWeight', 'producers', 'varieties', 'status'];
+        const dataForExport = reportData.map(dispatch => ({
             ...dispatch,
             totalNetWeight: dispatch.totalNetWeight ? dispatch.totalNetWeight.toFixed(2) : '0.00',
         }));
@@ -60,7 +102,7 @@ export default function DispatchReportPage() {
                 title="Reporte de Despachos"
                 description="Listado de todos los despachos creados."
                 onExport={handleExport}
-                isExportDisabled={loading || !dispatches || dispatches.length === 0}
+                isExportDisabled={loading || reportData.length === 0}
             />
             <Card>
                 <CardContent className="pt-6">
@@ -70,6 +112,8 @@ export default function DispatchReportPage() {
                                 <TableRow>
                                     <TableHead>Fecha</TableHead>
                                     <TableHead>Cliente</TableHead>
+                                    <TableHead>Productor(es)</TableHead>
+                                    <TableHead>Variedad(es)</TableHead>
                                     <TableHead>Total Bins</TableHead>
                                     <TableHead>Peso Neto Total</TableHead>
                                     <TableHead>Estado</TableHead>
@@ -77,12 +121,14 @@ export default function DispatchReportPage() {
                             </TableHeader>
                             <TableBody>
                                 {loading ? (
-                                    Array.from({ length: 5 }).map((_, i) => <TableRow key={i}><TableCell colSpan={5}><Skeleton className="h-4 w-full" /></TableCell></TableRow>)
-                                ) : dispatches && dispatches.length > 0 ? (
-                                    dispatches.map(dispatch => (
+                                    Array.from({ length: 5 }).map((_, i) => <TableRow key={i}><TableCell colSpan={7}><Skeleton className="h-4 w-full" /></TableCell></TableRow>)
+                                ) : reportData && reportData.length > 0 ? (
+                                    reportData.map(dispatch => (
                                         <TableRow key={dispatch.id}>
                                             <TableCell>{dispatch.createdAt?.toDate().toLocaleString()}</TableCell>
                                             <TableCell>{dispatch.exporterName}</TableCell>
+                                            <TableCell>{dispatch.producers.join(', ')}</TableCell>
+                                            <TableCell>{dispatch.varieties.join(', ')}</TableCell>
                                             <TableCell>{dispatch.totalBins}</TableCell>
                                             <TableCell>{dispatch.totalNetWeight ? `${dispatch.totalNetWeight.toFixed(2)} kg` : '-'}</TableCell>
                                             <TableCell>
@@ -91,7 +137,7 @@ export default function DispatchReportPage() {
                                         </TableRow>
                                     ))
                                 ) : (
-                                    <TableRow><TableCell colSpan={5} className="h-24 text-center">No hay despachos.</TableCell></TableRow>
+                                    <TableRow><TableCell colSpan={7} className="h-24 text-center">No hay despachos.</TableCell></TableRow>
                                 )}
                             </TableBody>
                         </Table>
