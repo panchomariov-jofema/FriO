@@ -16,12 +16,14 @@ export function useIsMobile() {
 
     // Listen for both resize and orientation changes
     window.addEventListener("resize", onChange)
+    window.addEventListener("orientationchange", onChange);
     
     // Initial check
     setIsMobile(checkIsMobile())
 
     return () => {
       window.removeEventListener("resize", onChange)
+      window.removeEventListener("orientationchange", onChange);
     }
   }, [])
 
