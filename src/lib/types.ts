@@ -211,6 +211,7 @@ export interface Chamber {
     capacity: number;
     columns: string[];
     rows: number[];
+    blocked?: string[];
 }
 
 export interface Dispatch {

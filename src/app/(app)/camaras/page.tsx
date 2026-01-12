@@ -188,6 +188,7 @@ export default function CamarasPage() {
 
     const allPossibleCoordinates = chamberConfig.columns
         .flatMap(col => chamberConfig.rows.map(row => `${col}${row}`))
+        .filter(coord => !chamberConfig.blocked?.includes(coord))
         .sort(naturalSort);
 
     let binsToStore = lotToStore.binCount;
@@ -453,6 +454,7 @@ export default function CamarasPage() {
                                   {config.rows.map(row =>
                                     config.columns.map(col => {
                                       const coord = `${col}${row}`;
+                                      const isBlocked = config.blocked?.includes(coord);
                                       const itemsInCoord = storedItemsByChamber[chamberId]?.[coord] || [];
                                       const isOccupied = itemsInCoord.length > 0;
                                       
@@ -463,6 +465,14 @@ export default function CamarasPage() {
                                       
                                       const occupancyPercentage = isOccupied ? (totalBins + totalPallets * 2) / 6 * 100 : 0; // Approx. 1 pallet = 2 bins
                                       const firstItem = isOccupied ? itemsInCoord[0] : null;
+
+                                      if (isBlocked) {
+                                        return (
+                                          <div key={coord} className="h-12 w-full rounded border-2 bg-gray-200 dark:bg-gray-700 relative">
+                                            <div className="absolute inset-0 bg-repeat bg-[length:10px_10px]" style={{backgroundImage: "repeating-linear-gradient(-45deg, #a0aec0, #a0aec0 1px, transparent 1px, transparent 5px)"}} />
+                                          </div>
+                                        )
+                                      }
 
                                       return (
                                         <Tooltip key={coord} delayDuration={100}>

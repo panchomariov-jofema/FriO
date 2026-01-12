@@ -8,6 +8,13 @@ const columns1to3 = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L']
 const columns4to6 = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O'];
 const rows = Array.from({ length: 13 }, (_, i) => i + 1);
 
+const blockedCoordsC1C3 = [
+    ...Array.from({ length: 5 }, (_, i) => `E${i + 9}`), // E9-E13
+    ...Array.from({ length: 5 }, (_, i) => `F${i + 9}`), // F9-F13
+    ...Array.from({ length: 5 }, (_, i) => `G${i + 9}`), // G9-G13
+    ...Array.from({ length: 5 }, (_, i) => `H${i + 9}`), // H9-H13
+];
+
 export const chambersConfig: ChambersConfig = {
     'CAMARA-1': {
         id: 'CAMARA-1',
@@ -15,6 +22,7 @@ export const chambersConfig: ChambersConfig = {
         capacity: 800,
         columns: columns1to3,
         rows,
+        blocked: blockedCoordsC1C3,
     },
     'CAMARA-2': {
         id: 'CAMARA-2',
@@ -22,6 +30,7 @@ export const chambersConfig: ChambersConfig = {
         capacity: 800,
         columns: columns1to3,
         rows,
+        blocked: blockedCoordsC1C3,
     },
     'CAMARA-3': {
         id: 'CAMARA-3',
@@ -29,6 +38,7 @@ export const chambersConfig: ChambersConfig = {
         capacity: 800,
         columns: columns1to3,
         rows,
+        blocked: blockedCoordsC1C3,
     },
     'CAMARA-4': {
         id: 'CAMARA-4',
