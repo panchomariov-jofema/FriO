@@ -4,7 +4,7 @@ import * as React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
-import type { ChamberLot, OtherFruitReception, StoredItem } from '@/lib/types';
+import type { ChamberLot, Exporter, OtherFruitReception, StoredItem } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -42,6 +42,7 @@ const naturalSort = (a: string, b: string) => {
 export default function CamarasPage() {
   const { data: chamberLots, loading: loadingChamberLots } = useFirestoreCollection<ChamberLot>('chamberLots');
   const { data: otherFruitReceptions, loading: loadingOtherFruit } = useFirestoreCollection<OtherFruitReception>('otherFruitReceptions');
+  const { data: exporters, loading: loadingExporters } = useFirestoreCollection<Exporter>('exporters');
   const [lotToStore, setLotToStore] = React.useState<ChamberLot | null>(null);
   const [itemToRelocate, setItemToRelocate] = React.useState<StoredItem | null>(null);
   const [isStoreDialogOpen, setStoreDialogOpen] = React.useState(false);
@@ -49,11 +50,16 @@ export default function CamarasPage() {
   const firestore = useFirestore();
   const { toast } = useToast();
 
-  const loading = loadingChamberLots || loadingOtherFruit;
+  const loading = loadingChamberLots || loadingOtherFruit || loadingExporters;
 
-  const { pendingLots, storedItemsByChamber, chamberOccupancy, totalNetWeightInStock } = React.useMemo(() => {
+  const { pendingLots, storedItemsByChamber, chamberOccupancy, totalNetWeightInStock, exporterMap } = React.useMemo(() => {
     const allChamberLots = chamberLots || [];
     const allOtherFruitReceptions = otherFruitReceptions || [];
+
+    const calculatedExporterMap = (exporters || []).reduce((acc, exp) => {
+      acc[exp.exporterId] = exp.name;
+      return acc;
+    }, {} as Record<string, string>);
 
     const calculatedPendingLots = allChamberLots
       .filter((lot) => lot.status === 'Pendiente por Almacenar')
@@ -148,9 +154,10 @@ export default function CamarasPage() {
         pendingLots: calculatedPendingLots, 
         storedItemsByChamber: calculatedStoredItemsByChamber, 
         chamberOccupancy: calculatedChamberOccupancy,
-        totalNetWeightInStock: calculatedTotalNetWeight
+        totalNetWeightInStock: calculatedTotalNetWeight,
+        exporterMap: calculatedExporterMap,
     };
-  }, [chamberLots, otherFruitReceptions]);
+  }, [chamberLots, otherFruitReceptions, exporters]);
 
 
   const handleStoreClick = (lot: ChamberLot) => {
@@ -356,7 +363,7 @@ export default function CamarasPage() {
                   <TableHead>ID Lote</TableHead>
                   <TableHead>Productor</TableHead>
                   <TableHead>N° Bins</TableHead>
-                  <TableHead>Origen</TableHead>
+                  <TableHead>Exportador</TableHead>
                   <TableHead>Estado</TableHead>
                   <TableHead className="text-right">Acciones</TableHead>
                 </TableRow>
@@ -370,7 +377,7 @@ export default function CamarasPage() {
                       <TableCell className="font-medium">{lot.displayLotId}</TableCell>
                       <TableCell>{lot.producerShortName}</TableCell>
                       <TableCell>{lot.binCount}</TableCell>
-                      <TableCell>{lot.hidrocooler}</TableCell>
+                      <TableCell>{exporterMap[lot.exporterId] || lot.exporterId}</TableCell>
                       <TableCell><Badge variant='secondary'>{lot.status}</Badge></TableCell>
                       <TableCell className="text-right">
                         <Button size="sm" onClick={() => handleStoreClick(lot)}>Almacenar</Button>
@@ -524,3 +531,5 @@ export default function CamarasPage() {
     </div>
   );
 }
+
+    
