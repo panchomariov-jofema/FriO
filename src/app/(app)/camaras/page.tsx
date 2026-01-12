@@ -362,7 +362,7 @@ export default function CamarasPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>ID Lote</TableHead>
-                  <TableHead>Productor</TableHead>
+                  <TableHead className="hidden md:table-cell">Productor</TableHead>
                   <TableHead>N° Bins</TableHead>
                   <TableHead>Exportador</TableHead>
                   <TableHead>Estado</TableHead>
@@ -376,7 +376,7 @@ export default function CamarasPage() {
                   pendingLots.map((lot) => (
                     <TableRow key={lot.id}>
                       <TableCell className="font-medium">{lot.displayLotId}</TableCell>
-                      <TableCell>{lot.producerShortName}</TableCell>
+                      <TableCell className="hidden md:table-cell">{lot.producerShortName}</TableCell>
                       <TableCell>{lot.binCount}</TableCell>
                       <TableCell>{exporterMap[lot.exporterId] || lot.exporterId}</TableCell>
                       <TableCell><Badge variant='secondary'>{lot.status}</Badge></TableCell>
