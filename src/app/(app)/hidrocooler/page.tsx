@@ -256,10 +256,10 @@ export default function HidrocoolerPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>ID Lote</TableHead>
-                  <TableHead>Productor</TableHead>
+                  <TableHead className="hidden md:table-cell">Productor</TableHead>
                   <TableHead>Cantidad de Bins</TableHead>
                   <TableHead>Peso Neto/Bin (kg)</TableHead>
-                  <TableHead>Estado</TableHead>
+                  <TableHead className="hidden md:table-cell">Estado</TableHead>
                   <TableHead className="text-right">Acciones</TableHead>
                 </TableRow>
               </TableHeader>
@@ -272,10 +272,10 @@ export default function HidrocoolerPage() {
                   sortedPendingLots.map((lot) => (
                     <TableRow key={lot.id}>
                       <TableCell className="font-medium">{lot.displayLotId}</TableCell>
-                      <TableCell>{lot.producerShortName}</TableCell>
+                      <TableCell className="hidden md:table-cell">{lot.producerShortName}</TableCell>
                       <TableCell>{lot.binCount}</TableCell>
                       <TableCell>{lot.netWeightPerBin?.toFixed(2) ?? '-'}</TableCell>
-                      <TableCell><Badge variant={getStatusVariant(lot.status)}>{lot.status}</Badge></TableCell>
+                      <TableCell className="hidden md:table-cell"><Badge variant={getStatusVariant(lot.status)}>{lot.status}</Badge></TableCell>
                       <TableCell className="text-right">
                         <Button size="sm" onClick={() => handleProcessClick(lot)}>Procesar</Button>
                       </TableCell>
