@@ -100,12 +100,12 @@ export default function DashboardPage() {
     } = React.useMemo(() => {
         
         // --- KPI Calculations (Always current, ignores date range) ---
-        const allChamberLots = (chamberLots || []);
-        const calculatedTotalBins = allChamberLots
+        const allChamberLotsForKPI = (chamberLots || []);
+        const calculatedTotalBins = allChamberLotsForKPI
             .filter(lot => lot.status === 'Almacenado')
             .reduce((sum, lot) => sum + lot.binCount, 0);
         
-        const calculatedPendingStorage = allChamberLots
+        const calculatedPendingStorage = allChamberLotsForKPI
             .filter(lot => lot.status === 'Pendiente por Almacenar')
             .reduce((sum, lot) => sum + lot.binCount, 0);
         
@@ -130,7 +130,7 @@ export default function DashboardPage() {
             const chamber = chambersConfig[chamberId];
             const totalCapacity = chamber.capacity;
 
-            const binsInChamber = allChamberLots
+            const binsInChamber = allChamberLotsForKPI
                 .filter(lot => lot.status === 'Almacenado' && lot.chamberId === chamberId)
                 .reduce((sum, lot) => sum + lot.binCount, 0);
 
@@ -182,7 +182,7 @@ export default function DashboardPage() {
         });
 
         // Process external ChamberLots within date range
-        allChamberLots.forEach(lot => {
+        (chamberLots || []).forEach(lot => {
             // Only external lots have their own weight and need to be counted here
             if (lot.hidrocooler !== 'EXTERNO') return; 
             if (!isDateInRange(lot.storedAt?.toDate())) return;
