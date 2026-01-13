@@ -99,85 +99,75 @@ export default function DashboardPage() {
         pendingHidroBins,
     } = React.useMemo(() => {
         
-        const isDateInRange = (lot: ReceptionLot | ChamberLot) => {
-            const date = lot.createdAt?.toDate() ?? (lot as ChamberLot).storedAt?.toDate();
+        const isDateInRange = (date: Date | null | undefined): boolean => {
             if (!date) return false;
-            if (!dateRange?.from) return true; // If no start date, include everything
-            const toDate = dateRange.to ? addDays(dateRange.to, 1) : addDays(dateRange.from, 1);
+            if (!dateRange?.from) return true; // No start date, include all
+            const toDate = dateRange.to ? addDays(dateRange.to, 1) : addDays(new Date(), 1); // Use today if no end date
             return date >= dateRange.from && date < toDate;
         };
-        
-        const filteredReceptionLots = (receptionLots || []).filter(isDateInRange);
-        const filteredChamberLots = (chamberLots || []).filter(isDateInRange);
-        
-        const relevantChamberLots = filteredChamberLots.filter(lot => (!selectedExporterId || lot.exporterId === selectedExporterId));
-
-        const exporterDisplayLotIds = new Set(filteredReceptionLots.map(lot => lot.displayLotId));
-        
-        const filteredProcessingLots = (processingLots || []).filter(p => exporterDisplayLotIds.has(p.displayLotId));
-
-        const filteredHidroLots = (hidrocoolerLots || []).filter(lot => {
-            const originalLot = (receptionLots || []).find(rl => rl.displayLotId === lot.displayLotId);
-            return originalLot && (!selectedExporterId || originalLot.exporterId === selectedExporterId) && isDateInRange(originalLot);
-        });
-
-        const calculatedTotalBins = (chamberLots || [])
-            .filter(lot => lot.status === 'Almacenado')
-            .reduce((sum, lot) => sum + lot.binCount, 0);
-        
-        const calculatedPendingStorage = (chamberLots || [])
-            .filter(lot => lot.status === 'Pendiente por Almacenar')
-            .reduce((sum, lot) => sum + lot.binCount, 0);
-        
-        const calculatedInProcess = filteredProcessingLots
-            .filter(p => p.status === 'En Proceso')
-            .reduce((sum, lot) => sum + lot.binCount, 0);
 
         const exporterMap = (exporters || []).reduce((acc, e) => {
             acc[e.exporterId] = e.name;
             return acc;
         }, {} as Record<string, string>);
-        
-        const kilosData = (filteredReceptionLots.filter(lot => !selectedExporterId || lot.exporterId === selectedExporterId)).reduce((acc, lot) => {
+
+        const kilosData: Record<string, number> = {};
+
+        // Process ReceptionLots
+        (receptionLots || []).forEach(lot => {
+            if (!isDateInRange(lot.createdAt?.toDate())) return;
+            if (selectedExporterId && lot.exporterId !== selectedExporterId) return;
+
             const weight = (lot.totalWeight && lot.totalWeight > 0)
                 ? (lot.totalWeight - (lot.binCount * 65) + (lot.noTotes || 0))
                 : 0;
 
             if (weight > 0) {
                 const exporterName = exporterMap[lot.exporterId] || 'No Asignado';
-                 if (!acc[exporterName]) {
-                    acc[exporterName] = 0;
-                }
-                acc[exporterName] += weight;
+                kilosData[exporterName] = (kilosData[exporterName] || 0) + weight;
             }
-            return acc;
-        }, {} as Record<string, number>);
-
-        // Add net kilos from external receptions (chamber lots)
-        relevantChamberLots
-            .filter(lot => lot.hidrocooler === 'EXTERNO' && lot.netWeightPerBin && lot.netWeightPerBin > 0)
-            .forEach(lot => {
-                const weight = (lot.netWeightPerBin || 0) * lot.binCount;
-                if (weight > 0) {
-                    const exporterName = exporterMap[lot.exporterId] || 'No Asignado';
-                    if (!kilosData[exporterName]) {
-                        kilosData[exporterName] = 0;
-                    }
-                    kilosData[exporterName] += weight;
-                }
         });
 
+        // Process external ChamberLots
+        (chamberLots || []).forEach(lot => {
+            if (lot.hidrocooler !== 'EXTERNO') return; // Only external lots have their own weight
+            if (!isDateInRange(lot.storedAt?.toDate())) return;
+            if (selectedExporterId && lot.exporterId !== selectedExporterId) return;
 
+            const weight = (lot.netWeightPerBin || 0) * lot.binCount;
+            if (weight > 0) {
+                const exporterName = exporterMap[lot.exporterId] || 'No Asignado';
+                kilosData[exporterName] = (kilosData[exporterName] || 0) + weight;
+            }
+        });
+        
         const barChartData = Object.entries(kilosData).map(([name, value]) => ({
             name,
             kilos: value,
         }));
         
+        // --- Other calculations that don't affect the chart ---
+        
+        const currentReceptionLots = (receptionLots || []);
+
+        const allChamberLots = (chamberLots || []);
+        const calculatedTotalBins = allChamberLots
+            .filter(lot => lot.status === 'Almacenado')
+            .reduce((sum, lot) => sum + lot.binCount, 0);
+        
+        const calculatedPendingStorage = allChamberLots
+            .filter(lot => lot.status === 'Pendiente por Almacenar')
+            .reduce((sum, lot) => sum + lot.binCount, 0);
+        
+        const calculatedInProcess = (processingLots || [])
+            .filter(p => p.status === 'En Proceso')
+            .reduce((sum, lot) => sum + lot.binCount, 0);
+        
         const calculatedOccupancy = Object.keys(chambersConfig).map(chamberId => {
             const chamber = chambersConfig[chamberId];
             const totalCapacity = chamber.capacity;
 
-            const binsInChamber = (chamberLots || [])
+            const binsInChamber = allChamberLots
                 .filter(lot => lot.status === 'Almacenado' && lot.chamberId === chamberId)
                 .reduce((sum, lot) => sum + lot.binCount, 0);
 
@@ -185,29 +175,23 @@ export default function DashboardPage() {
                 .flatMap(r => r.items.map(item => ({ ...item, unit: r.unit, chamberId: item.storageLocation?.chamberId })))
                 .filter(item => item.status === 'Almacenado' && item.chamberId === chamberId);
 
-            const otherBins = otherFruitInChamber
-                .filter(item => item.unit === 'Bins')
-                .reduce((sum, item) => sum + item.quantity, 0);
-
-            const otherPallets = otherFruitInChamber
-                .filter(item => item.unit === 'Pallets')
-                .reduce((sum, item) => sum + item.quantity, 0);
-            
+            const otherBins = otherFruitInChamber.filter(item => item.unit === 'Bins').reduce((sum, item) => sum + item.quantity, 0);
+            const otherPallets = otherFruitInChamber.filter(item => item.unit === 'Pallets').reduce((sum, item) => sum + item.quantity, 0);
             const occupiedEquivalentBins = binsInChamber + otherBins + (otherPallets * 2);
 
             return {
                 name: chamber.name,
-                ocupacion: occupiedEquivalentBins, // The value for the bar chart
+                ocupacion: occupiedEquivalentBins,
                 total: totalCapacity,
                 percentage: totalCapacity > 0 ? (occupiedEquivalentBins / totalCapacity) * 100 : 0
             };
         });
 
-        const sortedReceptions = filteredReceptionLots
-            .sort((a,b) => b.createdAt!.toMillis() - a.createdAt!.toMillis())
+        const sortedReceptions = currentReceptionLots
+            .sort((a,b) => (b.createdAt?.toMillis() ?? 0) - (a.createdAt?.toMillis() ?? 0))
             .slice(0, 5);
         
-        let stockForEmptyBins = (binMaterialStock || []).filter(s => s.lastUpdatedAt && isDateInRange({ createdAt: s.lastUpdatedAt } as any));
+        let stockForEmptyBins = (binMaterialStock || []).filter(s => isDateInRange(s.lastUpdatedAt?.toDate()));
         if (selectedExporterId) {
             stockForEmptyBins = stockForEmptyBins.filter(s => s.exporterId === selectedExporterId);
         }
@@ -217,7 +201,7 @@ export default function DashboardPage() {
             .filter(s => specificBinCodes.includes(s.binMaterialCode))
             .reduce((sum, s) => sum + s.quantity, 0);
 
-        const calculatedPendingHidroBins = filteredHidroLots
+        const calculatedPendingHidroBins = (hidrocoolerLots || [])
             .filter(lot => lot.status === 'Pendiente de Pre-Hidro')
             .reduce((sum, lot) => sum + lot.binCount, 0);
 
