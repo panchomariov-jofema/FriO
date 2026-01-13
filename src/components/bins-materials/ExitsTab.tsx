@@ -202,7 +202,7 @@ export function ExitsTab({ exporterId, producerId }: ExitsTabProps) {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Rut Conductor</FormLabel>
-                    <FormControl><Input {...field} autoComplete="off" /></FormControl>
+                    <FormControl><Input {...field} autoComplete="off" inputMode="numeric" pattern="[0-9]*" /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -265,5 +265,3 @@ export function ExitsTab({ exporterId, producerId }: ExitsTabProps) {
     </Card>
   );
 }
-
-    
