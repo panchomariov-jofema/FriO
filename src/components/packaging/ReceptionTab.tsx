@@ -168,7 +168,14 @@ export function ReceptionTab() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Documento de Entrada (Guía)</FormLabel>
-                    <FormControl><Input {...field} autoComplete="off" /></FormControl>
+                    <FormControl>
+                      <Input
+                        {...field}
+                        autoComplete="off"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                      />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
