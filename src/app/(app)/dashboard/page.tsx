@@ -99,32 +99,33 @@ export default function DashboardPage() {
         pendingHidroBins,
     } = React.useMemo(() => {
         
-        const isDateInRange = (date: Date | null | undefined) => {
+        const isDateInRange = (lot: ReceptionLot | ChamberLot) => {
+            const date = lot.createdAt?.toDate() ?? (lot as ChamberLot).storedAt?.toDate();
             if (!date) return false;
             if (!dateRange?.from) return true; // If no start date, include everything
             const toDate = dateRange.to ? addDays(dateRange.to, 1) : addDays(dateRange.from, 1);
             return date >= dateRange.from && date < toDate;
         };
         
-        const filteredReceptionLots = (receptionLots || [])
-            .filter(lot => (!selectedExporterId || lot.exporterId === selectedExporterId) && lot.createdAt && isDateInRange(lot.createdAt.toDate()));
+        const filteredReceptionLots = (receptionLots || []).filter(isDateInRange);
+        const filteredChamberLots = (chamberLots || []).filter(isDateInRange);
         
+        const relevantChamberLots = filteredChamberLots.filter(lot => (!selectedExporterId || lot.exporterId === selectedExporterId));
+
         const exporterDisplayLotIds = new Set(filteredReceptionLots.map(lot => lot.displayLotId));
         
         const filteredProcessingLots = (processingLots || []).filter(p => exporterDisplayLotIds.has(p.displayLotId));
 
         const filteredHidroLots = (hidrocoolerLots || []).filter(lot => {
             const originalLot = (receptionLots || []).find(rl => rl.displayLotId === lot.displayLotId);
-            return originalLot && (!selectedExporterId || originalLot.exporterId === selectedExporterId) && originalLot.createdAt && isDateInRange(originalLot.createdAt.toDate());
+            return originalLot && (!selectedExporterId || originalLot.exporterId === selectedExporterId) && isDateInRange(originalLot);
         });
 
-        const filteredChamberLots = (chamberLots || []).filter(lot => lot.storedAt && isDateInRange(lot.storedAt.toDate()));
-
-        const calculatedTotalBins = filteredChamberLots
+        const calculatedTotalBins = (chamberLots || [])
             .filter(lot => lot.status === 'Almacenado')
             .reduce((sum, lot) => sum + lot.binCount, 0);
         
-        const calculatedPendingStorage = filteredChamberLots
+        const calculatedPendingStorage = (chamberLots || [])
             .filter(lot => lot.status === 'Pendiente por Almacenar')
             .reduce((sum, lot) => sum + lot.binCount, 0);
         
@@ -137,7 +138,7 @@ export default function DashboardPage() {
             return acc;
         }, {} as Record<string, string>);
         
-        const kilosData = filteredReceptionLots.reduce((acc, lot) => {
+        const kilosData = (filteredReceptionLots.filter(lot => !selectedExporterId || lot.exporterId === selectedExporterId)).reduce((acc, lot) => {
             const weight = (lot.totalWeight && lot.totalWeight > 0)
                 ? (lot.totalWeight - (lot.binCount * 65) + (lot.noTotes || 0))
                 : 0;
@@ -153,9 +154,8 @@ export default function DashboardPage() {
         }, {} as Record<string, number>);
 
         // Add net kilos from external receptions (chamber lots)
-        filteredChamberLots
+        relevantChamberLots
             .filter(lot => lot.hidrocooler === 'EXTERNO' && lot.netWeightPerBin && lot.netWeightPerBin > 0)
-            .filter(lot => (!selectedExporterId || lot.exporterId === selectedExporterId))
             .forEach(lot => {
                 const weight = (lot.netWeightPerBin || 0) * lot.binCount;
                 if (weight > 0) {
@@ -207,7 +207,7 @@ export default function DashboardPage() {
             .sort((a,b) => b.createdAt!.toMillis() - a.createdAt!.toMillis())
             .slice(0, 5);
         
-        let stockForEmptyBins = (binMaterialStock || []).filter(s => s.lastUpdatedAt && isDateInRange(s.lastUpdatedAt.toDate()));
+        let stockForEmptyBins = (binMaterialStock || []).filter(s => s.lastUpdatedAt && isDateInRange({ createdAt: s.lastUpdatedAt } as any));
         if (selectedExporterId) {
             stockForEmptyBins = stockForEmptyBins.filter(s => s.exporterId === selectedExporterId);
         }
