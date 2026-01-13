@@ -152,6 +152,22 @@ export default function DashboardPage() {
             return acc;
         }, {} as Record<string, number>);
 
+        // Add net kilos from external receptions (chamber lots)
+        filteredChamberLots
+            .filter(lot => lot.hidrocooler === 'EXTERNO' && lot.netWeightPerBin && lot.netWeightPerBin > 0)
+            .filter(lot => (!selectedExporterId || lot.exporterId === selectedExporterId))
+            .forEach(lot => {
+                const weight = (lot.netWeightPerBin || 0) * lot.binCount;
+                if (weight > 0) {
+                    const exporterName = exporterMap[lot.exporterId] || 'No Asignado';
+                    if (!kilosData[exporterName]) {
+                        kilosData[exporterName] = 0;
+                    }
+                    kilosData[exporterName] += weight;
+                }
+        });
+
+
         const barChartData = Object.entries(kilosData).map(([name, value]) => ({
             name,
             kilos: value,
