@@ -29,6 +29,8 @@ export interface BinMaterialMovement {
   id: string;
   type: 'entrada' | 'salida';
   document: string;
+  driverName: string;
+  driverRUT: string;
   exporterId: string;
   producerId: string;
   items: {
@@ -290,3 +292,5 @@ export type StoredItem = {
 
 
 export type MasterData = Exporter | Producer | BinMaterial | OtherClient | PackagingMaster | UserMaster | Profile | Packing;
+
+    

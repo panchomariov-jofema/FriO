@@ -16,7 +16,6 @@ import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { Table, TableBody, TableCell, TableHeader, TableRow, TableHead } from '../ui/table';
 import { Skeleton } from '../ui/skeleton';
-import type { Exporter } from '@/lib/types';
 
 const movementItemSchema = z.object({
   binMaterialId: z.string(),
@@ -27,6 +26,8 @@ const movementItemSchema = z.object({
 
 const movementSchema = z.object({
   document: z.string().min(1, 'El documento es obligatorio.'),
+  driverName: z.string().min(1, 'El nombre del conductor es obligatorio.'),
+  driverRUT: z.string().min(1, 'El RUT del conductor es obligatorio.'),
   items: z.array(movementItemSchema),
 });
 
@@ -47,7 +48,7 @@ const calculationRules: Record<string, { binCode: string; related: Record<string
     },
     'MEYER': { // Exporter ID
         binCode: '10007',
-        related: { '10008': 24, '10009': 24 }
+        related: { '10008': 24 }
     },
     'BLOSSOM': { // Exporter ID
         binCode: '10011',
@@ -62,7 +63,7 @@ export function EntriesTab({ exporterId, producerId }: EntriesTabProps) {
 
   const form = useForm<MovementFormValues>({
     resolver: zodResolver(movementSchema),
-    defaultValues: { document: '', items: [] },
+    defaultValues: { document: '', driverName: '', driverRUT: '', items: [] },
   });
 
   const items = form.watch('items');
@@ -94,6 +95,8 @@ export function EntriesTab({ exporterId, producerId }: EntriesTabProps) {
     if (materials.length > 0) {
       form.reset({
         document: form.getValues('document'),
+        driverName: form.getValues('driverName'),
+        driverRUT: form.getValues('driverRUT'),
         items: materials.map(m => ({
           binMaterialId: m.id,
           binMaterialCode: m.code,
@@ -124,6 +127,8 @@ export function EntriesTab({ exporterId, producerId }: EntriesTabProps) {
         const movementData = {
           type: 'entrada' as const,
           document: values.document,
+          driverName: values.driverName,
+          driverRUT: values.driverRUT,
           exporterId,
           producerId,
           items: itemsToProcess,
@@ -163,14 +168,13 @@ export function EntriesTab({ exporterId, producerId }: EntriesTabProps) {
       });
 
       toast({ title: 'Éxito', description: 'Entrada registrada y stock actualizado.' });
-      // Reset form keeping document and resetting quantities
       const resetItems = materials.map(m => ({
         binMaterialId: m.id,
         binMaterialCode: m.code,
         binMaterialName: m.name,
         quantity: 0
       }));
-      form.reset({ document: '', items: resetItems });
+      form.reset({ document: '', driverName: '', driverRUT: '', items: resetItems });
 
     } catch (error: any) {
       console.error('Error processing entry:', error);
@@ -191,7 +195,7 @@ export function EntriesTab({ exporterId, producerId }: EntriesTabProps) {
       <CardContent>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-            <div className="md:w-1/3">
+            <div className="grid md:grid-cols-3 gap-4">
               <FormField
                 control={form.control}
                 name="document"
@@ -199,6 +203,28 @@ export function EntriesTab({ exporterId, producerId }: EntriesTabProps) {
                   <FormItem>
                     <FormLabel>Documento de Entrada</FormLabel>
                     <FormControl><Input {...field} placeholder="Ej: Guía de Despacho 123" autoComplete="off" /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="driverName"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Nombre Conductor</FormLabel>
+                    <FormControl><Input {...field} autoComplete="off" /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="driverRUT"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Rut Conductor</FormLabel>
+                    <FormControl><Input {...field} autoComplete="off" /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -258,3 +284,5 @@ export function EntriesTab({ exporterId, producerId }: EntriesTabProps) {
     </Card>
   );
 }
+
+    

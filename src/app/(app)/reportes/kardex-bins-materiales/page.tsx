@@ -52,6 +52,8 @@ export default function BinMaterialKardexReportPage() {
                 type: mov.type,
                 document: mov.document,
                 producerId: mov.producerId,
+                driverName: mov.driverName,
+                driverRUT: mov.driverRUT,
                 code: item.binMaterialCode,
                 name: item.binMaterialName,
                 quantity: mov.type === 'entrada' ? item.quantity : -item.quantity,
@@ -60,7 +62,7 @@ export default function BinMaterialKardexReportPage() {
     }, [movements]);
 
     const handleExport = () => {
-        const headers = ['date', 'type', 'document', 'producerId', 'code', 'name', 'quantity'];
+        const headers = ['date', 'type', 'document', 'producerId', 'driverName', 'driverRUT', 'code', 'name', 'quantity'];
         const csv = convertToCSV(kardexData, headers);
         downloadCSV(csv, 'kardex_bins_y_materiales.csv');
     };
@@ -83,6 +85,8 @@ export default function BinMaterialKardexReportPage() {
                                     <TableHead>Tipo</TableHead>
                                     <TableHead>Documento</TableHead>
                                     <TableHead>Productor</TableHead>
+                                    <TableHead>Conductor</TableHead>
+                                    <TableHead>RUT</TableHead>
                                     <TableHead>Código</TableHead>
                                     <TableHead>Material</TableHead>
                                     <TableHead>Cantidad</TableHead>
@@ -90,7 +94,7 @@ export default function BinMaterialKardexReportPage() {
                             </TableHeader>
                             <TableBody>
                                 {loading ? (
-                                    Array.from({ length: 5 }).map((_, i) => <TableRow key={i}><TableCell colSpan={7}><Skeleton className="h-4 w-full" /></TableCell></TableRow>)
+                                    Array.from({ length: 5 }).map((_, i) => <TableRow key={i}><TableCell colSpan={9}><Skeleton className="h-4 w-full" /></TableCell></TableRow>)
                                 ) : kardexData.length > 0 ? (
                                     kardexData.map(item => (
                                         <TableRow key={item.key}>
@@ -102,6 +106,8 @@ export default function BinMaterialKardexReportPage() {
                                             </TableCell>
                                             <TableCell>{item.document}</TableCell>
                                             <TableCell>{item.producerId}</TableCell>
+                                            <TableCell>{item.driverName}</TableCell>
+                                            <TableCell>{item.driverRUT}</TableCell>
                                             <TableCell>{item.code}</TableCell>
                                             <TableCell>{item.name}</TableCell>
                                             <TableCell className={item.quantity > 0 ? 'text-green-600' : 'text-red-600'}>
@@ -110,7 +116,7 @@ export default function BinMaterialKardexReportPage() {
                                         </TableRow>
                                     ))
                                 ) : (
-                                    <TableRow><TableCell colSpan={7} className="h-24 text-center">No hay movimientos.</TableCell></TableRow>
+                                    <TableRow><TableCell colSpan={9} className="h-24 text-center">No hay movimientos.</TableCell></TableRow>
                                 )}
                             </TableBody>
                         </Table>
@@ -120,3 +126,5 @@ export default function BinMaterialKardexReportPage() {
         </div>
     );
 }
+
+    

@@ -28,6 +28,8 @@ const movementItemSchema = z.object({
 
 const movementSchema = z.object({
   document: z.string().min(1, 'El documento es obligatorio.'),
+  driverName: z.string().min(1, 'El nombre del conductor es obligatorio.'),
+  driverRUT: z.string().min(1, 'El RUT del conductor es obligatorio.'),
   items: z.array(movementItemSchema),
 });
 
@@ -47,7 +49,7 @@ export function ExitsTab({ exporterId, producerId }: ExitsTabProps) {
 
   const form = useForm<MovementFormValues>({
     resolver: zodResolver(movementSchema),
-    defaultValues: { document: '', items: [] },
+    defaultValues: { document: '', driverName: '', driverRUT: '', items: [] },
   });
 
   const getStockForMaterial = React.useCallback((binMaterialId: string) => {
@@ -60,6 +62,8 @@ export function ExitsTab({ exporterId, producerId }: ExitsTabProps) {
     if (materials.length > 0) {
       form.reset({
         document: form.getValues('document'),
+        driverName: form.getValues('driverName'),
+        driverRUT: form.getValues('driverRUT'),
         items: materials.map(m => ({
           binMaterialId: m.id,
           binMaterialCode: m.code,
@@ -102,6 +106,8 @@ export function ExitsTab({ exporterId, producerId }: ExitsTabProps) {
         const movementData = {
           type: 'salida' as const,
           document: values.document,
+          driverName: values.driverName,
+          driverRUT: values.driverRUT,
           exporterId,
           producerId,
           items: itemsToProcess,
@@ -144,7 +150,7 @@ export function ExitsTab({ exporterId, producerId }: ExitsTabProps) {
         binMaterialName: m.name,
         quantity: 0
       }));
-      form.reset({ document: '', items: resetItems });
+      form.reset({ document: '', driverName: '', driverRUT: '', items: resetItems });
 
     } catch (error: any) {
       console.error('Error processing exit:', error);
@@ -167,7 +173,7 @@ export function ExitsTab({ exporterId, producerId }: ExitsTabProps) {
       <CardContent>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-            <div className="md:w-1/3">
+            <div className="grid md:grid-cols-3 gap-4">
                 <FormField
                 control={form.control}
                 name="document"
@@ -179,6 +185,28 @@ export function ExitsTab({ exporterId, producerId }: ExitsTabProps) {
                     </FormItem>
                 )}
                 />
+                 <FormField
+                control={form.control}
+                name="driverName"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Nombre Conductor</FormLabel>
+                    <FormControl><Input {...field} autoComplete="off" /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="driverRUT"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Rut Conductor</FormLabel>
+                    <FormControl><Input {...field} autoComplete="off" /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
             </div>
 
             <div className="space-y-2">
@@ -237,3 +265,5 @@ export function ExitsTab({ exporterId, producerId }: ExitsTabProps) {
     </Card>
   );
 }
+
+    
