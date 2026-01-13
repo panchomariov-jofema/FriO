@@ -82,7 +82,8 @@ export function RelocateDialog({
     };
     
     allChamberLots.forEach(lot => {
-        if (item.type === 'producerLot' && lot.id === item.id) return;
+        // Exclude the item being moved from occupancy calculation
+        if (item.type === 'producerLot' && lot.chamberId === item.chamberId && lot.coordinate === item.coordinate) return;
         
         if (lot.status === 'Almacenado' && lot.chamberId === targetChamberId && lot.coordinate) {
             const coordData = getCoord(lot.coordinate);
@@ -92,7 +93,8 @@ export function RelocateDialog({
 
     allOtherFruitReceptions.forEach(reception => {
         reception.items.forEach((fruitItem, index) => {
-            if (item.type === 'otherFruit' && reception.id === item.receptionId && index === item.itemIndex) return;
+            // Exclude the item being moved
+            if (item.type === 'otherFruit' && reception.id === item.receptionId && fruitItem.storageLocation?.chamberId === item.chamberId && fruitItem.storageLocation?.coordinate === item.coordinate) return;
 
             if (fruitItem.status === 'Almacenado' && fruitItem.storageLocation?.chamberId === targetChamberId && fruitItem.storageLocation.coordinate) {
                 const coordData = getCoord(fruitItem.storageLocation.coordinate);
@@ -106,6 +108,14 @@ export function RelocateDialog({
     });
 
     const available = allPossibleCoords.filter(coord => {
+      // Don't offer the current coordinate as a destination
+      if (item.chamberId === targetChamberId && item.coordinate === coord) {
+          return false;
+      }
+      if (chamberConfig.blocked?.includes(coord)) {
+          return false;
+      }
+      
       const occupied = currentOccupancyMap.get(coord) || { bins: 0, pallets: 0 };
       
       if (item.unit === 'Pallets') {
@@ -118,7 +128,7 @@ export function RelocateDialog({
         return occupied.bins < 6; // Can move to a coordinate with space for bins
       }
       
-      return false;
+      return false; // Should not happen
     });
 
     return { 
@@ -155,7 +165,7 @@ export function RelocateDialog({
     
     if (item.unit === 'Bins') {
         if (targetOccupancy.pallets > 0) {
-            toast({ variant: 'destructive', title: 'Error de Capacidad', description: 'No se puede mover un bin a una coordenada que ya contiene pallets.'});
+            toast({ variant: 'destructive', title: 'Error de Capacidad', description: 'No se pueden mover bins a una coordenada que ya contiene pallets.'});
             return;
         }
     }
