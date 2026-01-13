@@ -156,7 +156,7 @@ export function OtherFruitReceptionTab() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Documento de Entrada (Guía)</FormLabel>
-                    <FormControl><Input {...field} autoComplete="off" /></FormControl>
+                    <FormControl><Input {...field} autoComplete="off" inputMode="numeric" pattern="[0-9]*" /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -215,7 +215,7 @@ export function OtherFruitReceptionTab() {
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Cantidad ({selectedClient?.unit || 'Unidades'})</FormLabel>
-                          <FormControl><Input type="number" {...field} autoComplete="off" min="1" /></FormControl>
+                          <FormControl><Input type="number" {...field} autoComplete="off" min="1" inputMode="numeric" /></FormControl>
                           <FormMessage />
                         </FormItem>
                       )}

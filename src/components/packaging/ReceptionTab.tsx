@@ -193,6 +193,8 @@ export function ReceptionTab() {
                                 autoComplete="off" 
                                 disabled={!selectedClientId || loadingMasters}
                                 placeholder={!selectedClientId ? "Seleccione cliente" : "Ingrese código..."}
+                                inputMode="numeric" 
+                                pattern="[0-9]*"
                                />
                            </FormControl>
                           <FormMessage />
@@ -211,7 +213,7 @@ export function ReceptionTab() {
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Cant. Pallets</FormLabel>
-                          <FormControl><Input type="number" {...field} autoComplete="off" min="1" /></FormControl>
+                          <FormControl><Input type="number" {...field} autoComplete="off" min="1" inputMode="numeric" /></FormControl>
                           <FormMessage />
                         </FormItem>
                       )}

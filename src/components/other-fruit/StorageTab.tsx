@@ -256,7 +256,8 @@ function StorageForm({ item, onCancel, allReceptions, allChamberLots }: { item: 
                                         <FormControl>
                                           <Input 
                                             type="number" 
-                                            {...field} 
+                                            {...field}
+                                            inputMode="numeric"
                                           />
                                         </FormControl>
                                         <FormMessage />

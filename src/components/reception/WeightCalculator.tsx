@@ -129,6 +129,7 @@ export function WeightCalculator({ lot, open, onOpenChange, onWeightSaved }: Wei
               <Input
                 ref={inputRef}
                 type="number"
+                inputMode="decimal"
                 placeholder="Ingrese peso parcial (kg)"
                 value={currentWeight}
                 onChange={(e) => setCurrentWeight(e.target.value)}
