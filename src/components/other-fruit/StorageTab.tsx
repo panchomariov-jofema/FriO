@@ -83,6 +83,7 @@ function StorageForm({ item, onCancel, allReceptions, allChamberLots }: { item: 
             return currentOccupancyMap.get(coord)!;
         };
 
+        // Check OtherFruitReceptions
         allReceptions.forEach(reception => {
             if (reception.status !== 'Almacenado' && reception.status !== 'Parcialmente Almacenado') return;
             reception.items.forEach(storedItem => {
@@ -96,19 +97,29 @@ function StorageForm({ item, onCancel, allReceptions, allChamberLots }: { item: 
                 }
             });
         });
-
+        
+        // Check ChamberLots (producer fruit)
         allChamberLots.forEach(chamberLot => {
             if (chamberLot.status === 'Almacenado' && chamberLot.chamberId === targetChamberId && chamberLot.coordinate) {
                 const coordData = getCoord(chamberLot.coordinate);
-                coordData.bins += chamberLot.binCount;
+                coordData.bins += chamberLot.binCount; // Chamber lots are always in Bins
             }
         });
         
         const available = allPossibleCoords.filter(coord => {
+            if (chamberConfig.blocked?.includes(coord)) {
+                return false;
+            }
             const occupied = currentOccupancyMap.get(coord);
-            if (!occupied) return true;
-            if (item.unit === 'Bins') return occupied.pallets === 0;
-            if (item.unit === 'Pallets') return occupied.bins === 0;
+            if (!occupied) return true; // Coordinate is empty
+
+            // Rules for what can be placed where
+            if (item.unit === 'Bins') {
+                return occupied.pallets === 0 && occupied.bins < 6; // Can add bins if no pallets and space available
+            }
+            if (item.unit === 'Pallets') {
+                return occupied.bins === 0 && occupied.pallets < 2; // Can add pallets if no bins and space available
+            }
             return false;
         });
         
