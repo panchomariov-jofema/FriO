@@ -38,6 +38,26 @@ const naturalSort = (a: string, b: string) => {
   return aNum - bNum;
 };
 
+// Colors for lots
+const lotColorPalette = [
+  'hsl(var(--chart-1))',
+  'hsl(var(--chart-2))',
+  'hsl(var(--chart-3))',
+  'hsl(var(--chart-4))',
+  'hsl(var(--chart-5))',
+];
+
+const lotColorMap = new Map<string, string>();
+let nextColorIndex = 0;
+
+const getColorForLot = (lotId: string) => {    
+    if (!lotColorMap.has(lotId)) {
+        lotColorMap.set(lotId, lotColorPalette[nextColorIndex]);
+        nextColorIndex = (nextColorIndex + 1) % lotColorPalette.length;
+    }
+    return lotColorMap.get(lotId)!;
+};
+
 
 export default function CamarasPage() {
   const { data: chamberLots, loading: loadingChamberLots } = useFirestoreCollection<ChamberLot>('chamberLots');
@@ -472,14 +492,26 @@ export default function CamarasPage() {
                                       </div>
                                     )
                                   }
+                                  
+                                  const lotColor = firstItem ? getColorForLot(firstItem.displayId) : 'transparent';
+                                  const cellStyle = { 
+                                      '--lot-color': lotColor,
+                                      '--lot-color-border': lotColor.replace(')', ', 0.5)'),
+                                      '--lot-color-bg': lotColor.replace(')', ', 0.2)'),
+                                      '--lot-color-progress': lotColor.replace(')', ', 0.3)'),
+                                  } as React.CSSProperties;
+
 
                                   return (
                                     <Popover key={coord}>
                                       <PopoverTrigger asChild>
-                                        <div className={cn("h-12 w-full rounded border-2 flex items-center justify-center text-xs font-mono relative overflow-hidden cursor-pointer",
-                                            isOccupied ? 'bg-primary/20 border-primary/50' : 'bg-background border-dashed'
-                                        )}>
-                                          <div className="absolute bottom-0 left-0 top-0 bg-primary/30" style={{ right: `${100 - occupancyPercentage}%` }} />
+                                        <div 
+                                          className={cn("h-12 w-full rounded border-2 flex items-center justify-center text-xs font-mono relative overflow-hidden cursor-pointer",
+                                            isOccupied ? 'border-[var(--lot-color-border)] bg-[var(--lot-color-bg)]' : 'bg-background border-dashed'
+                                          )}
+                                          style={cellStyle}
+                                        >
+                                          <div className="absolute bottom-0 left-0 top-0 bg-[var(--lot-color-progress)]" style={{ right: `${100 - occupancyPercentage}%` }} />
                                           <span className="relative z-10 font-semibold">{coord}</span>
                                         </div>
                                       </PopoverTrigger>
