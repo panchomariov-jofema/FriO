@@ -50,12 +50,16 @@ const lotColorPalette = [
 const lotColorMap = new Map<string, string>();
 let nextColorIndex = 0;
 
-const getColorForLot = (lotId: string) => {    
-    if (!lotColorMap.has(lotId)) {
-        lotColorMap.set(lotId, lotColorPalette[nextColorIndex]);
-        nextColorIndex = (nextColorIndex + 1) % lotColorPalette.length;
+const getColorForLot = (lotId: string) => {
+    // Simple hash function to get a somewhat consistent index
+    let hash = 0;
+    for (let i = 0; i < lotId.length; i++) {
+        const char = lotId.charCodeAt(i);
+        hash = ((hash << 5) - hash) + char;
+        hash = hash & hash; // Convert to 32bit integer
     }
-    return lotColorMap.get(lotId)!;
+    const index = Math.abs(hash) % lotColorPalette.length;
+    return lotColorPalette[index];
 };
 
 
@@ -385,7 +389,7 @@ export default function CamarasPage() {
                   <TableHead className="hidden md:table-cell">Productor</TableHead>
                   <TableHead>N° Bins</TableHead>
                   <TableHead>Exportador</TableHead>
-                  <TableHead>Estado</TableHead>
+                  <TableHead className="hidden md:table-cell">Estado</TableHead>
                   <TableHead className="text-right">Acciones</TableHead>
                 </TableRow>
               </TableHeader>
@@ -399,7 +403,7 @@ export default function CamarasPage() {
                       <TableCell className="hidden md:table-cell">{lot.producerShortName}</TableCell>
                       <TableCell>{lot.binCount}</TableCell>
                       <TableCell>{exporterMap[lot.exporterId] || lot.exporterId}</TableCell>
-                      <TableCell><Badge variant='secondary'>{lot.status}</Badge></TableCell>
+                      <TableCell className="hidden md:table-cell"><Badge variant='secondary'>{lot.status}</Badge></TableCell>
                       <TableCell className="text-right">
                         <Button size="sm" onClick={() => handleStoreClick(lot)}>Almacenar</Button>
                       </TableCell>
