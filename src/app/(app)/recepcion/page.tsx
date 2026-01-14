@@ -7,7 +7,7 @@ import { z } from 'zod';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
-import type { Exporter, Variety, Producer } from '@/lib/types';
+import type { Exporter, Variety, Producer, ReceptionLot } from '@/lib/types';
 import { Label } from '@/components/ui/label';
 import { LotList } from '@/components/reception/LotList';
 import { useProducersByExporter } from '@/hooks/use-producers-by-exporter';
@@ -71,18 +71,21 @@ export default function RecepcionPage() {
     }
 
     const displayLotId = `${producer.shortName}-${values.document}`;
-    const netWeightPerBin = (values.totalWeight && values.totalWeight > 0)
-      ? (values.totalWeight - (values.binCount * 65) - ((values.toteCount - (values.emptyTotes || 0) - (values.noTotes || 0))*2)) / values.binCount
+    
+    const totalWeight = values.totalWeight || 0;
+    const toteWeight = (values.toteCount - (values.emptyTotes || 0) - (values.noTotes || 0)) * 2;
+    const netWeightPerBin = (totalWeight > 0 && values.binCount > 0)
+      ? (totalWeight - (values.binCount * 65) - toteWeight) / values.binCount
       : 0;
 
-    const lotData = {
+    const lotData: Partial<ReceptionLot> = {
       ...values,
       displayLotId,
       exporterId: selectedExporter,
       producerId: selectedProducerId,
       status: 'Pendiente de Peso' as const,
       createdAt: serverTimestamp(),
-      netWeightPerBin,
+      netWeightPerBin: netWeightPerBin > 0 ? netWeightPerBin : 0,
     };
 
     const collRef = collection(firestore, 'receptionLots');
@@ -90,7 +93,6 @@ export default function RecepcionPage() {
       .then(() => {
         toast({ title: 'Éxito', description: `Lote ${displayLotId} creado correctamente.` });
         form.reset({
-          ...form.getValues(),
           document: '',
           variety: undefined,
           binCount: 0,
