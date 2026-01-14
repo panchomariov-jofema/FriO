@@ -178,10 +178,10 @@ export default function DespachosPage() {
       
       const querySnapshot = await getDocs(q);
       
-      // FIFO: Sort by oldest first
+      // FIFO: Sort by oldest first (using receptionDate)
       const availableLots = querySnapshot.docs
         .map(doc => ({ id: doc.id, ...doc.data() } as ChamberLot))
-        .sort((a, b) => a.storedAt.toMillis() - b.storedAt.toMillis());
+        .sort((a, b) => a.receptionDate.toMillis() - b.receptionDate.toMillis());
 
       if (availableLots.length === 0) {
         toast({ variant: 'destructive', title: 'Sin Stock', description: 'No hay bins disponibles para este cliente.' });

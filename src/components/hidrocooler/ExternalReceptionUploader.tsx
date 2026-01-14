@@ -7,12 +7,13 @@ import { useToast } from '@/hooks/use-toast';
 import { useFirestore } from '@/firebase';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
 import type { Producer, Variety } from '@/lib/types';
-import { collection, writeBatch, serverTimestamp, doc } from 'firebase/firestore';
+import { collection, writeBatch, serverTimestamp, doc, Timestamp } from 'firebase/firestore';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { Download, Upload } from 'lucide-react';
+import { parse } from 'date-fns';
 
-const CSV_HEADERS = ['producerId', 'document', 'variety', 'binCount', 'netWeight'];
+const CSV_HEADERS = ['producerId', 'document', 'variety', 'binCount', 'netWeight', 'receptionDate'];
 
 export function ExternalReceptionUploader() {
   const [isOpen, setIsOpen] = React.useState(false);
@@ -74,6 +75,19 @@ export function ExternalReceptionUploader() {
           errors.push(`Línea ${index + 2}: binCount y netWeight deben ser números positivos.`);
           return;
         }
+
+        let receptionTimestamp;
+        if (row.receptionDate) {
+            // Expecting YYYY-MM-DD HH:MM:SS format
+            const parsedDate = parse(row.receptionDate, 'yyyy-MM-dd HH:mm:ss', new Date());
+            if (isNaN(parsedDate.getTime())) {
+                errors.push(`Línea ${index + 2}: El formato de receptionDate es inválido. Use 'YYYY-MM-DD HH:MM:SS'.`);
+                return;
+            }
+            receptionTimestamp = Timestamp.fromDate(parsedDate);
+        } else {
+            receptionTimestamp = serverTimestamp(); // Fallback to now
+        }
         
         const netWeightPerBin = netWeight / binCount;
         
@@ -86,6 +100,7 @@ export function ExternalReceptionUploader() {
           hidrocooler: 'EXTERNO',
           status: 'Pendiente por Almacenar' as const,
           netWeightPerBin: netWeightPerBin,
+          receptionDate: receptionTimestamp, // Use the parsed or fallback timestamp
           storedAt: serverTimestamp(),
         };
 
@@ -139,7 +154,7 @@ export function ExternalReceptionUploader() {
           </DialogHeader>
           <div className="space-y-4 py-4">
             <p className="text-sm text-muted-foreground">
-              Asegúrese de que el archivo CSV tenga las siguientes columnas en este orden: {CSV_HEADERS.join(', ')}.
+              El archivo CSV debe tener las columnas: {CSV_HEADERS.join(', ')}. La columna `receptionDate` (formato: YYYY-MM-DD HH:MM:SS) es opcional.
             </p>
             <div className="flex gap-4">
               <Button variant="secondary" onClick={handleDownloadTemplate} className="flex-1">

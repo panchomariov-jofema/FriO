@@ -177,7 +177,7 @@ export interface HidrocoolerLot {
   binCount: number;
   status: 'Pendiente de Pre-Hidro';
   netWeightPerBin?: number;
-  createdAt: Timestamp;
+  receptionDate: Timestamp; // Changed from createdAt
 }
 
 export interface ProcessingLot {
@@ -190,6 +190,7 @@ export interface ProcessingLot {
   status: 'En Proceso' | 'Finalizado';
   netWeightPerBin?: number;
   createdAt: Timestamp;
+  receptionDate: Timestamp; // Propagated
 }
 
 export interface ChamberLot {
@@ -204,7 +205,8 @@ export interface ChamberLot {
     coordinate?: string;
     netWeightPerBin?: number;
     status: 'Pendiente por Almacenar' | 'Almacenado' | 'Despachado';
-    storedAt: Timestamp;
+    receptionDate: Timestamp; // The true FIFO date
+    storedAt: Timestamp; // When it was put in the chamber
 }
 
 export interface Chamber {
@@ -292,5 +294,3 @@ export type StoredItem = {
 
 
 export type MasterData = Exporter | Producer | BinMaterial | OtherClient | PackagingMaster | UserMaster | Profile | Packing;
-
-    

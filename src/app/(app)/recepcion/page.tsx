@@ -73,11 +73,11 @@ export default function RecepcionPage() {
     const displayLotId = `${producer.shortName}-${values.document}`;
     
     const totalWeight = values.totalWeight || 0;
-    const sinTotes = values.noTotes || 0;
-    const TARE_BIN = 65;
-    const totalBinsTare = values.binCount * TARE_BIN;
     
-    const netWeight = totalWeight - totalBinsTare + sinTotes;
+    const netWeight = totalWeight > 0 
+      ? totalWeight - (values.binCount * 65) + (values.noTotes || 0)
+      : 0;
+
     const netWeightPerBin = (netWeight > 0 && values.binCount > 0)
       ? netWeight / values.binCount
       : 0;

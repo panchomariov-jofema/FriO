@@ -73,7 +73,7 @@ export function WeightCalculator({ lot, open, onOpenChange, onWeightSaved }: Wei
     const totalBinsTare = lot.binCount * TARE_BIN;
     const sinTotes = lot.noTotes || 0;
     
-    const netWeight = totalWeight - totalBinsTare + sinTotes;
+    const netWeight = totalWeight - (lot.binCount * 65) + (lot.noTotes || 0);
     const netWeightPerBin = netWeight > 0 && lot.binCount > 0 ? netWeight / lot.binCount : 0;
 
 
@@ -97,7 +97,7 @@ export function WeightCalculator({ lot, open, onOpenChange, onWeightSaved }: Wei
         binCount: lot.binCount,
         netWeightPerBin: netWeightPerBin,
         status: 'Pendiente de Pre-Hidro' as const,
-        createdAt: serverTimestamp(),
+        receptionDate: lot.createdAt, // Propagate the original reception date for FIFO
     };
     // We can't use batch.add, so we create a new doc ref
     const newHidroLotRef = doc(hidrocoolerRef);
