@@ -53,7 +53,7 @@ export function ProcessLotDialog({ lot, open, onOpenChange, onProcess }: Process
       if(selectedHidrocooler) {
           form.setValue('binCount', finalBinCount);
       } else {
-         form.reset({ hidrocooler: undefined, binCount: lot.binCount });
+         form.reset({ hidrocooler: undefined, binCount: lot.binCount, netWeightPerBin: lot.netWeightPerBin });
       }
 
     }
@@ -62,7 +62,7 @@ export function ProcessLotDialog({ lot, open, onOpenChange, onProcess }: Process
   React.useEffect(() => {
     // Reset form when dialog opens
     if (open && lot) {
-      form.reset({ hidrocooler: undefined, binCount: lot.binCount });
+      form.reset({ hidrocooler: undefined, binCount: lot.binCount, netWeightPerBin: lot.netWeightPerBin });
     }
   }, [open, lot, form]);
 

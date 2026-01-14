@@ -190,6 +190,7 @@ export default function DespachosPage() {
       
       const binsToDispatch = [];
       let accumulatedBins = 0;
+      let totalNetWeight = 0;
       const batch = writeBatch(firestore);
 
       for (const lot of availableLots) {
@@ -202,6 +203,9 @@ export default function DespachosPage() {
                 binCount: lot.binCount,
             });
             accumulatedBins += lot.binCount;
+             if (lot.netWeightPerBin && lot.netWeightPerBin > 0) {
+                totalNetWeight += lot.binCount * lot.netWeightPerBin;
+            }
 
             // Mark the entire lot as dispatched
             const lotRef = doc(firestore, 'chamberLots', lot.id);
@@ -220,6 +224,7 @@ export default function DespachosPage() {
         exporterName: selectedExporter.name,
         packingId: values.packingId || null,
         totalBins: accumulatedBins,
+        totalNetWeight: totalNetWeight,
         status: 'Pendiente de Salida' as const,
         createdAt: serverTimestamp(),
         bins: binsToDispatch,

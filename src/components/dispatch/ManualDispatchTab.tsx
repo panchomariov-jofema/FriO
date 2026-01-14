@@ -210,13 +210,14 @@ export function ManualDispatchTab({ exporters, loadingExporters, chamberLots, lo
                                 <TableHead>Cámara</TableHead>
                                 <TableHead>Coord.</TableHead>
                                 <TableHead>Bins</TableHead>
+                                <TableHead>Peso Neto/Bin</TableHead>
                                 <TableHead>Productor</TableHead>
                                 <TableHead>Variedad</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {loadingChamberLots ? (
-                                Array.from({ length: 5 }).map((_, i) => <TableRow key={i}><TableCell colSpan={7}><Skeleton className="w-full h-4" /></TableCell></TableRow>)
+                                Array.from({ length: 5 }).map((_, i) => <TableRow key={i}><TableCell colSpan={8}><Skeleton className="w-full h-4" /></TableCell></TableRow>)
                             ) : filteredLots.length > 0 ? (
                                 filteredLots.map(lot => (
                                     <TableRow key={lot.id} data-state={selectedLots[lot.id] ? 'selected' : ''}>
@@ -230,12 +231,13 @@ export function ManualDispatchTab({ exporters, loadingExporters, chamberLots, lo
                                         <TableCell>{lot.chamberId}</TableCell>
                                         <TableCell>{lot.coordinate}</TableCell>
                                         <TableCell>{lot.binCount}</TableCell>
+                                        <TableCell>{lot.netWeightPerBin ? `${lot.netWeightPerBin.toFixed(2)} kg` : '-'}</TableCell>
                                         <TableCell>{lot.producerShortName}</TableCell>
                                         <TableCell>{lot.variety}</TableCell>
                                     </TableRow>
                                 ))
                             ) : (
-                                <TableRow><TableCell colSpan={7} className="h-24 text-center">No se encontraron lotes con los filtros seleccionados.</TableCell></TableRow>
+                                <TableRow><TableCell colSpan={8} className="h-24 text-center">No se encontraron lotes con los filtros seleccionados.</TableCell></TableRow>
                             )}
                         </TableBody>
                     </Table>

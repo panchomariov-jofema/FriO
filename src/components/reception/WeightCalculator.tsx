@@ -70,8 +70,13 @@ export function WeightCalculator({ lot, open, onOpenChange, onWeightSaved }: Wei
     const displayLotId = `${producer.shortName}-${lot.document}`;
 
     // Calculate net weight per bin
-    const netWeight = totalWeight - (lot.binCount * 65) + (lot.noTotes || 0);
+    const TARE_BIN = 65; // kg
+    const TARE_TOTE = 2; // kg
+    const totalBinsTare = lot.binCount * TARE_BIN;
+    const totalTotesTare = lot.toteCount * TARE_TOTE;
+    const netWeight = totalWeight - totalBinsTare - totalTotesTare;
     const netWeightPerBin = netWeight > 0 && lot.binCount > 0 ? netWeight / lot.binCount : 0;
+
 
     const batch = writeBatch(firestore);
 
