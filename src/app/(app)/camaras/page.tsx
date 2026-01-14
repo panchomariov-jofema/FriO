@@ -38,27 +38,29 @@ const naturalSort = (a: string, b: string) => {
   return aNum - bNum;
 };
 
-// Colors for lots
+// Expanded and more distinct color palette
 const lotColorPalette = [
   'hsl(221, 83%, 53%)', // Blue
   'hsl(0, 72%, 51%)',   // Red
   'hsl(48, 96%, 53%)',  // Yellow
   'hsl(262, 83%, 60%)', // Violet
   'hsl(170, 75%, 41%)', // Cyan
+  'hsl(350, 75%, 55%)', // Pink
+  'hsl(25, 85%, 50%)',  // Orange
+  'hsl(120, 50%, 50%)', // Green
 ];
 
+// Map to store assigned colors for each lot ID
+const lotColorMap = new Map<string, string>();
 let nextColorIndex = 0;
 
 const getColorForLot = (lotId: string) => {
-    // Simple hash function to get a somewhat consistent index
-    let hash = 0;
-    for (let i = 0; i < lotId.length; i++) {
-        const char = lotId.charCodeAt(i);
-        hash = ((hash << 5) - hash) + char;
-        hash = hash & hash; // Convert to 32bit integer
+    if (!lotColorMap.has(lotId)) {
+        const color = lotColorPalette[nextColorIndex];
+        lotColorMap.set(lotId, color);
+        nextColorIndex = (nextColorIndex + 1) % lotColorPalette.length;
     }
-    const index = Math.abs(hash) % lotColorPalette.length;
-    return lotColorPalette[index];
+    return lotColorMap.get(lotId)!;
 };
 
 
