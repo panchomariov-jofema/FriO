@@ -160,89 +160,100 @@ export default function DespachosPage() {
   }, [chamberLots]);
 
   const onSubmit = async (values: DispatchFormValues) => {
-    if (!firestore || !exporters) return;
-
+    if (!firestore || !exporters || !chamberLots) return;
+  
     const selectedExporter = exporters.find(e => e.exporterId === values.exporterId);
     if (!selectedExporter) {
         toast({ variant: 'destructive', title: 'Error', description: 'Cliente no encontrado.' });
         return;
     }
-
+  
     try {
-      const chamberLotsRef = collection(firestore, 'chamberLots');
-      const q = query(
-        chamberLotsRef,
-        where('exporterId', '==', values.exporterId),
-        where('status', '==', 'Almacenado')
-      );
-      
-      const querySnapshot = await getDocs(q);
-      
-      // FIFO: Sort by oldest first (using receptionDate)
-      const availableLots = querySnapshot.docs
-        .map(doc => ({ id: doc.id, ...doc.data() } as ChamberLot))
-        .sort((a, b) => a.receptionDate.toMillis() - b.receptionDate.toMillis());
+        const availableLots = (chamberLots || [])
+            .filter(lot => lot.status === 'Almacenado' && lot.exporterId === values.exporterId);
 
-      if (availableLots.length === 0) {
-        toast({ variant: 'destructive', title: 'Sin Stock', description: 'No hay bins disponibles para este cliente.' });
-        form.reset();
-        return;
-      }
-      
-      const binsToDispatch = [];
-      let accumulatedBins = 0;
-      let totalNetWeight = 0;
-      const batch = writeBatch(firestore);
+        if (availableLots.length === 0) {
+            toast({ variant: 'destructive', title: 'Sin Stock', description: 'No hay bins disponibles para este cliente.' });
+            return;
+        }
 
-      for (const lot of availableLots) {
-        // Rule 2 & 3: Do not break lots & do not exceed max bins
-        if (accumulatedBins + lot.binCount <= values.maxBins) {
-            binsToDispatch.push({
+        // 1. Group all chamber lot fractions by their original displayLotId
+        const groupedLots = availableLots.reduce((acc, lot) => {
+            if (!acc[lot.displayLotId]) {
+                acc[lot.displayLotId] = {
+                    totalBins: 0,
+                    receptionDate: lot.receptionDate,
+                    fractions: []
+                };
+            }
+            acc[lot.displayLotId].totalBins += lot.binCount;
+            acc[lot.displayLotId].fractions.push(lot);
+            return acc;
+        }, {} as Record<string, { totalBins: number, receptionDate: any, fractions: ChamberLot[] }>);
+
+        // 2. Sort the grouped lots by receptionDate (FIFO)
+        const sortedGroupedLots = Object.values(groupedLots).sort((a, b) => a.receptionDate.toMillis() - b.receptionDate.toMillis());
+
+        // 3. Select whole lots without exceeding maxBins
+        const binsToDispatch: ChamberLot[] = [];
+        let accumulatedBins = 0;
+        
+        for (const groupedLot of sortedGroupedLots) {
+            if (accumulatedBins + groupedLot.totalBins <= values.maxBins) {
+                accumulatedBins += groupedLot.totalBins;
+                binsToDispatch.push(...groupedLot.fractions);
+            }
+        }
+  
+        if (binsToDispatch.length === 0) {
+            toast({ variant: 'destructive', title: 'Sin Stock suficiente', description: 'No se encontraron lotes completos que se ajusten a la cantidad solicitada.' });
+            return;
+        }
+  
+        // 4. Create batch and dispatch document
+        const batch = writeBatch(firestore);
+        let totalNetWeight = 0;
+
+        const dispatchBinsPayload = binsToDispatch.map(lot => {
+            const lotRef = doc(firestore, 'chamberLots', lot.id);
+            batch.update(lotRef, { status: 'Despachado' });
+
+            if (lot.netWeightPerBin && lot.netWeightPerBin > 0) {
+                totalNetWeight += lot.binCount * lot.netWeightPerBin;
+            }
+
+            return {
                 chamberLotId: lot.id,
                 displayLotId: lot.displayLotId,
                 chamberId: lot.chamberId!,
                 coordinate: lot.coordinate!,
                 binCount: lot.binCount,
-            });
-            accumulatedBins += lot.binCount;
-             if (lot.netWeightPerBin && lot.netWeightPerBin > 0) {
-                totalNetWeight += lot.binCount * lot.netWeightPerBin;
-            }
+            };
+        });
 
-            // Mark the entire lot as dispatched
-            const lotRef = doc(firestore, 'chamberLots', lot.id);
-            batch.update(lotRef, { status: 'Despachado' });
-        }
-      }
-
-
-      if (binsToDispatch.length === 0) {
-        toast({ variant: 'destructive', title: 'Sin Stock suficiente', description: 'No se encontraron lotes completos que se ajusten a la cantidad solicitada.' });
-        return;
-      }
-
-      const dispatchData = {
-        exporterId: selectedExporter.exporterId,
-        exporterName: selectedExporter.name,
-        packingId: values.packingId || null,
-        totalBins: accumulatedBins,
-        totalNetWeight: totalNetWeight,
-        status: 'Pendiente de Salida' as const,
-        createdAt: serverTimestamp(),
-        bins: binsToDispatch,
-      };
-
-      const dispatchRef = doc(collection(firestore, 'dispatches'));
-      batch.set(dispatchRef, dispatchData);
-
-      await batch.commit();
-      
-      toast({
-        title: 'Despacho Creado',
-        description: `Se ha creado un despacho con ${accumulatedBins} bins para ${selectedExporter.name}.`,
-      });
-      form.reset({ exporterId: undefined, packingId: undefined, maxBins: 0 });
-
+  
+        const dispatchData = {
+          exporterId: selectedExporter.exporterId,
+          exporterName: selectedExporter.name,
+          packingId: values.packingId || null,
+          totalBins: accumulatedBins,
+          totalNetWeight: totalNetWeight,
+          status: 'Pendiente de Salida' as const,
+          createdAt: serverTimestamp(),
+          bins: dispatchBinsPayload,
+        };
+  
+        const dispatchRef = doc(collection(firestore, 'dispatches'));
+        batch.set(dispatchRef, dispatchData);
+  
+        await batch.commit();
+        
+        toast({
+          title: 'Despacho Creado',
+          description: `Se ha creado un despacho con ${accumulatedBins} bins para ${selectedExporter.name}.`,
+        });
+        form.reset({ exporterId: undefined, packingId: undefined, maxBins: 0 });
+  
     } catch (error: any) {
         console.error("Error creating dispatch:", error);
         toast({ variant: 'destructive', title: 'Error', description: 'Ocurrió un error al crear el despacho.' });
