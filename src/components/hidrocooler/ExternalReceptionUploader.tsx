@@ -13,7 +13,7 @@ import { FirestorePermissionError } from '@/firebase/errors';
 import { Download, Upload } from 'lucide-react';
 import { parse } from 'date-fns';
 
-const CSV_HEADERS = ['producerId', 'document', 'variety', 'binCount', 'netWeight', 'receptionDate'];
+const CSV_HEADERS = ['receptionDate', 'producerId', 'document', 'variety', 'binCount', 'netWeight'];
 
 export function ExternalReceptionUploader() {
   const [isOpen, setIsOpen] = React.useState(false);
