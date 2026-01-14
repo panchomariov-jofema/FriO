@@ -26,7 +26,7 @@ import { Form } from '@/components/ui/form';
 import { z } from 'zod';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
 import type { MasterData } from '@/lib/types';
-import { addDoc, collection, deleteDoc, doc, updateDoc, writeBatch } from 'firebase/firestore';
+import { addDoc, collection, deleteDoc, doc, updateDoc, writeBatch, query, where, getDocs } from 'firebase/firestore';
 import { useFirestore } from '@/firebase';
 import { Download, Pencil, Trash2, Upload } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -107,18 +107,18 @@ export function MasterDataShell<T extends MasterData>({
     setIsDeleteDialogOpen(true);
   };
 
-  const onSubmit = (values: z.infer<typeof schema>) => {
+  const onSubmit = async (values: z.infer<typeof schema>) => {
       // If modulesAccess exists and is a string, convert it to an array
       const dataToSave = {...values};
       if (typeof dataToSave.modulesAccess === 'string') {
         try {
           dataToSave.modulesAccess = JSON.parse(dataToSave.modulesAccess);
         } catch (e) {
-          dataToSave.modulesAccess = dataToSave.modulesAccess.split(',').map((s: string) => s.trim());
+          dataToSave.modulesAccess = val.split(',').map((s: string) => s.trim());
         }
       }
       
-      if (currentItem?.id) {
+      if (currentItem?.id) { // --- UPDATE ---
         const docRef = doc(firestore, collectionName, currentItem.id);
         updateDoc(docRef, dataToSave)
         .then(()=> {
@@ -136,7 +136,32 @@ export function MasterDataShell<T extends MasterData>({
             );
         });
 
-      } else {
+      } else { // --- CREATE ---
+        const keyFields: Record<string, string> = {
+          exporters: 'exporterId',
+          producers: 'producerId',
+          binMaterials: 'code',
+          otherClients: 'clientId',
+          packagingMaster: 'code',
+          usersMaster: 'userName',
+          profiles: 'profileId',
+          packings: 'name', // special case, might need composite check
+        };
+        
+        const keyField = keyFields[collectionName];
+        if (keyField && dataToSave[keyField]) {
+            const q = query(collection(firestore, collectionName), where(keyField, "==", dataToSave[keyField]));
+            const querySnapshot = await getDocs(q);
+            if (!querySnapshot.empty) {
+                toast({
+                    variant: 'destructive',
+                    title: 'Clave Duplicada',
+                    description: `Ya existe un registro con el valor '${dataToSave[keyField]}' en el campo '${keyField}'.`,
+                });
+                return; // Stop submission
+            }
+        }
+        
         const collRef = collection(firestore, collectionName);
         addDoc(collRef, dataToSave)
         .then(() => {
