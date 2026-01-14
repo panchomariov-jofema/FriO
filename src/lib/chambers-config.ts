@@ -83,3 +83,12 @@ export const chambersConfig: ChambersConfig = {
         blocked: blockedCoordsC6,
     },
 };
+
+// Asignación de cámaras exclusivas por ID de exportador
+export const exporterChamberAssignments: Record<string, string[]> = {
+  'SUBSOLE': ['CAMARA-2', 'CAMARA-3'],
+  'MEYER': ['CAMARA-3', 'CAMARA-6'],
+  'BLOSSOM': ['CAMARA-3', 'CAMARA-5'],
+  // Agrega aquí otras asignaciones si es necesario
+  // Ejemplo: 'OTRO_EXPORTADOR': ['CAMARA-1']
+};

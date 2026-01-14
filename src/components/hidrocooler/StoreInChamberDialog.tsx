@@ -9,7 +9,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import type { ChamberLot } from '@/lib/types';
-import { chambersConfig } from '@/lib/chambers-config';
+import { chambersConfig, exporterChamberAssignments } from '@/lib/chambers-config';
 
 interface StoreInChamberDialogProps {
   lot: ChamberLot | null;
@@ -32,6 +32,24 @@ export function StoreInChamberDialog({ lot, open, onOpenChange, onStore }: Store
     }
   });
 
+  const availableChambers = React.useMemo(() => {
+    if (!lot) return [];
+    
+    const assignedChamberIds = exporterChamberAssignments[lot.exporterId];
+    
+    // If the exporter has specific chambers assigned, filter by them
+    if (assignedChamberIds && assignedChamberIds.length > 0) {
+        return Object.values(chambersConfig).filter(chamber => 
+            assignedChamberIds.includes(chamber.id)
+        );
+    }
+    
+    // If no specific assignment, show all chambers
+    return Object.values(chambersConfig);
+
+  }, [lot]);
+
+
   React.useEffect(() => {
     if (open) {
       form.reset({ chamberId: undefined });
@@ -50,7 +68,7 @@ export function StoreInChamberDialog({ lot, open, onOpenChange, onStore }: Store
         <DialogHeader>
           <DialogTitle>Almacenar Lote: {lot.displayLotId}</DialogTitle>
           <DialogDescription>
-            Seleccione la cámara de destino para los {lot.binCount} bins. El sistema asignará la primera coordenada disponible.
+            Seleccione la cámara de destino para los {lot.binCount} bins del exportador <span className='font-bold'>{lot.exporterId}</span>. El sistema asignará la primera coordenada disponible.
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -68,9 +86,14 @@ export function StoreInChamberDialog({ lot, open, onOpenChange, onStore }: Store
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {Object.values(chambersConfig).map(chamber => (
+                      {availableChambers.map(chamber => (
                         <SelectItem key={chamber.id} value={chamber.id}>{chamber.name}</SelectItem>
                       ))}
+                       {availableChambers.length === 0 && (
+                          <div className="p-4 text-sm text-center text-muted-foreground">
+                            No hay cámaras asignadas para este exportador.
+                          </div>
+                        )}
                     </SelectContent>
                   </Select>
                   <FormMessage />
