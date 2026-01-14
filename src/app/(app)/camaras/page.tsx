@@ -40,14 +40,13 @@ const naturalSort = (a: string, b: string) => {
 
 // Colors for lots
 const lotColorPalette = [
-  'hsl(var(--chart-1))',
-  'hsl(var(--chart-2))',
-  'hsl(var(--chart-3))',
-  'hsl(var(--chart-4))',
-  'hsl(var(--chart-5))',
+  'hsl(221, 83%, 53%)', // Blue
+  'hsl(0, 72%, 51%)',   // Red
+  'hsl(48, 96%, 53%)',  // Yellow
+  'hsl(262, 83%, 60%)', // Violet
+  'hsl(170, 75%, 41%)', // Cyan
 ];
 
-const lotColorMap = new Map<string, string>();
 let nextColorIndex = 0;
 
 const getColorForLot = (lotId: string) => {
