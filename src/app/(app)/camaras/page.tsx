@@ -93,7 +93,7 @@ export default function CamarasPage() {
 
     const calculatedPendingLots = allChamberLots
       .filter((lot) => lot.status === 'Pendiente por Almacenar')
-      .sort((a, b) => b.storedAt && a.storedAt ? b.storedAt.toMillis() - a.storedAt.toMillis() : 0);
+      .sort((a, b) => b.receptionDate && a.receptionDate ? a.receptionDate.toMillis() - b.receptionDate.toMillis() : 0);
       
     const allStoredItems: StoredItem[] = [
       ...allChamberLots
@@ -423,11 +423,11 @@ export default function CamarasPage() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead>Fecha Recepción</TableHead>
                   <TableHead>ID Lote</TableHead>
                   <TableHead className="hidden md:table-cell">Productor</TableHead>
                   <TableHead>N° Bins</TableHead>
                   <TableHead>Exportador</TableHead>
-                  <TableHead className="hidden md:table-cell">Estado</TableHead>
                   <TableHead className="text-right">Acciones</TableHead>
                 </TableRow>
               </TableHeader>
@@ -437,11 +437,11 @@ export default function CamarasPage() {
                 ) : pendingLots.length > 0 ? (
                   pendingLots.map((lot) => (
                     <TableRow key={lot.id}>
+                      <TableCell>{lot.receptionDate?.toDate().toLocaleString('es-CL', { year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute:'2-digit' })}</TableCell>
                       <TableCell className="font-medium">{lot.displayLotId}</TableCell>
                       <TableCell className="hidden md:table-cell">{lot.producerShortName}</TableCell>
                       <TableCell>{lot.binCount}</TableCell>
                       <TableCell>{exporterMap[lot.exporterId] || lot.exporterId}</TableCell>
-                      <TableCell className="hidden md:table-cell"><Badge variant='secondary'>{lot.status}</Badge></TableCell>
                       <TableCell className="text-right">
                         <Button size="sm" onClick={() => handleStoreClick(lot)}>Almacenar</Button>
                       </TableCell>
@@ -613,5 +613,3 @@ export default function CamarasPage() {
     </div>
   );
 }
-
-    
