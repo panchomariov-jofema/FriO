@@ -38,9 +38,9 @@ export default function HidrocoolerPage() {
   const sortedPendingLots = React.useMemo(() => {
     if (!pendingLots) return [];
     return pendingLots.filter(l => l.status === 'Pendiente de Pre-Hidro').sort((a, b) => {
-        if (!b.createdAt) return -1;
-        if (!a.createdAt) return 1;
-        return a.createdAt.toMillis() - b.createdAt.toMillis();
+        if (!b.receptionDate) return -1;
+        if (!a.receptionDate) return 1;
+        return a.receptionDate.toMillis() - b.receptionDate.toMillis();
     });
   }, [pendingLots]);
 
@@ -76,7 +76,7 @@ export default function HidrocoolerPage() {
                 throw "El lote original no existe.";
             }
 
-            const currentLotData = lotDoc.data();
+            const currentLotData = lotDoc.data() as HidrocoolerLot;
             const currentBinCount = currentLotData.binCount;
             if (binCount > currentBinCount) {
                 throw "La cantidad de bins a procesar excede la disponible.";
@@ -99,6 +99,7 @@ export default function HidrocoolerPage() {
                 netWeightPerBin: currentLotData.netWeightPerBin || 0, // Propagate net weight
                 status: 'En Proceso' as const,
                 createdAt: serverTimestamp(),
+                receptionDate: lotToProcess.receptionDate, // Propagate reception date
             };
             
             // We can't use addDoc in a transaction, so we create a ref and set it.
@@ -141,7 +142,8 @@ export default function HidrocoolerPage() {
         hidrocooler: processingLot.hidrocooler,
         netWeightPerBin: processingLot.netWeightPerBin || 0, // Propagate net weight
         status: 'Pendiente por Almacenar' as const,
-        storedAt: serverTimestamp(),
+        receptionDate: processingLot.receptionDate, // Propagate reception date for FIFO
+        storedAt: serverTimestamp(), // This is for knowing when it was stored, not for FIFO
     };
     
     const chamberLotsRef = collection(firestore, 'chamberLots');
@@ -212,7 +214,7 @@ export default function HidrocoolerPage() {
                     binCount: newPendingBinCount,
                     status: 'Pendiente de Pre-Hidro',
                     netWeightPerBin: lotToEdit.netWeightPerBin, // Carry over net weight
-                    createdAt: originalReceptionLot.createdAt, // Or a new timestamp
+                    receptionDate: lotToEdit.receptionDate, // Carry over reception date
                 });
             }
         });
@@ -255,11 +257,11 @@ export default function HidrocoolerPage() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead>Fecha Recepción</TableHead>
                   <TableHead>ID Lote</TableHead>
                   <TableHead className="hidden md:table-cell">Productor</TableHead>
                   <TableHead>Cantidad de Bins</TableHead>
                   <TableHead>Peso Neto/Bin (kg)</TableHead>
-                  <TableHead className="hidden md:table-cell">Estado</TableHead>
                   <TableHead className="text-right">Acciones</TableHead>
                 </TableRow>
               </TableHeader>
@@ -271,11 +273,11 @@ export default function HidrocoolerPage() {
                 ) : sortedPendingLots.length > 0 ? (
                   sortedPendingLots.map((lot) => (
                     <TableRow key={lot.id}>
+                      <TableCell className="text-sm">{lot.receptionDate?.toDate().toLocaleString('es-CL', { year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute:'2-digit' })}</TableCell>
                       <TableCell className="font-medium">{lot.displayLotId}</TableCell>
                       <TableCell className="hidden md:table-cell">{lot.producerShortName}</TableCell>
                       <TableCell>{lot.binCount}</TableCell>
                       <TableCell>{lot.netWeightPerBin?.toFixed(2) ?? '-'}</TableCell>
-                      <TableCell className="hidden md:table-cell"><Badge variant={getStatusVariant(lot.status)}>{lot.status}</Badge></TableCell>
                       <TableCell className="text-right">
                         <Button size="sm" onClick={() => handleProcessClick(lot)}>Procesar</Button>
                       </TableCell>
