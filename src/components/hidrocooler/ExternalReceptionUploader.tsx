@@ -78,10 +78,9 @@ export function ExternalReceptionUploader() {
 
         let receptionTimestamp;
         if (row.receptionDate) {
-            // Expecting YYYY-MM-DD HH:MM:SS format
-            const parsedDate = parse(row.receptionDate, 'yyyy-MM-dd HH:mm:ss', new Date());
+            const parsedDate = parse(row.receptionDate, 'yyyy-MM-dd HH:mm', new Date());
             if (isNaN(parsedDate.getTime())) {
-                errors.push(`Línea ${index + 2}: El formato de receptionDate es inválido. Use 'YYYY-MM-DD HH:MM:SS'.`);
+                errors.push(`Línea ${index + 2}: El formato de receptionDate es inválido. Use 'YYYY-MM-DD HH:MM'.`);
                 return;
             }
             receptionTimestamp = Timestamp.fromDate(parsedDate);
@@ -100,7 +99,7 @@ export function ExternalReceptionUploader() {
           hidrocooler: 'EXTERNO',
           status: 'Pendiente por Almacenar' as const,
           netWeightPerBin: netWeightPerBin,
-          receptionDate: receptionTimestamp, // Use the parsed or fallback timestamp
+          receptionDate: receptionTimestamp,
           storedAt: serverTimestamp(),
         };
 
@@ -154,7 +153,7 @@ export function ExternalReceptionUploader() {
           </DialogHeader>
           <div className="space-y-4 py-4">
             <p className="text-sm text-muted-foreground">
-              El archivo CSV debe tener las columnas: {CSV_HEADERS.join(', ')}. La columna `receptionDate` (formato: YYYY-MM-DD HH:MM:SS) es opcional.
+              El archivo CSV debe tener las columnas: {CSV_HEADERS.join(', ')}. La columna `receptionDate` (formato: YYYY-MM-DD HH:MM) es opcional.
             </p>
             <div className="flex gap-4">
               <Button variant="secondary" onClick={handleDownloadTemplate} className="flex-1">
