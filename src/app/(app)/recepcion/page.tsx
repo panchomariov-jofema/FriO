@@ -71,6 +71,9 @@ export default function RecepcionPage() {
     }
 
     const displayLotId = `${producer.shortName}-${values.document}`;
+    const netWeightPerBin = (values.totalWeight && values.totalWeight > 0)
+      ? (values.totalWeight - (values.binCount * 65) - ((values.toteCount - (values.emptyTotes || 0) - (values.noTotes || 0))*2)) / values.binCount
+      : 0;
 
     const lotData = {
       ...values,
@@ -79,6 +82,7 @@ export default function RecepcionPage() {
       producerId: selectedProducerId,
       status: 'Pendiente de Peso' as const,
       createdAt: serverTimestamp(),
+      netWeightPerBin,
     };
 
     const collRef = collection(firestore, 'receptionLots');
@@ -192,7 +196,7 @@ export default function RecepcionPage() {
                 <FormField control={form.control} name="emptyTotes" render={({ field }) => (
                   <FormItem><FormLabel>Totes Vacíos (Opcional)</FormLabel><FormControl><Input type="number" {...field} value={field.value || ''} autoComplete="off" inputMode="numeric" /></FormControl><FormMessage /></FormItem>
                 )} />
-                <FormField control={form.control} name="noTotes" render={({ field }) => (
+                 <FormField control={form.control} name="noTotes" render={({ field }) => (
                   <FormItem><FormLabel>Sin Totes (Opcional)</FormLabel><FormControl><Input type="number" {...field} value={field.value || ''} autoComplete="off" inputMode="numeric" /></FormControl><FormMessage /></FormItem>
                 )} />
               </div>
