@@ -49,12 +49,14 @@ export function ManualDispatchTab({ exporters, loadingExporters, chamberLots, lo
 
     const filteredLots = React.useMemo(() => {
         const { exporterId, chamberId, variety } = form.getValues();
-        return (chamberLots || []).filter(lot =>
-            lot.status === 'Almacenado' &&
-            (!exporterId || lot.exporterId === exporterId) &&
-            (!chamberId || lot.chamberId === chamberId) &&
-            (!variety || lot.variety === variety)
-        );
+        return (chamberLots || [])
+            .filter(lot =>
+                lot.status === 'Almacenado' &&
+                (!exporterId || lot.exporterId === exporterId) &&
+                (!chamberId || lot.chamberId === chamberId) &&
+                (!variety || lot.variety === variety)
+            )
+            .sort((a, b) => a.storedAt.toMillis() - b.storedAt.toMillis()); // FIFO Sort
     }, [chamberLots, form.watch()]);
 
     const handleSelectLot = (lot: ChamberLot, isSelected: boolean) => {
