@@ -14,12 +14,12 @@ import { useFirestore } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
-import { chambersConfig } from '@/lib/chambers-config';
+import { chambersConfig, exporterChamberAssignments } from '@/lib/chambers-config';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 import { Progress } from '@/components/ui/progress';
-import { RelocateDialog } from '@/components/hidrocooler/RelocateDialog';
+import { RelocateLotDialog } from '@/components/camaras/RelocateLotDialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Trash2 } from 'lucide-react';
 import { ExternalReceptionUploader } from '@/components/hidrocooler/ExternalReceptionUploader';
@@ -74,7 +74,7 @@ export default function CamarasPage() {
   const { data: otherFruitReceptions, loading: loadingOtherFruit } = useFirestoreCollection<OtherFruitReception>('otherFruitReceptions');
   const { data: exporters, loading: loadingExporters } = useFirestoreCollection<Exporter>('exporters');
   const [lotToStore, setLotToStore] = React.useState<ChamberLot | null>(null);
-  const [itemToRelocate, setItemToRelocate] = React.useState<StoredItem | null>(null);
+  const [coordToRelocate, setCoordToRelocate] = React.useState<{ chamberId: string, coordinate: string } | null>(null);
   const [isStoreDialogOpen, setStoreDialogOpen] = React.useState(false);
   const [isRelocateDialogOpen, setRelocateDialogOpen] = React.useState(false);
   const firestore = useFirestore();
@@ -82,7 +82,7 @@ export default function CamarasPage() {
 
   const loading = loadingChamberLots || loadingOtherFruit || loadingExporters;
 
-  const { pendingLots, storedItemsByChamber, chamberOccupancy, totalNetWeightInStock, exporterMap } = React.useMemo(() => {
+  const { pendingLots, storedItemsByChamber, chamberOccupancy, totalNetWeightInStock, exporterMap, allLotsInChambers } = React.useMemo(() => {
     const allChamberLots = chamberLots || [];
     const allOtherFruitReceptions = otherFruitReceptions || [];
 
@@ -186,6 +186,7 @@ export default function CamarasPage() {
         chamberOccupancy: calculatedChamberOccupancy,
         totalNetWeightInStock: calculatedTotalNetWeight,
         exporterMap: calculatedExporterMap,
+        allLotsInChambers: allChamberLots,
     };
   }, [chamberLots, otherFruitReceptions, exporters]);
 
@@ -195,8 +196,8 @@ export default function CamarasPage() {
     setStoreDialogOpen(true);
   };
   
-  const handleRelocateClick = (item: StoredItem) => {
-    setItemToRelocate(item);
+  const handleRelocateClick = (chamberId: string, coordinate: string) => {
+    setCoordToRelocate({ chamberId, coordinate });
     setRelocateDialogOpen(true);
   }
 
@@ -204,8 +205,6 @@ export default function CamarasPage() {
     if (!lotToStore || !firestore) return;
 
     const chamberConfig = chambersConfig[chamberId];
-    const totalCapacity = chamberOccupancy[chamberId]?.total ?? 0;
-
     const allStoredLots = chamberLots || [];
     const storedInChamber = allStoredLots.filter(l => l.chamberId === chamberId && l.coordinate);
     const occupiedCoordinates = storedInChamber.reduce((acc, lot) => {
@@ -297,35 +296,65 @@ export default function CamarasPage() {
   };
 
   const handleRelocate = async ({ targetChamberId, targetCoordinate }: { targetChamberId: string, targetCoordinate: string}) => {
-    if (!itemToRelocate || !firestore) return;
+    if (!coordToRelocate || !firestore) return;
+
+    const { chamberId: sourceChamberId, coordinate: sourceCoordinate } = coordToRelocate;
+
+    // Find all lot documents that are in the source coordinate
+    const lotsToMove = (chamberLots || []).filter(
+      (lot) =>
+        lot.chamberId === sourceChamberId &&
+        lot.coordinate === sourceCoordinate &&
+        lot.status === 'Almacenado'
+    );
+     // Find all other fruit items that are in the source coordinate
+    const fruitItemsToMove = (otherFruitReceptions || []).flatMap(reception =>
+        reception.items
+            .filter(item => item.status === 'Almacenado' && item.storageLocation?.chamberId === sourceChamberId && item.storageLocation?.coordinate === sourceCoordinate)
+            .map((item, index) => ({ reception, item, index }))
+    );
+
+    if (lotsToMove.length === 0 && fruitItemsToMove.length === 0) {
+      toast({ title: 'Error', description: 'No se encontró nada que mover en la coordenada de origen.', variant: 'destructive' });
+      setRelocateDialogOpen(false);
+      return;
+    }
     
     try {
-        if (itemToRelocate.type === 'producerLot') {
-            const lotRef = doc(firestore, 'chamberLots', itemToRelocate.id);
-            await updateDoc(lotRef, {
+        const batch = writeBatch(firestore);
+
+        // Update producer lots
+        lotsToMove.forEach(lot => {
+            const lotRef = doc(firestore, 'chamberLots', lot.id);
+            batch.update(lotRef, {
                 chamberId: targetChamberId,
                 coordinate: targetCoordinate,
             });
-        } else if (itemToRelocate.type === 'otherFruit') {
-            const receptionRef = doc(firestore, 'otherFruitReceptions', itemToRelocate.receptionId!);
-            const receptionDoc = await getDoc(receptionRef);
-            if (!receptionDoc.exists()) throw new Error("Recepción no encontrada");
-            
-            const updatedItems = [...receptionDoc.data().items];
-            const itemToUpdate = updatedItems[itemToRelocate.itemIndex!];
-            
+        });
+
+        // Update other fruit items
+        const fruitUpdatesByReception: Record<string, any[]> = {};
+        fruitItemsToMove.forEach(({ reception, item, index }) => {
+            if (!fruitUpdatesByReception[reception.id]) {
+                fruitUpdatesByReception[reception.id] = JSON.parse(JSON.stringify(reception.items));
+            }
+            const itemToUpdate = fruitUpdatesByReception[reception.id][index];
             if (itemToUpdate) {
                 itemToUpdate.storageLocation = {
                     chamberId: targetChamberId,
                     coordinate: targetCoordinate,
                 };
-                await updateDoc(receptionRef, { items: updatedItems });
-            } else {
-                 throw new Error("Ítem no encontrado en la recepción");
             }
-        }
+        });
+
+        Object.entries(fruitUpdatesByReception).forEach(([receptionId, updatedItems]) => {
+            const receptionRef = doc(firestore, 'otherFruitReceptions', receptionId);
+            batch.update(receptionRef, { items: updatedItems });
+        });
+
+        await batch.commit();
         
-        toast({ title: 'Éxito', description: `Coordenada ${itemToRelocate.coordinate} reubicada a ${chambersConfig[targetChamberId].name} - ${targetCoordinate}.` });
+        toast({ title: 'Éxito', description: `Coordenada ${sourceCoordinate} reubicada a ${chambersConfig[targetChamberId].name} - ${targetCoordinate}.` });
 
     } catch (e: any) {
         console.error("Error al reubicar: ", e);
@@ -375,6 +404,9 @@ export default function CamarasPage() {
       }));
     }
   };
+
+  const lotsInCoordToRelocate = coordToRelocate ? storedItemsByChamber[coordToRelocate.chamberId]?.[coordToRelocate.coordinate] || [] : [];
+
 
   return (
     <div className="space-y-6">
@@ -540,7 +572,7 @@ export default function CamarasPage() {
                                                 <p>Pallets: {totalPallets}</p>
                                                 {totalNetWeight > 0 && <p className="col-span-2">Peso Neto: {totalNetWeight.toFixed(1)} kg</p>}
                                             </div>
-                                            <Button size="sm" className="w-full mt-2" onClick={() => handleRelocateClick(firstItem)}>Reubicar</Button>
+                                            <Button size="sm" className="w-full mt-2" onClick={() => handleRelocateClick(chamberId, coord)}>Reubicar</Button>
                                           </div>
                                         </PopoverContent>
                                       )}
@@ -566,18 +598,20 @@ export default function CamarasPage() {
         />
       )}
 
-      {itemToRelocate && (
-        <RelocateDialog
-            item={itemToRelocate}
+      {coordToRelocate && (
+        <RelocateLotDialog
             open={isRelocateDialogOpen}
             onOpenChange={setRelocateDialogOpen}
             onRelocate={handleRelocate}
-            storedItems={{
-                chamberLots: chamberLots || [],
-                otherFruitReceptions: otherFruitReceptions || [],
-            }}
+            sourceChamberId={coordToRelocate.chamberId}
+            sourceCoordinate={coordToRelocate.coordinate}
+            lotsInCoordinate={lotsInCoordToRelocate}
+            allChamberLots={allLotsInChambers}
+            allOtherFruitReceptions={otherFruitReceptions || []}
         />
       )}
     </div>
   );
 }
+
+    

@@ -13,15 +13,15 @@ import { chambersConfig } from '@/lib/chambers-config';
 import { Alert, AlertDescription } from '../ui/alert';
 import { useToast } from '@/hooks/use-toast';
 
-interface RelocateDialogProps {
-  item: StoredItem | null;
+interface RelocateLotDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onRelocate: (data: { targetChamberId: string; targetCoordinate: string }) => void;
-  storedItems: {
-    chamberLots: ChamberLot[];
-    otherFruitReceptions: OtherFruitReception[];
-  }
+  sourceChamberId: string;
+  sourceCoordinate: string;
+  lotsInCoordinate: StoredItem[];
+  allChamberLots: ChamberLot[];
+  allOtherFruitReceptions: OtherFruitReception[];
 }
 
 const relocateSchema = z.object({
@@ -43,13 +43,16 @@ const naturalSort = (a: string, b: string) => {
   return aNum - bNum;
 };
 
-export function RelocateDialog({
-  item,
+export function RelocateLotDialog({
   open,
   onOpenChange,
   onRelocate,
-  storedItems
-}: RelocateDialogProps) {
+  sourceChamberId,
+  sourceCoordinate,
+  lotsInCoordinate,
+  allChamberLots,
+  allOtherFruitReceptions,
+}: RelocateLotDialogProps) {
   const { toast } = useToast();
   const form = useForm<RelocateFormValues>({
     resolver: zodResolver(relocateSchema),
@@ -59,83 +62,46 @@ export function RelocateDialog({
     },
   });
   
-  const sourceChamberId = item?.chamberId;
-  const sourceCoordinate = item?.coordinate;
   const targetChamberId = form.watch('targetChamberId');
 
-  const { allChamberLots = [], allOtherFruitReceptions = [] } = storedItems || {};
-
-  const { availableCoordinates, occupancyMap } = React.useMemo(() => {
-    if (!targetChamberId || !item) return { availableCoordinates: [], occupancyMap: new Map() };
+  const { availableCoordinates } = React.useMemo(() => {
+    if (!targetChamberId) return { availableCoordinates: [] };
 
     const chamberConfig = chambersConfig[targetChamberId];
-    if (!chamberConfig) return { availableCoordinates: [], occupancyMap: new Map() };
+    if (!chamberConfig) return { availableCoordinates: [] };
 
     const allPossibleCoords = chamberConfig.columns.flatMap(col => chamberConfig.rows.map(row => `${col}${row}`)).sort(naturalSort);
-    const currentOccupancyMap = new Map<string, { bins: number, pallets: number }>();
-
-    const getCoord = (coord: string) => {
-      if (!currentOccupancyMap.has(coord)) {
-        currentOccupancyMap.set(coord, { bins: 0, pallets: 0 });
-      }
-      return currentOccupancyMap.get(coord)!;
-    };
     
+    const occupiedCoords = new Set<string>();
+
     allChamberLots.forEach(lot => {
-        // Exclude the item being moved from occupancy calculation
-        if (item.type === 'producerLot' && lot.chamberId === item.chamberId && lot.coordinate === item.coordinate) return;
-        
-        if (lot.status === 'Almacenado' && lot.chamberId === targetChamberId && lot.coordinate) {
-            const coordData = getCoord(lot.coordinate);
-            coordData.bins += lot.binCount;
-        }
+      if (lot.status === 'Almacenado' && lot.chamberId === targetChamberId && lot.coordinate) {
+        occupiedCoords.add(lot.coordinate);
+      }
     });
 
     allOtherFruitReceptions.forEach(reception => {
-        reception.items.forEach((fruitItem, index) => {
-            // Exclude the item being moved
-            if (item.type === 'otherFruit' && reception.id === item.receptionId && fruitItem.storageLocation?.chamberId === item.chamberId && fruitItem.storageLocation?.coordinate === item.coordinate) return;
-
-            if (fruitItem.status === 'Almacenado' && fruitItem.storageLocation?.chamberId === targetChamberId && fruitItem.storageLocation.coordinate) {
-                const coordData = getCoord(fruitItem.storageLocation.coordinate);
-                if (reception.unit === 'Bins') {
-                    coordData.bins += fruitItem.quantity;
-                } else {
-                    coordData.pallets += fruitItem.quantity;
-                }
+        reception.items.forEach(item => {
+            if(item.status === 'Almacenado' && item.storageLocation?.chamberId === targetChamberId && item.storageLocation.coordinate) {
+                 occupiedCoords.add(item.storageLocation.coordinate);
             }
         });
     });
 
-    const available = allPossibleCoords.filter(coord => {
-      // Don't offer the current coordinate as a destination
-      if (item.chamberId === targetChamberId && item.coordinate === coord) {
-          return false;
-      }
-      if (chamberConfig.blocked?.includes(coord)) {
-          return false;
-      }
-      
-      const occupied = currentOccupancyMap.get(coord) || { bins: 0, pallets: 0 };
-      
-      if (item.unit === 'Pallets') {
-        if (occupied.bins > 0) return false; // Can't move pallets to a coordinate with bins
-        return occupied.pallets < 2; // Can move to a coordinate with 0 or 1 pallet
-      }
-      
-      if (item.unit === 'Bins') {
-        if (occupied.pallets > 0) return false; // Can't move bins to a coordinate with pallets
-        return occupied.bins < 6; // Can move to a coordinate with space for bins
-      }
-      
-      return false; // Should not happen
-    });
+    // We can move to the same coordinate if we are changing chambers
+    if (sourceChamberId !== targetChamberId) {
+        // occupiedCoords doesn't need change
+    } else {
+    // If moving within the same chamber, the source coord is available
+      occupiedCoords.delete(sourceCoordinate);
+    }
+    
+    const available = allPossibleCoords.filter(coord => !occupiedCoords.has(coord) && !chamberConfig.blocked?.includes(coord));
 
     return { 
         availableCoordinates: available,
-        occupancyMap: currentOccupancyMap,
     };
-  }, [targetChamberId, allChamberLots, allOtherFruitReceptions, item]);
+  }, [targetChamberId, allChamberLots, allOtherFruitReceptions, sourceChamberId, sourceCoordinate]);
 
 
   React.useEffect(() => {
@@ -148,32 +114,15 @@ export function RelocateDialog({
   }, [open, form]);
 
   const onSubmit = (values: RelocateFormValues) => {
-    if (!item) return;
-
-    const targetOccupancy = occupancyMap.get(values.targetCoordinate) || { bins: 0, pallets: 0 };
-    
-    if (item.unit === 'Pallets') {
-        if (targetOccupancy.bins > 0) {
-            toast({ variant: 'destructive', title: 'Error de Capacidad', description: 'No se puede mover un pallet a una coordenada que ya contiene bins.'});
-            return;
-        }
-        if (targetOccupancy.pallets >= 2) {
-            toast({ variant: 'destructive', title: 'Error de Capacidad', description: 'La coordenada de destino ya tiene 2 pallets.'});
-            return;
-        }
+    if (values.targetChamberId === sourceChamberId && values.targetCoordinate === sourceCoordinate) {
+        toast({ variant: 'destructive', title: 'Error', description: 'La ubicación de destino no puede ser la misma que la de origen.'});
+        return;
     }
-    
-    if (item.unit === 'Bins') {
-        if (targetOccupancy.pallets > 0) {
-            toast({ variant: 'destructive', title: 'Error de Capacidad', description: 'No se pueden mover bins a una coordenada que ya contiene pallets.'});
-            return;
-        }
-    }
-
     onRelocate(values);
   };
 
-  if (!item || !sourceChamberId || !sourceCoordinate) return null;
+  const item = lotsInCoordinate[0];
+  if (!item) return null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -232,27 +181,20 @@ export function RelocateDialog({
               name="targetCoordinate"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Coordenada de Destino</FormLabel>
+                  <FormLabel>Coordenada de Destino (Solo vacías)</FormLabel>
                   <Select onValueChange={field.onChange} value={field.value} disabled={!targetChamberId || availableCoordinates.length === 0}>
                     <FormControl>
                       <SelectTrigger>
-                        <SelectValue placeholder={!targetChamberId ? "Seleccione una cámara primero" : "Seleccione una coordenada"} />
+                        <SelectValue placeholder={!targetChamberId ? "Seleccione una cámara primero" : "Seleccione una coordenada vacía"} />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
                       {availableCoordinates.length > 0 ? (
                         availableCoordinates.map(coord => (
-                          <SelectItem key={coord} value={coord}>
-                              {coord}
-                              {occupancyMap.has(coord) && (
-                                  <span className="text-muted-foreground ml-2 text-xs">
-                                      (Ocup: {occupancyMap.get(coord)?.bins} Bins, {occupancyMap.get(coord)?.pallets} Pallets)
-                                  </span>
-                              )}
-                          </SelectItem>
+                          <SelectItem key={coord} value={coord}>{coord}</SelectItem>
                         ))
                       ) : (
-                        <div className="p-4 text-sm text-center text-muted-foreground">No hay coordenadas válidas disponibles.</div>
+                        <div className="p-4 text-sm text-center text-muted-foreground">No hay coordenadas vacías.</div>
                       )}
                     </SelectContent>
                   </Select>
@@ -273,3 +215,5 @@ export function RelocateDialog({
     </Dialog>
   );
 }
+
+    
