@@ -69,13 +69,11 @@ export function WeightCalculator({ lot, open, onOpenChange, onWeightSaved }: Wei
     
     const displayLotId = `${producer.shortName}-${lot.document}`;
 
-    // Correctly calculate net weight per bin
     const TARE_BIN = 65; // kg
-    const TARE_TOTE = 2; // kg
     const totalBinsTare = lot.binCount * TARE_BIN;
-    const totesToSubtract = (lot.toteCount || 0) - (lot.emptyTotes || 0);
-    const totalTotesTare = totesToSubtract * TARE_TOTE;
-    const netWeight = totalWeight - totalBinsTare - totalTotesTare;
+    const sinTotes = lot.noTotes || 0;
+    
+    const netWeight = totalWeight - totalBinsTare + sinTotes;
     const netWeightPerBin = netWeight > 0 && lot.binCount > 0 ? netWeight / lot.binCount : 0;
 
 

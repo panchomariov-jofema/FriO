@@ -73,9 +73,13 @@ export default function RecepcionPage() {
     const displayLotId = `${producer.shortName}-${values.document}`;
     
     const totalWeight = values.totalWeight || 0;
-    const toteWeight = (values.toteCount - (values.emptyTotes || 0) - (values.noTotes || 0)) * 2;
-    const netWeightPerBin = (totalWeight > 0 && values.binCount > 0)
-      ? (totalWeight - (values.binCount * 65) - toteWeight) / values.binCount
+    const sinTotes = values.noTotes || 0;
+    const TARE_BIN = 65;
+    const totalBinsTare = values.binCount * TARE_BIN;
+    
+    const netWeight = totalWeight - totalBinsTare + sinTotes;
+    const netWeightPerBin = (netWeight > 0 && values.binCount > 0)
+      ? netWeight / values.binCount
       : 0;
 
     const lotData: Partial<ReceptionLot> = {
