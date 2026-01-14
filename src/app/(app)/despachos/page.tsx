@@ -590,7 +590,7 @@ const handleUndoDispatch = async (dispatchToUndo: Dispatch) => {
                             <TableHead>Cliente</TableHead>
                             <TableHead>Fecha</TableHead>
                             <TableHead>Total Bins</TableHead>
-                            <TableHead>Peso Neto</TableHead>
+                            <TableHead className="hidden md:table-cell">Peso Neto</TableHead>
                             <TableHead>Estado</TableHead>
                             <TableHead className="text-right">Acciones</TableHead>
                         </TableRow>
@@ -604,7 +604,7 @@ const handleUndoDispatch = async (dispatchToUndo: Dispatch) => {
                                     <TableCell className="font-medium">{dispatch.exporterName}</TableCell>
                                     <TableCell>{dispatch.createdAt?.toDate().toLocaleDateString()}</TableCell>
                                     <TableCell>{dispatch.totalBins}</TableCell>
-                                    <TableCell>{dispatch.totalNetWeight ? `${dispatch.totalNetWeight.toFixed(2)} kg` : '-'}</TableCell>
+                                    <TableCell className="hidden md:table-cell">{dispatch.totalNetWeight ? `${dispatch.totalNetWeight.toFixed(2)} kg` : '-'}</TableCell>
                                     <TableCell><Badge variant={dispatch.status === 'Completado' ? 'default' : 'secondary'}>{dispatch.status}</Badge></TableCell>
                                     <TableCell className="text-right space-x-2">
                                        <AlertDialog>
