@@ -178,6 +178,7 @@ export default function DespachosPage() {
       
       const querySnapshot = await getDocs(q);
       
+      // FIFO: Sort by oldest first
       const availableLots = querySnapshot.docs
         .map(doc => ({ id: doc.id, ...doc.data() } as ChamberLot))
         .sort((a, b) => a.storedAt.toMillis() - b.storedAt.toMillis());
@@ -194,6 +195,7 @@ export default function DespachosPage() {
       const batch = writeBatch(firestore);
 
       for (const lot of availableLots) {
+        // Rule 2 & 3: Do not break lots & do not exceed max bins
         if (accumulatedBins + lot.binCount <= values.maxBins) {
             binsToDispatch.push({
                 chamberLotId: lot.id,
