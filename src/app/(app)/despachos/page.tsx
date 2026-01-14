@@ -373,8 +373,8 @@ const handleUndoDispatch = async (dispatchToUndo: Dispatch) => {
         const originalReception = receptionLots.find(lot => lot.displayLotId === groupedBin.displayLotId);
         const producer = producers.find(p => p.producerId === originalReception?.producerId);
 
-        const netWeight = (originalReception?.totalWeight && originalReception.totalWeight > 0)
-            ? (originalReception.totalWeight - (originalReception.binCount * 65) + (originalReception.noTotes || 0))
+        const netWeight = (originalReception?.netWeightPerBin && originalReception.binCount > 0)
+            ? originalReception.netWeightPerBin * groupedBin.totalBins
             : null;
 
         return {

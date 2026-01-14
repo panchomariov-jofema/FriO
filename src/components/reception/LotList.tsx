@@ -167,9 +167,9 @@ export function LotList({ exporterId }: LotListProps) {
                   ))
                 ) : filteredLots.length > 0 ? (
                   filteredLots.map((lot) => {
-                    const pesoNeto = (lot.totalWeight && lot.totalWeight > 0)
-                      ? (lot.totalWeight - (lot.binCount * 65) + (lot.noTotes || 0))
-                      : null;
+                     const pesoNeto = (lot.netWeightPerBin && lot.binCount > 0)
+                        ? lot.netWeightPerBin * lot.binCount
+                        : null;
                     
                     return (
                     <TableRow key={lot.id}>

@@ -47,8 +47,8 @@ export default function ReceptionLogReportPage() {
         if (!receptionLots) return;
         const headers = ['createdAt', 'displayLotId', 'producerId', 'variety', 'binCount', 'status', 'totalWeight', 'pesoNeto'];
         const dataForExport = receptionLots.map(lot => {
-            const pesoNeto = (lot.totalWeight && lot.totalWeight > 0)
-                ? (lot.totalWeight - (lot.binCount * 65) + (lot.noTotes || 0))
+            const pesoNeto = (lot.netWeightPerBin && lot.binCount > 0)
+                ? lot.netWeightPerBin * lot.binCount
                 : null;
             return {
                 ...lot,
@@ -88,8 +88,8 @@ export default function ReceptionLogReportPage() {
                                     Array.from({ length: 5 }).map((_, i) => <TableRow key={i}><TableCell colSpan={8}><Skeleton className="h-4 w-full" /></TableCell></TableRow>)
                                 ) : receptionLots && receptionLots.length > 0 ? (
                                     receptionLots.map(lot => {
-                                        const pesoNeto = (lot.totalWeight && lot.totalWeight > 0)
-                                            ? (lot.totalWeight - (lot.binCount * 65) + (lot.noTotes || 0))
+                                        const pesoNeto = (lot.netWeightPerBin && lot.binCount > 0)
+                                            ? lot.netWeightPerBin * lot.binCount
                                             : null;
 
                                         return (
