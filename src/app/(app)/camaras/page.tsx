@@ -38,7 +38,8 @@ const naturalSort = (a: string, b: string) => {
   return aNum - bNum;
 };
 
-// Expanded and more distinct color palette
+// --- Color Palette Logic (Moved outside component to persist state) ---
+
 const lotColorPalette = [
   'hsl(221, 83%, 53%)', // Blue
   'hsl(0, 72%, 51%)',   // Red
@@ -48,6 +49,10 @@ const lotColorPalette = [
   'hsl(350, 75%, 55%)', // Pink
   'hsl(25, 85%, 50%)',  // Orange
   'hsl(120, 50%, 50%)', // Green
+  'hsl(310, 80%, 50%)', // Magenta
+  'hsl(195, 100%, 45%)',// Sky Blue
+  'hsl(60, 100%, 45%)', // Lemon
+  'hsl(290, 60%, 50%)', // Purple
 ];
 
 // Map to store assigned colors for each lot ID
