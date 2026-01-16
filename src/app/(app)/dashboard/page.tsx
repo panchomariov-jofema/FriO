@@ -78,19 +78,14 @@ function downloadCSV(csvString: string, filename: string) {
 function FallCreekExecutiveView({ data, clientName }: { data: any[], clientName: string }) {
     const handleExport = () => {
         const headers = [
+            { key: 'receptionDate', label: 'Fecha Recepción' },
             { key: 'clientLotId', label: 'Lote Cliente' },
             { key: 'productName', label: 'Producto' },
             { key: 'totalQuantity', label: 'Cantidad Total' },
             { key: 'unit', label: 'Unidad' },
-            { key: 'locations', label: 'Ubicaciones' },
         ];
         
-        const dataToExport = data.map(lot => ({
-            ...lot,
-            locations: lot.locations.map((loc: any) => `${loc.coordinate}: ${loc.quantity}`).join(' | ')
-        }));
-
-        const csv = convertToCSV(dataToExport, headers);
+        const csv = convertToCSV(data, headers);
         downloadCSV(csv, `resumen_fall_creek_${new Date().toISOString().split('T')[0]}.csv`);
     };
 
@@ -128,27 +123,19 @@ function FallCreekExecutiveView({ data, clientName }: { data: any[], clientName:
                         <Table>
                             <TableHeader>
                                 <TableRow>
+                                    <TableHead>Fecha Recepción</TableHead>
                                     <TableHead>Lote Cliente</TableHead>
                                     <TableHead>Producto</TableHead>
                                     <TableHead>Cantidad Total</TableHead>
-                                    <TableHead>Ubicaciones</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
                                 {data.map(lot => (
                                     <TableRow key={lot.clientLotId}>
+                                        <TableCell>{lot.receptionDate?.toDate().toLocaleString('es-CL')}</TableCell>
                                         <TableCell className="font-mono">{lot.clientLotId}</TableCell>
                                         <TableCell>{lot.productName}</TableCell>
                                         <TableCell className="font-semibold">{lot.totalQuantity} {lot.unit}</TableCell>
-                                        <TableCell>
-                                            <div className="flex flex-col space-y-1 max-h-32 overflow-y-auto">
-                                                {lot.locations.map((loc: any, index: number) => (
-                                                    <span key={index} className="text-xs font-mono">
-                                                        {loc.coordinate}: {loc.quantity} {lot.unit}
-                                                    </span>
-                                                ))}
-                                            </div>
-                                        </TableCell>
                                     </TableRow>
                                 ))}
                             </TableBody>
@@ -376,7 +363,8 @@ export default function DashboardPage() {
             productName: string,
             unit: 'Bins' | 'Pallets',
             totalQuantity: number,
-            locations: { coordinate: string, quantity: number }[]
+            locations: { coordinate: string, quantity: number }[],
+            receptionDate: any,
         }>();
         
         clientReceptions.forEach(reception => {
@@ -387,7 +375,8 @@ export default function DashboardPage() {
                             productName: item.productName,
                             unit: reception.unit,
                             totalQuantity: 0,
-                            locations: []
+                            locations: [],
+                            receptionDate: reception.createdAt,
                         });
                     }
                     const lotSummary = lots.get(item.clientLotId)!;
