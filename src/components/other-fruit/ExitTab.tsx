@@ -18,16 +18,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Label } from '../ui/label';
 import { Checkbox } from '../ui/checkbox';
 
-interface SelectedItem {
-  receptionId: string;
-  itemIndex: number;
-  productName: string;
-  productCode: string;
-  quantity: number;
-  unit: 'Bins' | 'Pallets';
-  clientLotId?: string;
-  coordinate: string;
-}
+const getLocationKey = (receptionId: string, itemIndex: number) => `${receptionId}_${itemIndex}`;
 
 interface AggregatedLot {
   displayLotId: string;
@@ -52,7 +43,7 @@ export function OtherFruitExitTab() {
 
   const [selectedClientId, setSelectedClientId] = React.useState('');
   const [document, setDocument] = React.useState('');
-  const [selectedItems, setSelectedItems] = React.useState<Record<string, SelectedItem>>({});
+  const [quantitiesToDispatch, setQuantitiesToDispatch] = React.useState<Record<string, number>>({});
   const [isDispatching, setIsDispatching] = React.useState(false);
 
   const fruitClients = React.useMemo(() => (allClients || []).filter(c => c.type.toUpperCase() === 'FRUTA'), [allClients]);
@@ -94,55 +85,58 @@ export function OtherFruitExitTab() {
     return Array.from(lotMap.values()).filter(lot => lot.totalQuantity > 0);
   }, [selectedClientId, allReceptions]);
   
-  const handleSelect = (item: AggregatedLot['locations'][0], isSelected: boolean) => {
-    const key = `${item.receptionId}-${item.itemIndex}`;
-    setSelectedItems(prev => {
-        const newSelection = {...prev};
-        if (isSelected) {
-            newSelection[key] = {
-                receptionId: item.receptionId,
-                itemIndex: item.itemIndex,
-                productName: item.productName,
-                productCode: item.productCode,
-                quantity: item.quantity,
-                unit: aggregatedStockByLot.find(l => l.locations.some(loc => loc.receptionId === item.receptionId))?.unit || 'Bins',
-                clientLotId: item.clientLotId,
-                coordinate: item.coordinate
-            };
-        } else {
-            delete newSelection[key];
-        }
-        return newSelection;
-    });
-  };
+  const handleQuantityChange = (item: AggregatedLot['locations'][0], newQuantityStr: string) => {
+    const key = getLocationKey(item.receptionId, item.itemIndex);
+    const newQuantity = parseInt(newQuantityStr, 10);
 
+    if (isNaN(newQuantity) || newQuantity <= 0) {
+      setQuantitiesToDispatch(prev => {
+        const newState = { ...prev };
+        delete newState[key];
+        return newState;
+      });
+      return;
+    }
+
+    if (newQuantity > item.quantity) {
+      toast({
+        title: 'Cantidad excede el stock',
+        description: `Solo hay ${item.quantity} disponibles en esta ubicación.`,
+        variant: 'destructive'
+      });
+      // Optionally reset to max
+      setQuantitiesToDispatch(prev => ({
+        ...prev,
+        [key]: item.quantity,
+      }));
+      return;
+    }
+    
+    setQuantitiesToDispatch(prev => ({
+      ...prev,
+      [key]: newQuantity,
+    }));
+  };
+  
   const handleSelectAllForLot = (lot: AggregatedLot, isSelected: boolean) => {
-    setSelectedItems(prev => {
-        const newSelection = { ...prev };
-        lot.locations.forEach(loc => {
-            const key = `${loc.receptionId}-${loc.itemIndex}`;
-            if (isSelected) {
-                newSelection[key] = {
-                    receptionId: loc.receptionId,
-                    itemIndex: loc.itemIndex,
-                    productName: loc.productName,
-                    productCode: loc.productCode,
-                    quantity: loc.quantity,
-                    unit: lot.unit,
-                    clientLotId: loc.clientLotId,
-                    coordinate: loc.coordinate
-                };
-            } else {
-                delete newSelection[key];
-            }
-        });
-        return newSelection;
+    setQuantitiesToDispatch(prev => {
+      const newQuantities = { ...prev };
+      lot.locations.forEach(loc => {
+        const key = getLocationKey(loc.receptionId, loc.itemIndex);
+        if (isSelected) {
+          newQuantities[key] = loc.quantity;
+        } else {
+          delete newQuantities[key];
+        }
+      });
+      return newQuantities;
     });
   };
 
   const handleDispatch = async () => {
-     if (Object.keys(selectedItems).length === 0) {
-      toast({ variant: 'destructive', title: 'Error', description: 'Debe seleccionar al menos una ubicación para despachar.' });
+    const itemsToDispatch = Object.entries(quantitiesToDispatch).filter(([, qty]) => qty > 0);
+    if (itemsToDispatch.length === 0) {
+      toast({ variant: 'destructive', title: 'Error', description: 'Debe ingresar una cantidad para al menos una ubicación.' });
       return;
     }
     
@@ -157,23 +151,33 @@ export function OtherFruitExitTab() {
     try {
         const batch = writeBatch(firestore);
         const receptionUpdates = new Map<string, OtherFruitReceptionItem[]>();
+        const movementItems: OtherFruitMovement['items'] = [];
         
-        Object.values(selectedItems).forEach(item => {
-             if (!receptionUpdates.has(item.receptionId)) {
-                const originalReception = allReceptions.find(r => r.id === item.receptionId);
-                if (originalReception) {
-                    receptionUpdates.set(item.receptionId, JSON.parse(JSON.stringify(originalReception.items)));
-                }
+        for (const [key, quantityToDispatch] of itemsToDispatch) {
+            const [receptionId, itemIndexStr] = key.split('_');
+            const itemIndex = parseInt(itemIndexStr, 10);
+            
+            const originalReception = allReceptions.find(r => r.id === receptionId);
+            if (!originalReception) continue;
+            
+            if (!receptionUpdates.has(receptionId)) {
+                receptionUpdates.set(receptionId, JSON.parse(JSON.stringify(originalReception.items)));
             }
             
-            const updatedItems = receptionUpdates.get(item.receptionId);
-            if (updatedItems) {
-                const itemToUpdate = updatedItems[item.itemIndex];
-                if (itemToUpdate) {
-                    itemToUpdate.quantity = 0; // Set to 0 as we are dispatching the whole coordinate item
-                }
+            const updatedItems = receptionUpdates.get(receptionId)!;
+            const itemToUpdate = updatedItems[itemIndex];
+            
+            if (itemToUpdate && itemToUpdate.quantity >= quantityToDispatch) {
+                itemToUpdate.quantity -= quantityToDispatch;
+                
+                movementItems.push({
+                    productCode: itemToUpdate.productCode,
+                    productName: itemToUpdate.productName,
+                    quantity: quantityToDispatch,
+                    clientLotId: itemToUpdate.clientLotId,
+                });
             }
-        });
+        }
 
         receptionUpdates.forEach((items, receptionId) => {
             const receptionRef = doc(firestore, 'otherFruitReceptions', receptionId);
@@ -187,18 +191,13 @@ export function OtherFruitExitTab() {
             clientName: client.name,
             unit: client.unit,
             document: document || `SALIDA-${Date.now()}`,
-            items: Object.values(selectedItems).map(item => ({
-                productCode: item.productCode,
-                productName: item.productName,
-                quantity: item.quantity,
-                clientLotId: item.clientLotId,
-            })),
+            items: movementItems,
             createdAt: serverTimestamp(),
         });
         
         await batch.commit();
         toast({ title: 'Éxito', description: 'Despacho registrado y stock actualizado.' });
-        setSelectedItems({});
+        setQuantitiesToDispatch({});
         setDocument('');
 
     } catch (error) {
@@ -214,8 +213,8 @@ export function OtherFruitExitTab() {
   }
   
   const totalSelectedQuantity = React.useMemo(() => {
-    return Object.values(selectedItems).reduce((sum, item) => sum + item.quantity, 0);
-  }, [selectedItems]);
+    return Object.values(quantitiesToDispatch).reduce((sum, qty) => sum + qty, 0);
+  }, [quantitiesToDispatch]);
 
 
   return (
@@ -223,14 +222,14 @@ export function OtherFruitExitTab() {
       <CardHeader>
         <CardTitle>Registrar Salida de Fruta (Otros Clientes)</CardTitle>
         <CardDescription>
-          Seleccione un cliente para ver su stock disponible. Expanda cada lote para seleccionar las coordenadas a despachar.
+          Seleccione un cliente para ver su stock. Expanda cada lote para despachar una cantidad específica de cada coordenada.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="grid md:grid-cols-2 gap-4">
             <div>
               <Label>Cliente</Label>
-              <Select value={selectedClientId} onValueChange={(val) => {setSelectedClientId(val); setSelectedItems({});}} disabled={loading}>
+              <Select value={selectedClientId} onValueChange={(val) => {setSelectedClientId(val); setQuantitiesToDispatch({});}} disabled={loading}>
                 <SelectTrigger><SelectValue placeholder="Seleccione un cliente..." /></SelectTrigger>
                 <SelectContent>
                   {fruitClients.map(c => <SelectItem key={c.id} value={c.clientId}>{c.name}</SelectItem>)}
@@ -249,8 +248,10 @@ export function OtherFruitExitTab() {
             <>
             <Accordion type="multiple" className="w-full">
                 {aggregatedStockByLot.map(lot => {
-                    const isAllSelectedForLot = lot.locations.length > 0 && lot.locations.every(loc => selectedItems[`${loc.receptionId}-${loc.itemIndex}`]);
-                    const isSomeSelectedForLot = lot.locations.some(loc => selectedItems[`${loc.receptionId}-${loc.itemIndex}`]);
+                    const allLocationKeysForLot = lot.locations.map(l => getLocationKey(l.receptionId, l.itemIndex));
+                    const selectedKeysInLot = allLocationKeysForLot.filter(key => key in quantitiesToDispatch);
+                    const isAllSelected = selectedKeysInLot.length === allLocationKeysForLot.length && allLocationKeysForLot.every(key => quantitiesToDispatch[key] === lot.locations.find(l => getLocationKey(l.receptionId, l.itemIndex) === key)?.quantity);
+                    const isSomeSelected = selectedKeysInLot.length > 0;
 
                     return (
                         <AccordionItem value={lot.displayLotId} key={lot.displayLotId}>
@@ -266,7 +267,7 @@ export function OtherFruitExitTab() {
                                     <TableRow>
                                         <TableHead className="w-12">
                                             <Checkbox
-                                                checked={isAllSelectedForLot ? true : isSomeSelectedForLot ? 'indeterminate' : false}
+                                                checked={isAllSelected ? true : isSomeSelected ? 'indeterminate' : false}
                                                 onCheckedChange={(checked) => handleSelectAllForLot(lot, !!checked)}
                                                 aria-label="Seleccionar todo en este lote"
                                             />
@@ -274,24 +275,36 @@ export function OtherFruitExitTab() {
                                         <TableHead>Coordenada</TableHead>
                                         <TableHead>Producto</TableHead>
                                         <TableHead>Lote Cliente</TableHead>
-                                        <TableHead>Cantidad</TableHead>
+                                        <TableHead>Disp.</TableHead>
+                                        <TableHead className="w-32">A Despachar</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
                                     {lot.locations.map(loc => {
-                                        const key = `${loc.receptionId}-${loc.itemIndex}`;
+                                        const key = getLocationKey(loc.receptionId, loc.itemIndex);
                                         return (
                                             <TableRow key={key}>
                                                 <TableCell>
                                                     <Checkbox 
-                                                        checked={!!selectedItems[key]}
-                                                        onCheckedChange={(checked) => handleSelect(loc, !!checked)}
+                                                        checked={!!quantitiesToDispatch[key]}
+                                                        onCheckedChange={(checked) => handleQuantityChange(loc, checked ? loc.quantity.toString() : '0')}
                                                     />
                                                 </TableCell>
                                                 <TableCell className="font-mono">{loc.coordinate}</TableCell>
                                                 <TableCell>{loc.productName}</TableCell>
                                                 <TableCell className="font-mono">{loc.clientLotId || '-'}</TableCell>
                                                 <TableCell>{loc.quantity}</TableCell>
+                                                <TableCell>
+                                                    <Input
+                                                        type="number"
+                                                        min={0}
+                                                        max={loc.quantity}
+                                                        value={quantitiesToDispatch[key] || ''}
+                                                        onChange={(e) => handleQuantityChange(loc, e.target.value)}
+                                                        placeholder="0"
+                                                        className="h-8"
+                                                    />
+                                                </TableCell>
                                             </TableRow>
                                         )
                                     })}
@@ -308,10 +321,10 @@ export function OtherFruitExitTab() {
                 </div>
             )}
 
-            {Object.keys(selectedItems).length > 0 && (
+            {Object.keys(quantitiesToDispatch).length > 0 && (
                  <div className="flex justify-between items-center pt-4">
                     <div className="text-sm font-medium">
-                        Total seleccionado: {totalSelectedQuantity} {Object.values(selectedItems)[0].unit}
+                        Total a despachar: {totalSelectedQuantity} {aggregatedStockByLot.find(l => l.locations.some(loc => quantitiesToDispatch[getLocationKey(loc.receptionId, loc.itemIndex)]))?.unit}
                     </div>
                     <Button onClick={handleDispatch} disabled={isDispatching}>
                         {isDispatching ? "Despachando..." : "Confirmar Despacho"}
