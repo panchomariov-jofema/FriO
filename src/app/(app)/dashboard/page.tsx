@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { DateRange } from "react-day-picker"
 import { addDays, format } from "date-fns"
-import { Calendar as CalendarIcon } from "lucide-react"
+import { Calendar as CalendarIcon, ChevronsRight } from "lucide-react"
 import {
   Card,
   CardContent,
@@ -12,7 +12,7 @@ import {
   CardDescription,
 } from '@/components/ui/card';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
-import type { ChamberLot, Dispatch, Exporter, ProcessingLot, ReceptionLot, BinMaterialStock, OtherFruitReception, Profile, UserMaster, HidrocoolerLot } from '@/lib/types';
+import type { ChamberLot, Dispatch, Exporter, ProcessingLot, ReceptionLot, BinMaterialStock, OtherFruitReception, Profile, UserMaster, HidrocoolerLot, OtherClient } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis, Cell, Legend, LabelList } from 'recharts';
 import { ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
@@ -41,12 +41,71 @@ const CHART_COLORS = [
   "hsl(var(--chart-5))",
 ];
 
+function FallCreekExecutiveView({ data, clientName }: { data: any[], clientName: string }) {
+    if (data.length === 0) {
+        return (
+             <Card>
+                <CardHeader>
+                    <CardTitle>Resumen Ejecutivo: {clientName}</CardTitle>
+                    <CardDescription>Resumen de lotes de cliente almacenados en cámara.</CardDescription>
+                </CardHeader>
+                <CardContent className="h-48 flex items-center justify-center">
+                    <p className="text-muted-foreground">No se encontraron lotes de cliente almacenados para {clientName}.</p>
+                </CardContent>
+            </Card>
+        )
+    }
+
+    return (
+        <div className="space-y-6">
+            <Card>
+                <CardHeader>
+                    <CardTitle>Resumen Ejecutivo: {clientName}</CardTitle>
+                    <CardDescription>Resumen de lotes de cliente almacenados en cámara.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <div className="rounded-md border">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Lote Cliente</TableHead>
+                                    <TableHead>Producto</TableHead>
+                                    <TableHead>Cantidad Total</TableHead>
+                                    <TableHead>Ubicaciones</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {data.map(lot => (
+                                    <TableRow key={lot.clientLotId}>
+                                        <TableCell className="font-mono">{lot.clientLotId}</TableCell>
+                                        <TableCell>{lot.productName}</TableCell>
+                                        <TableCell className="font-semibold">{lot.totalQuantity} {lot.unit}</TableCell>
+                                        <TableCell>
+                                            <div className="flex flex-col space-y-1 max-h-32 overflow-y-auto">
+                                                {lot.locations.map((loc: any, index: number) => (
+                                                    <span key={index} className="text-xs font-mono">
+                                                        {loc.coordinate}: {loc.quantity} {lot.unit}
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </div>
+                </CardContent>
+            </Card>
+        </div>
+    );
+}
+
 export default function DashboardPage() {
     const { user } = useUser();
     const { data: users, loading: loadingUsers } = useFirestoreCollection<UserMaster>('usersMaster');
     const { data: profiles, loading: loadingProfiles } = useFirestoreCollection<Profile>('profiles');
 
-    const [selectedExporterId, setSelectedExporterId] = React.useState<string | null>(null);
+    const [selectedClient, setSelectedClient] = React.useState<{ value: string; label: string; id: string; type: 'exporter' | 'otherclient'; name: string } | null>(null);
     const [fixedExporterId, setFixedExporterId] = React.useState<string | null>(null);
     const [userProfile, setUserProfile] = React.useState<Profile | null>(null);
     const [dateRange, setDateRange] = React.useState<DateRange | undefined>({
@@ -54,16 +113,37 @@ export default function DashboardPage() {
         to: new Date(),
     });
 
-
     const { data: chamberLots, loading: loadingChamber } = useFirestoreCollection<ChamberLot>('chamberLots');
     const { data: otherFruitReceptions, loading: loadingOtherFruit } = useFirestoreCollection<OtherFruitReception>('otherFruitReceptions');
     const { data: processingLots, loading: loadingProcessing } = useFirestoreCollection<ProcessingLot>('processingLots');
     const { data: dispatches, loading: loadingDispatches } = useFirestoreCollection<Dispatch>('dispatches');
     const { data: receptionLots, loading: loadingReception } = useFirestoreCollection<ReceptionLot>('receptionLots');
     const { data: exporters, loading: loadingExporters } = useFirestoreCollection<Exporter>('exporters');
+    const { data: otherClients, loading: loadingOtherClients } = useFirestoreCollection<OtherClient>('otherClients');
     const { data: binMaterialStock, loading: loadingBinStock } = useFirestoreCollection<BinMaterialStock>('binMaterialStock');
     const { data: hidrocoolerLots, loading: loadingHidroLots } = useFirestoreCollection<HidrocoolerLot>('hidrocoolerLots');
 
+    const filterOptions = React.useMemo(() => {
+        const exporterOptions = (exporters || []).map(e => ({
+            value: `exporter_${e.id}`,
+            label: e.name,
+            name: e.name,
+            id: e.exporterId,
+            type: 'exporter' as const
+        }));
+
+        const clientOptions = (otherClients || [])
+            .filter(c => c.type === 'fruta')
+            .map(c => ({
+                value: `otherclient_${c.id}`,
+                label: c.name,
+                name: c.name,
+                id: c.clientId,
+                type: 'otherclient' as const
+            }));
+
+        return [...exporterOptions, ...clientOptions].sort((a, b) => a.label.localeCompare(b.label));
+    }, [exporters, otherClients]);
     
     React.useEffect(() => {
         if (user && users.length > 0 && profiles.length > 0 && !userProfile) {
@@ -79,10 +159,16 @@ export default function DashboardPage() {
         if (userProfile) {
             const dashboardPermission = userProfile.modulesAccess.find(p => typeof p === 'object' && p.name === 'Dashboard');
             if (dashboardPermission && typeof dashboardPermission === 'object' && 'fixedExporterId' in dashboardPermission) {
-                const exporter = exporters.find(e => e.name === dashboardPermission.fixedExporterId);
+                const exporter = exporters.find(e => e.name === (dashboardPermission as any).fixedExporterId);
                 if (exporter) {
                     setFixedExporterId(exporter.exporterId);
-                    setSelectedExporterId(exporter.exporterId);
+                    setSelectedClient({
+                        value: `exporter_${exporter.id}`,
+                        label: exporter.name,
+                        name: exporter.name,
+                        id: exporter.exporterId,
+                        type: 'exporter' as const
+                    });
                 }
             }
         }
@@ -99,7 +185,6 @@ export default function DashboardPage() {
         pendingHidroBins,
     } = React.useMemo(() => {
         
-        // --- KPI Calculations (Always current, ignores date range) ---
         const allChamberLotsForKPI = (chamberLots || []);
         const calculatedTotalBins = allChamberLotsForKPI
             .filter(lot => lot.status === 'Almacenado')
@@ -118,9 +203,12 @@ export default function DashboardPage() {
             .reduce((sum, lot) => sum + lot.binCount, 0);
 
         let stockForEmptyBins = (binMaterialStock || []);
-        if (selectedExporterId) {
-            stockForEmptyBins = stockForEmptyBins.filter(s => s.exporterId === selectedExporterId);
+        if (selectedClient && selectedClient.type === 'exporter') {
+            stockForEmptyBins = stockForEmptyBins.filter(s => s.exporterId === selectedClient.id);
+        } else if (selectedClient) {
+             stockForEmptyBins = [];
         }
+
         const specificBinCodes = ['10001', '10011', '10007'];
         const calculatedEmptyBins = stockForEmptyBins
             .filter(s => specificBinCodes.includes(s.binMaterialCode))
@@ -150,8 +238,6 @@ export default function DashboardPage() {
             };
         });
 
-        // --- Date-filtered Calculations (for charts and recent activity) ---
-
         const isDateInRange = (date: Date | null | undefined): boolean => {
             if (!date) return false;
             if (!dateRange?.from) return true; // No start date, include all
@@ -165,11 +251,13 @@ export default function DashboardPage() {
         }, {} as Record<string, string>);
 
         const kilosData: Record<string, number> = {};
+        const isExporterSelected = selectedClient && selectedClient.type === 'exporter';
+        const isOtherClientSelected = selectedClient && selectedClient.type === 'otherclient';
 
-        // Process ReceptionLots within date range
         (receptionLots || []).forEach(lot => {
+            if (isOtherClientSelected) return;
             if (!isDateInRange(lot.createdAt?.toDate())) return;
-            if (selectedExporterId && lot.exporterId !== selectedExporterId) return;
+            if (isExporterSelected && lot.exporterId !== selectedClient.id) return;
 
             const weight = lot.netWeightPerBin && lot.netWeightPerBin > 0 
                 ? lot.netWeightPerBin * lot.binCount
@@ -181,12 +269,11 @@ export default function DashboardPage() {
             }
         });
 
-        // Process external ChamberLots within date range
         (chamberLots || []).forEach(lot => {
-            // Only external lots have their own weight and need to be counted here
+            if (isOtherClientSelected) return;
             if (lot.hidrocooler !== 'EXTERNO') return; 
             if (!isDateInRange(lot.storedAt?.toDate())) return;
-            if (selectedExporterId && lot.exporterId !== selectedExporterId) return;
+            if (isExporterSelected && lot.exporterId !== selectedClient.id) return;
 
             const weight = (lot.netWeightPerBin || 0) * lot.binCount;
             if (weight > 0) {
@@ -215,9 +302,55 @@ export default function DashboardPage() {
             pendingHidroBins: calculatedPendingHidroBins,
         };
 
-    }, [chamberLots, otherFruitReceptions, processingLots, exporters, receptionLots, binMaterialStock, hidrocoolerLots, selectedExporterId, dateRange]);
+    }, [chamberLots, otherFruitReceptions, processingLots, exporters, receptionLots, binMaterialStock, hidrocoolerLots, selectedClient, dateRange]);
 
-    const loading = loadingChamber || loadingOtherFruit || loadingProcessing || loadingDispatches || loadingExporters || loadingReception || loadingBinStock || loadingUsers || loadingProfiles || loadingHidroLots;
+
+    const fallCreekData = React.useMemo(() => {
+        if (selectedClient?.name !== 'FALL CREEK' || !otherFruitReceptions) {
+            return null;
+        }
+        
+        const clientReceptions = otherFruitReceptions.filter(r => r.clientId === selectedClient.id);
+        
+        const lots = new Map<string, {
+            productName: string,
+            unit: 'Bins' | 'Pallets',
+            totalQuantity: number,
+            locations: { coordinate: string, quantity: number }[]
+        }>();
+        
+        clientReceptions.forEach(reception => {
+            reception.items.forEach(item => {
+                if (item.status === 'Almacenado' && item.clientLotId && item.quantity > 0) {
+                    if (!lots.has(item.clientLotId)) {
+                        lots.set(item.clientLotId, {
+                            productName: item.productName,
+                            unit: reception.unit,
+                            totalQuantity: 0,
+                            locations: []
+                        });
+                    }
+                    const lotSummary = lots.get(item.clientLotId)!;
+                    lotSummary.totalQuantity += item.quantity;
+                    if(item.storageLocation?.coordinate && item.storageLocation?.chamberId) {
+                        lotSummary.locations.push({
+                            coordinate: `${item.storageLocation.chamberId}/${item.storageLocation.coordinate}`,
+                            quantity: item.quantity
+                        });
+                    }
+                }
+            });
+        });
+        
+        return Array.from(lots.entries()).map(([clientLotId, summary]) => ({
+            clientLotId,
+            ...summary
+        }));
+
+    }, [selectedClient, otherFruitReceptions]);
+
+
+    const loading = loadingChamber || loadingOtherFruit || loadingProcessing || loadingDispatches || loadingExporters || loadingReception || loadingBinStock || loadingUsers || loadingProfiles || loadingHidroLots || loadingOtherClients;
 
     const kpiCards = [
         { title: "Total Bins en Cámara (Fruta)", value: totalBinsInStock, icon: Warehouse },
@@ -241,83 +374,102 @@ export default function DashboardPage() {
         },
     };
 
+    const renderDashboardHeader = () => (
+        <Card>
+            <CardContent className="pt-6">
+                <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+                        <div className="flex-1">
+                        <h2 className="text-2xl font-bold tracking-tight">Dashboard Ejecutivo</h2>
+                        <p className="text-muted-foreground">
+                            Vista general de los indicadores clave de la operación.
+                        </p>
+                    </div>
+                    <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                        <div className="w-full sm:w-auto sm:min-w-[200px]">
+                            <Label htmlFor="date-range-picker">Filtrar por Fecha</Label>
+                                <Popover>
+                                <PopoverTrigger asChild>
+                                <Button
+                                    id="date-range-picker"
+                                    variant={"outline"}
+                                    className={cn(
+                                    "w-full justify-start text-left font-normal",
+                                    !dateRange && "text-muted-foreground"
+                                    )}
+                                >
+                                    <CalendarIcon className="mr-2 h-4 w-4" />
+                                    {dateRange?.from ? (
+                                    dateRange.to ? (
+                                        <>
+                                        {format(dateRange.from, "LLL dd, y")} -{" "}
+                                        {format(dateRange.to, "LLL dd, y")}
+                                        </>
+                                    ) : (
+                                        format(dateRange.from, "LLL dd, y")
+                                    )
+                                    ) : (
+                                    <span>Seleccione un rango</span>
+                                    )}
+                                </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-auto p-0" align="end">
+                                <Calendar
+                                    initialFocus
+                                    mode="range"
+                                    defaultMonth={dateRange?.from}
+                                    selected={dateRange}
+                                    onSelect={setDateRange}
+                                    numberOfMonths={2}
+                                    showWeekNumber
+                                />
+                                </PopoverContent>
+                            </Popover>
+                        </div>
+                        {!fixedExporterId && (
+                        <div className="w-full sm:w-auto sm:min-w-[200px]">
+                            <Label htmlFor="client-filter">Filtrar por Cliente</Label>
+                            <Select
+                                value={selectedClient?.value ?? 'all'}
+                                onValueChange={(value) => {
+                                    if (value === 'all') {
+                                        setSelectedClient(null);
+                                    } else {
+                                        const client = filterOptions.find(o => o.value === value) || null;
+                                        setSelectedClient(client);
+                                    }
+                                }}
+                                disabled={loadingExporters || loadingOtherClients}
+                            >
+                                <SelectTrigger id="client-filter">
+                                    <SelectValue placeholder="Seleccione..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">Ver Todos</SelectItem>
+                                    {filterOptions.map(e => (
+                                        <SelectItem key={e.value} value={e.value}>{e.label}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        )}
+                    </div>
+                </div>
+            </CardContent>
+        </Card>
+    );
+
+    if (selectedClient?.name === 'FALL CREEK' && fallCreekData) {
+        return (
+             <div className="space-y-6">
+                {renderDashboardHeader()}
+                <FallCreekExecutiveView data={fallCreekData} clientName={selectedClient.name} />
+             </div>
+        )
+    }
 
     return (
         <div className="space-y-6">
-            <Card>
-                <CardContent className="pt-6">
-                    <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-                         <div className="flex-1">
-                            <h2 className="text-2xl font-bold tracking-tight">Dashboard Ejecutivo</h2>
-                            <p className="text-muted-foreground">
-                                Vista general de los indicadores clave de la operación.
-                            </p>
-                        </div>
-                        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-                            <div className="w-full sm:w-auto sm:min-w-[200px]">
-                                <Label htmlFor="date-range-picker">Filtrar por Fecha</Label>
-                                 <Popover>
-                                    <PopoverTrigger asChild>
-                                    <Button
-                                        id="date-range-picker"
-                                        variant={"outline"}
-                                        className={cn(
-                                        "w-full justify-start text-left font-normal",
-                                        !dateRange && "text-muted-foreground"
-                                        )}
-                                    >
-                                        <CalendarIcon className="mr-2 h-4 w-4" />
-                                        {dateRange?.from ? (
-                                        dateRange.to ? (
-                                            <>
-                                            {format(dateRange.from, "LLL dd, y")} -{" "}
-                                            {format(dateRange.to, "LLL dd, y")}
-                                            </>
-                                        ) : (
-                                            format(dateRange.from, "LLL dd, y")
-                                        )
-                                        ) : (
-                                        <span>Seleccione un rango</span>
-                                        )}
-                                    </Button>
-                                    </PopoverTrigger>
-                                    <PopoverContent className="w-auto p-0" align="end">
-                                    <Calendar
-                                        initialFocus
-                                        mode="range"
-                                        defaultMonth={dateRange?.from}
-                                        selected={dateRange}
-                                        onSelect={setDateRange}
-                                        numberOfMonths={2}
-                                        showWeekNumber
-                                    />
-                                    </PopoverContent>
-                                </Popover>
-                            </div>
-                            {!fixedExporterId && (
-                            <div className="w-full sm:w-auto sm:min-w-[200px]">
-                                <Label htmlFor="exporter-filter">Filtrar por Exportador</Label>
-                                <Select
-                                    value={selectedExporterId ?? 'all'}
-                                    onValueChange={(value) => setSelectedExporterId(value === 'all' ? null : value)}
-                                    disabled={loadingExporters}
-                                >
-                                    <SelectTrigger id="exporter-filter">
-                                        <SelectValue placeholder="Seleccione..." />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="all">Ver Todos</SelectItem>
-                                        {exporters.map(e => (
-                                            <SelectItem key={e.id} value={e.exporterId}>{e.name}</SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            )}
-                        </div>
-                    </div>
-                </CardContent>
-            </Card>
+            {renderDashboardHeader()}
 
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
                 {kpiCards.map(kpi => (
