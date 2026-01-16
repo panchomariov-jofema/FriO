@@ -39,6 +39,7 @@ const storeSchema = z.object({
   chamberId: z.string({ required_error: 'Debe seleccionar una cámara.' }),
   coordinate: z.string({ required_error: 'Debe seleccionar una coordenada de inicio.' }),
   quantity: z.coerce.number().positive("La cantidad debe ser mayor a 0"),
+  storageType: z.enum(['secuencial', 'pareado'], { required_error: 'Debe seleccionar un tipo de almacenamiento.' }),
 });
 type StoreFormValues = z.infer<typeof storeSchema>;
 
@@ -61,6 +62,7 @@ function StorageForm({ item, onCancel, allReceptions, allChamberLots }: { item: 
             chamberId: undefined, 
             coordinate: undefined, 
             quantity: item.unit === 'Pallets' ? 1 : 6, 
+            storageType: 'secuencial',
         },
     });
 
@@ -146,15 +148,43 @@ function StorageForm({ item, onCancel, allReceptions, allChamberLots }: { item: 
             }
         }
         
+        const chamberConfig = chambersConfig[values.chamberId];
+        if (!chamberConfig) return;
+
+        let coordsToIterate: string[] = [];
+
+        if (values.storageType === 'pareado') {
+            const generatedPairedCoords: string[] = [];
+            for (let i = 0; i < chamberConfig.columns.length; i += 2) {
+                if (chamberConfig.columns[i + 1]) {
+                    for (const row of chamberConfig.rows) {
+                        generatedPairedCoords.push(`${chamberConfig.columns[i]}${row}`);
+                        generatedPairedCoords.push(`${chamberConfig.columns[i + 1]}${row}`);
+                    }
+                }
+            }
+            
+            const filteredAndOrdered = generatedPairedCoords.filter(c => availableCoordinates.includes(c));
+            
+            const startIndex = filteredAndOrdered.indexOf(values.coordinate);
+            if (startIndex === -1) {
+                toast({ variant: 'destructive', title: 'Error de Coordenada', description: 'La coordenada de inicio seleccionada no está disponible en el orden pareado. Por favor, elija otra.' });
+                return;
+            }
+            coordsToIterate = filteredAndOrdered.slice(startIndex);
+
+        } else { // 'secuencial'
+            const startIndex = availableCoordinates.indexOf(values.coordinate);
+            if (startIndex === -1) {
+                toast({ variant: 'destructive', title: 'Error', description: 'La coordenada de inicio no está disponible.' });
+                return;
+            }
+            coordsToIterate = availableCoordinates.slice(startIndex);
+        }
+        
         const maxCapacity = item.unit === 'Bins' ? 6 : 2;
         let pendingToStore = item.quantity;
         
-        const startIndex = availableCoordinates.indexOf(values.coordinate);
-        if (startIndex === -1) {
-            toast({ variant: 'destructive', title: 'Error', description: 'La coordenada de inicio no está disponible.' });
-            return;
-        }
-
         const batch = writeBatch(firestore);
         const receptionDocRef = doc(firestore, 'otherFruitReceptions', item.receptionId);
         const originalReception = allReceptions.find(r => r.id === item.receptionId);
@@ -164,8 +194,8 @@ function StorageForm({ item, onCancel, allReceptions, allChamberLots }: { item: 
 
 
         try {
-            for (let i = startIndex; i < availableCoordinates.length && pendingToStore > 0; i++) {
-                const currentCoord = availableCoordinates[i];
+            for (let i = 0; i < coordsToIterate.length && pendingToStore > 0; i++) {
+                const currentCoord = coordsToIterate[i];
                 const occupancy = occupancyMap.get(currentCoord) || { bins: 0, pallets: 0 };
                 const currentStockInCoord = item.unit === 'Bins' ? occupancy.bins : occupancy.pallets;
                 const spaceAvailable = maxCapacity - currentStockInCoord;
@@ -193,11 +223,11 @@ function StorageForm({ item, onCancel, allReceptions, allChamberLots }: { item: 
             }
 
             if (pendingToStore > 0) {
-                 toast({ variant: 'destructive', title: 'Espacio Insuficiente', description: `Solo se pudieron almacenar ${item.quantity - pendingToStore} de ${item.quantity}. No hay suficientes coordenadas libres.` });
+                 toast({ variant: 'destructive', title: 'Espacio Insuficiente', description: `Solo se pudieron almacenar ${item.quantity - pendingToStore} de ${item.quantity}. No hay suficientes coordenadas libres en la secuencia.` });
             }
 
             if (pendingToStore < item.quantity) { // If at least one item was stored
-                originalItemToUpdate.quantity = pendingToStore; // Update remaining quantity on original item
+                originalItemToUpdate.quantity = pendingToStore;
                 
                  if (pendingToStore === 0) {
                     // if all was stored, we can remove the original pending item
@@ -217,7 +247,7 @@ function StorageForm({ item, onCancel, allReceptions, allChamberLots }: { item: 
                 toast({ title: 'Éxito', description: `${item.quantity - pendingToStore} ${item.unit} almacenados automáticamente.` });
                 onCancel();
             } else {
-                 toast({ variant: 'destructive', title: 'Sin espacio', description: 'No se pudo almacenar ningún item. Verifique la disponibilidad.' });
+                 toast({ variant: 'destructive', title: 'Sin espacio', description: 'No se pudo almacenar ningún item. Verifique la disponibilidad y la secuencia.' });
             }
 
         } catch(error) {
@@ -234,7 +264,7 @@ function StorageForm({ item, onCancel, allReceptions, allChamberLots }: { item: 
                     <h4 className="font-semibold mb-4">Almacenamiento Automático: {item.quantity} {item.unit} de {item.productName}</h4>
                      <Form {...form}>
                         <form onSubmit={form.handleSubmit(handleStoreConfirm)} className="space-y-4">
-                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
                                 <FormField control={form.control} name="chamberId" render={({ field }) => (
                                     <FormItem>
                                         <FormLabel>Cámara</FormLabel>
@@ -271,6 +301,19 @@ function StorageForm({ item, onCancel, allReceptions, allChamberLots }: { item: 
                                             inputMode="numeric"
                                           />
                                         </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}/>
+                                <FormField control={form.control} name="storageType" render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Tipo Almacenamiento</FormLabel>
+                                        <Select onValueChange={field.onChange} value={field.value}>
+                                            <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
+                                            <SelectContent>
+                                                <SelectItem value="secuencial">Secuencial</SelectItem>
+                                                <SelectItem value="pareado">Pareado</SelectItem>
+                                            </SelectContent>
+                                        </Select>
                                         <FormMessage />
                                     </FormItem>
                                 )}/>
