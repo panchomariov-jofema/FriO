@@ -11,103 +11,131 @@ import { addDoc, collection, doc, writeBatch, serverTimestamp } from 'firebase/f
 import { useToast } from '@/hooks/use-toast';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
-import { Search, PackageX } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
 import { Skeleton } from '../ui/skeleton';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '../ui/accordion';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+import { Label } from '../ui/label';
+import { Checkbox } from '../ui/checkbox';
 
-// --- Component for Lot-specific Search ---
-function SearchByLot() {
+interface SelectedItem {
+  receptionId: string;
+  itemIndex: number;
+  productName: string;
+  productCode: string;
+  quantity: number;
+  unit: 'Bins' | 'Pallets';
+  clientLotId?: string;
+  coordinate: string;
+}
+
+interface AggregatedLot {
+  displayLotId: string;
+  unit: 'Bins' | 'Pallets';
+  totalQuantity: number;
+  locations: {
+    receptionId: string;
+    itemIndex: number;
+    coordinate: string;
+    quantity: number;
+    productName: string;
+    productCode: string;
+    clientLotId?: string;
+  }[];
+}
+
+export function OtherFruitExitTab() {
+  const { data: allClients, loading: loadingClients } = useFirestoreCollection<OtherClient>('otherClients');
   const { data: allReceptions, loading: loadingReceptions } = useFirestoreCollection<OtherFruitReception>('otherFruitReceptions');
   const firestore = useFirestore();
   const { toast } = useToast();
 
-  const [searchLotId, setSearchLotId] = React.useState('');
-  const [isSearching, setIsSearching] = React.useState(false);
+  const [selectedClientId, setSelectedClientId] = React.useState('');
+  const [document, setDocument] = React.useState('');
+  const [selectedItems, setSelectedItems] = React.useState<Record<string, SelectedItem>>({});
   const [isDispatching, setIsDispatching] = React.useState(false);
-  const [searchResults, setSearchResults] = React.useState<any[]>([]);
-  const [dispatchQuantities, setDispatchQuantities] = React.useState<Record<string, number>>({});
 
-  const handleSearch = () => {
-    setIsSearching(true);
-    setSearchResults([]);
-    setDispatchQuantities({});
+  const fruitClients = React.useMemo(() => (allClients || []).filter(c => c.type.toUpperCase() === 'FRUTA'), [allClients]);
+  const loading = loadingClients || loadingReceptions;
 
-    if (!searchLotId.trim()) {
-      toast({ title: 'Error de Búsqueda', description: 'Debe ingresar un ID de lote de cliente.', variant: 'destructive' });
-      setIsSearching(false);
-      return;
-    }
+  const aggregatedStockByLot = React.useMemo(() => {
+    if (!selectedClientId || !allReceptions) return [];
 
-    const results = (allReceptions || [])
-      .flatMap(reception =>
-        reception.items.map((item, index) => ({
-          ...item,
-          receptionId: reception.id,
-          itemIndex: index,
-          clientName: reception.clientName,
-          unit: reception.unit,
-        }))
-      )
-      .filter(item => item.clientLotId === searchLotId && item.status === 'Almacenado' && item.quantity > 0)
-      .sort((a,b) => (a.storedAt instanceof Date ? a.storedAt.getTime() : a.storedAt?.toMillis() || 0) - (b.storedAt instanceof Date ? b.storedAt.getTime() : b.storedAt?.toMillis() || 0));
+    const lotMap = new Map<string, AggregatedLot>();
 
-    setSearchResults(results);
-    setIsSearching(false);
-    
-    if (results.length === 0) {
-      toast({ title: 'Sin Resultados', description: `No se encontró stock almacenado para el lote de cliente '${searchLotId}'.` });
-    }
-  };
+    allReceptions.forEach(reception => {
+      if (reception.clientId !== selectedClientId) return;
 
-  const handleDispatchAmountChange = (itemKey: string, value: string) => {
-    const amount = parseInt(value, 10);
-    setDispatchQuantities(prev => ({
-      ...prev,
-      [itemKey]: isNaN(amount) ? 0 : amount,
-    }));
+      reception.items.forEach((item, index) => {
+        if (item.status === 'Almacenado' && item.quantity > 0 && item.storageLocation?.coordinate && reception.displayLotId) {
+          if (!lotMap.has(reception.displayLotId)) {
+            lotMap.set(reception.displayLotId, {
+              displayLotId: reception.displayLotId,
+              unit: reception.unit,
+              totalQuantity: 0,
+              locations: [],
+            });
+          }
+
+          const lot = lotMap.get(reception.displayLotId)!;
+          lot.totalQuantity += item.quantity;
+          lot.locations.push({
+            receptionId: reception.id,
+            itemIndex: index,
+            coordinate: item.storageLocation.coordinate,
+            quantity: item.quantity,
+            productName: item.productName,
+            productCode: item.productCode,
+            clientLotId: item.clientLotId,
+          });
+        }
+      });
+    });
+    return Array.from(lotMap.values()).filter(lot => lot.totalQuantity > 0);
+  }, [selectedClientId, allReceptions]);
+  
+  const handleSelect = (item: AggregatedLot['locations'][0], isSelected: boolean) => {
+    const key = `${item.receptionId}-${item.itemIndex}`;
+    setSelectedItems(prev => {
+        const newSelection = {...prev};
+        if (isSelected) {
+            newSelection[key] = {
+                receptionId: item.receptionId,
+                itemIndex: item.itemIndex,
+                productName: item.productName,
+                productCode: item.productCode,
+                quantity: item.quantity,
+                unit: aggregatedStockByLot.find(l => l.locations.some(loc => loc.receptionId === item.receptionId))?.unit || 'Bins',
+                clientLotId: item.clientLotId,
+                coordinate: item.coordinate
+            };
+        } else {
+            delete newSelection[key];
+        }
+        return newSelection;
+    });
   };
 
   const handleDispatch = async () => {
-    setIsDispatching(true);
-
-    const itemsToDispatch = searchResults.map((item) => {
-      const key = `${item.receptionId}-${item.itemIndex}`;
-      return { ...item, key, quantityToDispatch: dispatchQuantities[key] || 0 };
-    }).filter(item => item.quantityToDispatch > 0);
-
-    if (itemsToDispatch.length === 0) {
-      toast({ variant: 'destructive', title: 'Error', description: 'No ha especificado una cantidad para despachar.' });
-      setIsDispatching(false);
+     if (Object.keys(selectedItems).length === 0) {
+      toast({ variant: 'destructive', title: 'Error', description: 'Debe seleccionar al menos una ubicación para despachar.' });
+      return;
+    }
+    
+    const client = fruitClients.find(c => c.clientId === selectedClientId);
+    if (!client) {
+      toast({ variant: 'destructive', title: 'Error', description: 'Cliente no encontrado.' });
       return;
     }
 
-    for (const item of itemsToDispatch) {
-      if (item.quantityToDispatch > item.quantity) {
-        toast({
-          variant: 'destructive',
-          title: 'Error de Stock',
-          description: `La cantidad a despachar para ${item.productName} (${item.quantityToDispatch}) excede la disponible (${item.quantity}).`,
-        });
-        setIsDispatching(false);
-        return;
-      }
-    }
-    
-    const client = allReceptions.find(r => r.id === itemsToDispatch[0].receptionId);
-    if (!client) {
-         toast({ variant: 'destructive', title: 'Error', description: 'No se pudo encontrar la información del cliente.' });
-         setIsDispatching(false);
-         return;
-    }
+    setIsDispatching(true);
 
     try {
         const batch = writeBatch(firestore);
         const receptionUpdates = new Map<string, OtherFruitReceptionItem[]>();
-
-        itemsToDispatch.forEach(item => {
-            if (!receptionUpdates.has(item.receptionId)) {
+        
+        Object.values(selectedItems).forEach(item => {
+             if (!receptionUpdates.has(item.receptionId)) {
                 const originalReception = allReceptions.find(r => r.id === item.receptionId);
                 if (originalReception) {
                     receptionUpdates.set(item.receptionId, JSON.parse(JSON.stringify(originalReception.items)));
@@ -118,7 +146,7 @@ function SearchByLot() {
             if (updatedItems) {
                 const itemToUpdate = updatedItems[item.itemIndex];
                 if (itemToUpdate) {
-                    itemToUpdate.quantity -= item.quantityToDispatch;
+                    itemToUpdate.quantity = 0; // Set to 0 as we are dispatching the whole coordinate item
                 }
             }
         });
@@ -132,13 +160,13 @@ function SearchByLot() {
         batch.set(movementRef, {
             type: 'salida',
             clientId: client.clientId,
-            clientName: client.clientName,
+            clientName: client.name,
             unit: client.unit,
-            document: `LOTE_CLIENTE ${searchLotId}`,
-            items: itemsToDispatch.map(item => ({
+            document: document || `SALIDA-${Date.now()}`,
+            items: Object.values(selectedItems).map(item => ({
                 productCode: item.productCode,
                 productName: item.productName,
-                quantity: item.quantityToDispatch,
+                quantity: item.quantity,
                 clientLotId: item.clientLotId,
             })),
             createdAt: serverTimestamp(),
@@ -146,10 +174,11 @@ function SearchByLot() {
         
         await batch.commit();
         toast({ title: 'Éxito', description: 'Despacho registrado y stock actualizado.' });
-        handleSearch();
+        setSelectedItems({});
+        setDocument('');
 
     } catch (error) {
-        console.error("Error creating fruit dispatch:", error);
+         console.error("Error creating fruit dispatch:", error);
         toast({ variant: 'destructive', title: 'Error', description: 'No se pudo registrar el despacho.' });
         errorEmitter.emit('permission-error', new FirestorePermissionError({
             path: 'otherFruitMovements or otherFruitReceptions',
@@ -158,257 +187,106 @@ function SearchByLot() {
     } finally {
         setIsDispatching(false);
     }
-  };
+  }
   
-  const totalToDispatch = Object.values(dispatchQuantities).reduce((sum, qty) => sum + qty, 0);
+  const totalSelectedQuantity = React.useMemo(() => {
+    return Object.values(selectedItems).reduce((sum, item) => sum + item.quantity, 0);
+  }, [selectedItems]);
+
 
   return (
     <Card>
       <CardHeader>
-        <CardDescription>Busque un lote de cliente específico para despachar el stock asociado.</CardDescription>
+        <CardTitle>Registrar Salida de Fruta (Otros Clientes)</CardTitle>
+        <CardDescription>
+          Seleccione un cliente para ver su stock disponible. Expanda cada lote para seleccionar las coordenadas a despachar.
+        </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-6">
-        <div className="flex w-full max-w-sm items-center space-x-2">
-          <Input type="text" placeholder="ID Lote del Cliente..." value={searchLotId} onChange={(e) => setSearchLotId(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleSearch()} disabled={loadingReceptions}/>
-          <Button onClick={handleSearch} disabled={loadingReceptions || isSearching}><Search className="mr-2 h-4 w-4" />Buscar</Button>
+      <CardContent className="space-y-4">
+        <div className="grid md:grid-cols-2 gap-4">
+            <div>
+              <Label>Cliente</Label>
+              <Select value={selectedClientId} onValueChange={(val) => {setSelectedClientId(val); setSelectedItems({});}} disabled={loading}>
+                <SelectTrigger><SelectValue placeholder="Seleccione un cliente..." /></SelectTrigger>
+                <SelectContent>
+                  {fruitClients.map(c => <SelectItem key={c.id} value={c.clientId}>{c.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Documento de Salida (Opcional)</Label>
+              <Input placeholder="Ej: Vale de consumo, Guía..." value={document} onChange={(e) => setDocument(e.target.value)} disabled={!selectedClientId} />
+            </div>
         </div>
-        {(isSearching || loadingReceptions) && <div className="space-y-2"><Skeleton className="h-8 w-full" /><Skeleton className="h-8 w-full" /></div>}
-        {!isSearching && !loadingReceptions && searchResults.length > 0 && (
-          <>
-            <div className="rounded-md border"><Table><TableHeader><TableRow><TableHead>Producto</TableHead><TableHead>Ubicación</TableHead><TableHead>Disponible</TableHead><TableHead className="w-[150px]">A Despachar</TableHead></TableRow></TableHeader><TableBody>
-              {searchResults.map((item) => { const key = `${item.receptionId}-${item.itemIndex}`; return (
-                  <TableRow key={key}>
-                    <TableCell>{item.productName} ({item.productCode})</TableCell>
-                    <TableCell className="font-mono">{item.storageLocation?.chamberId} / {item.storageLocation?.coordinate}</TableCell>
-                    <TableCell>{item.quantity} {item.unit}</TableCell>
-                    <TableCell><Input type="number" min="0" max={item.quantity} value={dispatchQuantities[key] || ''} onChange={(e) => handleDispatchAmountChange(key, e.target.value)} placeholder="0" /></TableCell>
-                  </TableRow>
-              );})}
-            </TableBody></Table></div>
-            <div className="flex justify-end items-center gap-4">
-              <p className="text-sm font-medium">Total a Despachar: {totalToDispatch}</p>
-              <Button onClick={handleDispatch} disabled={isDispatching || totalToDispatch === 0}>{isDispatching ? 'Despachando...' : 'Confirmar Despacho'}</Button>
-            </div>
-          </>
-        )}
-        {searchLotId && !isSearching && !loadingReceptions && searchResults.length === 0 && (
-            <div className="flex flex-col items-center justify-center text-center p-8 border rounded-md border-dashed">
-                <PackageX className="h-12 w-12 text-muted-foreground" /><p className="mt-4 text-sm font-semibold">No se encontró stock para el lote: '{searchLotId}'</p><p className="mt-1 text-xs text-muted-foreground">Verifique el ID del lote o si el stock ya ha sido despachado.</p>
-            </div>
+
+        {selectedClientId && (
+            loadingReceptions ? <Skeleton className="h-24 w-full" />
+            : (
+            <>
+            <Accordion type="multiple" className="w-full">
+                {aggregatedStockByLot.map(lot => (
+                    <AccordionItem value={lot.displayLotId} key={lot.displayLotId}>
+                        <AccordionTrigger>
+                            <div className="flex justify-between w-full pr-4">
+                                <span className="font-mono">{lot.displayLotId}</span>
+                                <span className="font-semibold">{lot.totalQuantity} {lot.unit}</span>
+                            </div>
+                        </AccordionTrigger>
+                        <AccordionContent>
+                           <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead className="w-12"></TableHead>
+                                    <TableHead>Coordenada</TableHead>
+                                    <TableHead>Producto</TableHead>
+                                    <TableHead>Lote Cliente</TableHead>
+                                    <TableHead>Cantidad</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {lot.locations.map(loc => {
+                                    const key = `${loc.receptionId}-${loc.itemIndex}`;
+                                    return (
+                                        <TableRow key={key}>
+                                            <TableCell>
+                                                <Checkbox 
+                                                    checked={!!selectedItems[key]}
+                                                    onCheckedChange={(checked) => handleSelect(loc, !!checked)}
+                                                />
+                                            </TableCell>
+                                            <TableCell className="font-mono">{loc.coordinate}</TableCell>
+                                            <TableCell>{loc.productName}</TableCell>
+                                            <TableCell className="font-mono">{loc.clientLotId || '-'}</TableCell>
+                                            <TableCell>{loc.quantity}</TableCell>
+                                        </TableRow>
+                                    )
+                                })}
+                            </TableBody>
+                           </Table>
+                        </AccordionContent>
+                    </AccordionItem>
+                ))}
+            </Accordion>
+             {aggregatedStockByLot.length === 0 && (
+                <div className="text-center p-8 border-dashed border rounded-md text-sm text-muted-foreground">
+                    No hay stock disponible para este cliente.
+                </div>
+            )}
+
+            {Object.keys(selectedItems).length > 0 && (
+                 <div className="flex justify-between items-center pt-4">
+                    <div className="text-sm font-medium">
+                        Total seleccionado: {totalSelectedQuantity} {Object.values(selectedItems)[0].unit}
+                    </div>
+                    <Button onClick={handleDispatch} disabled={isDispatching}>
+                        {isDispatching ? "Despachando..." : "Confirmar Despacho"}
+                    </Button>
+                </div>
+            )}
+            </>
+            )
         )}
       </CardContent>
     </Card>
-  );
-}
-
-// --- Component for General Exit ---
-function GeneralExit() {
-    const { data: allClients, loading: loadingClients } = useFirestoreCollection<OtherClient>('otherClients');
-    const { data: allReceptions, loading: loadingReceptions } = useFirestoreCollection<OtherFruitReception>('otherFruitReceptions');
-    const firestore = useFirestore();
-    const { toast } = useToast();
-    const [selectedClientId, setSelectedClientId] = React.useState('');
-    const [document, setDocument] = React.useState('');
-    const [quantitiesToDispatch, setQuantitiesToDispatch] = React.useState<Record<string, number>>({});
-    const [isDispatching, setIsDispatching] = React.useState(false);
-
-    const fruitClients = React.useMemo(() => (allClients || []).filter(c => c.type.toUpperCase() === 'FRUTA'), [allClients]);
-
-    const aggregatedStock = React.useMemo(() => {
-        if (!selectedClientId) return [];
-
-        const stockMap = new Map<string, { productName: string; unit: 'Bins' | 'Pallets'; totalQuantity: number; locations: { receptionId: string; itemIndex: number; storedAt: any; quantity: number }[] }>();
-
-        (allReceptions || []).forEach(reception => {
-            if (reception.clientId !== selectedClientId) return;
-
-            reception.items.forEach((item, index) => {
-                if (item.status === 'Almacenado' && item.quantity > 0) {
-                    if (!stockMap.has(item.productCode)) {
-                        stockMap.set(item.productCode, {
-                            productName: item.productName,
-                            unit: reception.unit,
-                            totalQuantity: 0,
-                            locations: []
-                        });
-                    }
-                    const product = stockMap.get(item.productCode)!;
-                    product.totalQuantity += item.quantity;
-                    product.locations.push({
-                        receptionId: reception.id,
-                        itemIndex: index,
-                        storedAt: item.storedAt,
-                        quantity: item.quantity
-                    });
-                }
-            });
-        });
-
-        stockMap.forEach(product => {
-            product.locations.sort((a, b) => (a.storedAt?.toMillis() || 0) - (b.storedAt?.toMillis() || 0)); // FIFO
-        });
-
-        return Array.from(stockMap.entries()).map(([productCode, data]) => ({ productCode, ...data }));
-    }, [selectedClientId, allReceptions]);
-
-    const handleQuantityChange = (productCode: string, value: string) => {
-        const amount = parseInt(value, 10);
-        setQuantitiesToDispatch(prev => ({
-            ...prev,
-            [productCode]: isNaN(amount) ? 0 : amount,
-        }));
-    };
-
-    const handleGeneralDispatch = async () => {
-        setIsDispatching(true);
-
-        const itemsToDispatch = Object.entries(quantitiesToDispatch).map(([productCode, quantity]) => ({ productCode, quantity })).filter(item => item.quantity > 0);
-        if (itemsToDispatch.length === 0) {
-            toast({ variant: 'destructive', title: 'Error', description: 'Debe ingresar una cantidad para al menos un producto.' });
-            setIsDispatching(false);
-            return;
-        }
-
-        const client = fruitClients.find(c => c.clientId === selectedClientId);
-        if (!client) {
-            toast({ variant: 'destructive', title: 'Error', description: 'Cliente no encontrado.' });
-            setIsDispatching(false);
-            return;
-        }
-
-        try {
-            const batch = writeBatch(firestore);
-            const receptionUpdates = new Map<string, OtherFruitReceptionItem[]>();
-            const movementItems = [];
-
-            for (const item of itemsToDispatch) {
-                const stock = aggregatedStock.find(s => s.productCode === item.productCode);
-                if (!stock || item.quantity > stock.totalQuantity) {
-                    throw new Error(`Stock insuficiente para ${stock?.productName || item.productCode}.`);
-                }
-
-                let needed = item.quantity;
-                movementItems.push({ productCode: item.productCode, productName: stock.productName, quantity: item.quantity });
-
-                for (const location of stock.locations) {
-                    if (needed === 0) break;
-
-                    if (!receptionUpdates.has(location.receptionId)) {
-                        const originalReception = allReceptions.find(r => r.id === location.receptionId);
-                        if (originalReception) {
-                            receptionUpdates.set(location.receptionId, JSON.parse(JSON.stringify(originalReception.items)));
-                        }
-                    }
-
-                    const updatedItems = receptionUpdates.get(location.receptionId);
-                    if (updatedItems) {
-                        const itemToUpdate = updatedItems[location.itemIndex];
-                        if (itemToUpdate) {
-                            const canTake = Math.min(needed, itemToUpdate.quantity);
-                            itemToUpdate.quantity -= canTake;
-                            needed -= canTake;
-                        }
-                    }
-                }
-            }
-
-            receptionUpdates.forEach((items, receptionId) => {
-                const receptionRef = doc(firestore, 'otherFruitReceptions', receptionId);
-                batch.update(receptionRef, { items, updatedAt: serverTimestamp() });
-            });
-
-            const movementRef = doc(collection(firestore, 'otherFruitMovements'));
-            batch.set(movementRef, {
-                type: 'salida',
-                clientId: client.clientId,
-                clientName: client.name,
-                unit: client.unit,
-                document: document || `SALIDA-${Date.now()}`,
-                items: movementItems,
-                createdAt: serverTimestamp(),
-            });
-
-            await batch.commit();
-            toast({ title: 'Éxito', description: 'Salida general registrada y stock actualizado.' });
-            setQuantitiesToDispatch({});
-            setDocument('');
-
-        } catch (error: any) {
-            console.error("Error creating general fruit dispatch:", error);
-            toast({ variant: 'destructive', title: 'Error', description: error.message || 'No se pudo registrar la salida.' });
-            errorEmitter.emit('permission-error', new FirestorePermissionError({
-                path: 'otherFruitMovements or otherFruitReceptions',
-                operation: 'write'
-            }));
-        } finally {
-            setIsDispatching(false);
-        }
-    };
-    
-    const loading = loadingClients || loadingReceptions;
-
-    return (
-        <Card>
-            <CardHeader>
-                <CardTitle>Registrar Salida General</CardTitle>
-                <CardDescription>Seleccione un cliente y las cantidades de productos a despachar. El sistema usará el stock más antiguo (FIFO).</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-                <div className="grid md:grid-cols-2 gap-4">
-                    <Select value={selectedClientId} onValueChange={setSelectedClientId} disabled={loading}>
-                        <SelectTrigger><SelectValue placeholder="Seleccione un cliente..." /></SelectTrigger>
-                        <SelectContent>
-                            {fruitClients.map(c => <SelectItem key={c.id} value={c.clientId}>{c.name}</SelectItem>)}
-                        </SelectContent>
-                    </Select>
-                    <Input placeholder="Documento de Salida (Opcional)" value={document} onChange={(e) => setDocument(e.target.value)} disabled={!selectedClientId} />
-                </div>
-
-                {selectedClientId && (
-                    <>
-                    <div className="rounded-md border">
-                        <Table>
-                            <TableHeader><TableRow><TableHead>Producto</TableHead><TableHead>Disponible</TableHead><TableHead className="w-[150px]">A Despachar</TableHead></TableRow></TableHeader>
-                            <TableBody>
-                                {loadingReceptions ? <TableRow><TableCell colSpan={3}><Skeleton className="h-8" /></TableCell></TableRow>
-                                : aggregatedStock.length > 0 ? aggregatedStock.map(stock => (
-                                    <TableRow key={stock.productCode}>
-                                        <TableCell>{stock.productName} ({stock.productCode})</TableCell>
-                                        <TableCell>{stock.totalQuantity} {stock.unit}</TableCell>
-                                        <TableCell><Input type="number" placeholder="0" min="0" max={stock.totalQuantity} value={quantitiesToDispatch[stock.productCode] || ''} onChange={(e) => handleQuantityChange(stock.productCode, e.target.value)} /></TableCell>
-                                    </TableRow>
-                                ))
-                                : <TableRow><TableCell colSpan={3} className="text-center h-24">No hay stock para este cliente.</TableCell></TableRow>
-                                }
-                            </TableBody>
-                        </Table>
-                    </div>
-                    <div className="flex justify-end">
-                        <Button onClick={handleGeneralDispatch} disabled={isDispatching || Object.values(quantitiesToDispatch).every(q => q === 0)}>
-                            {isDispatching ? "Despachando..." : "Confirmar Salida General"}
-                        </Button>
-                    </div>
-                    </>
-                )}
-            </CardContent>
-        </Card>
-    );
-}
-
-export function OtherFruitExitTab() {
-  return (
-    <div className="space-y-6">
-        <GeneralExit />
-        <Accordion type="single" collapsible className="w-full">
-            <AccordionItem value="item-1">
-                <AccordionTrigger>
-                    <h3 className="text-lg font-medium">Salida por Lote de Cliente Específico</h3>
-                </AccordionTrigger>
-                <AccordionContent>
-                    <SearchByLot />
-                </AccordionContent>
-            </AccordionItem>
-        </Accordion>
-    </div>
   );
 }
