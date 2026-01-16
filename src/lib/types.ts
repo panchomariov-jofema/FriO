@@ -237,6 +237,7 @@ export interface Dispatch {
 }
 
 export interface OtherFruitReceptionItem {
+    clientLotId?: string;
     productCode: string;
     productName: string;
     quantity: number;
@@ -272,6 +273,7 @@ export interface OtherFruitMovement {
     productCode: string;
     productName: string;
     quantity: number;
+    clientLotId?: string;
   }[];
   createdAt: Timestamp;
 }

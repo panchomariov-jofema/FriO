@@ -142,6 +142,7 @@ export const receptionLotSchema = z.object({
 });
 
 export const otherFruitReceptionItemSchema = z.object({
+    clientLotId: z.string().optional(),
     productCode: z.string().min(1, "El código es obligatorio."),
     productName: z.string().min(1, "El nombre es obligatorio."),
     quantity: z.coerce.number().min(1, "La cantidad debe ser al menos 1."),

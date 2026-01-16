@@ -24,6 +24,7 @@ import { usePackagingMastersByClient } from '@/hooks/usePackagingMastersByClient
 type ReceptionFormValues = z.infer<typeof otherFruitReceptionSchema>;
 
 const defaultItem = {
+  clientLotId: '',
   productCode: '',
   productName: '',
   quantity: 1,
@@ -173,7 +174,20 @@ export function OtherFruitReceptionTab() {
               <FormLabel>Ítems Recibidos</FormLabel>
               {fields.map((field, index) => (
                 <div key={field.id} className="flex items-end gap-2 p-3 border rounded-md">
-                  <div className="flex-1 grid sm:grid-cols-3 gap-4 items-end">
+                  <div className="flex-1 grid sm:grid-cols-4 gap-4 items-end">
+                    <FormField
+                      control={form.control}
+                      name={`items.${index}.clientLotId`}
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Lote Cliente (Opcional)</FormLabel>
+                          <FormControl>
+                            <Input {...field} value={field.value ?? ''} autoComplete="off" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
                     <FormField
                       control={form.control}
                       name={`items.${index}.productCode`}
