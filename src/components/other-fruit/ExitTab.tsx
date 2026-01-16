@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
-import type { OtherClient, OtherFruitReception, OtherFruitReceptionItem } from '@/lib/types';
+import type { OtherClient, OtherFruitReception, OtherFruitReceptionItem, OtherFruitMovement } from '@/lib/types';
 import { useFirestore } from '@/firebase';
 import { addDoc, collection, doc, writeBatch, serverTimestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
@@ -56,6 +56,8 @@ export function OtherFruitExitTab() {
 
     allReceptions.forEach(reception => {
       if (reception.clientId !== selectedClientId) return;
+
+      if (!reception.displayLotId) return;
 
       reception.items.forEach((item, index) => {
         if (item.status === 'Almacenado' && item.quantity > 0 && item.storageLocation?.coordinate && reception.displayLotId) {
@@ -170,12 +172,23 @@ export function OtherFruitExitTab() {
             if (itemToUpdate && itemToUpdate.quantity >= quantityToDispatch) {
                 itemToUpdate.quantity -= quantityToDispatch;
                 
-                movementItems.push({
+                const newItemForMovement: {
+                    productCode: string;
+                    productName: string;
+                    quantity: number;
+                    clientLotId?: string;
+                } = {
                     productCode: itemToUpdate.productCode,
                     productName: itemToUpdate.productName,
                     quantity: quantityToDispatch,
-                    clientLotId: itemToUpdate.clientLotId,
-                });
+                };
+
+                if (typeof itemToUpdate.clientLotId !== 'undefined') {
+                    newItemForMovement.clientLotId = itemToUpdate.clientLotId;
+                }
+                
+                movementItems.push(newItemForMovement);
+
             }
         }
 
