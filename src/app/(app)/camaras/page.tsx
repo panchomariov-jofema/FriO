@@ -102,6 +102,7 @@ export default function CamarasPage() {
             id: lot.id,
             type: 'producerLot' as const,
             displayId: lot.displayLotId,
+            lotIdForColor: lot.displayLotId,
             ownerName: lot.producerShortName,
             varietyOrProduct: lot.variety,
             quantity: lot.binCount,
@@ -119,6 +120,7 @@ export default function CamarasPage() {
                 id: `${reception.id}-${index}`,
                 type: 'otherFruit' as const,
                 displayId: item.productCode,
+                lotIdForColor: reception.displayLotId || reception.id,
                 ownerName: reception.clientName,
                 varietyOrProduct: item.productName,
                 quantity: item.quantity,
@@ -535,7 +537,7 @@ export default function CamarasPage() {
                                     )
                                   }
                                   
-                                  const lotColor = firstItem ? getColorForLot(firstItem.displayId) : 'transparent';
+                                  const lotColor = firstItem ? getColorForLot(`${firstItem.type}-${firstItem.lotIdForColor}`) : 'transparent';
                                   const cellStyle = { 
                                       '--lot-color': lotColor,
                                       '--lot-color-border': lotColor.replace(')', ', 0.5)'),

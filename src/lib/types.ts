@@ -283,6 +283,7 @@ export type StoredItem = {
   id: string;
   type: 'producerLot' | 'otherFruit'; // Differentiator
   displayId: string; // e.g., displayLotId or productName
+  lotIdForColor: string; // ID used for grouping and coloring
   ownerName: string; // e.g., producerShortName or clientName
   varietyOrProduct: string;
   quantity: number;
