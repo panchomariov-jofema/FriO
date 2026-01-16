@@ -61,7 +61,7 @@ function StorageForm({ item, onCancel, allReceptions, allChamberLots }: { item: 
         defaultValues: { 
             chamberId: undefined, 
             coordinate: undefined, 
-            quantity: item.unit === 'Pallets' ? 1 : 6, 
+            quantity: item.unit === 'Pallets' ? 1 : 9, 
             storageType: 'secuencial',
         },
     });
@@ -117,7 +117,7 @@ function StorageForm({ item, onCancel, allReceptions, allChamberLots }: { item: 
 
             // Rules for what can be placed where
             if (item.unit === 'Bins') {
-                return occupied.pallets === 0 && occupied.bins < 6; // Can add bins if no pallets and space available
+                return occupied.pallets === 0 && occupied.bins < 9; // Can add bins if no pallets and space available
             }
             if (item.unit === 'Pallets') {
                 return occupied.bins === 0 && occupied.pallets < 2; // Can add pallets if no bins and space available
@@ -142,8 +142,8 @@ function StorageForm({ item, onCancel, allReceptions, allChamberLots }: { item: 
                 return;
             }
         } else { // Bins
-             if (quantityPerCoord < 1 || quantityPerCoord > 6) {
-                form.setError('quantity', { message: `Para bins, la cantidad debe ser entre 1 y 6.` });
+             if (quantityPerCoord < 1 || quantityPerCoord > 9) {
+                form.setError('quantity', { message: `Para bins, la cantidad debe ser entre 1 y 9.` });
                 return;
             }
         }
@@ -182,7 +182,7 @@ function StorageForm({ item, onCancel, allReceptions, allChamberLots }: { item: 
             coordsToIterate = availableCoordinates.slice(startIndex);
         }
         
-        const maxCapacity = item.unit === 'Bins' ? 6 : 2;
+        const maxCapacity = item.unit === 'Bins' ? 9 : 2;
         let pendingToStore = item.quantity;
         
         const batch = writeBatch(firestore);
