@@ -58,6 +58,7 @@ export default function OtherFruitKardexReportPage() {
                         type: 'entrada',
                         clientName: reception.clientName,
                         document: reception.document,
+                        clientLotId: item.clientLotId,
                         productCode: item.productCode,
                         productName: item.productName,
                         quantity: item.quantity,
@@ -76,6 +77,7 @@ export default function OtherFruitKardexReportPage() {
                         type: 'salida',
                         clientName: movement.clientName,
                         document: movement.document,
+                        clientLotId: item.clientLotId,
                         productCode: item.productCode,
                         productName: item.productName,
                         quantity: -item.quantity,
@@ -109,11 +111,12 @@ export default function OtherFruitKardexReportPage() {
             "Tipo": item.type,
             "Cliente": item.clientName,
             "Documento": item.document,
+            "Lote Cliente": item.clientLotId || '',
             "Codigo Producto": item.productCode,
             "Nombre Producto": item.productName,
             "Cantidad": item.quantity,
         }));
-        const headers = ["Fecha", "Tipo", "Cliente", "Documento", "Codigo Producto", "Nombre Producto", "Cantidad"];
+        const headers = ["Fecha", "Tipo", "Cliente", "Documento", "Lote Cliente", "Codigo Producto", "Nombre Producto", "Cantidad"];
         const csv = convertToCSV(dataToExport, headers);
         downloadCSV(csv, 'kardex_fruta_otros_clientes.csv');
     };
@@ -153,6 +156,7 @@ export default function OtherFruitKardexReportPage() {
                                     <TableHead>Tipo</TableHead>
                                     <TableHead>Cliente</TableHead>
                                     <TableHead>Documento</TableHead>
+                                    <TableHead>Lote Cliente</TableHead>
                                     <TableHead>Cód. Prod.</TableHead>
                                     <TableHead>Producto</TableHead>
                                     <TableHead>Cantidad</TableHead>
@@ -160,7 +164,7 @@ export default function OtherFruitKardexReportPage() {
                             </TableHeader>
                             <TableBody>
                                 {loading ? (
-                                    Array.from({ length: 5 }).map((_, i) => <TableRow key={i}><TableCell colSpan={7}><Skeleton className="h-4 w-full" /></TableCell></TableRow>)
+                                    Array.from({ length: 5 }).map((_, i) => <TableRow key={i}><TableCell colSpan={8}><Skeleton className="h-4 w-full" /></TableCell></TableRow>)
                                 ) : filteredData.length > 0 ? (
                                     filteredData.map((item) => (
                                     <TableRow key={item.key}>
@@ -172,6 +176,7 @@ export default function OtherFruitKardexReportPage() {
                                         </TableCell>
                                         <TableCell>{item.clientName}</TableCell>
                                         <TableCell>{item.document}</TableCell>
+                                        <TableCell className="font-mono">{item.clientLotId || '-'}</TableCell>
                                         <TableCell>{item.productCode}</TableCell>
                                         <TableCell>{item.productName}</TableCell>
                                         <TableCell className={item.quantity > 0 ? 'text-green-600' : 'text-red-600'}>
@@ -180,7 +185,7 @@ export default function OtherFruitKardexReportPage() {
                                     </TableRow>
                                     ))
                                 ) : (
-                                    <TableRow><TableCell colSpan={7} className="h-24 text-center">No hay movimientos para los filtros seleccionados.</TableCell></TableRow>
+                                    <TableRow><TableCell colSpan={8} className="h-24 text-center">No hay movimientos para los filtros seleccionados.</TableCell></TableRow>
                                 )}
                             </TableBody>
                         </Table>
