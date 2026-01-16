@@ -116,6 +116,30 @@ export function OtherFruitExitTab() {
     });
   };
 
+  const handleSelectAllForLot = (lot: AggregatedLot, isSelected: boolean) => {
+    setSelectedItems(prev => {
+        const newSelection = { ...prev };
+        lot.locations.forEach(loc => {
+            const key = `${loc.receptionId}-${loc.itemIndex}`;
+            if (isSelected) {
+                newSelection[key] = {
+                    receptionId: loc.receptionId,
+                    itemIndex: loc.itemIndex,
+                    productName: loc.productName,
+                    productCode: loc.productCode,
+                    quantity: loc.quantity,
+                    unit: lot.unit,
+                    clientLotId: loc.clientLotId,
+                    coordinate: loc.coordinate
+                };
+            } else {
+                delete newSelection[key];
+            }
+        });
+        return newSelection;
+    });
+  };
+
   const handleDispatch = async () => {
      if (Object.keys(selectedItems).length === 0) {
       toast({ variant: 'destructive', title: 'Error', description: 'Debe seleccionar al menos una ubicación para despachar.' });
@@ -224,48 +248,59 @@ export function OtherFruitExitTab() {
             : (
             <>
             <Accordion type="multiple" className="w-full">
-                {aggregatedStockByLot.map(lot => (
-                    <AccordionItem value={lot.displayLotId} key={lot.displayLotId}>
-                        <AccordionTrigger>
-                            <div className="flex justify-between w-full pr-4">
-                                <span className="font-mono">{lot.displayLotId}</span>
-                                <span className="font-semibold">{lot.totalQuantity} {lot.unit}</span>
-                            </div>
-                        </AccordionTrigger>
-                        <AccordionContent>
-                           <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead className="w-12"></TableHead>
-                                    <TableHead>Coordenada</TableHead>
-                                    <TableHead>Producto</TableHead>
-                                    <TableHead>Lote Cliente</TableHead>
-                                    <TableHead>Cantidad</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {lot.locations.map(loc => {
-                                    const key = `${loc.receptionId}-${loc.itemIndex}`;
-                                    return (
-                                        <TableRow key={key}>
-                                            <TableCell>
-                                                <Checkbox 
-                                                    checked={!!selectedItems[key]}
-                                                    onCheckedChange={(checked) => handleSelect(loc, !!checked)}
-                                                />
-                                            </TableCell>
-                                            <TableCell className="font-mono">{loc.coordinate}</TableCell>
-                                            <TableCell>{loc.productName}</TableCell>
-                                            <TableCell className="font-mono">{loc.clientLotId || '-'}</TableCell>
-                                            <TableCell>{loc.quantity}</TableCell>
-                                        </TableRow>
-                                    )
-                                })}
-                            </TableBody>
-                           </Table>
-                        </AccordionContent>
-                    </AccordionItem>
-                ))}
+                {aggregatedStockByLot.map(lot => {
+                    const isAllSelectedForLot = lot.locations.length > 0 && lot.locations.every(loc => selectedItems[`${loc.receptionId}-${loc.itemIndex}`]);
+                    const isSomeSelectedForLot = lot.locations.some(loc => selectedItems[`${loc.receptionId}-${loc.itemIndex}`]);
+
+                    return (
+                        <AccordionItem value={lot.displayLotId} key={lot.displayLotId}>
+                            <AccordionTrigger>
+                                <div className="flex justify-between w-full pr-4">
+                                    <span className="font-mono">{lot.displayLotId}</span>
+                                    <span className="font-semibold">{lot.totalQuantity} {lot.unit}</span>
+                                </div>
+                            </AccordionTrigger>
+                            <AccordionContent>
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead className="w-12">
+                                            <Checkbox
+                                                checked={isAllSelectedForLot ? true : isSomeSelectedForLot ? 'indeterminate' : false}
+                                                onCheckedChange={(checked) => handleSelectAllForLot(lot, !!checked)}
+                                                aria-label="Seleccionar todo en este lote"
+                                            />
+                                        </TableHead>
+                                        <TableHead>Coordenada</TableHead>
+                                        <TableHead>Producto</TableHead>
+                                        <TableHead>Lote Cliente</TableHead>
+                                        <TableHead>Cantidad</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {lot.locations.map(loc => {
+                                        const key = `${loc.receptionId}-${loc.itemIndex}`;
+                                        return (
+                                            <TableRow key={key}>
+                                                <TableCell>
+                                                    <Checkbox 
+                                                        checked={!!selectedItems[key]}
+                                                        onCheckedChange={(checked) => handleSelect(loc, !!checked)}
+                                                    />
+                                                </TableCell>
+                                                <TableCell className="font-mono">{loc.coordinate}</TableCell>
+                                                <TableCell>{loc.productName}</TableCell>
+                                                <TableCell className="font-mono">{loc.clientLotId || '-'}</TableCell>
+                                                <TableCell>{loc.quantity}</TableCell>
+                                            </TableRow>
+                                        )
+                                    })}
+                                </TableBody>
+                            </Table>
+                            </AccordionContent>
+                        </AccordionItem>
+                    );
+                })}
             </Accordion>
              {aggregatedStockByLot.length === 0 && (
                 <div className="text-center p-8 border-dashed border rounded-md text-sm text-muted-foreground">
