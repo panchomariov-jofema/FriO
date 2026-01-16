@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { DateRange } from "react-day-picker"
 import { addDays, format } from "date-fns"
-import { Calendar as CalendarIcon, ChevronsRight } from "lucide-react"
+import { Calendar as CalendarIcon, ChevronsRight, Download } from "lucide-react"
 import {
   Card,
   CardContent,
@@ -41,13 +41,67 @@ const CHART_COLORS = [
   "hsl(var(--chart-5))",
 ];
 
+
+// Helper to convert array of objects to CSV
+function convertToCSV(data: any[], headers: {key: string, label: string}[]) {
+    const headerRow = headers.map(h => h.label).join(';');
+    const rows = data.map(row => 
+        headers.map(header => {
+            let value = row[header.key];
+             if (value instanceof Date) {
+                value = value.toLocaleString();
+            } else if (typeof value === 'object' && value !== null && value?.toDate) {
+                value = value.toDate().toLocaleString();
+            }
+            const stringValue = String(value ?? '');
+            return `"${stringValue.replace(/"/g, '""')}"`;
+        }).join(';')
+    );
+    return [headerRow, ...rows].join('\n');
+}
+
+function downloadCSV(csvString: string, filename: string) {
+    const blob = new Blob([`\uFEFF${csvString}`], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    if (link.download !== undefined) {
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        link.setAttribute('download', filename);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+}
+
+
 function FallCreekExecutiveView({ data, clientName }: { data: any[], clientName: string }) {
+    const handleExport = () => {
+        const headers = [
+            { key: 'clientLotId', label: 'Lote Cliente' },
+            { key: 'productName', label: 'Producto' },
+            { key: 'totalQuantity', label: 'Cantidad Total' },
+            { key: 'unit', label: 'Unidad' },
+            { key: 'locations', label: 'Ubicaciones' },
+        ];
+        
+        const dataToExport = data.map(lot => ({
+            ...lot,
+            locations: lot.locations.map((loc: any) => `${loc.coordinate}: ${loc.quantity}`).join(' | ')
+        }));
+
+        const csv = convertToCSV(dataToExport, headers);
+        downloadCSV(csv, `resumen_fall_creek_${new Date().toISOString().split('T')[0]}.csv`);
+    };
+
     if (data.length === 0) {
         return (
              <Card>
-                <CardHeader>
-                    <CardTitle>Resumen Ejecutivo: {clientName}</CardTitle>
-                    <CardDescription>Resumen de lotes de cliente almacenados en cámara.</CardDescription>
+                <CardHeader className="flex flex-row items-start justify-between">
+                    <div>
+                        <CardTitle>Resumen Ejecutivo: {clientName}</CardTitle>
+                        <CardDescription>Resumen de lotes de cliente almacenados en cámara.</CardDescription>
+                    </div>
                 </CardHeader>
                 <CardContent className="h-48 flex items-center justify-center">
                     <p className="text-muted-foreground">No se encontraron lotes de cliente almacenados para {clientName}.</p>
@@ -59,9 +113,15 @@ function FallCreekExecutiveView({ data, clientName }: { data: any[], clientName:
     return (
         <div className="space-y-6">
             <Card>
-                <CardHeader>
-                    <CardTitle>Resumen Ejecutivo: {clientName}</CardTitle>
-                    <CardDescription>Resumen de lotes de cliente almacenados en cámara.</CardDescription>
+                <CardHeader className="flex flex-row items-start justify-between">
+                    <div>
+                        <CardTitle>Resumen Ejecutivo: {clientName}</CardTitle>
+                        <CardDescription>Resumen de lotes de cliente almacenados en cámara.</CardDescription>
+                    </div>
+                     <Button onClick={handleExport} variant="outline" size="sm" disabled={data.length === 0}>
+                        <Download className="mr-2 h-4 w-4" />
+                        Exportar
+                    </Button>
                 </CardHeader>
                 <CardContent>
                     <div className="rounded-md border">
