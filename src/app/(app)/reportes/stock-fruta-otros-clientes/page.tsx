@@ -48,34 +48,19 @@ export default function OtherFruitStockReportPage() {
 
     const stockData = React.useMemo(() => {
         if (!receptions) return [];
-        const stockMap: { [key: string]: { clientName: string, productCode: string, productName: string, unit: string, totalQuantity: number, locations: { loc: string, qty: number }[] } } = {};
-
-        receptions.forEach(reception => {
-            reception.items.forEach(item => {
-                if (item.status === 'Almacenado' && item.quantity > 0) {
-                    const key = `${reception.clientId}-${item.productCode}`;
-                    if (!stockMap[key]) {
-                        stockMap[key] = {
-                            clientName: reception.clientName,
-                            productCode: item.productCode,
-                            productName: item.productName,
-                            unit: reception.unit,
-                            totalQuantity: 0,
-                            locations: []
-                        };
-                    }
-                    stockMap[key].totalQuantity += item.quantity;
-                    if (item.storageLocation) {
-                        stockMap[key].locations.push({
-                            loc: `${item.storageLocation.chamberId} / ${item.storageLocation.coordinate}`,
-                            qty: item.quantity
-                        });
-                    }
-                }
-            });
-        });
-
-        return Object.values(stockMap);
+        return receptions.flatMap(reception => 
+            reception.items
+                .filter(item => item.status === 'Almacenado' && item.quantity > 0 && item.storageLocation)
+                .map((item, index) => ({
+                    id: `${reception.id}-${index}`,
+                    clientName: reception.clientName,
+                    productCode: item.productCode,
+                    productName: item.productName,
+                    unit: reception.unit,
+                    quantity: item.quantity,
+                    location: `${item.storageLocation!.chamberId} / ${item.storageLocation!.coordinate}`
+                }))
+        );
     }, [receptions]);
     
     const filteredData = React.useMemo(() => {
@@ -91,23 +76,24 @@ export default function OtherFruitStockReportPage() {
     }, [stockData]);
 
     const handleExport = () => {
+        const headers = ["Cliente", "Codigo Producto", "Nombre Producto", "Ubicacion", "Cantidad", "Unidad"];
         const dataToExport = filteredData.map(item => ({
             "Cliente": item.clientName,
             "Codigo Producto": item.productCode,
             "Nombre Producto": item.productName,
-            "Cantidad Total": item.totalQuantity,
-            "Unidad": item.unit
+            "Ubicacion": item.location,
+            "Cantidad": item.quantity,
+            "Unidad": item.unit,
         }));
-        const headers = ["Cliente", "Codigo Producto", "Nombre Producto", "Cantidad Total", "Unidad"];
         const csv = convertToCSV(dataToExport, headers);
-        downloadCSV(csv, 'reporte_stock_otros_clientes.csv');
+        downloadCSV(csv, 'reporte_stock_por_ubicacion_otros_clientes.csv');
     };
     
     return (
         <div className="space-y-6">
              <ReportHeader
-                title="Reporte de Stock de Fruta (Otros Clientes)"
-                description="Inventario consolidado de fruta de clientes externos en cámara."
+                title="Reporte Stock por Ubicacion (Otros Clientes)"
+                description="Inventario de fruta de clientes externos detallado por ubicación."
                 onExport={handleExport}
                 isExportDisabled={loadingReceptions || filteredData.length === 0}
             >
@@ -136,25 +122,27 @@ export default function OtherFruitStockReportPage() {
                                     <TableHead>Cliente</TableHead>
                                     <TableHead>Cód. Producto</TableHead>
                                     <TableHead>Producto</TableHead>
-                                    <TableHead>Cantidad Total</TableHead>
+                                    <TableHead>Ubicación</TableHead>
+                                    <TableHead>Cantidad</TableHead>
                                     <TableHead>Unidad</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
                                 {loadingReceptions ? (
-                                    Array.from({ length: 5 }).map((_, i) => <TableRow key={i}><TableCell colSpan={5}><Skeleton className="h-4 w-full" /></TableCell></TableRow>)
+                                    Array.from({ length: 5 }).map((_, i) => <TableRow key={i}><TableCell colSpan={6}><Skeleton className="h-4 w-full" /></TableCell></TableRow>)
                                 ) : filteredData.length > 0 ? (
                                     filteredData.map(item => (
-                                        <TableRow key={`${item.clientName}-${item.productCode}`}>
+                                        <TableRow key={item.id}>
                                             <TableCell>{item.clientName}</TableCell>
                                             <TableCell>{item.productCode}</TableCell>
                                             <TableCell>{item.productName}</TableCell>
-                                            <TableCell className="font-semibold">{item.totalQuantity}</TableCell>
+                                            <TableCell>{item.location}</TableCell>
+                                            <TableCell className="font-semibold">{item.quantity}</TableCell>
                                             <TableCell>{item.unit}</TableCell>
                                         </TableRow>
                                     ))
                                 ) : (
-                                    <TableRow><TableCell colSpan={5} className="h-24 text-center">No hay datos de stock para los filtros seleccionados.</TableCell></TableRow>
+                                    <TableRow><TableCell colSpan={6} className="h-24 text-center">No hay datos de stock para los filtros seleccionados.</TableCell></TableRow>
                                 )}
                             </TableBody>
                         </Table>

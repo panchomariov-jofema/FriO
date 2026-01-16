@@ -27,8 +27,8 @@ const reportList = [
         href: '/reportes/log-recepcion-fruta'
     },
     { 
-        title: 'Reporte de Stock de Fruta (Otros Clientes)', 
-        description: 'Inventario consolidado de fruta de clientes externos en cámara.',
+        title: 'Reporte Stock por Ubicacion (Otros Clientes)', 
+        description: 'Inventario de fruta de clientes externos detallado por ubicación.',
         href: '/reportes/stock-fruta-otros-clientes'
     },
     { 
