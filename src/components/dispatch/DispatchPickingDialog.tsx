@@ -73,14 +73,6 @@ export function DispatchPickingDialog({ dispatch, open, onOpenChange, onConfirmD
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl printable-area">
-        <style>{`
-            @media print {
-              body * { visibility: hidden; }
-              .printable-area, .printable-area * { visibility: visible; }
-              .printable-area { position: absolute; left: 0; top: 0; width: 100%; padding: 1rem; }
-              .no-print { display: none !important; }
-            }
-        `}</style>
         <DialogHeader className="no-print">
           <DialogTitle>Picking de Despacho: {dispatch.exporterName}</DialogTitle>
           <DialogDescription>

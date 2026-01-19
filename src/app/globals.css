@@ -92,3 +92,33 @@
   background-position: center;
   background-repeat: no-repeat;
 }
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .printable-area, .printable-area * {
+    visibility: visible;
+  }
+  .printable-area {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    height: auto !important;
+    padding: 1rem !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+  /* Un-style the scroll area for printing to show all content */
+  .printable-area .max-h-96 {
+      max-height: none !important;
+  }
+  .printable-area [data-radix-scroll-area-viewport] {
+      overflow-y: visible !important;
+      height: auto !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+}
