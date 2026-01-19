@@ -55,6 +55,7 @@ import { usePackingsByExporter } from '@/hooks/use-packings-by-exporter';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ManualDispatchTab } from '@/components/dispatch/ManualDispatchTab';
 import { Download } from 'lucide-react';
+import { DispatchPickingDialog } from '@/components/dispatch/DispatchPickingDialog';
 
 const dispatchSchema = z.object({
   exporterId: z.string().min(1, 'Debe seleccionar un cliente.'),
@@ -65,20 +66,6 @@ const dispatchSchema = z.object({
 });
 
 type DispatchFormValues = z.infer<typeof dispatchSchema>;
-
-// Helper for natural sorting (e.g., A1, A2, ... A10)
-const naturalSort = (a: string, b: string) => {
-  const re = /(\d+)/;
-  const aNum = parseInt(a.split(re)[1] || '0', 10);
-  const bNum = parseInt(b.split(re)[1] || '0', 10);
-  const aLetter = a.split(re)[0];
-  const bLetter = b.split(re)[0];
-
-  if (aLetter < bLetter) return -1;
-  if (aLetter > bLetter) return 1;
-
-  return aNum - bNum;
-};
 
 // Helper to convert array of objects to CSV
 function convertToCSV(data: any[], headers: string[]) {
@@ -123,6 +110,7 @@ export default function DespachosPage() {
   const { toast } = useToast();
   const [isConfirming, setIsConfirming] = React.useState(false);
   const [isUndoing, setIsUndoing] = React.useState(false);
+  const [pickingDispatch, setPickingDispatch] = React.useState<Dispatch | null>(null);
 
   const form = useForm<DispatchFormValues>({
     resolver: zodResolver(dispatchSchema),
@@ -307,6 +295,7 @@ export default function DespachosPage() {
         );
     } finally {
         setIsConfirming(false);
+        setPickingDispatch(null);
     }
 };
 
@@ -625,65 +614,11 @@ const handleUndoDispatch = async (dispatchToUndo: Dispatch) => {
                                     <TableCell className="hidden md:table-cell">{dispatch.totalNetWeight ? `${dispatch.totalNetWeight.toFixed(2)} kg` : '-'}</TableCell>
                                     <TableCell><Badge variant={dispatch.status === 'Completado' ? 'default' : 'secondary'}>{dispatch.status}</Badge></TableCell>
                                     <TableCell className="text-right space-x-2">
-                                       <AlertDialog>
-                                          <AlertDialogTrigger asChild>
-                                             <Button variant="outline" size="sm">Ver Bins</Button>
-                                          </AlertDialogTrigger>
-                                          <AlertDialogContent>
-                                            <AlertDialogHeader>
-                                              <AlertDialogTitle>Bins en Despacho para {dispatch.exporterName}</AlertDialogTitle>
-                                              <AlertDialogDescription>
-                                                 Total: {dispatch.totalBins} bins.
-                                              </AlertDialogDescription>
-                                            </AlertDialogHeader>
-                                            <div className="max-h-60 overflow-y-auto border rounded-md">
-                                                <Table>
-                                                    <TableHeader>
-                                                        <TableRow>
-                                                            <TableHead>Lote</TableHead>
-                                                            <TableHead>Cámara</TableHead>
-                                                            <TableHead>Coord.</TableHead>
-                                                            <TableHead>Bins</TableHead>
-                                                        </TableRow>
-                                                    </TableHeader>
-                                                    <TableBody>
-                                                        {[...dispatch.bins].sort((a, b) => naturalSort(a.coordinate, b.coordinate)).map((bin, index) => (
-                                                            <TableRow key={index}>
-                                                                <TableCell>{bin.displayLotId}</TableCell>
-                                                                <TableCell>{bin.chamberId}</TableCell>
-                                                                <TableCell>{bin.coordinate}</TableCell>
-                                                                <TableCell>{bin.binCount}</TableCell>
-                                                            </TableRow>
-                                                        ))}
-                                                    </TableBody>
-                                                </Table>
-                                            </div>
-                                            <AlertDialogFooter>
-                                              <AlertDialogCancel>Cerrar</AlertDialogCancel>
-                                            </AlertDialogFooter>
-                                          </AlertDialogContent>
-                                        </AlertDialog>
                                         {dispatch.status === 'Pendiente de Salida' && (
                                             <>
-                                            <AlertDialog>
-                                                <AlertDialogTrigger asChild>
-                                                    <Button size="sm" disabled={isConfirming || isUndoing}>Confirmar</Button>
-                                                </AlertDialogTrigger>
-                                                <AlertDialogContent>
-                                                    <AlertDialogHeader>
-                                                        <AlertDialogTitle>¿Confirmar salida del despacho?</AlertDialogTitle>
-                                                        <AlertDialogDescription>
-                                                            Esta acción rebajará el stock de las cámaras y liberará las coordenadas. Esta acción no se puede deshacer.
-                                                        </AlertDialogDescription>
-                                                    </AlertDialogHeader>
-                                                    <AlertDialogFooter>
-                                                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                                        <AlertDialogAction onClick={() => handleConfirmDispatch(dispatch)}>
-                                                            Confirmar Salida
-                                                        </AlertDialogAction>
-                                                    </AlertDialogFooter>
-                                                </AlertDialogContent>
-                                            </AlertDialog>
+                                            <Button variant="outline" size="sm" onClick={() => setPickingDispatch(dispatch)}>
+                                                Hacer Picking
+                                            </Button>
                                             <AlertDialog>
                                                 <AlertDialogTrigger asChild>
                                                     <Button variant="destructive" size="sm" disabled={isConfirming || isUndoing}>Deshacer</Button>
@@ -729,6 +664,14 @@ const handleUndoDispatch = async (dispatchToUndo: Dispatch) => {
             </div>
         </CardContent>
       </Card>
+      
+      <DispatchPickingDialog
+        dispatch={pickingDispatch}
+        open={!!pickingDispatch}
+        onOpenChange={(open) => !open && setPickingDispatch(null)}
+        onConfirmDispatch={handleConfirmDispatch}
+        isConfirming={isConfirming}
+      />
     </div>
   );
 }
