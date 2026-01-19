@@ -56,20 +56,24 @@ export function ExitTab() {
     return [...new Map(filtered.map(item => [item.clientId, item])).values()];
   }, [allClients]);
 
-  const inStockMasterCodes = React.useMemo(() => {
-    if (!selectedClientId || !allReceptions) return new Set<string>();
-
+  const { inStockMasterCodes, stockByCode } = React.useMemo(() => {
     const codes = new Set<string>();
-    allReceptions.forEach(reception => {
-        if (reception.clientId === selectedClientId) {
-            reception.items.forEach(item => {
-                if (item.status === 'Almacenado' && item.palletCount > 0) {
-                    codes.add(item.packagingMasterCode);
-                }
-            });
-        }
-    });
-    return codes;
+    const stockMap = new Map<string, number>();
+
+    if (selectedClientId && allReceptions) {
+        allReceptions.forEach(reception => {
+            if (reception.clientId === selectedClientId) {
+                reception.items.forEach(item => {
+                    if (item.status === 'Almacenado' && item.palletCount > 0) {
+                        codes.add(item.packagingMasterCode);
+                        const currentStock = stockMap.get(item.packagingMasterCode) || 0;
+                        stockMap.set(item.packagingMasterCode, currentStock + item.palletCount);
+                    }
+                });
+            }
+        });
+    }
+    return { inStockMasterCodes: codes, stockByCode: stockMap };
   }, [selectedClientId, allReceptions]);
   
   const clientPackagingMasters = React.useMemo(() => {
@@ -88,6 +92,19 @@ export function ExitTab() {
       return;
     }
     
+    // Validate stock before submitting
+    for (const item of itemsToProcess) {
+        const availableStock = stockByCode.get(item.packagingMasterCode) || 0;
+        if (item.palletCount > availableStock) {
+            toast({
+                variant: 'destructive',
+                title: 'Stock Insuficiente',
+                description: `No hay suficiente stock para "${item.packagingMasterName}". Disponible: ${availableStock}, Solicitado: ${item.palletCount}.`,
+            });
+            return; // Stop submission
+        }
+    }
+
     try {
         const movementData = {
             type: 'salida' as const,
@@ -179,7 +196,7 @@ export function ExitTab() {
                 <FormLabel>Ítems Solicitados</FormLabel>
                 {fields.map((field, index) => (
                   <div key={field.id} className="flex items-end gap-2 p-3 border rounded-md">
-                    <div className="flex-1 grid sm:grid-cols-3 gap-4">
+                    <div className="flex-1 grid sm:grid-cols-2 gap-4">
                        <FormField
                             control={form.control}
                             name={`items.${index}.packagingMasterCode`}
@@ -209,6 +226,9 @@ export function ExitTab() {
                                     <FormControl>
                                         <Input type="number" {...itemField} autoComplete="off" min="1" />
                                     </FormControl>
+                                    <p className="text-xs text-muted-foreground pt-1">
+                                        Stock: {stockByCode.get(form.getValues(`items.${index}.packagingMasterCode`)) || 0}
+                                    </p>
                                     <FormMessage />
                                 </FormItem>
                             )}
