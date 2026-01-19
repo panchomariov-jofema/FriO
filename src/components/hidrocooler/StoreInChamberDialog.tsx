@@ -39,97 +39,84 @@ export function StoreInChamberDialog({ lot, open, onOpenChange, onStore, allCham
 
   const selectedChamberId = form.watch('chamberId');
 
-  const availableCoordinates = React.useMemo(() => {
-    if (!selectedChamberId || !lot) return [];
-    
+  const { availableCoordinatesForNewLots, suggestion } = React.useMemo(() => {
+    if (!selectedChamberId || !lot) {
+      return { availableCoordinatesForNewLots: [], suggestion: null };
+    }
+
     const chamberConfig = chambersConfig[selectedChamberId];
-    if (!chamberConfig) return [];
-    
-    const occupiedCoordinates = new Set<string>();
-    (allChamberLots || [])
-        .filter(l => l.chamberId === selectedChamberId && l.coordinate && l.binCount >= 6) // Only consider full coordinates as occupied for new placements
-        .forEach(l => occupiedCoordinates.add(l.coordinate!));
-    
-    (allOtherFruitReceptions || []).forEach(reception => {
-        reception.items.forEach(item => {
-            if(item.storageLocation?.chamberId === selectedChamberId && item.storageLocation.coordinate) {
-                // This logic might need refinement based on how pallets/bins occupy space
-                occupiedCoordinates.add(item.storageLocation.coordinate);
-            }
-        });
+    if (!chamberConfig) {
+      return { availableCoordinatesForNewLots: [], suggestion: null };
+    }
+
+    const occupancyMap = new Map<string, { lots: {displayLotId: string, binCount: number }[] }>();
+
+    // Populate occupancy map from producer lots
+    allChamberLots.forEach(l => {
+      if (l.chamberId === selectedChamberId && l.coordinate) {
+        if (!occupancyMap.has(l.coordinate)) {
+          occupancyMap.set(l.coordinate, { lots: [] });
+        }
+        occupancyMap.get(l.coordinate)!.lots.push({ displayLotId: l.displayLotId, binCount: l.binCount });
+      }
     });
 
-    const allPossibleCoordinates = chamberConfig.columns
-        .flatMap(col => chamberConfig.rows.map(row => `${col}${row}`))
-        .filter(coord => !chamberConfig.blocked?.includes(coord))
-        .sort(naturalSort);
+    // Populate occupancy map from other fruit receptions
+    allOtherFruitReceptions.forEach(r => {
+      r.items.forEach(item => {
+        if (item.storageLocation?.chamberId === selectedChamberId && item.storageLocation.coordinate) {
+            const lotId = `other_${r.id}_${item.productCode}`;
+            if (!occupancyMap.has(item.storageLocation.coordinate)) {
+                occupancyMap.set(item.storageLocation.coordinate, { lots: [] });
+            }
+            // Mark as full to prevent mixing lot types
+            occupancyMap.get(item.storageLocation.coordinate)!.lots.push({ displayLotId: lotId, binCount: 9 });
+        }
+      });
+    });
 
-    // For the dropdown, we only want to show coordinates that are completely empty
-    return allPossibleCoordinates.filter(coord => !occupiedCoordinates.has(coord));
+    const allPossibleCoords = chamberConfig.columns
+      .flatMap(col => chamberConfig.rows.map(row => `${col}${row}`))
+      .filter(coord => !chamberConfig.blocked?.includes(coord))
+      .sort(naturalSort);
+
+    // 1. Find a partially filled coordinate with the SAME lot
+    const partialSameLotCoords = allPossibleCoords.filter(coord => {
+      const occupiedBy = occupancyMap.get(coord);
+      if (!occupiedBy || occupiedBy.lots.length === 0) return false;
+      const isSameLot = occupiedBy.lots.every(l => l.displayLotId === lot.displayLotId);
+      if (!isSameLot) return false;
+      const totalBins = occupiedBy.lots.reduce((sum, l) => sum + l.binCount, 0);
+      return totalBins < 6; // Standard capacity per coordinate for producer lots
+    });
+
+    let currentSuggestion: string | null = null;
+    if (partialSameLotCoords.length > 0) {
+      currentSuggestion = partialSameLotCoords[0]; // Already sorted by naturalSort
+    } else {
+      // 2. Find the first completely empty coordinate
+      const firstEmpty = allPossibleCoords.find(coord => !occupancyMap.has(coord));
+      if (firstEmpty) {
+        currentSuggestion = firstEmpty;
+      }
+    }
+
+    const emptyCoords = allPossibleCoords.filter(coord => !occupancyMap.has(coord));
+
+    return { availableCoordinatesForNewLots: emptyCoords, suggestion: currentSuggestion };
+
   }, [selectedChamberId, lot, allChamberLots, allOtherFruitReceptions]);
 
 
   // Effect to suggest a coordinate when a chamber is selected
   React.useEffect(() => {
-    if (selectedChamberId && lot) {
-        // --- Suggestion Logic ---
-        const assignedChamberIds = [selectedChamberId];
-
-        const allOccupiedCoordsByChamber: Record<string, Set<string>> = {};
-        allChamberLots
-            .filter(l => l.coordinate)
-            .forEach(l => {
-                if (!allOccupiedCoordsByChamber[l.chamberId!]) allOccupiedCoordsByChamber[l.chamberId!] = new Set();
-                allOccupiedCoordsByChamber[l.chamberId!].add(l.coordinate!);
-            });
-        allOtherFruitReceptions.forEach(reception => {
-            reception.items.forEach(item => {
-                if(item.storageLocation?.chamberId && item.storageLocation.coordinate) {
-                    if (!allOccupiedCoordsByChamber[item.storageLocation.chamberId]) allOccupiedCoordsByChamber[item.storageLocation.chamberId] = new Set();
-                    allOccupiedCoordsByChamber[item.storageLocation.chamberId].add(item.storageLocation.coordinate);
-                }
-            });
-        });
-
-        const sameLotCoordsByChamber: Record<string, string[]> = {};
-        allChamberLots
-            .filter(l => l.displayLotId === lot.displayLotId && l.chamberId && l.coordinate && (l.binCount < 6))
-            .forEach(l => {
-                if (!sameLotCoordsByChamber[l.chamberId!]) sameLotCoordsByChamber[l.chamberId!] = [];
-                sameLotCoordsByChamber[l.chamberId!].push(l.coordinate!);
-            });
-
-        let bestSuggestion: string | null = null;
-
-        for (const chamberId of assignedChamberIds) {
-            if (sameLotCoordsByChamber[chamberId]?.length > 0) {
-                bestSuggestion = sameLotCoordsByChamber[chamberId].sort(naturalSort)[0];
-                break;
-            }
-
-            const chamberConfig = chambersConfig[chamberId];
-            const occupiedInChamber = allOccupiedCoordsByChamber[chamberId] || new Set();
-
-            const allPossibleCoordinates = chamberConfig.columns
-                .flatMap(col => chamberConfig.rows.map(row => `${col}${row}`))
-                .filter(coord => !chamberConfig.blocked?.includes(coord))
-                .sort(naturalSort);
-            
-            const firstAvailable = allPossibleCoordinates.find(coord => !occupiedInChamber.has(coord));
-
-            if (firstAvailable) {
-                bestSuggestion = firstAvailable;
-                break;
-            }
-        }
-
-        if (bestSuggestion) {
-            form.setValue('coordinate', bestSuggestion, { shouldValidate: true });
-        } else {
-            form.resetField('coordinate');
-        }
+    if (suggestion) {
+        form.setValue('coordinate', suggestion, { shouldValidate: true });
+        form.trigger('coordinate');
+    } else {
+        form.resetField('coordinate');
     }
-  }, [selectedChamberId, lot, allChamberLots, allOtherFruitReceptions, form]);
+  }, [suggestion, form]);
 
 
   // Effect to reset form when dialog opens
@@ -176,11 +163,11 @@ export function StoreInChamberDialog({ lot, open, onOpenChange, onStore, allCham
                 <FormField control={form.control} name="coordinate" render={({ field }) => (
                     <FormItem>
                     <FormLabel>Coordenada de Inicio</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value} disabled={!selectedChamberId || availableCoordinates.length === 0}>
+                    <Select onValueChange={field.onChange} value={field.value} disabled={!selectedChamberId}>
                         <FormControl><SelectTrigger><SelectValue placeholder={!selectedChamberId ? "Seleccione cámara" : "Seleccione..."} /></SelectTrigger></FormControl>
                         <SelectContent>
-                        {availableCoordinates.length > 0 ? (
-                            availableCoordinates.map(coord => (
+                        {availableCoordinatesForNewLots.length > 0 ? (
+                            availableCoordinatesForNewLots.map(coord => (
                             <SelectItem key={coord} value={coord}>{coord}</SelectItem>
                             ))
                         ) : (
