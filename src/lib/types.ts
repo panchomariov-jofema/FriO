@@ -114,6 +114,7 @@ export interface PackagingExitItemLocation {
   itemIndex: number;
   palletsToWithdraw: number;
   locationString?: string;
+  available?: number;
 }
 
 export interface PackagingExitItem {

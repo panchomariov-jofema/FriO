@@ -17,6 +17,7 @@ import { ScrollArea } from '../ui/scroll-area';
 import { Download } from 'lucide-react';
 import { z } from 'zod';
 import { packagingExitSchema } from '@/lib/schemas';
+import { Input } from '../ui/input';
 
 type ExitFormValues = z.infer<typeof packagingExitSchema>;
 
@@ -68,16 +69,35 @@ const flattenPayload = (payload: ExitFormValues) => {
 
 export function PackagingPickingDialog({ payload, open, onOpenChange, onConfirmExit, isConfirming, clientName }: PackagingPickingDialogProps) {
   const [pickedItems, setPickedItems] = React.useState<Record<string, boolean>>({});
+  const [quantities, setQuantities] = React.useState<Record<string, number>>({});
 
   const flatItems = React.useMemo(() => payload ? flattenPayload(payload) : [], [payload]);
 
   React.useEffect(() => {
     if (payload) {
+      const initialQuantities = flatItems.reduce((acc, item) => {
+        acc[item.compositeKey] = item.palletsToWithdraw;
+        return acc;
+      }, {} as Record<string, number>);
+      setQuantities(initialQuantities);
       setPickedItems({});
     }
-  }, [payload]);
+  }, [payload, flatItems]);
 
   if (!payload) return null;
+
+  const handleQuantityChange = (compositeKey: string, available: number, newCountStr: string) => {
+    let newCount = parseInt(newCountStr, 10);
+    if (isNaN(newCount) || newCount < 0) {
+      newCount = 0;
+    }
+    if (newCount > available) {
+      newCount = available;
+    }
+    setQuantities(prev => ({ ...prev, [compositeKey]: newCount }));
+  };
+  
+  const totalPickedPallets = Object.values(quantities).reduce((sum, qty) => sum + qty, 0);
 
   const handleSelectAll = (checked: boolean | 'indeterminate') => {
     const newPickedItems: Record<string, boolean> = {};
@@ -111,7 +131,7 @@ export function PackagingPickingDialog({ payload, open, onOpenChange, onConfirmE
         codigo: item.itemCode,
         articulo: item.itemName,
         ubicacion: item.locationString,
-        cantidad: item.palletsToWithdraw,
+        cantidad: quantities[item.compositeKey] ?? item.palletsToWithdraw,
     }));
     
     const headers = [
@@ -126,13 +146,43 @@ export function PackagingPickingDialog({ payload, open, onOpenChange, onConfirmE
     downloadCSV(csv, `picking_embalaje_${clientName}_${date}.csv`);
   };
 
+  const handleConfirm = () => {
+    if (!payload) return;
+
+    const newPayload: ExitFormValues = JSON.parse(JSON.stringify(payload));
+    
+    newPayload.items.forEach(item => {
+        let totalPalletsForItem = 0;
+        if (item.locations) {
+            const updatedLocations = item.locations.map(loc => {
+                const compositeKey = `${item.packagingMasterCode}_${loc.locationKey}`;
+                const newQuantity = quantities[compositeKey];
+                
+                if (typeof newQuantity === 'number') {
+                    loc.palletsToWithdraw = newQuantity;
+                }
+                return loc;
+            }).filter(loc => loc.palletsToWithdraw > 0);
+
+            item.locations = updatedLocations;
+            
+            totalPalletsForItem = item.locations.reduce((sum, loc) => sum + loc.palletsToWithdraw, 0);
+        }
+        item.palletCount = totalPalletsForItem;
+    });
+
+    newPayload.items = newPayload.items.filter(item => item.palletCount > 0);
+
+    onConfirmExit(newPayload);
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl">
         <DialogHeader>
           <DialogTitle>Picking de Salida de Embalaje: {clientName}</DialogTitle>
           <DialogDescription>
-            Confirme la recolección física de cada artículo y ubicación.
+            Confirme la recolección física de cada artículo y ubicación. Total a retirar: {totalPickedPallets} pallets.
           </DialogDescription>
         </DialogHeader>
         <div>
@@ -149,7 +199,7 @@ export function PackagingPickingDialog({ payload, open, onOpenChange, onConfirmE
                   </TableHead>
                   <TableHead>Artículo</TableHead>
                   <TableHead>Ubicación</TableHead>
-                  <TableHead className="text-right">Pallets a Retirar</TableHead>
+                  <TableHead className="text-right w-36">Pallets a Retirar</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -166,7 +216,16 @@ export function PackagingPickingDialog({ payload, open, onOpenChange, onConfirmE
                         <div className="text-sm text-muted-foreground">{item.itemCode}</div>
                     </TableCell>
                     <TableCell>{item.locationString}</TableCell>
-                    <TableCell className="text-right font-semibold">{item.palletsToWithdraw}</TableCell>
+                    <TableCell className="text-right">
+                       <Input
+                            type="number"
+                            value={quantities[item.compositeKey] ?? ''}
+                            onChange={(e) => handleQuantityChange(item.compositeKey, item.available || item.palletsToWithdraw, e.target.value)}
+                            max={item.available || item.palletsToWithdraw}
+                            min={0}
+                            className="h-8 w-24 ml-auto text-right"
+                        />
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -182,7 +241,7 @@ export function PackagingPickingDialog({ payload, open, onOpenChange, onConfirmE
             <DialogClose asChild>
               <Button type="button" variant="outline">Cancelar</Button>
             </DialogClose>
-            <Button onClick={() => onConfirmExit(payload)} disabled={!allItemsCount || !allItemsPicked || isConfirming}>
+            <Button onClick={handleConfirm} disabled={!allItemsPicked || isConfirming}>
               {isConfirming ? 'Confirmando...' : 'Confirmar Salida'}
             </Button>
           </div>

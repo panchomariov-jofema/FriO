@@ -195,6 +195,7 @@ export function ExitTab() {
             itemIndex: locationData.itemIndex,
             palletsToWithdraw: newPalletCount,
             locationString: locationData.location,
+            available: locationData.available,
         });
     }
 
