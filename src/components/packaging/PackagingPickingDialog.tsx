@@ -104,6 +104,7 @@ export function PackagingPickingDialog({ payload, open, onOpenChange, onConfirmE
   const checkedCount = Object.keys(pickedItems).length;
   const allItemsCount = flatItems.length;
   const selectAllState = checkedCount === allItemsCount && allItemsCount > 0 ? true : checkedCount === 0 ? false : 'indeterminate';
+  const allItemsPicked = allItemsCount > 0 && checkedCount === allItemsCount;
 
   const handleExportCSV = () => {
     const dataToExport = flatItems.map(item => ({
