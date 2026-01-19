@@ -180,7 +180,11 @@ export default function DespachosPage() {
         }, {} as Record<string, { totalBins: number, receptionDate: any, fractions: ChamberLot[] }>);
 
         // 2. Sort the grouped lots by receptionDate (FIFO)
-        const sortedGroupedLots = Object.values(groupedLots).sort((a, b) => a.receptionDate.toMillis() - b.receptionDate.toMillis());
+        const sortedGroupedLots = Object.values(groupedLots).sort((a, b) => {
+            if (!a.receptionDate) return 1;
+            if (!b.receptionDate) return -1;
+            return a.receptionDate.toMillis() - b.receptionDate.toMillis();
+        });
 
         // 3. Select whole lots without exceeding maxBins
         const binsToDispatch: ChamberLot[] = [];
