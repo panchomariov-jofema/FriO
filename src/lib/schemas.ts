@@ -59,6 +59,7 @@ const packagingExitItemLocationSchema = z.object({
     receptionId: z.string(),
     itemIndex: z.number(),
     palletsToWithdraw: z.coerce.number().min(0),
+    locationString: z.string().optional(),
 });
 
 export const packagingExitItemSchema = z.object({
