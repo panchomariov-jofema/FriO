@@ -56,7 +56,11 @@ export function ManualDispatchTab({ exporters, loadingExporters, chamberLots, lo
                 (!chamberId || lot.chamberId === chamberId) &&
                 (!variety || lot.variety === variety)
             )
-            .sort((a, b) => a.receptionDate.toMillis() - b.receptionDate.toMillis()); // FIFO Sort
+            .sort((a, b) => {
+                if (!a.receptionDate) return 1;
+                if (!b.receptionDate) return -1;
+                return a.receptionDate.toMillis() - b.receptionDate.toMillis();
+            }); // FIFO Sort
     }, [chamberLots, form.watch()]);
 
     const handleSelectLot = (lot: ChamberLot, isSelected: boolean) => {
