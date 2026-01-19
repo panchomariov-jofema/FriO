@@ -99,8 +99,8 @@ export function PendingPickingTab() {
     <>
       <Card>
         <CardHeader>
-          <CardTitle>Salidas de Embalaje Pendientes de Picking</CardTitle>
-          <CardDescription>Lista de solicitudes de salida que deben ser verificadas y confirmadas por el operador de bodega.</CardDescription>
+          <CardTitle>Despachos Pendientes de Picking</CardTitle>
+          <CardDescription>Lista de solicitudes de despacho que deben ser verificadas y confirmadas por el operador de bodega.</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="rounded-md border">

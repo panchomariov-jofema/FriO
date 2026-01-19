@@ -53,7 +53,7 @@ export function ExitTab() {
 
   const packagingClients = React.useMemo(() => {
     const filtered = (allClients || []).filter(c => c.type.toLowerCase() === 'embalaje');
-    return [...new Map(filtered.map(item => [item.id, item])).values()];
+    return [...new Map(filtered.map(item => [item.clientId, item])).values()];
   }, [allClients]);
 
   const inStockMasterCodes = React.useMemo(() => {
@@ -76,7 +76,6 @@ export function ExitTab() {
       if (!selectedClientId) return [];
       const mastersForClient = (allPackagingMasters || []).filter(m => m.clientId === selectedClientId);
       const inStockMasters = mastersForClient.filter(m => inStockMasterCodes.has(m.code));
-      // Deduplicate by 'code' to ensure unique values in the dropdown
       return [...new Map(inStockMasters.map(item => [item.code, item])).values()];
   }, [selectedClientId, allPackagingMasters, inStockMasterCodes]);
 
@@ -142,8 +141,8 @@ export function ExitTab() {
     <>
       <Card>
         <CardHeader>
-          <CardTitle>Crear Solicitud de Salida de Embalaje</CardTitle>
-          <CardDescription>Seleccione un cliente y los artículos a retirar. Esto creará una tarea en "Picking Pendiente".</CardDescription>
+          <CardTitle>Crear Solicitud de Despacho</CardTitle>
+          <CardDescription>Seleccione un cliente y los artículos a retirar. Esto creará una tarea en la pestaña de "Picking".</CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>
@@ -234,7 +233,7 @@ export function ExitTab() {
 
               <div className="flex justify-end">
                 <Button type="submit" disabled={form.formState.isSubmitting || isLoading}>
-                  {form.formState.isSubmitting ? 'Creando Solicitud...' : 'Crear Solicitud de Salida'}
+                  {form.formState.isSubmitting ? 'Creando Solicitud...' : 'Crear Solicitud de Despacho'}
                 </Button>
               </div>
             </form>
