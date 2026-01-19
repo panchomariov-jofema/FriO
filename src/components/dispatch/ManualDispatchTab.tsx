@@ -15,7 +15,7 @@ import { Checkbox } from '../ui/checkbox';
 import { Skeleton } from '../ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { useFirestore } from '@/firebase';
-import { writeBatch, doc, collection, serverTimestamp } from 'firebase/firestore';
+import { writeBatch, doc, collection, serverTimestamp, addDoc } from 'firebase/firestore';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 
@@ -81,17 +81,15 @@ export function ManualDispatchTab({ exporters, loadingExporters, chamberLots, lo
             return;
         }
 
-        const { exporterId, packingId } = form.getValues();
+        const { packingId } = form.getValues();
         const firstLot = Object.values(selectedLots)[0];
         const mainExporterId = firstLot.exporterId;
 
-        // Check if all selected lots are from the same exporter
         if (!Object.values(selectedLots).every(lot => lot.exporterId === mainExporterId)) {
             toast({ variant: 'destructive', title: 'Error de consistencia', description: 'Todos los lotes seleccionados deben pertenecer al mismo exportador.' });
             return;
         }
         
-        // Use the exporter from the selected lots, not from the filter
         const selectedExporter = exporters.find(e => e.exporterId === mainExporterId);
          if (!selectedExporter) {
             toast({ variant: 'destructive', title: 'Error', description: 'Cliente no encontrado para los lotes seleccionados.' });
@@ -102,7 +100,6 @@ export function ManualDispatchTab({ exporters, loadingExporters, chamberLots, lo
         setIsSubmitting(true);
 
         try {
-            const batch = writeBatch(firestore);
             const binsToDispatch = [];
             let totalBins = 0;
             let totalNetWeight = 0;
@@ -119,9 +116,6 @@ export function ManualDispatchTab({ exporters, loadingExporters, chamberLots, lo
                 if (lot.netWeightPerBin && lot.netWeightPerBin > 0) {
                     totalNetWeight += lot.binCount * lot.netWeightPerBin;
                 }
-
-                const lotRef = doc(firestore, 'chamberLots', lot.id);
-                batch.update(lotRef, { status: 'Despachado' });
             }
 
             const dispatchData = {
@@ -130,23 +124,21 @@ export function ManualDispatchTab({ exporters, loadingExporters, chamberLots, lo
                 packingId: packingId || null,
                 totalBins: totalBins,
                 totalNetWeight: totalNetWeight,
-                status: 'Pendiente de Salida' as const,
+                status: 'Pendiente de Picking' as const,
                 createdAt: serverTimestamp(),
                 bins: binsToDispatch,
             };
 
-            const dispatchRef = doc(collection(firestore, 'dispatches'));
-            batch.set(dispatchRef, dispatchData);
-
-            await batch.commit();
-            toast({ title: 'Éxito', description: `Despacho manual creado con ${totalBins} bins.` });
+            await addDoc(collection(firestore, 'dispatches'), dispatchData);
+            
+            toast({ title: 'Éxito', description: `Solicitud de despacho creada con ${totalBins} bins.` });
             setSelectedLots({});
             form.reset();
 
         } catch (error: any) {
-            console.error("Error creating manual dispatch:", error);
-            toast({ variant: 'destructive', title: 'Error', description: 'Ocurrió un error al crear el despacho manual.' });
-            errorEmitter.emit('permission-error', new FirestorePermissionError({ path: 'dispatches', operation: 'write' }));
+            console.error("Error creating manual dispatch request:", error);
+            toast({ variant: 'destructive', title: 'Error', description: 'Ocurrió un error al crear la solicitud.' });
+            errorEmitter.emit('permission-error', new FirestorePermissionError({ path: 'dispatches', operation: 'create' }));
         } finally {
             setIsSubmitting(false);
         }
@@ -163,9 +155,9 @@ export function ManualDispatchTab({ exporters, loadingExporters, chamberLots, lo
     return (
         <Card>
             <CardHeader>
-                <CardTitle>Crear Nuevo Despacho Manual</CardTitle>
+                <CardTitle>Crear Solicitud de Despacho Manual</CardTitle>
                 <CardDescription>
-                    Filtre y seleccione los lotes específicos que desea incluir en el despacho.
+                    Filtre y seleccione los lotes específicos que desea incluir en la solicitud de despacho.
                 </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -254,7 +246,7 @@ export function ManualDispatchTab({ exporters, loadingExporters, chamberLots, lo
                         <span className="font-semibold"> Peso Neto Total: {totalSelectedNetWeight.toFixed(2)} kg</span>
                     </div>
                     <Button onClick={handleCreateDispatch} disabled={isSubmitting || Object.keys(selectedLots).length === 0}>
-                        {isSubmitting ? 'Creando Despacho...' : 'Crear Despacho Manual'}
+                        {isSubmitting ? 'Creando Solicitud...' : 'Crear Solicitud de Despacho'}
                     </Button>
                 </div>
             </CardContent>

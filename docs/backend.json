@@ -405,12 +405,17 @@
             "required": ["packagingMasterId", "packagingMasterCode", "packagingMasterName", "palletCount"]
           }
         },
+        "status": {
+          "type": "string",
+          "enum": ["Pendiente de Picking", "Completado"],
+          "description": "The status of the exit movement."
+        },
         "createdAt": {
           "type": "string",
           "format": "date-time"
         }
       },
-      "required": ["type", "clientId", "document", "items", "createdAt"]
+      "required": ["type", "clientId", "document", "items", "createdAt", "status"]
     },
      "OtherFruitMovement": {
       "$schema": "http://json-schema.org/draft-07/schema#",
@@ -782,7 +787,7 @@
         },
         "status": {
           "type": "string",
-          "enum": ["Pendiente de Salida", "Completado"],
+          "enum": ["Pendiente de Picking", "Completado"],
           "description": "Status of the dispatch."
         },
         "createdAt": {

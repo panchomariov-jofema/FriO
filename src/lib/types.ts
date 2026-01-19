@@ -105,6 +105,7 @@ export interface PackagingMovement {
   clientId: string;
   document: string;
   items: PackagingMovementItem[];
+  status: 'Pendiente de Picking' | 'Completado';
   createdAt: Timestamp;
 }
 
@@ -227,7 +228,7 @@ export interface Dispatch {
   packingId?: string | null;
   totalBins: number;
   totalNetWeight?: number;
-  status: 'Pendiente de Salida' | 'Completado';
+  status: 'Pendiente de Picking' | 'Completado';
   createdAt: Timestamp;
   bins: {
     chamberLotId: string;

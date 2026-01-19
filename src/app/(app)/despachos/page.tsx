@@ -33,7 +33,7 @@ import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
 import type { ChamberLot, Dispatch, Exporter, Producer, ReceptionLot } from '@/lib/types';
 import { useFirestore } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
-import { collection, query, where, getDocs, writeBatch, serverTimestamp, doc, addDoc, getDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, writeBatch, serverTimestamp, doc, addDoc, getDoc, deleteDoc } from 'firebase/firestore';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -179,7 +179,7 @@ export default function DespachosPage() {
             return acc;
         }, {} as Record<string, { totalBins: number, receptionDate: any, fractions: ChamberLot[] }>);
 
-        // 2. Sort the grouped lots by receptionDate (FIFO)
+        // 2. Sort the grouped lots by receptionDate (FIFO), handling possible nulls
         const sortedGroupedLots = Object.values(groupedLots).sort((a, b) => {
             if (!a.receptionDate) return 1;
             if (!b.receptionDate) return -1;
@@ -202,18 +202,13 @@ export default function DespachosPage() {
             return;
         }
   
-        // 4. Create batch and dispatch document
-        const batch = writeBatch(firestore);
+        // 4. Create dispatch document without touching the chamberLots
         let totalNetWeight = 0;
 
         const dispatchBinsPayload = binsToDispatch.map(lot => {
-            const lotRef = doc(firestore, 'chamberLots', lot.id);
-            batch.update(lotRef, { status: 'Despachado' });
-
             if (lot.netWeightPerBin && lot.netWeightPerBin > 0) {
                 totalNetWeight += lot.binCount * lot.netWeightPerBin;
             }
-
             return {
                 chamberLotId: lot.id,
                 displayLotId: lot.displayLotId,
@@ -222,7 +217,6 @@ export default function DespachosPage() {
                 binCount: lot.binCount,
             };
         });
-
   
         const dispatchData = {
           exporterId: selectedExporter.exporterId,
@@ -230,30 +224,27 @@ export default function DespachosPage() {
           packingId: values.packingId || null,
           totalBins: accumulatedBins,
           totalNetWeight: totalNetWeight,
-          status: 'Pendiente de Salida' as const,
+          status: 'Pendiente de Picking' as const,
           createdAt: serverTimestamp(),
           bins: dispatchBinsPayload,
         };
   
-        const dispatchRef = doc(collection(firestore, 'dispatches'));
-        batch.set(dispatchRef, dispatchData);
-  
-        await batch.commit();
+        await addDoc(collection(firestore, 'dispatches'), dispatchData);
         
         toast({
-          title: 'Despacho Creado',
-          description: `Se ha creado un despacho con ${accumulatedBins} bins para ${selectedExporter.name}.`,
+          title: 'Solicitud de Despacho Creada',
+          description: `Se ha creado una solicitud con ${accumulatedBins} bins para ${selectedExporter.name}.`,
         });
         form.reset({ exporterId: undefined, packingId: undefined, maxBins: 0 });
   
     } catch (error: any) {
-        console.error("Error creating dispatch:", error);
-        toast({ variant: 'destructive', title: 'Error', description: 'Ocurrió un error al crear el despacho.' });
+        console.error("Error creating dispatch request:", error);
+        toast({ variant: 'destructive', title: 'Error', description: 'Ocurrió un error al crear la solicitud de despacho.' });
         errorEmitter.emit(
             'permission-error',
             new FirestorePermissionError({
-                path: 'dispatches or chamberLots',
-                operation: 'write',
+                path: 'dispatches',
+                operation: 'create',
             })
         );
     }
@@ -330,47 +321,24 @@ const handleUndoDispatch = async (dispatchToUndo: Dispatch) => {
     setIsUndoing(true);
 
     try {
-        const batch = writeBatch(firestore);
-
-        // Revert chamber lots
-        for (const bin of dispatchToUndo.bins) {
-            const lotRef = doc(firestore, 'chamberLots', bin.chamberLotId);
-            const lotDoc = await getDoc(lotRef);
-            
-            if (lotDoc.exists()) {
-                const currentLot = lotDoc.data() as ChamberLot;
-                if (currentLot.status === 'Despachado') {
-                    // If it was fully dispatched, just revert status
-                    batch.update(lotRef, { status: 'Almacenado' });
-                } else {
-                    // This case is now less likely as we don't split lots, but keep as safeguard
-                    batch.update(lotRef, { binCount: currentLot.binCount + bin.binCount });
-                }
-            } else {
-              // This case shouldn't happen if dispatch is 'Pendiente', but as a safeguard
-              console.warn(`Lot ${bin.chamberLotId} not found, cannot undo.`);
-            }
-        }
-
-        // Delete the dispatch document
+        // For a pending picking request, we just need to delete the dispatch document.
+        // The stock in chamberLots was never touched.
         const dispatchRef = doc(firestore, 'dispatches', dispatchToUndo.id);
-        batch.delete(dispatchRef);
-
-        await batch.commit();
+        await deleteDoc(dispatchRef);
 
         toast({
-            title: 'Despacho Deshecho',
-            description: `El despacho para ${dispatchToUndo.exporterName} ha sido cancelado y el stock restaurado.`,
+            title: 'Solicitud Deshecha',
+            description: `La solicitud de despacho para ${dispatchToUndo.exporterName} ha sido cancelada.`,
         });
 
     } catch (error: any) {
-        console.error("Error undoing dispatch:", error);
-        toast({ variant: 'destructive', title: 'Error', description: 'Ocurrió un error al deshacer el despacho.' });
+        console.error("Error undoing dispatch request:", error);
+        toast({ variant: 'destructive', title: 'Error', description: 'Ocurrió un error al deshacer la solicitud.' });
         errorEmitter.emit(
             'permission-error',
             new FirestorePermissionError({
-                path: 'dispatches or chamberLots',
-                operation: 'write',
+                path: `dispatches/${dispatchToUndo.id}`,
+                operation: 'delete',
             })
         );
     } finally {
@@ -510,9 +478,9 @@ const handleUndoDispatch = async (dispatchToUndo: Dispatch) => {
         <TabsContent value="automatico">
             <Card>
                 <CardHeader>
-                <CardTitle>Crear Nuevo Despacho Automático</CardTitle>
+                <CardTitle>Crear Solicitud de Despacho Automático</CardTitle>
                 <CardDescription>
-                    Seleccione un cliente y la cantidad de bins a despachar. El sistema asignará los lotes más antiguos (FIFO) sin dividirlos.
+                    Seleccione un cliente y la cantidad de bins. El sistema reservará los lotes más antiguos (FIFO) sin dividirlos para un posterior picking.
                 </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -591,7 +559,7 @@ const handleUndoDispatch = async (dispatchToUndo: Dispatch) => {
                             )}
                         />
                         <Button type="submit" disabled={form.formState.isSubmitting} className="lg:col-span-1">
-                            {form.formState.isSubmitting ? 'Procesando...' : 'Crear Despacho'}
+                            {form.formState.isSubmitting ? 'Procesando...' : 'Crear Solicitud'}
                         </Button>
                     </div>
                     </form>
@@ -612,8 +580,8 @@ const handleUndoDispatch = async (dispatchToUndo: Dispatch) => {
       
       <Card>
         <CardHeader>
-            <CardTitle>Despachos Creados</CardTitle>
-            <CardDescription>Lista de despachos pendientes y completados.</CardDescription>
+            <CardTitle>Solicitudes de Despacho</CardTitle>
+            <CardDescription>Lista de despachos pendientes de picking y completados.</CardDescription>
         </CardHeader>
         <CardContent>
             <div className="rounded-md border">
@@ -640,7 +608,7 @@ const handleUndoDispatch = async (dispatchToUndo: Dispatch) => {
                                     <TableCell className="hidden md:table-cell">{dispatch.totalNetWeight ? `${dispatch.totalNetWeight.toFixed(2)} kg` : '-'}</TableCell>
                                     <TableCell><Badge variant={dispatch.status === 'Completado' ? 'default' : 'secondary'}>{dispatch.status}</Badge></TableCell>
                                     <TableCell className="text-right space-x-2">
-                                        {dispatch.status === 'Pendiente de Salida' && (
+                                        {dispatch.status === 'Pendiente de Picking' && (
                                             <>
                                             <Button variant="outline" size="sm" onClick={() => setPickingDispatch(dispatch)}>
                                                 Hacer Picking
@@ -651,9 +619,9 @@ const handleUndoDispatch = async (dispatchToUndo: Dispatch) => {
                                                 </AlertDialogTrigger>
                                                 <AlertDialogContent>
                                                     <AlertDialogHeader>
-                                                        <AlertDialogTitle>¿Deshacer el despacho?</AlertDialogTitle>
+                                                        <AlertDialogTitle>¿Deshacer la solicitud?</AlertDialogTitle>
                                                         <AlertDialogDescription>
-                                                           Esta acción cancelará el despacho y restaurará el stock a su estado original. Los bins volverán a estar disponibles.
+                                                           Esta acción cancelará la solicitud de despacho. Podrá crearla de nuevo si es necesario.
                                                         </AlertDialogDescription>
                                                     </AlertDialogHeader>
                                                     <AlertDialogFooter>

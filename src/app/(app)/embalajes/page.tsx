@@ -17,6 +17,7 @@ import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
 import type { PackagingReception } from '@/lib/types';
 import { ExitTab } from '@/components/packaging/ExitTab';
 import { StockAndRelocationTab } from '@/components/packaging/StockAndRelocationTab';
+import { PendingPickingTab } from '@/components/packaging/PendingPickingTab';
 
 export default function EmbalajesPage() {
   const firestore = useFirestore();
@@ -87,10 +88,11 @@ export default function EmbalajesPage() {
             </AlertDialog>
           </CardHeader>
           <CardContent>
-            <TabsList className="grid w-full grid-cols-2 md:grid-cols-4">
+            <TabsList className="grid w-full grid-cols-2 md:grid-cols-5">
               <TabsTrigger value="recepcion">Recepción</TabsTrigger>
-              <TabsTrigger value="salidas">Salidas</TabsTrigger>
               <TabsTrigger value="almacenamiento">Pendientes</TabsTrigger>
+              <TabsTrigger value="salidas">Solicitar Salida</TabsTrigger>
+              <TabsTrigger value="picking">Picking Pendiente</TabsTrigger>
               <TabsTrigger value="stock">Stock</TabsTrigger>
             </TabsList>
           </CardContent>
@@ -100,12 +102,16 @@ export default function EmbalajesPage() {
           <ReceptionTab />
         </TabsContent>
         
+        <TabsContent value="almacenamiento">
+          <StorageTab />
+        </TabsContent>
+        
         <TabsContent value="salidas">
           <ExitTab />
         </TabsContent>
 
-        <TabsContent value="almacenamiento">
-          <StorageTab />
+        <TabsContent value="picking">
+            <PendingPickingTab />
         </TabsContent>
 
         <TabsContent value="stock">

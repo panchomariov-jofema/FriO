@@ -18,16 +18,20 @@ import { Download } from 'lucide-react';
 import { z } from 'zod';
 import { packagingExitSchema } from '@/lib/schemas';
 import { Input } from '../ui/input';
+import { PackagingMovement, PackagingReception } from '@/lib/types';
+import { useToast } from '@/hooks/use-toast';
 
 type ExitFormValues = z.infer<typeof packagingExitSchema>;
 
 interface PackagingPickingDialogProps {
-  payload: ExitFormValues | null;
+  movement: PackagingMovement | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onConfirmExit: (payload: ExitFormValues) => void;
   isConfirming: boolean;
   clientName: string;
+  allReceptions: PackagingReception[];
+  loadingReceptions: boolean;
 }
 
 function convertToCSV(data: any[], headers: {key: string, label: string}[]) {
@@ -55,9 +59,104 @@ function downloadCSV(csvString: string, filename: string) {
     }
 }
 
-const flattenPayload = (payload: ExitFormValues) => {
-    if (!payload) return [];
-    return payload.items.flatMap(item => 
+// Helper to get a unique key for a location
+const getLocationKey = (receptionId: string, itemIndex: number) => `${receptionId}_${itemIndex}`;
+
+
+export function PackagingPickingDialog({ movement, open, onOpenChange, onConfirmExit, isConfirming, clientName, allReceptions, loadingReceptions }: PackagingPickingDialogProps) {
+  const { toast } = useToast();
+  const [confirmedPayload, setConfirmedPayload] = React.useState<ExitFormValues | null>(null);
+  const [pickedItems, setPickedItems] = React.useState<Record<string, boolean>>({});
+
+  React.useEffect(() => {
+    if (movement && allReceptions.length > 0) {
+        // This logic runs once when the dialog opens to prepare the picking list.
+        const stockMap: Record<string, { name: string, locations: { locationKey: string, locationString: string, available: number, receptionId: string, itemIndex: number }[] }> = {};
+
+        allReceptions
+            .filter(r => r.clientId === movement.clientId && (r.status === 'Almacenado' || r.status === 'Parcialmente Almacenado'))
+            .forEach(reception => {
+                reception.items.forEach((item, index) => {
+                    if (item.status === 'Almacenado' && item.palletCount > 0 && item.storageLocation) {
+                        if (!stockMap[item.packagingMasterCode]) {
+                            stockMap[item.packagingMasterCode] = { name: item.packagingMasterName, locations: [] };
+                        }
+                        const locationKey = getLocationKey(reception.id, index);
+                        stockMap[item.packagingMasterCode].locations.push({
+                            locationKey,
+                            locationString: `${item.storageLocation.warehouse} / ${item.storageLocation.aisle}`,
+                            available: item.palletCount,
+                            receptionId: reception.id,
+                            itemIndex: index,
+                        });
+                    }
+                });
+            });
+
+        const payload: ExitFormValues = {
+            clientId: movement.clientId,
+            document: movement.document,
+            items: [],
+        };
+
+        const errors: string[] = [];
+
+        for(const requestedItem of movement.items) {
+            const itemStock = stockMap[requestedItem.packagingMasterCode];
+            if (!itemStock) {
+                errors.push(`No hay stock para el artículo ${requestedItem.packagingMasterCode}.`);
+                continue;
+            }
+            
+            let needed = requestedItem.palletCount;
+            const newItem: z.infer<typeof packagingExitSchema.shape.items.element> = {
+                ...requestedItem,
+                palletCount: 0,
+                locations: [],
+            };
+
+            // FIFO: Sort locations by reception date
+            itemStock.locations.sort((a,b) => {
+                const receptionA = allReceptions.find(r => r.id === a.receptionId)!.createdAt.toMillis();
+                const receptionB = allReceptions.find(r => r.id === b.receptionId)!.createdAt.toMillis();
+                return receptionA - receptionB;
+            });
+
+            for (const loc of itemStock.locations) {
+                if (needed > 0) {
+                    const toWithdraw = Math.min(needed, loc.available);
+                    newItem.locations.push({
+                        ...loc,
+                        palletsToWithdraw: toWithdraw,
+                    });
+                    newItem.palletCount += toWithdraw;
+                    needed -= toWithdraw;
+                } else {
+                    break;
+                }
+            }
+
+            if (needed > 0) {
+                errors.push(`Stock insuficiente para ${requestedItem.packagingMasterCode}. Solicitado: ${requestedItem.palletCount}, Disponible: ${requestedItem.palletCount - needed}`);
+            }
+            payload.items.push(newItem);
+        }
+
+        if (errors.length > 0) {
+            toast({ title: 'Error de Stock', description: errors.join(' '), variant: 'destructive'});
+            onOpenChange(false);
+            return;
+        }
+
+        setConfirmedPayload(payload);
+        setPickedItems({});
+
+    }
+  }, [movement, allReceptions, toast, onOpenChange]);
+
+  const flatItems = React.useMemo(() => {
+    if (!confirmedPayload) return [];
+    return confirmedPayload.items.flatMap(item => 
         (item.locations || []).map(loc => ({
             ...loc,
             itemCode: item.packagingMasterCode,
@@ -65,39 +164,9 @@ const flattenPayload = (payload: ExitFormValues) => {
             compositeKey: `${item.packagingMasterCode}_${loc.locationKey}`
         }))
     ).filter(item => item.palletsToWithdraw > 0);
-};
+  }, [confirmedPayload]);
 
-export function PackagingPickingDialog({ payload, open, onOpenChange, onConfirmExit, isConfirming, clientName }: PackagingPickingDialogProps) {
-  const [pickedItems, setPickedItems] = React.useState<Record<string, boolean>>({});
-  const [quantities, setQuantities] = React.useState<Record<string, number>>({});
-
-  const flatItems = React.useMemo(() => payload ? flattenPayload(payload) : [], [payload]);
-
-  React.useEffect(() => {
-    if (payload) {
-      const initialQuantities = flatItems.reduce((acc, item) => {
-        acc[item.compositeKey] = item.palletsToWithdraw;
-        return acc;
-      }, {} as Record<string, number>);
-      setQuantities(initialQuantities);
-      setPickedItems({});
-    }
-  }, [payload, flatItems]);
-
-  if (!payload) return null;
-
-  const handleQuantityChange = (compositeKey: string, available: number, newCountStr: string) => {
-    let newCount = parseInt(newCountStr, 10);
-    if (isNaN(newCount) || newCount < 0) {
-      newCount = 0;
-    }
-    if (newCount > available) {
-      newCount = available;
-    }
-    setQuantities(prev => ({ ...prev, [compositeKey]: newCount }));
-  };
-  
-  const totalPickedPallets = Object.values(quantities).reduce((sum, qty) => sum + qty, 0);
+  if (!movement || !confirmedPayload) return null; // Or a loading state
 
   const handleSelectAll = (checked: boolean | 'indeterminate') => {
     const newPickedItems: Record<string, boolean> = {};
@@ -131,7 +200,7 @@ export function PackagingPickingDialog({ payload, open, onOpenChange, onConfirmE
         codigo: item.itemCode,
         articulo: item.itemName,
         ubicacion: item.locationString,
-        cantidad: quantities[item.compositeKey] ?? item.palletsToWithdraw,
+        cantidad: item.palletsToWithdraw,
     }));
     
     const headers = [
@@ -146,35 +215,7 @@ export function PackagingPickingDialog({ payload, open, onOpenChange, onConfirmE
     downloadCSV(csv, `picking_embalaje_${clientName}_${date}.csv`);
   };
 
-  const handleConfirm = () => {
-    if (!payload) return;
-
-    const newPayload: ExitFormValues = JSON.parse(JSON.stringify(payload));
-    
-    newPayload.items.forEach(item => {
-        let totalPalletsForItem = 0;
-        if (item.locations) {
-            const updatedLocations = item.locations.map(loc => {
-                const compositeKey = `${item.packagingMasterCode}_${loc.locationKey}`;
-                const newQuantity = quantities[compositeKey];
-                
-                if (typeof newQuantity === 'number') {
-                    loc.palletsToWithdraw = newQuantity;
-                }
-                return loc;
-            }).filter(loc => loc.palletsToWithdraw > 0);
-
-            item.locations = updatedLocations;
-            
-            totalPalletsForItem = item.locations.reduce((sum, loc) => sum + loc.palletsToWithdraw, 0);
-        }
-        item.palletCount = totalPalletsForItem;
-    });
-
-    newPayload.items = newPayload.items.filter(item => item.palletCount > 0);
-
-    onConfirmExit(newPayload);
-  }
+  const totalPallets = confirmedPayload.items.reduce((sum, item) => sum + item.palletCount, 0);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -182,7 +223,7 @@ export function PackagingPickingDialog({ payload, open, onOpenChange, onConfirmE
         <DialogHeader>
           <DialogTitle>Picking de Salida de Embalaje: {clientName}</DialogTitle>
           <DialogDescription>
-            Confirme la recolección física de cada artículo y ubicación. Total a retirar: {totalPickedPallets} pallets.
+            Confirme la recolección física de cada artículo y ubicación. Total a retirar: {totalPallets} pallets.
           </DialogDescription>
         </DialogHeader>
         <div>
@@ -219,11 +260,9 @@ export function PackagingPickingDialog({ payload, open, onOpenChange, onConfirmE
                     <TableCell className="text-right">
                        <Input
                             type="number"
-                            value={quantities[item.compositeKey] ?? ''}
-                            onChange={(e) => handleQuantityChange(item.compositeKey, item.available || item.palletsToWithdraw, e.target.value)}
-                            max={item.available || item.palletsToWithdraw}
-                            min={0}
-                            className="h-8 w-24 ml-auto text-right"
+                            value={item.palletsToWithdraw}
+                            readOnly
+                            className="h-8 w-24 ml-auto text-right bg-muted"
                         />
                     </TableCell>
                   </TableRow>
@@ -241,7 +280,7 @@ export function PackagingPickingDialog({ payload, open, onOpenChange, onConfirmE
             <DialogClose asChild>
               <Button type="button" variant="outline">Cancelar</Button>
             </DialogClose>
-            <Button onClick={handleConfirm} disabled={!allItemsPicked || isConfirming}>
+            <Button onClick={() => onConfirmExit(confirmedPayload)} disabled={!allItemsPicked || isConfirming}>
               {isConfirming ? 'Confirmando...' : 'Confirmar Salida'}
             </Button>
           </div>
