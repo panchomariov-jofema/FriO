@@ -124,7 +124,7 @@ export function StoreInChamberDialog({ lot, open, onOpenChange, onStore, allCham
         }
 
         if (bestSuggestion) {
-            form.setValue('coordinate', bestSuggestion);
+            form.setValue('coordinate', bestSuggestion, { shouldValidate: true });
         } else {
             form.resetField('coordinate');
         }
