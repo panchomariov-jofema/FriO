@@ -9,7 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { StoreInChamberDialog } from '@/components/hidrocooler/StoreInChamberDialog';
-import { collection, doc, writeBatch, getDocs, updateDoc, getDoc } from 'firebase/firestore';
+import { collection, doc, writeBatch, getDocs, updateDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 import { useFirestore } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { errorEmitter } from '@/firebase/error-emitter';
@@ -191,45 +191,48 @@ export default function CamarasPage() {
 
   const handleStoreInChamber = async ({ chamberId, coordinate: startCoordinate }: { chamberId: string; coordinate: string; }) => {
     if (!lotToStore || !firestore) return;
-
+  
+    const BINS_PER_COORDINATE = 6;
     const chamberConfig = chambersConfig[chamberId];
-    // Find all stored lots to calculate occupancy
-    const storedInChamber = (chamberLots || []).filter(l => l.chamberId === chamberId && l.coordinate);
-    const occupiedCoordinates = storedInChamber.reduce((acc, lot) => {
-        if (lot.coordinate) {
-          if (!acc[lot.coordinate]) acc[lot.coordinate] = [];
-           acc[lot.coordinate].push(lot);
-        }
+  
+    // Build the initial occupancy map from ALL stored items
+    const occupiedCoordinates = (allLotsInChambers || [])
+      .filter(l => l.status === 'Almacenado' && l.chamberId === chamberId && l.coordinate)
+      .reduce((acc, lot) => {
+        if (!acc[lot.coordinate!]) acc[lot.coordinate!] = [];
+        acc[lot.coordinate!].push(lot);
         return acc;
     }, {} as Record<string, ChamberLot[]>);
-
+    
+    (otherFruitReceptions || []).forEach(reception => {
+        reception.items.forEach(item => {
+            if (item.status === 'Almacenado' && item.storageLocation?.chamberId === chamberId && item.storageLocation.coordinate) {
+                if (!occupiedCoordinates[item.storageLocation.coordinate]) {
+                    occupiedCoordinates[item.storageLocation.coordinate] = [];
+                }
+            }
+        });
+    });
+    
     const allPossibleCoordinates = chamberConfig.columns
         .flatMap(col => chamberConfig.rows.map(row => `${col}${row}`))
         .filter(coord => !chamberConfig.blocked?.includes(coord))
         .sort(naturalSort);
-    
-    const startIndex = allPossibleCoordinates.indexOf(startCoordinate);
-    if (startIndex === -1) {
-        toast({ variant: 'destructive', title: 'Error de Coordenada', description: 'La coordenada de inicio seleccionada ya no está disponible o es inválida.' });
-        return;
-    }
-    
-    // Use only coordinates from the starting point onwards
-    const coordinatesToSearch = allPossibleCoordinates.slice(startIndex);
 
     let binsToStore = lotToStore.binCount;
     const batch = writeBatch(firestore);
     
-    // First, try to fill partially filled coordinates of the same lot that appear AFTER the start coordinate
-    for (const coord of coordinatesToSearch) {
+    // --- PASS 1: Fill partially filled coordinates of the same lot ANYWHERE in the chamber ---
+    for (const coord of allPossibleCoordinates) {
         if (binsToStore === 0) break;
-        
+
         const lotsInCoord = occupiedCoordinates[coord];
         if (lotsInCoord && lotsInCoord.length > 0) {
             const isSameLot = lotsInCoord.every(l => l.displayLotId === lotToStore.displayLotId);
             if (isSameLot) {
                 const binsInCoord = lotsInCoord.reduce((sum, l) => sum + l.binCount, 0);
-                const spaceAvailable = 6 - binsInCoord;
+                const spaceAvailable = BINS_PER_COORDINATE - binsInCoord;
+                
                 if (spaceAvailable > 0) {
                     const binsToAdd = Math.min(binsToStore, spaceAvailable);
                     
@@ -240,39 +243,54 @@ export default function CamarasPage() {
                         binCount: binsToAdd,
                         chamberId: chamberId,
                         coordinate: coord,
-                        status: 'Almacenado'
+                        status: 'Almacenado',
+                        storedAt: serverTimestamp()
                     });
                     binsToStore -= binsToAdd;
-                    if (!occupiedCoordinates[coord]) occupiedCoordinates[coord] = [];
-                    occupiedCoordinates[coord].push({ ...lotToStore, binCount: binsToAdd, chamberId, coordinate: coord } as ChamberLot);
+                    
+                    // Live update local map
+                    occupiedCoordinates[coord].push({...lotToStore, binCount: binsToAdd} as ChamberLot);
                 }
             }
         }
     }
     
-    // Then, fill empty coordinates AFTER the start coordinate
-    for (const coord of coordinatesToSearch) {
-        if (binsToStore === 0) break;
+    // --- PASS 2: Fill empty coordinates starting from the user's selection ---
+    if (binsToStore > 0) {
+        const startIndex = allPossibleCoordinates.indexOf(startCoordinate);
+        if (startIndex === -1) {
+            toast({ variant: 'destructive', title: 'Error de Coordenada', description: 'La coordenada de inicio seleccionada ya no está disponible o es inválida.' });
+            return;
+        }
 
-        if (!occupiedCoordinates[coord]) {
-            const binsToAdd = Math.min(binsToStore, 6);
-            
-            const newLotFractionRef = doc(collection(firestore, 'chamberLots'));
-            batch.set(newLotFractionRef, {
-                ...lotToStore,
-                id: newLotFractionRef.id,
-                binCount: binsToAdd,
-                chamberId: chamberId,
-                coordinate: coord,
-                status: 'Almacenado'
-            });
-            binsToStore -= binsToAdd;
-            occupiedCoordinates[coord] = [{ ...lotToStore, binCount: binsToAdd, chamberId, coordinate: coord } as ChamberLot];
+        const coordinatesToSearch = allPossibleCoordinates.slice(startIndex);
+        for (const coord of coordinatesToSearch) {
+            if (binsToStore === 0) break;
+
+            if (!occupiedCoordinates[coord]) { // Check if the coordinate is truly empty
+                const binsToAdd = Math.min(binsToStore, BINS_PER_COORDINATE);
+                
+                const newLotFractionRef = doc(collection(firestore, 'chamberLots'));
+                batch.set(newLotFractionRef, {
+                    ...lotToStore,
+                    id: newLotFractionRef.id,
+                    binCount: binsToAdd,
+                    chamberId: chamberId,
+                    coordinate: coord,
+                    status: 'Almacenado',
+                    storedAt: serverTimestamp()
+                });
+                binsToStore -= binsToAdd;
+                
+                // Live update local map
+                occupiedCoordinates[coord] = [{...lotToStore, binCount: binsToAdd} as ChamberLot]; 
+            }
         }
     }
 
+
     if (binsToStore > 0) {
-        toast({ variant: 'destructive', title: 'Error de espacio', description: `No se encontraron coordenadas suficientes para almacenar todos los bins desde la ubicación ${startCoordinate}.` });
+        toast({ variant: 'destructive', title: 'Error de espacio', description: `No se encontraron coordenadas suficientes para almacenar todos los bins desde la ubicación ${startCoordinate}. Quedaron ${binsToStore} sin almacenar.` });
         return;
     }
 
@@ -479,7 +497,7 @@ export default function CamarasPage() {
                 <AlertDialogHeader>
                     <AlertDialogTitle>¿Está seguro de limpiar todo el stock?</AlertDialogTitle>
                     <AlertDialogDescription>
-                        Esta acción no se puede deshacer. Se eliminarán permanentemente TODOS los lotes
+                        Esta acción no se puede deshacer. Se eliminarán permanentemente TODAS las lotes
                         almacenados en las cámaras. Esta herramienta es solo para fines de desarrollo y pruebas.
                     </AlertDialogDescription>
                 </AlertDialogHeader>
