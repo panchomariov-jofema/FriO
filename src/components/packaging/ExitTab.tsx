@@ -51,12 +51,14 @@ export function ExitTab() {
   const selectedClientId = form.watch('clientId');
 
   const packagingClients = React.useMemo(() => {
-    return (allClients || []).filter(c => c.type.toLowerCase() === 'embalaje');
+    const filtered = (allClients || []).filter(c => c.type.toLowerCase() === 'embalaje');
+    return [...new Map(filtered.map(item => [item.id, item])).values()];
   }, [allClients]);
 
   const clientPackagingMasters = React.useMemo(() => {
       if (!selectedClientId) return [];
-      return (allPackagingMasters || []).filter(m => m.clientId === selectedClientId);
+      const filtered = (allPackagingMasters || []).filter(m => m.clientId === selectedClientId);
+      return [...new Map(filtered.map(item => [item.id, item])).values()];
   }, [selectedClientId, allPackagingMasters]);
 
 
