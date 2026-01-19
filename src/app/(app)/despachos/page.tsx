@@ -259,26 +259,47 @@ export default function DespachosPage() {
     }
   };
 
-  const handleConfirmDispatch = async (dispatchToConfirm: Dispatch) => {
+  const handleConfirmDispatch = async (dispatchToConfirm: Dispatch, pickedQuantities: Record<string, number>) => {
     if (!firestore) return;
     setIsConfirming(true);
 
     try {
         const batch = writeBatch(firestore);
 
-        const lotsToDelete = dispatchToConfirm.bins.map(bin => bin.chamberLotId);
-        const uniqueLotsToDelete = [...new Set(lotsToDelete)];
+        const chamberLotMap = new Map((chamberLots || []).map(lot => [lot.id, lot]));
+        
+        const finalBins: Dispatch['bins'] = [];
+        let finalTotalBins = 0;
+        let finalTotalNetWeight = 0;
 
-        for (const lotId of uniqueLotsToDelete) {
-             const lotRef = doc(firestore, 'chamberLots', lotId);
-             const lotDoc = await getDoc(lotRef);
-             if (lotDoc.exists() && lotDoc.data().status === 'Despachado') {
-                 batch.delete(lotRef);
-             }
+        // Recalculate final values based on picked quantities
+        for (const originalBin of dispatchToConfirm.bins) {
+            const pickedCount = pickedQuantities[originalBin.chamberLotId] ?? 0;
+            if (pickedCount > 0) {
+                const lotData = chamberLotMap.get(originalBin.chamberLotId);
+                finalTotalBins += pickedCount;
+                if (lotData?.netWeightPerBin) {
+                    finalTotalNetWeight += pickedCount * lotData.netWeightPerBin;
+                }
+                finalBins.push({ ...originalBin, binCount: pickedCount });
+            }
         }
-
+        
+        // Update the dispatch document with the final corrected data
         const dispatchRef = doc(firestore, 'dispatches', dispatchToConfirm.id);
-        batch.update(dispatchRef, { status: 'Completado' });
+        batch.update(dispatchRef, {
+            status: 'Completado',
+            bins: finalBins,
+            totalBins: finalTotalBins,
+            totalNetWeight: finalTotalNetWeight,
+        });
+
+        // Delete the original chamberLot documents associated with this dispatch.
+        // This is the "correction" part. The original record is removed.
+        for (const bin of dispatchToConfirm.bins) {
+             const lotRef = doc(firestore, 'chamberLots', bin.chamberLotId);
+             batch.delete(lotRef);
+        }
 
         await batch.commit();
 
@@ -302,6 +323,7 @@ export default function DespachosPage() {
         setPickingDispatch(null);
     }
 };
+
 
 const handleUndoDispatch = async (dispatchToUndo: Dispatch) => {
     if (!firestore) return;

@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -17,12 +18,13 @@ import type { Dispatch } from '@/lib/types';
 import { ScrollArea } from '../ui/scroll-area';
 import { Download } from 'lucide-react';
 import { naturalSort } from '@/lib/utils';
+import { Input } from '../ui/input';
 
 interface DispatchPickingDialogProps {
   dispatch: Dispatch | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onConfirmDispatch: (dispatch: Dispatch) => void;
+  onConfirmDispatch: (dispatch: Dispatch, quantities: Record<string, number>) => void;
   isConfirming: boolean;
 }
 
@@ -53,14 +55,33 @@ function downloadCSV(csvString: string, filename: string) {
 
 export function DispatchPickingDialog({ dispatch, open, onOpenChange, onConfirmDispatch, isConfirming }: DispatchPickingDialogProps) {
   const [pickedItems, setPickedItems] = React.useState<Record<string, boolean>>({});
+  const [quantities, setQuantities] = React.useState<Record<string, number>>({});
 
   React.useEffect(() => {
     if (dispatch) {
       setPickedItems({});
+      const initialQuantities = dispatch.bins.reduce((acc, bin) => {
+        acc[bin.chamberLotId] = bin.binCount;
+        return acc;
+      }, {} as Record<string, number>);
+      setQuantities(initialQuantities);
     }
   }, [dispatch]);
 
   if (!dispatch) return null;
+
+  const handleQuantityChange = (chamberLotId: string, originalCount: number, newCountStr: string) => {
+    let newCount = parseInt(newCountStr, 10);
+    if (isNaN(newCount) || newCount < 0) {
+      newCount = 0;
+    }
+    if (newCount > originalCount) {
+      newCount = originalCount;
+    }
+    setQuantities(prev => ({ ...prev, [chamberLotId]: newCount }));
+  };
+
+  const totalPickedBins = Object.values(quantities).reduce((sum, qty) => sum + qty, 0);
 
   const allItems = [...dispatch.bins].sort((a, b) => naturalSort(a.coordinate, b.coordinate));
   const allItemsPicked = allItems.length > 0 && allItems.every(item => pickedItems[item.chamberLotId]);
@@ -96,7 +117,7 @@ export function DispatchPickingDialog({ dispatch, open, onOpenChange, onConfirmD
         lote: item.displayLotId,
         camara: item.chamberId,
         coordenada: item.coordinate,
-        bins: item.binCount,
+        bins: quantities[item.chamberLotId] ?? item.binCount,
     }));
     
     const headers = [
@@ -117,7 +138,7 @@ export function DispatchPickingDialog({ dispatch, open, onOpenChange, onConfirmD
         <DialogHeader>
           <DialogTitle>Picking de Despacho: {dispatch.exporterName}</DialogTitle>
           <DialogDescription>
-            Confirme la recolección física de cada ubicación. Total: {dispatch.totalBins} bins.
+            Confirme la recolección física de cada ubicación. Total a despachar: {totalPickedBins} bins.
           </DialogDescription>
         </DialogHeader>
         <div>
@@ -135,7 +156,7 @@ export function DispatchPickingDialog({ dispatch, open, onOpenChange, onConfirmD
                   <TableHead>Lote</TableHead>
                   <TableHead>Cámara</TableHead>
                   <TableHead>Coordenada</TableHead>
-                  <TableHead>Bins</TableHead>
+                  <TableHead className="w-24">Bins</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -150,7 +171,16 @@ export function DispatchPickingDialog({ dispatch, open, onOpenChange, onConfirmD
                     <TableCell>{bin.displayLotId}</TableCell>
                     <TableCell>{bin.chamberId}</TableCell>
                     <TableCell>{bin.coordinate}</TableCell>
-                    <TableCell>{bin.binCount}</TableCell>
+                    <TableCell>
+                      <Input
+                        type="number"
+                        value={quantities[bin.chamberLotId] ?? ''}
+                        onChange={(e) => handleQuantityChange(bin.chamberLotId, bin.binCount, e.target.value)}
+                        max={bin.binCount}
+                        min={0}
+                        className="h-8 w-20"
+                      />
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -166,7 +196,7 @@ export function DispatchPickingDialog({ dispatch, open, onOpenChange, onConfirmD
             <DialogClose asChild>
               <Button type="button" variant="outline">Cancelar</Button>
             </DialogClose>
-            <Button onClick={() => onConfirmDispatch(dispatch)} disabled={!allItemsPicked || isConfirming}>
+            <Button onClick={() => onConfirmDispatch(dispatch, quantities)} disabled={!allItemsPicked || isConfirming}>
               {isConfirming ? 'Confirmando...' : 'Confirmar Salida'}
             </Button>
           </div>
