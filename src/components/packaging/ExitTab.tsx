@@ -31,6 +31,7 @@ const defaultItem = {
 export function ExitTab() {
   const { data: allClients, loading: loadingClients } = useFirestoreCollection<OtherClient>('otherClients');
   const { data: allPackagingMasters, loading: loadingMasters } = useFirestoreCollection<PackagingMaster>('packagingMaster');
+  const { data: allReceptions, loading: loadingReceptions } = useFirestoreCollection<PackagingReception>('packagingReceptions');
   const firestore = useFirestore();
   const { toast } = useToast();
   
@@ -55,11 +56,28 @@ export function ExitTab() {
     return [...new Map(filtered.map(item => [item.id, item])).values()];
   }, [allClients]);
 
+  const inStockMasterCodes = React.useMemo(() => {
+    if (!selectedClientId || !allReceptions) return new Set<string>();
+
+    const codes = new Set<string>();
+    allReceptions.forEach(reception => {
+        if (reception.clientId === selectedClientId) {
+            reception.items.forEach(item => {
+                if (item.status === 'Almacenado' && item.palletCount > 0) {
+                    codes.add(item.packagingMasterCode);
+                }
+            });
+        }
+    });
+    return codes;
+  }, [selectedClientId, allReceptions]);
+  
   const clientPackagingMasters = React.useMemo(() => {
       if (!selectedClientId) return [];
-      const filtered = (allPackagingMasters || []).filter(m => m.clientId === selectedClientId);
-      return [...new Map(filtered.map(item => [item.id, item])).values()];
-  }, [selectedClientId, allPackagingMasters]);
+      const mastersForClient = (allPackagingMasters || []).filter(m => m.clientId === selectedClientId);
+      const inStockMasters = mastersForClient.filter(m => inStockMasterCodes.has(m.code));
+      return [...new Map(inStockMasters.map(item => [item.id, item])).values()];
+  }, [selectedClientId, allPackagingMasters, inStockMasterCodes]);
 
 
   const onSubmit = async (values: ExitFormValues) => {
@@ -117,7 +135,7 @@ export function ExitTab() {
     }
   };
 
-  const isLoading = loadingClients || loadingMasters;
+  const isLoading = loadingClients || loadingMasters || loadingReceptions;
 
   return (
     <>
