@@ -97,9 +97,19 @@
   body * {
     visibility: hidden;
   }
+
   .printable-area, .printable-area * {
     visibility: visible;
   }
+
+  div[data-radix-portal] {
+      visibility: visible !important;
+  }
+  
+  div[data-radix-dialog-overlay] {
+      visibility: hidden !important;
+  }
+
   .printable-area {
     position: absolute !important;
     left: 0 !important;
@@ -109,15 +119,17 @@
     padding: 1rem !important;
     border: none !important;
     box-shadow: none !important;
+    overflow: visible !important;
+    background: white !important;
+    color: black !important;
   }
-  /* Un-style the scroll area for printing to show all content */
-  .printable-area .max-h-96 {
+  
+  .printable-area .max-h-96, .printable-area [data-radix-scroll-area-viewport] {
       max-height: none !important;
-  }
-  .printable-area [data-radix-scroll-area-viewport] {
       overflow-y: visible !important;
       height: auto !important;
   }
+  
   .no-print {
     display: none !important;
   }
