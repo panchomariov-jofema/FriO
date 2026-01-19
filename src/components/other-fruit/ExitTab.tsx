@@ -233,7 +233,7 @@ export function OtherFruitExitTab() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Registrar Salida de Fruta (Otros Clientes)</CardTitle>
+        <CardTitle>Registrar Despacho de Fruta (Otros Clientes)</CardTitle>
         <CardDescription>
           Seleccione un cliente para ver su stock. Expanda cada lote para despachar una cantidad específica de cada coordenada.
         </CardDescription>
@@ -250,7 +250,7 @@ export function OtherFruitExitTab() {
               </Select>
             </div>
             <div>
-              <Label>Documento de Salida (Opcional)</Label>
+              <Label>Documento de Despacho (Opcional)</Label>
               <Input placeholder="Ej: Vale de consumo, Guía..." value={document} onChange={(e) => setDocument(e.target.value)} disabled={!selectedClientId} />
             </div>
         </div>
