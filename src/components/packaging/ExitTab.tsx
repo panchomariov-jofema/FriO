@@ -76,7 +76,8 @@ export function ExitTab() {
       if (!selectedClientId) return [];
       const mastersForClient = (allPackagingMasters || []).filter(m => m.clientId === selectedClientId);
       const inStockMasters = mastersForClient.filter(m => inStockMasterCodes.has(m.code));
-      return [...new Map(inStockMasters.map(item => [item.id, item])).values()];
+      // Deduplicate by 'code' to ensure unique values in the dropdown
+      return [...new Map(inStockMasters.map(item => [item.code, item])).values()];
   }, [selectedClientId, allPackagingMasters, inStockMasterCodes]);
 
 
@@ -192,7 +193,7 @@ export function ExitTab() {
                                     </SelectTrigger></FormControl>
                                     <SelectContent>
                                       {clientPackagingMasters.map((m) => (
-                                          <SelectItem key={m.id} value={m.code}>{m.code} - {m.name}</SelectItem>
+                                          <SelectItem key={m.code} value={m.code}>{m.code} - {m.name}</SelectItem>
                                       ))}
                                     </SelectContent>
                                 </Select>
