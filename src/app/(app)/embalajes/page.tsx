@@ -90,7 +90,7 @@ export default function EmbalajesPage() {
           <CardContent>
             <TabsList className="grid w-full grid-cols-2 md:grid-cols-5">
               <TabsTrigger value="recepcion">Recepción</TabsTrigger>
-              <TabsTrigger value="almacenamiento">Pendientes</TabsTrigger>
+              <TabsTrigger value="almacenamiento">Almacenamiento</TabsTrigger>
               <TabsTrigger value="salidas">Solicitar Salida</TabsTrigger>
               <TabsTrigger value="picking">Picking Pendiente</TabsTrigger>
               <TabsTrigger value="stock">Stock</TabsTrigger>
