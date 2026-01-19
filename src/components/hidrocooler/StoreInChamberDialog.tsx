@@ -8,14 +8,19 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import type { ChamberLot } from '@/lib/types';
+import type { ChamberLot, OtherFruitReception } from '@/lib/types';
 import { chambersConfig, exporterChamberAssignments } from '@/lib/chambers-config';
+import { naturalSort } from '@/lib/utils';
+import { AlertCircle } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 
 interface StoreInChamberDialogProps {
   lot: ChamberLot | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onStore: (data: { chamberId: string }) => void;
+  allChamberLots: ChamberLot[];
+  allOtherFruitReceptions: OtherFruitReception[];
 }
 
 const storeSchema = z.object({
@@ -24,7 +29,7 @@ const storeSchema = z.object({
 
 type StoreFormValues = z.infer<typeof storeSchema>;
 
-export function StoreInChamberDialog({ lot, open, onOpenChange, onStore }: StoreInChamberDialogProps) {
+export function StoreInChamberDialog({ lot, open, onOpenChange, onStore, allChamberLots, allOtherFruitReceptions }: StoreInChamberDialogProps) {
   const form = useForm<StoreFormValues>({
     resolver: zodResolver(storeSchema),
     defaultValues: {
@@ -32,27 +37,81 @@ export function StoreInChamberDialog({ lot, open, onOpenChange, onStore }: Store
     }
   });
 
+  const selectedChamberId = form.watch('chamberId');
+  const [suggestion, setSuggestion] = React.useState<string | null>(null);
+
   const availableChambers = React.useMemo(() => {
     if (!lot) return [];
     
     const assignedChamberIds = exporterChamberAssignments[lot.exporterId];
     
-    // If the exporter has specific chambers assigned, filter by them
     if (assignedChamberIds && assignedChamberIds.length > 0) {
         return Object.values(chambersConfig).filter(chamber => 
             assignedChamberIds.includes(chamber.id)
         );
     }
     
-    // If no specific assignment, show all chambers
     return Object.values(chambersConfig);
 
   }, [lot]);
+
+  React.useEffect(() => {
+      if (selectedChamberId && lot) {
+        const chamberConfig = chambersConfig[selectedChamberId];
+        if (!chamberConfig) {
+            setSuggestion(null);
+            return;
+        };
+
+        const allPossibleCoordinates = chamberConfig.columns
+            .flatMap(col => chamberConfig.rows.map(row => `${col}${row}`))
+            .filter(coord => !chamberConfig.blocked?.includes(coord))
+            .sort(naturalSort);
+        
+        const occupiedCoordinates = new Set<string>();
+
+        // Find partially filled coordinates of the same lot first
+        const sameLotPartiallyFilledCoords = new Map<string, number>();
+        (allChamberLots || [])
+            .filter(l => l.chamberId === selectedChamberId && l.displayLotId === lot.displayLotId && l.coordinate)
+            .forEach(l => {
+                occupiedCoordinates.add(l.coordinate!);
+                const currentBins = sameLotPartiallyFilledCoords.get(l.coordinate!) || 0;
+                sameLotPartiallyFilledCoords.set(l.coordinate!, currentBins + l.binCount);
+            });
+        
+        for (const [coord, binsInCoord] of sameLotPartiallyFilledCoords.entries()) {
+            if (binsInCoord < 6) {
+                setSuggestion(coord);
+                return;
+            }
+        }
+        
+        // Find fully occupied coordinates from other lots
+        (allChamberLots || [])
+            .filter(l => l.chamberId === selectedChamberId && l.displayLotId !== lot.displayLotId && l.coordinate)
+            .forEach(l => occupiedCoordinates.add(l.coordinate!));
+        
+        (allOtherFruitReceptions || []).forEach(reception => {
+            reception.items.forEach(item => {
+                if(item.status === 'Almacenado' && item.storageLocation?.chamberId === selectedChamberId && item.storageLocation.coordinate) {
+                    occupiedCoordinates.add(item.storageLocation.coordinate);
+                }
+            });
+        });
+
+        const firstAvailable = allPossibleCoordinates.find(coord => !occupiedCoordinates.has(coord));
+        setSuggestion(firstAvailable || 'No disponible');
+      } else {
+        setSuggestion(null);
+      }
+  }, [selectedChamberId, lot, allChamberLots, allOtherFruitReceptions]);
 
 
   React.useEffect(() => {
     if (open) {
       form.reset({ chamberId: undefined });
+      setSuggestion(null);
     }
   }, [form, open]);
 
@@ -68,7 +127,7 @@ export function StoreInChamberDialog({ lot, open, onOpenChange, onStore }: Store
         <DialogHeader>
           <DialogTitle>Almacenar Lote: {lot.displayLotId}</DialogTitle>
           <DialogDescription>
-            Seleccione la cámara de destino para los {lot.binCount} bins del exportador <span className='font-bold'>{lot.exporterId}</span>. El sistema asignará la primera coordenada disponible.
+            Seleccione la cámara de destino para los {lot.binCount} bins del exportador <span className='font-bold'>{lot.exporterId}</span>.
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -100,11 +159,24 @@ export function StoreInChamberDialog({ lot, open, onOpenChange, onStore }: Store
                 </FormItem>
               )}
             />
+
+            {suggestion && (
+                <Alert variant={suggestion === 'No disponible' ? 'destructive' : 'default'}>
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertTitle>Ubicación Sugerida</AlertTitle>
+                    <AlertDescription>
+                        {suggestion === 'No disponible'
+                        ? 'No hay espacio disponible en esta cámara.'
+                        : <>Diríjase a la ubicación: <span className="font-bold font-mono">{suggestion}</span></>}
+                    </AlertDescription>
+                </Alert>
+            )}
+
             <DialogFooter>
               <DialogClose asChild>
                 <Button type="button" variant="outline">Cancelar</Button>
               </DialogClose>
-              <Button type="submit">Confirmar Almacenamiento</Button>
+              <Button type="submit" disabled={!selectedChamberId || suggestion === 'No disponible'}>Confirmar Almacenamiento</Button>
             </DialogFooter>
           </form>
         </Form>

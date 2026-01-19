@@ -597,6 +597,8 @@ export default function CamarasPage() {
             open={isStoreDialogOpen}
             onOpenChange={setStoreDialogOpen}
             onStore={handleStoreInChamber}
+            allChamberLots={allLotsInChambers}
+            allOtherFruitReceptions={otherFruitReceptions || []}
         />
       )}
 
