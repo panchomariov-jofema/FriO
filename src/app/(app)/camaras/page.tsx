@@ -17,26 +17,12 @@ import { FirestorePermissionError } from '@/firebase/errors';
 import { chambersConfig, exporterChamberAssignments } from '@/lib/chambers-config';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { cn } from '@/lib/utils';
+import { cn, naturalSort } from '@/lib/utils';
 import { Progress } from '@/components/ui/progress';
 import { RelocateLotDialog } from '@/components/camaras/RelocateLotDialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Trash2 } from 'lucide-react';
 import { ExternalReceptionUploader } from '@/components/hidrocooler/ExternalReceptionUploader';
-
-// Helper for natural sorting (e.g., A1, A2, ... A10)
-const naturalSort = (a: string, b: string) => {
-  const re = /(\d+)/;
-  const aNum = parseInt(a.split(re)[1] || '0', 10);
-  const bNum = parseInt(b.split(re)[1] || '0', 10);
-  const aLetter = a.split(re)[0];
-  const bLetter = b.split(re)[0];
-
-  if (aLetter < bLetter) return -1;
-  if (aLetter > bLetter) return 1;
-
-  return aNum - bNum;
-};
 
 // --- Color Palette Logic (Moved outside component to persist state) ---
 
@@ -203,12 +189,12 @@ export default function CamarasPage() {
     setRelocateDialogOpen(true);
   }
 
-  const handleStoreInChamber = async ({ chamberId }: { chamberId: string; }) => {
+  const handleStoreInChamber = async ({ chamberId, coordinate: startCoordinate }: { chamberId: string; coordinate: string; }) => {
     if (!lotToStore || !firestore) return;
 
     const chamberConfig = chambersConfig[chamberId];
-    const allStoredLots = chamberLots || [];
-    const storedInChamber = allStoredLots.filter(l => l.chamberId === chamberId && l.coordinate);
+    // Find all stored lots to calculate occupancy
+    const storedInChamber = (chamberLots || []).filter(l => l.chamberId === chamberId && l.coordinate);
     const occupiedCoordinates = storedInChamber.reduce((acc, lot) => {
         if (lot.coordinate) {
           if (!acc[lot.coordinate]) acc[lot.coordinate] = [];
@@ -221,12 +207,21 @@ export default function CamarasPage() {
         .flatMap(col => chamberConfig.rows.map(row => `${col}${row}`))
         .filter(coord => !chamberConfig.blocked?.includes(coord))
         .sort(naturalSort);
+    
+    const startIndex = allPossibleCoordinates.indexOf(startCoordinate);
+    if (startIndex === -1) {
+        toast({ variant: 'destructive', title: 'Error de Coordenada', description: 'La coordenada de inicio seleccionada ya no está disponible o es inválida.' });
+        return;
+    }
+    
+    // Use only coordinates from the starting point onwards
+    const coordinatesToSearch = allPossibleCoordinates.slice(startIndex);
 
     let binsToStore = lotToStore.binCount;
     const batch = writeBatch(firestore);
     
-    // First, try to fill partially filled coordinates of the same lot
-    for (const coord of allPossibleCoordinates) {
+    // First, try to fill partially filled coordinates of the same lot that appear AFTER the start coordinate
+    for (const coord of coordinatesToSearch) {
         if (binsToStore === 0) break;
         
         const lotsInCoord = occupiedCoordinates[coord];
@@ -248,13 +243,15 @@ export default function CamarasPage() {
                         status: 'Almacenado'
                     });
                     binsToStore -= binsToAdd;
+                    if (!occupiedCoordinates[coord]) occupiedCoordinates[coord] = [];
+                    occupiedCoordinates[coord].push({ ...lotToStore, binCount: binsToAdd, chamberId, coordinate: coord } as ChamberLot);
                 }
             }
         }
     }
     
-    // Then, fill empty coordinates
-    for (const coord of allPossibleCoordinates) {
+    // Then, fill empty coordinates AFTER the start coordinate
+    for (const coord of coordinatesToSearch) {
         if (binsToStore === 0) break;
 
         if (!occupiedCoordinates[coord]) {
@@ -270,11 +267,12 @@ export default function CamarasPage() {
                 status: 'Almacenado'
             });
             binsToStore -= binsToAdd;
+            occupiedCoordinates[coord] = [{ ...lotToStore, binCount: binsToAdd, chamberId, coordinate: coord } as ChamberLot];
         }
     }
 
     if (binsToStore > 0) {
-        toast({ variant: 'destructive', title: 'Error de espacio', description: 'No se encontraron coordenadas suficientes para almacenar todos los bins.' });
+        toast({ variant: 'destructive', title: 'Error de espacio', description: `No se encontraron coordenadas suficientes para almacenar todos los bins desde la ubicación ${startCoordinate}.` });
         return;
     }
 
