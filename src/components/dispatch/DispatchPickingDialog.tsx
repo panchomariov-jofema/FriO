@@ -15,7 +15,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 import type { Dispatch } from '@/lib/types';
 import { ScrollArea } from '../ui/scroll-area';
-import { Printer } from 'lucide-react';
+import { Download } from 'lucide-react';
 import { naturalSort } from '@/lib/utils';
 
 interface DispatchPickingDialogProps {
@@ -26,6 +26,31 @@ interface DispatchPickingDialogProps {
   isConfirming: boolean;
 }
 
+function convertToCSV(data: any[], headers: {key: string, label: string}[]) {
+    const headerRow = headers.map(h => h.label).join(';');
+    const rows = data.map(row => 
+        headers.map(header => {
+            const stringValue = String(row[header.key] ?? '');
+            return `"${stringValue.replace(/"/g, '""')}"`;
+        }).join(';')
+    );
+    return [headerRow, ...rows].join('\n');
+}
+
+function downloadCSV(csvString: string, filename: string) {
+    const blob = new Blob([`\uFEFF${csvString}`], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    if (link.download !== undefined) {
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        link.setAttribute('download', filename);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+}
+
 export function DispatchPickingDialog({ dispatch, open, onOpenChange, onConfirmDispatch, isConfirming }: DispatchPickingDialogProps) {
   const [pickedItems, setPickedItems] = React.useState<Record<string, boolean>>({});
 
@@ -34,10 +59,6 @@ export function DispatchPickingDialog({ dispatch, open, onOpenChange, onConfirmD
       setPickedItems({});
     }
   }, [dispatch]);
-
-  const handlePrint = () => {
-    window.print();
-  };
 
   if (!dispatch) return null;
 
@@ -70,10 +91,30 @@ export function DispatchPickingDialog({ dispatch, open, onOpenChange, onConfirmD
   const allItemsCount = allItems.length;
   const selectAllState = checkedCount === allItemsCount && allItemsCount > 0 ? true : checkedCount === 0 ? false : 'indeterminate';
 
+  const handleExportCSV = () => {
+    const dataToExport = allItems.map(item => ({
+        lote: item.displayLotId,
+        camara: item.chamberId,
+        coordenada: item.coordinate,
+        bins: item.binCount,
+    }));
+    
+    const headers = [
+        { key: 'lote', label: 'Lote' },
+        { key: 'camara', label: 'Cámara' },
+        { key: 'coordenada', label: 'Coordenada' },
+        { key: 'bins', label: 'Bins' },
+    ];
+    
+    const csv = convertToCSV(dataToExport, headers);
+    const date = new Date().toISOString().split('T')[0];
+    downloadCSV(csv, `picking_despacho_${dispatch.exporterName}_${date}.csv`);
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl printable-area">
-        <DialogHeader className="no-print">
+      <DialogContent className="max-w-3xl">
+        <DialogHeader>
           <DialogTitle>Picking de Despacho: {dispatch.exporterName}</DialogTitle>
           <DialogDescription>
             Confirme la recolección física de cada ubicación. Total: {dispatch.totalBins} bins.
@@ -84,7 +125,7 @@ export function DispatchPickingDialog({ dispatch, open, onOpenChange, onConfirmD
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[50px] no-print">
+                  <TableHead className="w-[50px]">
                      <Checkbox
                         checked={selectAllState}
                         onCheckedChange={handleSelectAll}
@@ -100,7 +141,7 @@ export function DispatchPickingDialog({ dispatch, open, onOpenChange, onConfirmD
               <TableBody>
                 {allItems.map((bin) => (
                   <TableRow key={bin.chamberLotId}>
-                    <TableCell className="no-print">
+                    <TableCell>
                        <Checkbox
                           checked={!!pickedItems[bin.chamberLotId]}
                           onCheckedChange={(checked) => handleItemCheck(bin.chamberLotId, !!checked)}
@@ -116,10 +157,10 @@ export function DispatchPickingDialog({ dispatch, open, onOpenChange, onConfirmD
             </Table>
           </ScrollArea>
         </div>
-        <DialogFooter className="sm:justify-between pt-4 no-print">
-           <Button variant="outline" onClick={handlePrint}>
-            <Printer className="mr-2 h-4 w-4" />
-            Imprimir Picking
+        <DialogFooter className="sm:justify-between pt-4">
+           <Button variant="outline" onClick={handleExportCSV}>
+            <Download className="mr-2 h-4 w-4" />
+            Exportar CSV
           </Button>
           <div className="flex gap-2">
             <DialogClose asChild>
