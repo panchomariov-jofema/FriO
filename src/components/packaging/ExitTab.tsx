@@ -25,7 +25,7 @@ const defaultItem = {
     packagingMasterId: '',
     packagingMasterCode: '',
     packagingMasterName: '',
-    palletCount: 0,
+    palletCount: 1,
 };
 
 export function ExitTab() {
@@ -52,8 +52,7 @@ export function ExitTab() {
   const selectedClientId = form.watch('clientId');
 
   const packagingClients = React.useMemo(() => {
-    const filtered = (allClients || []).filter(c => c.type.toLowerCase() === 'embalaje');
-    return [...new Map(filtered.map(item => [item.clientId, item])).values()];
+    return [...new Map((allClients || []).filter(c => c.type.toLowerCase() === 'embalaje').map(item => [item.clientId, item])).values()];
   }, [allClients]);
 
   const { inStockMasterCodes, stockByCode } = React.useMemo(() => {
@@ -86,14 +85,9 @@ export function ExitTab() {
 
   const onSubmit = async (values: ExitFormValues) => {
     if (!firestore) return;
-    const itemsToProcess = values.items.filter(item => item.palletCount > 0);
-    if (itemsToProcess.length === 0) {
-      toast({ variant: 'destructive', title: 'Error', description: 'Debe agregar al menos un artículo con cantidad mayor a cero.' });
-      return;
-    }
     
     // Validate stock before submitting
-    for (const item of itemsToProcess) {
+    for (const item of values.items) {
         const availableStock = stockByCode.get(item.packagingMasterCode) || 0;
         if (item.palletCount > availableStock) {
             toast({
@@ -110,7 +104,7 @@ export function ExitTab() {
             type: 'salida' as const,
             clientId: values.clientId,
             document: values.document || '',
-            items: itemsToProcess.map(item => ({
+            items: values.items.map(item => ({
                 packagingMasterId: item.packagingMasterId,
                 packagingMasterCode: item.packagingMasterCode,
                 packagingMasterName: item.packagingMasterName,

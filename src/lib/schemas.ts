@@ -67,14 +67,14 @@ export const packagingExitItemSchema = z.object({
     packagingMasterId: z.string().min(1, "Debe ingresar un código de artículo válido."),
     packagingMasterCode: z.string().min(1, "Debe ingresar un código de artículo."),
     packagingMasterName: z.string(),
-    palletCount: z.coerce.number().min(0),
-    locations: z.array(packagingExitItemLocationSchema),
+    palletCount: z.coerce.number().min(1, "La cantidad debe ser mayor a 0."),
+    locations: z.array(packagingExitItemLocationSchema).optional(),
 });
 
 export const packagingExitSchema = z.object({
     clientId: z.string().min(1, "Debe seleccionar un cliente."),
     document: z.string().optional(),
-    items: z.array(packagingExitItemSchema).min(1),
+    items: z.array(packagingExitItemSchema).min(1, "Debe agregar al menos un artículo."),
 });
 
 
