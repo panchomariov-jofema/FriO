@@ -46,6 +46,7 @@ const calculationRules: Record<string, { binCode: string; related: Record<string
         binCode: '10001', // BINS GENERICO
         related: { 
             '10002': 24, // TOTES PLASTICO
+            '10003': 24, // LAMINA (Asumiendo que el código es 10003)
         }
     },
     'MEYER': { // Exporter ID
