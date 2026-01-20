@@ -11,10 +11,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { EntriesTab } from '@/components/bins-materials/EntriesTab';
 import { ExitsTab } from '@/components/bins-materials/ExitsTab';
 import { StockTab } from '@/components/bins-materials/StockTab';
+import { Checkbox } from '@/components/ui/checkbox';
 
 export default function BinsYMaterialesPage() {
   const [selectedExporterId, setSelectedExporterId] = React.useState<string | null>(null);
   const [selectedProducerId, setSelectedProducerId] = React.useState<string | null>(null);
+  const [isDirectDispatch, setIsDirectDispatch] = React.useState(false);
 
   const { data: exporters, loading: loadingExporters } = useFirestoreCollection<Exporter>('exporters');
   const { data: producers, loading: loadingProducers } = useProducersByExporter(selectedExporterId);
@@ -27,7 +29,7 @@ export default function BinsYMaterialesPage() {
           <CardDescription>Seleccione un exportador y productor para gestionar el inventario.</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 items-end">
             <div className="space-y-2">
               <Label htmlFor="exporter-select">Exportador</Label>
               <Select
@@ -69,6 +71,20 @@ export default function BinsYMaterialesPage() {
                 </SelectContent>
               </Select>
             </div>
+            <div className="flex items-center space-x-2 pb-2">
+                <Checkbox 
+                    id="direct-dispatch" 
+                    checked={isDirectDispatch}
+                    onCheckedChange={(checked) => setIsDirectDispatch(!!checked)}
+                    disabled={!selectedExporterId || !selectedProducerId}
+                />
+                <Label
+                    htmlFor="direct-dispatch"
+                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                >
+                    Despacho Directo
+                </Label>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -81,7 +97,11 @@ export default function BinsYMaterialesPage() {
           </TabsList>
           <TabsContent value="entradas">
              {selectedExporterId && selectedProducerId ? (
-                <EntriesTab exporterId={selectedExporterId} producerId={selectedProducerId} />
+                <EntriesTab 
+                  exporterId={selectedExporterId} 
+                  producerId={selectedProducerId} 
+                  isDirectDispatch={isDirectDispatch} 
+                />
               ) : (
                 <Card className="mt-4 flex items-center justify-center h-64 border-dashed">
                     <CardContent className="text-center">

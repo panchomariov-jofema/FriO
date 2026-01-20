@@ -149,6 +149,10 @@
           "type": "string",
           "format": "date-time",
           "description": "Timestamp of the movement."
+        },
+        "observation": {
+          "type": "string",
+          "description": "Optional observation about the movement, e.g., 'Despacho Directo'."
         }
       },
       "required": [

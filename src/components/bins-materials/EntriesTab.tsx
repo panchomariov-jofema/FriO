@@ -16,6 +16,7 @@ import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { Table, TableBody, TableCell, TableHeader, TableRow, TableHead } from '../ui/table';
 import { Skeleton } from '../ui/skeleton';
+import { BinMaterialMovement } from '@/lib/types';
 
 const movementItemSchema = z.object({
   binMaterialId: z.string(),
@@ -36,6 +37,7 @@ type MovementFormValues = z.infer<typeof movementSchema>;
 interface EntriesTabProps {
   exporterId: string;
   producerId: string;
+  isDirectDispatch: boolean;
 }
 
 // Rules for automatic calculation
@@ -56,7 +58,7 @@ const calculationRules: Record<string, { binCode: string; related: Record<string
     }
 };
 
-export function EntriesTab({ exporterId, producerId }: EntriesTabProps) {
+export function EntriesTab({ exporterId, producerId, isDirectDispatch }: EntriesTabProps) {
   const { toast } = useToast();
   const firestore = useFirestore();
   const { materials, loading: loadingMaterials } = useBinMaterialsByExporter(exporterId);
@@ -124,7 +126,7 @@ export function EntriesTab({ exporterId, producerId }: EntriesTabProps) {
     try {
       await runTransaction(firestore, async (transaction) => {
         const movementRef = doc(collection(firestore, 'binMaterialMovements'));
-        const movementData = {
+        const movementData: Partial<BinMaterialMovement> & { createdAt: any, type: 'entrada', items: any[] } = {
           type: 'entrada' as const,
           document: values.document,
           driverName: values.driverName,
@@ -134,40 +136,52 @@ export function EntriesTab({ exporterId, producerId }: EntriesTabProps) {
           items: itemsToProcess,
           createdAt: serverTimestamp(),
         };
+
+        if (isDirectDispatch) {
+            movementData.observation = 'Despacho Directo';
+        }
+        
         transaction.set(movementRef, movementData);
         
-        for (const item of itemsToProcess) {
-          const stockQuery = query(
-            collection(firestore, 'binMaterialStock'),
-            where('exporterId', '==', exporterId),
-            where('binMaterialId', '==', item.binMaterialId)
-          );
+        if (!isDirectDispatch) {
+            for (const item of itemsToProcess) {
+                const stockQuery = query(
+                    collection(firestore, 'binMaterialStock'),
+                    where('exporterId', '==', exporterId),
+                    where('binMaterialId', '==', item.binMaterialId)
+                );
 
-          const stockSnap = await getDocs(stockQuery);
-          
-          if (stockSnap.empty) {
-            const newStockRef = doc(collection(firestore, 'binMaterialStock'));
-            transaction.set(newStockRef, {
-              binMaterialId: item.binMaterialId,
-              binMaterialCode: item.binMaterialCode,
-              binMaterialName: item.binMaterialName,
-              exporterId: exporterId,
-              quantity: item.quantity,
-              lastUpdatedAt: serverTimestamp(),
-            });
-          } else {
-            const stockDoc = stockSnap.docs[0];
-            const stockRef = stockDoc.ref;
-            const currentQuantity = stockDoc.data().quantity || 0;
-            transaction.update(stockRef, {
-              quantity: currentQuantity + item.quantity,
-              lastUpdatedAt: serverTimestamp(),
-            });
-          }
+                const stockSnap = await getDocs(stockQuery);
+                
+                if (stockSnap.empty) {
+                    const newStockRef = doc(collection(firestore, 'binMaterialStock'));
+                    transaction.set(newStockRef, {
+                    binMaterialId: item.binMaterialId,
+                    binMaterialCode: item.binMaterialCode,
+                    binMaterialName: item.binMaterialName,
+                    exporterId: exporterId,
+                    quantity: item.quantity,
+                    lastUpdatedAt: serverTimestamp(),
+                    });
+                } else {
+                    const stockDoc = stockSnap.docs[0];
+                    const stockRef = stockDoc.ref;
+                    const currentQuantity = stockDoc.data().quantity || 0;
+                    transaction.update(stockRef, {
+                    quantity: currentQuantity + item.quantity,
+                    lastUpdatedAt: serverTimestamp(),
+                    });
+                }
+            }
         }
       });
 
-      toast({ title: 'Éxito', description: 'Entrada registrada y stock actualizado.' });
+      const successDescription = isDirectDispatch 
+        ? 'Movimiento de despacho directo registrado.'
+        : 'Entrada registrada y stock actualizado.';
+
+      toast({ title: 'Éxito', description: successDescription });
+
       const resetItems = materials.map(m => ({
         binMaterialId: m.id,
         binMaterialCode: m.code,
@@ -190,7 +204,12 @@ export function EntriesTab({ exporterId, producerId }: EntriesTabProps) {
     <Card>
       <CardHeader>
         <CardTitle>Registrar Entrada</CardTitle>
-        <CardDescription>Ingrese un documento y las cantidades de los materiales que ingresan al inventario.</CardDescription>
+        <CardDescription>
+          {isDirectDispatch 
+            ? 'Registrar un despacho directo del exportador al productor. Este movimiento no afectará el stock del frigorífico.'
+            : 'Ingrese un documento y las cantidades de los materiales que ingresan al inventario.'
+          }
+        </CardDescription>
       </CardHeader>
       <CardContent>
         <Form {...form}>

@@ -40,6 +40,7 @@ export interface BinMaterialMovement {
     quantity: number;
   }[];
   createdAt: Timestamp;
+  observation?: string;
 }
 
 export interface BinMaterialStock {
