@@ -49,7 +49,7 @@ export default function BinMaterialKardexReportPage() {
             mov.items.map((item: any, index: number) => ({
                 key: `${mov.id}-${index}`,
                 date: mov.createdAt.toDate(),
-                type: mov.type,
+                type: mov.observation === 'Despacho Directo' ? 'Despacho Directo' : mov.type,
                 document: mov.document,
                 producerId: mov.producerId,
                 driverName: mov.driverName,
@@ -65,6 +65,19 @@ export default function BinMaterialKardexReportPage() {
         const headers = ['date', 'type', 'document', 'producerId', 'driverName', 'driverRUT', 'code', 'name', 'quantity'];
         const csv = convertToCSV(kardexData, headers);
         downloadCSV(csv, 'kardex_bins_y_materiales.csv');
+    };
+
+    const getBadgeVariant = (type: string): 'default' | 'secondary' | 'destructive' | 'outline' => {
+        switch(type) {
+            case 'entrada':
+                return 'default';
+            case 'salida':
+                return 'secondary';
+            case 'Despacho Directo':
+                return 'outline';
+            default:
+                return 'default';
+        }
     };
 
     return (
@@ -100,7 +113,7 @@ export default function BinMaterialKardexReportPage() {
                                         <TableRow key={item.key}>
                                             <TableCell>{item.date.toLocaleString()}</TableCell>
                                             <TableCell>
-                                                <Badge variant={item.type === 'entrada' ? 'default' : 'secondary'}>
+                                                <Badge variant={getBadgeVariant(item.type)}>
                                                     {item.type.charAt(0).toUpperCase() + item.type.slice(1)}
                                                 </Badge>
                                             </TableCell>
