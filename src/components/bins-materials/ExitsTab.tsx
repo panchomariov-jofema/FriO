@@ -37,30 +37,31 @@ type MovementFormValues = z.infer<typeof movementSchema>;
 
 interface ExitsTabProps {
   exporterId: string;
+  exporterName?: string;
   producerId: string;
 }
 
 // Rules for automatic calculation
 const calculationRules: Record<string, { binCode: string; related: Record<string, number> }> = {
-    'SUBSOLE': { // Exporter ID
+    'Subsole': {
         binCode: '10001', // BINS GENERICO
         related: {
             '10002': 24, // TOTES PLASTICO
             '10003': 24, // LAMINA
         }
     },
-    'MEYER': { // Exporter ID
+    'Meyer': {
         binCode: '10007',
         related: { '10008': 24 }
     },
-    'BLOSSOM': { // Exporter ID
+    'Blossom': {
         binCode: '10011',
         related: { '10012': 24, '10013': 24 }
     }
 };
 
 
-export function ExitsTab({ exporterId, producerId }: ExitsTabProps) {
+export function ExitsTab({ exporterId, exporterName, producerId }: ExitsTabProps) {
   const { toast } = useToast();
   const firestore = useFirestore();
   const { materials, loading: loadingMaterials } = useBinMaterialsByExporter(exporterId);
@@ -76,7 +77,8 @@ export function ExitsTab({ exporterId, producerId }: ExitsTabProps) {
 
   // Effect for automatic quantity calculation
   React.useEffect(() => {
-    const rules = calculationRules[exporterId];
+    if (!exporterName) return;
+    const rules = calculationRules[exporterName];
     // Guard against running when data is not ready
     if (!rules || !items || items.length === 0) return;
 
@@ -86,7 +88,7 @@ export function ExitsTab({ exporterId, producerId }: ExitsTabProps) {
     const binQuantity = binItem.quantity;
     
     // This check prevents the effect from running when the form is resetting
-    if (typeof binQuantity === 'undefined') return;
+    if (typeof binQuantity === 'undefined' || binQuantity === null) return;
 
     Object.entries(rules.related).forEach(([relatedCode, multiplier]) => {
         const relatedItemIndex = items.findIndex(item => item.binMaterialCode === relatedCode);
@@ -100,7 +102,7 @@ export function ExitsTab({ exporterId, producerId }: ExitsTabProps) {
         }
     });
 
-  }, [items, exporterId, form]);
+  }, [items, exporterName, form]);
 
   const getStockForMaterial = React.useCallback((binMaterialId: string) => {
     const stockItem = stockData.find(s => s.exporterId === exporterId && s.binMaterialId === binMaterialId);
