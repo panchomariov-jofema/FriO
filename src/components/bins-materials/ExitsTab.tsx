@@ -40,6 +40,26 @@ interface ExitsTabProps {
   producerId: string;
 }
 
+// Rules for automatic calculation
+const calculationRules: Record<string, { binCode: string; related: Record<string, number> }> = {
+    'SUBSOLE': { // Exporter ID
+        binCode: '10001', // BINS GENERICO
+        related: {
+            '10002': 24, // TOTES PLASTICO
+            '10003': 24, // LAMINA
+        }
+    },
+    'MEYER': { // Exporter ID
+        binCode: '10007',
+        related: { '10008': 24 }
+    },
+    'BLOSSOM': { // Exporter ID
+        binCode: '10011',
+        related: { '10012': 24, '10013': 24 }
+    }
+};
+
+
 export function ExitsTab({ exporterId, producerId }: ExitsTabProps) {
   const { toast } = useToast();
   const firestore = useFirestore();
@@ -51,6 +71,36 @@ export function ExitsTab({ exporterId, producerId }: ExitsTabProps) {
     resolver: zodResolver(movementSchema),
     defaultValues: { document: '', driverName: '', driverRUT: '', items: [] },
   });
+
+  const items = form.watch('items');
+
+  // Effect for automatic quantity calculation
+  React.useEffect(() => {
+    const rules = calculationRules[exporterId];
+    // Guard against running when data is not ready
+    if (!rules || !items || items.length === 0) return;
+
+    const binItem = items.find(item => item.binMaterialCode === rules.binCode);
+    if (!binItem) return;
+
+    const binQuantity = binItem.quantity;
+    
+    // This check prevents the effect from running when the form is resetting
+    if (typeof binQuantity === 'undefined') return;
+
+    Object.entries(rules.related).forEach(([relatedCode, multiplier]) => {
+        const relatedItemIndex = items.findIndex(item => item.binMaterialCode === relatedCode);
+        if (relatedItemIndex !== -1) {
+            const currentVal = items[relatedItemIndex].quantity;
+            const newVal = binQuantity * multiplier;
+            if (currentVal !== newVal) {
+                // Set value and trigger validation
+                form.setValue(`items.${relatedItemIndex}.quantity`, newVal, { shouldValidate: true });
+            }
+        }
+    });
+
+  }, [items, exporterId, form]);
 
   const getStockForMaterial = React.useCallback((binMaterialId: string) => {
     const stockItem = stockData.find(s => s.exporterId === exporterId && s.binMaterialId === binMaterialId);

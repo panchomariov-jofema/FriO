@@ -46,7 +46,7 @@ const calculationRules: Record<string, { binCode: string; related: Record<string
         binCode: '10001', // BINS GENERICO
         related: { 
             '10002': 24, // TOTES PLASTICO
-            '10003': 24, // LAMINA (Asumiendo que el código es 10003)
+            '10003': 24, // LAMINA
         }
     },
     'MEYER': { // Exporter ID
@@ -71,22 +71,28 @@ export function EntriesTab({ exporterId, producerId, isDirectDispatch }: Entries
 
   const items = form.watch('items');
   
+  // Effect for automatic quantity calculation
   React.useEffect(() => {
     const rules = calculationRules[exporterId];
-    if (!rules || !items) return;
+    // Guard against running when data is not ready
+    if (!rules || !items || items.length === 0) return;
 
     const binItem = items.find(item => item.binMaterialCode === rules.binCode);
     if (!binItem) return;
 
     const binQuantity = binItem.quantity;
     
+    // This check prevents the effect from running when the form is resetting
+    if (typeof binQuantity === 'undefined') return;
+
     Object.entries(rules.related).forEach(([relatedCode, multiplier]) => {
         const relatedItemIndex = items.findIndex(item => item.binMaterialCode === relatedCode);
         if (relatedItemIndex !== -1) {
             const currentVal = items[relatedItemIndex].quantity;
             const newVal = binQuantity * multiplier;
             if (currentVal !== newVal) {
-                form.setValue(`items.${relatedItemIndex}.quantity`, newVal);
+                // Set value and trigger validation
+                form.setValue(`items.${relatedItemIndex}.quantity`, newVal, { shouldValidate: true });
             }
         }
     });
