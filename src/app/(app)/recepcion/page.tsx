@@ -135,7 +135,7 @@ export default function RecepcionPage() {
         </CardHeader>
         <CardContent>
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 max-w-lg mx-auto md:max-w-none">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2 md:col-span-2">
                   <Label htmlFor="exporter-select">Exportador</Label>
@@ -206,7 +206,7 @@ export default function RecepcionPage() {
                   <FormItem><FormLabel>Sin Totes (Opcional)</FormLabel><FormControl><Input type="number" {...field} value={field.value || ''} autoComplete="off" inputMode="numeric" /></FormControl><FormMessage /></FormItem>
                 )} />
               </div>
-              <div className="flex justify-end">
+              <div className="flex justify-start md:justify-end">
                 <Button type="submit" disabled={isFormSubmitting || !selectedExporter || !form.getValues('producerId')}>
                   {isFormSubmitting ? 'Guardando...' : 'Crear Lote'}
                 </Button>
