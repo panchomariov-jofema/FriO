@@ -135,7 +135,7 @@ export default function RecepcionPage() {
         </CardHeader>
         <CardContent>
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 max-w-lg mx-auto md:max-w-none">
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 md:max-w-none max-w-lg">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2 md:col-span-2">
                   <Label htmlFor="exporter-select">Exportador</Label>
