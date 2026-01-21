@@ -171,16 +171,20 @@ export default function DashboardPage() {
     const { data: hidrocoolerLots, loading: loadingHidroLots } = useFirestoreCollection<HidrocoolerLot>('hidrocoolerLots');
 
     const filterOptions = React.useMemo(() => {
-        const exporterOptions = (exporters || []).map(e => ({
-            value: `exporter_${e.id}`,
-            label: e.name,
-            name: e.name,
-            id: e.exporterId,
-            type: 'exporter' as const
-        }));
+        const allowedClientNames = ['SUBSOLE', 'MEYER', 'BLOSSOM', 'FALL CREEK', 'OLMUE'];
+
+        const exporterOptions = (exporters || [])
+            .filter(e => allowedClientNames.includes(e.name))
+            .map(e => ({
+                value: `exporter_${e.id}`,
+                label: e.name,
+                name: e.name,
+                id: e.exporterId,
+                type: 'exporter' as const
+            }));
 
         const clientOptions = (otherClients || [])
-            .filter(c => c.type === 'fruta')
+            .filter(c => c.type === 'fruta' && allowedClientNames.includes(c.name))
             .map(c => ({
                 value: `otherclient_${c.id}`,
                 label: c.name,
