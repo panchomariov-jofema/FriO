@@ -404,7 +404,7 @@ export default function DashboardPage() {
     const kpiCards = [
         { title: "Total Bins en Cámara (Fruta)", value: totalBinsInStock, icon: Warehouse },
         { title: "Total Bins Vacíos (Stock)", value: totalEmptyBins, icon: Archive },
-        { title: "Bins Pend. en Hidro", value: pendingHidroBins, icon: Waves },
+        { title: "Bins Pend. de Hidro", value: pendingHidroBins, icon: Waves },
         { title: "Bins en Proceso (Hidro)", value: inProcess, icon: Boxes },
         { title: "Pend. por Almacenar en Camara", value: pendingStorage, icon: PackageCheck },
     ];
