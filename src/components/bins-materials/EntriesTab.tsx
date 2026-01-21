@@ -230,7 +230,7 @@ export function EntriesTab({ exporterId, exporterName, producerId, isDirectDispa
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Documento de Entrada</FormLabel>
-                    <FormControl><Input {...field} placeholder="Ej: Guía de Despacho 123" autoComplete="off" /></FormControl>
+                    <FormControl><Input {...field} placeholder="Ej: Guía de Despacho 123" autoComplete="off" inputMode="numeric" /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -252,7 +252,7 @@ export function EntriesTab({ exporterId, exporterName, producerId, isDirectDispa
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Rut Conductor</FormLabel>
-                    <FormControl><Input {...field} autoComplete="off" /></FormControl>
+                    <FormControl><Input {...field} autoComplete="off" inputMode="numeric" /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )}

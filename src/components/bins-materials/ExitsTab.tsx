@@ -232,7 +232,7 @@ export function ExitsTab({ exporterId, exporterName, producerId }: ExitsTabProps
                 render={({ field }) => (
                     <FormItem>
                     <FormLabel>Documento de Salida</FormLabel>
-                    <FormControl><Input {...field} placeholder="Ej: Vale de Consumo 456" autoComplete="off" /></FormControl>
+                    <FormControl><Input {...field} placeholder="Ej: Vale de Consumo 456" autoComplete="off" inputMode="numeric" /></FormControl>
                     <FormMessage />
                     </FormItem>
                 )}
@@ -254,7 +254,7 @@ export function ExitsTab({ exporterId, exporterName, producerId }: ExitsTabProps
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Rut Conductor</FormLabel>
-                    <FormControl><Input {...field} autoComplete="off" /></FormControl>
+                    <FormControl><Input {...field} autoComplete="off" inputMode="numeric" /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )}

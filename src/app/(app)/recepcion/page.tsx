@@ -181,7 +181,7 @@ export default function RecepcionPage() {
                     </FormItem>
                 )} />
                 <FormField control={form.control} name="document" render={({ field }) => (
-                  <FormItem><FormLabel>Documento</FormLabel><FormControl><Input {...field} value={field.value || ''} autoComplete="off" inputMode="numeric" pattern="[0-9]*" /></FormControl><FormMessage /></FormItem>
+                  <FormItem><FormLabel>Documento</FormLabel><FormControl><Input {...field} value={field.value || ''} autoComplete="off" inputMode="numeric" /></FormControl><FormMessage /></FormItem>
                 )} />
                 <FormField control={form.control} name="variety" render={({ field }) => (
                     <FormItem>
