@@ -607,6 +607,13 @@ export default function DashboardPage() {
                                         className="fill-foreground font-semibold"
                                         formatter={(value: number) => `${value.toFixed(1)}%`}
                                     />
+                                    <LabelList 
+                                        dataKey="ocupacion"
+                                        position="insideLeft"
+                                        offset={8}
+                                        className="fill-primary-foreground font-bold"
+                                        formatter={(value: number) => value > 0 ? `${value.toLocaleString('es-CL')} BINS` : ''}
+                                    />
                                 </Bar>
                             </BarChart>
                         </ChartContainer>
