@@ -93,6 +93,7 @@ export default function HidrocoolerPage() {
             const newProcessingLot = {
                 originalLotId: lotToProcess.id,
                 displayLotId: lotToProcess.displayLotId,
+                exporterId: currentLotData.exporterId,
                 producerShortName: lotToProcess.producerShortName,
                 binCount: binCount,
                 hidrocooler,
@@ -273,7 +274,7 @@ export default function HidrocoolerPage() {
                 ) : sortedPendingLots.length > 0 ? (
                   sortedPendingLots.map((lot) => (
                     <TableRow key={lot.id}>
-                      <TableCell className="text-sm">{lot.receptionDate.toDate().toLocaleString()}</TableCell>
+                      <TableCell className="text-sm">{lot.receptionDate?.toDate().toLocaleString('es-CL', { year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute:'2-digit' })}</TableCell>
                       <TableCell className="font-medium">{lot.displayLotId}</TableCell>
                       <TableCell className="hidden md:table-cell">{lot.producerShortName}</TableCell>
                       <TableCell>{lot.binCount}</TableCell>

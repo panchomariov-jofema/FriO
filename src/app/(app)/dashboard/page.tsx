@@ -231,21 +231,38 @@ export default function DashboardPage() {
         totalEmptyBins,
         pendingHidroBins,
     } = React.useMemo(() => {
+        let finalChamberLots = chamberLots || [];
+        let finalOtherFruitReceptions = otherFruitReceptions || [];
+        let finalProcessingLots = processingLots || [];
+        let finalHidrocoolerLots = hidrocoolerLots || [];
+
+        if (selectedClient) {
+            if (selectedClient.type === 'exporter') {
+                finalChamberLots = (chamberLots || []).filter(lot => lot.exporterId === selectedClient.id);
+                finalProcessingLots = (processingLots || []).filter(lot => lot.exporterId === selectedClient.id);
+                finalHidrocoolerLots = (hidrocoolerLots || []).filter(lot => lot.exporterId === selectedClient.id);
+                finalOtherFruitReceptions = [];
+            } else if (selectedClient.type === 'otherclient') {
+                finalOtherFruitReceptions = (otherFruitReceptions || []).filter(r => r.clientId === selectedClient.id);
+                finalChamberLots = [];
+                finalProcessingLots = [];
+                finalHidrocoolerLots = [];
+            }
+        }
         
-        const allChamberLotsForKPI = (chamberLots || []);
-        const calculatedTotalBins = allChamberLotsForKPI
+        const calculatedTotalBins = finalChamberLots
             .filter(lot => lot.status === 'Almacenado')
             .reduce((sum, lot) => sum + lot.binCount, 0);
         
-        const calculatedPendingStorage = allChamberLotsForKPI
+        const calculatedPendingStorage = finalChamberLots
             .filter(lot => lot.status === 'Pendiente por Almacenar')
             .reduce((sum, lot) => sum + lot.binCount, 0);
         
-        const calculatedInProcess = (processingLots || [])
+        const calculatedInProcess = finalProcessingLots
             .filter(p => p.status === 'En Proceso')
             .reduce((sum, lot) => sum + lot.binCount, 0);
 
-        const calculatedPendingHidroBins = (hidrocoolerLots || [])
+        const calculatedPendingHidroBins = finalHidrocoolerLots
             .filter(lot => lot.status === 'Pendiente de Pre-Hidro')
             .reduce((sum, lot) => sum + lot.binCount, 0);
 
@@ -265,11 +282,11 @@ export default function DashboardPage() {
             const chamber = chambersConfig[chamberId];
             const totalCapacity = chamber.capacity;
 
-            const binsInChamber = allChamberLotsForKPI
+            const binsInChamber = finalChamberLots
                 .filter(lot => lot.status === 'Almacenado' && lot.chamberId === chamberId)
                 .reduce((sum, lot) => sum + lot.binCount, 0);
 
-            const otherFruitInChamber = (otherFruitReceptions || [])
+            const otherFruitInChamber = finalOtherFruitReceptions
                 .flatMap(r => r.items.map(item => ({ ...item, unit: r.unit, chamberId: item.storageLocation?.chamberId })))
                 .filter(item => item.status === 'Almacenado' && item.chamberId === chamberId);
 

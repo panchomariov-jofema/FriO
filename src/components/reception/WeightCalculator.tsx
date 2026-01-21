@@ -93,6 +93,7 @@ export function WeightCalculator({ lot, open, onOpenChange, onWeightSaved }: Wei
     const hidrocoolerRef = collection(firestore, 'hidrocoolerLots');
     const hidrocoolerLotData = {
         displayLotId: displayLotId,
+        exporterId: lot.exporterId,
         producerShortName: producer.shortName,
         binCount: lot.binCount,
         netWeightPerBin: netWeightPerBin,

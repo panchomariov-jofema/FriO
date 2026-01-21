@@ -177,6 +177,7 @@ export interface ReceptionLot {
 export interface HidrocoolerLot {
   id: string;
   displayLotId: string;
+  exporterId: string;
   producerShortName: string;
   binCount: number;
   status: 'Pendiente de Pre-Hidro';
@@ -188,6 +189,7 @@ export interface ProcessingLot {
   id: string;
   originalLotId: string;
   displayLotId: string;
+  exporterId: string;
   producerShortName: string;
   binCount: number;
   hidrocooler: string;
