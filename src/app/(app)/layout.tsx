@@ -132,8 +132,7 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
         <Sidebar>
           <SidebarHeader>
             <div className="flex items-center gap-2 p-2">
-              <SidebarTrigger className="md:hidden" />
-              <Apple className="w-8 h-8 text-primary hidden md:block" />
+              <Apple className="w-8 h-8 text-primary" />
               <span className="font-bold text-lg group-data-[collapsible=icon]:hidden">
                 FÑO
               </span>
@@ -161,7 +160,7 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
           </SidebarFooter>
         </Sidebar>
         <SidebarInset>
-           <header className="flex items-center justify-between h-14 px-4 border-b">
+           <header className="sticky top-0 z-30 flex items-center justify-between h-14 px-4 border-b bg-background">
               <SidebarTrigger />
               <div className="flex-1" />
               <Button variant="ghost" size="sm" onClick={handleSignOut}>
