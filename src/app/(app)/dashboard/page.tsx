@@ -254,13 +254,42 @@ export default function DashboardPage() {
             }
         }
         
-        const calculatedTotalBins = finalChamberLots
+        const producerFruitBinsInStock = finalChamberLots
             .filter(lot => lot.status === 'Almacenado')
             .reduce((sum, lot) => sum + lot.binCount, 0);
+
+        const otherFruitInStock = finalOtherFruitReceptions
+            .flatMap(r => r.items.map(item => ({ ...item, unit: r.unit })))
+            .filter(item => item.status === 'Almacenado' && item.quantity > 0);
+
+        const otherFruitBins = otherFruitInStock
+            .filter(item => item.unit === 'Bins')
+            .reduce((sum, item) => sum + item.quantity, 0);
+            
+        const otherFruitPallets = otherFruitInStock
+            .filter(item => item.unit === 'Pallets')
+            .reduce((sum, item) => sum + item.quantity, 0);
         
-        const calculatedPendingStorage = finalChamberLots
+        const calculatedTotalBinsInStock = producerFruitBinsInStock + otherFruitBins + (otherFruitPallets * 2);
+
+        const producerPendingStorage = finalChamberLots
             .filter(lot => lot.status === 'Pendiente por Almacenar')
             .reduce((sum, lot) => sum + lot.binCount, 0);
+        
+        const otherFruitPendingStorage = finalOtherFruitReceptions
+            .filter(r => r.status === 'Pendiente de almacenar' || r.status === 'Parcialmente Almacenado')
+            .flatMap(r => r.items.map(item => ({...item, unit: r.unit})))
+            .filter(item => item.status === 'Pendiente de almacenar')
+            .reduce((sum, item) => {
+                if (item.unit === 'Bins') {
+                    return sum + item.quantity;
+                } else if (item.unit === 'Pallets') {
+                    return sum + (item.quantity * 2);
+                }
+                return sum;
+            }, 0);
+
+        const calculatedPendingStorage = producerPendingStorage + otherFruitPendingStorage;
         
         const calculatedInProcess = finalProcessingLots
             .filter(p => p.status === 'En Proceso')
@@ -360,7 +389,7 @@ export default function DashboardPage() {
             .slice(0, 5);
         
         return {
-            totalBinsInStock: calculatedTotalBins,
+            totalBinsInStock: calculatedTotalBinsInStock,
             pendingStorage: calculatedPendingStorage,
             inProcess: calculatedInProcess,
             kilosPorExportador: barChartData,
