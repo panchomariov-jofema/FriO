@@ -104,7 +104,7 @@ export function EditLotDialog({ lot, open, onOpenChange, onLotUpdated }: EditLot
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Editar Lote</DialogTitle>
           <DialogDescription>
