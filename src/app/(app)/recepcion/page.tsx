@@ -136,8 +136,8 @@ export default function RecepcionPage() {
         <CardContent>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="space-y-2 col-span-2 sm:col-span-1">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2 md:col-span-2">
                   <Label htmlFor="exporter-select">Exportador</Label>
                   <Select
                     value={selectedExporter ?? ''}
@@ -161,7 +161,7 @@ export default function RecepcionPage() {
                   </Select>
                 </div>
                 <FormField control={form.control} name="producerId" render={({ field }) => (
-                    <FormItem className="col-span-2 sm:col-span-1">
+                    <FormItem className="md:col-span-2">
                         <FormLabel>Productor</FormLabel>
                         <Select onValueChange={field.onChange} value={field.value} disabled={!selectedExporter || loadingProducers}>
                             <FormControl>
