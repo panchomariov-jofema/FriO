@@ -252,7 +252,7 @@ export function EntriesTab({ exporterId, exporterName, producerId, isDirectDispa
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Rut Conductor</FormLabel>
-                    <FormControl><Input {...field} autoComplete="off" inputMode="numeric" pattern="[0-9]*" /></FormControl>
+                    <FormControl><Input {...field} autoComplete="off" /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
