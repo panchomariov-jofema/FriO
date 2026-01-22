@@ -5,7 +5,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Form, FormControl, FormField, FormItem, FormMessage } from '@/components/ui/form';
 import { Thermometer, Save } from 'lucide-react';
 import { useFirestore } from '@/firebase';
@@ -15,6 +15,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { ChamberTemperature } from '@/lib/types';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
+import { cn } from '@/lib/utils';
 
 const tempSchema = z.object({
   temperature: z.coerce.number({ invalid_type_error: 'Inválido' }),
@@ -82,10 +83,17 @@ export function ChamberTemperatureInput({ chamberId }: ChamberTemperatureInputPr
   return (
     <Popover open={isPopoverOpen} onOpenChange={setPopoverOpen}>
       <PopoverTrigger asChild>
-        <Button variant="ghost" size="sm" className="flex items-center gap-2 text-muted-foreground">
+        <div
+          role="button"
+          onClick={(e) => e.stopPropagation()}
+          className={cn(
+            buttonVariants({ variant: 'ghost', size: 'sm' }),
+            'flex items-center gap-2 text-muted-foreground'
+          )}
+        >
           <Thermometer className="h-4 w-4" />
           <span className="font-mono text-sm">{latestTemp ? `${latestTemp.temperature.toFixed(1)}°C` : '--.- °C'}</span>
-        </Button>
+        </div>
       </PopoverTrigger>
       <PopoverContent className="w-48 p-2">
         <Form {...form}>
