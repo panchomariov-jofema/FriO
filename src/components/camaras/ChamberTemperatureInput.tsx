@@ -5,17 +5,18 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Input } from '@/components/ui/input';
-import { Button, buttonVariants } from '@/components/ui/button';
+import { buttonVariants } from '@/components/ui/button';
 import { Form, FormControl, FormField, FormItem, FormMessage } from '@/components/ui/form';
 import { Thermometer, Save } from 'lucide-react';
 import { useFirestore } from '@/firebase';
-import { collection, addDoc, serverTimestamp, query, orderBy, limit, onSnapshot } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, query, orderBy, limit, onSnapshot, where } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { ChamberTemperature } from '@/lib/types';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { cn } from '@/lib/utils';
+import { Button } from '../ui/button';
 
 const tempSchema = z.object({
   temperature: z.coerce.number({ invalid_type_error: 'Inválido' }),
@@ -35,12 +36,16 @@ export function ChamberTemperatureInput({ chamberId }: ChamberTemperatureInputPr
 
   const form = useForm<TempFormValues>({
     resolver: zodResolver(tempSchema),
+    defaultValues: {
+        temperature: undefined,
+    }
   });
   
   React.useEffect(() => {
     if (!firestore) return;
     const q = query(
       collection(firestore, 'chamberTemperatures'),
+      where('chamberId', '==', chamberId),
       orderBy('timestamp', 'desc'),
       limit(1)
     );
@@ -68,7 +73,6 @@ export function ChamberTemperatureInput({ chamberId }: ChamberTemperatureInputPr
       await addDoc(collection(firestore, 'chamberTemperatures'), tempData);
       toast({ title: 'Éxito', description: `Temperatura para ${chamberId} guardada.` });
       setPopoverOpen(false);
-      form.reset();
     } catch (error) {
       console.error('Error saving temperature:', error);
       toast({ variant: 'destructive', title: 'Error', description: 'No se pudo guardar la temperatura.' });
@@ -79,13 +83,19 @@ export function ChamberTemperatureInput({ chamberId }: ChamberTemperatureInputPr
       }));
     }
   };
+  
+  React.useEffect(() => {
+    if (!isPopoverOpen) {
+      form.reset();
+    }
+  }, [isPopoverOpen, form]);
 
   return (
     <Popover open={isPopoverOpen} onOpenChange={setPopoverOpen}>
       <PopoverTrigger asChild>
         <div
           role="button"
-          onClick={(e) => e.stopPropagation()}
+          onClick={(e) => { e.stopPropagation(); setPopoverOpen(true); }}
           className={cn(
             buttonVariants({ variant: 'ghost', size: 'sm' }),
             'flex items-center gap-2 text-muted-foreground'
@@ -95,7 +105,7 @@ export function ChamberTemperatureInput({ chamberId }: ChamberTemperatureInputPr
           <span className="font-mono text-sm">{latestTemp ? `${latestTemp.temperature.toFixed(1)}°C` : '--.- °C'}</span>
         </div>
       </PopoverTrigger>
-      <PopoverContent className="w-48 p-2">
+      <PopoverContent className="w-48 p-2" onClick={(e) => e.stopPropagation()}>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="flex items-center gap-2">
             <FormField
@@ -110,6 +120,7 @@ export function ChamberTemperatureInput({ chamberId }: ChamberTemperatureInputPr
                       placeholder="Temp °C"
                       className="h-8"
                       {...field}
+                      value={field.value ?? ''}
                     />
                   </FormControl>
                   <FormMessage className="text-xs" />
