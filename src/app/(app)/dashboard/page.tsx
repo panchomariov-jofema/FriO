@@ -12,7 +12,7 @@ import {
   CardDescription,
 } from '@/components/ui/card';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
-import type { ChamberLot, Dispatch, Exporter, ProcessingLot, ReceptionLot, BinMaterialStock, OtherFruitReception, Profile, UserMaster, HidrocoolerLot, OtherClient } from '@/lib/types';
+import type { ChamberLot, Dispatch, Exporter, ProcessingLot, ReceptionLot, BinMaterialStock, OtherFruitReception, Profile, UserMaster, HidrocoolerLot, OtherClient, ChamberTemperature } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis, Cell, Legend, LabelList } from 'recharts';
 import { ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
@@ -147,6 +147,22 @@ function FallCreekExecutiveView({ data, clientName }: { data: any[], clientName:
     );
 }
 
+const renderCustomizedLabel = (props: any) => {
+    const { x, y, width, height, value, payload } = props;
+    
+    const tempText = payload.temperature !== null && payload.temperature !== undefined
+        ? ` / ${payload.temperature.toFixed(1)}°C`
+        : '';
+    const fullLabel = `${value.toFixed(1)}%${tempText}`;
+
+    return (
+        <text x={x + width + 8} y={y + height / 2} textAnchor="start" dominantBaseline="middle" className="fill-foreground font-semibold" fontSize={12}>
+            {fullLabel}
+        </text>
+    );
+};
+
+
 export default function DashboardPage() {
     const { user } = useUser();
     const { data: users, loading: loadingUsers } = useFirestoreCollection<UserMaster>('usersMaster');
@@ -169,6 +185,7 @@ export default function DashboardPage() {
     const { data: otherClients, loading: loadingOtherClients } = useFirestoreCollection<OtherClient>('otherClients');
     const { data: binMaterialStock, loading: loadingBinStock } = useFirestoreCollection<BinMaterialStock>('binMaterialStock');
     const { data: hidrocoolerLots, loading: loadingHidroLots } = useFirestoreCollection<HidrocoolerLot>('hidrocoolerLots');
+    const { data: temperatures, loading: loadingTemps } = useFirestoreCollection<ChamberTemperature>('chamberTemperatures');
 
     const filterOptions = React.useMemo(() => {
         const allowedClientNames = ['SUBSOLE', 'MEYER', 'BLOSSOM', 'FALL CREEK', 'OLMUE'];
@@ -311,6 +328,13 @@ export default function DashboardPage() {
             .filter(s => specificBinCodes.includes(s.binMaterialCode))
             .reduce((sum, s) => sum + s.quantity, 0);
         
+        const latestTemps: Record<string, ChamberTemperature> = {};
+        (temperatures || []).forEach(temp => {
+            if (!latestTemps[temp.chamberId] || (temp.timestamp?.toMillis() ?? 0) > (latestTemps[temp.chamberId].timestamp?.toMillis() ?? 0)) {
+                latestTemps[temp.chamberId] = temp;
+            }
+        });
+
         const calculatedOccupancy = Object.keys(chambersConfig).map(chamberId => {
             const chamber = chambersConfig[chamberId];
             const totalCapacity = chamber.capacity;
@@ -326,12 +350,15 @@ export default function DashboardPage() {
             const otherBins = otherFruitInChamber.filter(item => item.unit === 'Bins').reduce((sum, item) => sum + item.quantity, 0);
             const otherPallets = otherFruitInChamber.filter(item => item.unit === 'Pallets').reduce((sum, item) => sum + item.quantity, 0);
             const occupiedEquivalentBins = binsInChamber + otherBins + (otherPallets * 2);
+            
+            const latestTemp = latestTemps[chamberId];
 
             return {
                 name: chamber.name,
                 ocupacion: occupiedEquivalentBins,
                 total: totalCapacity,
-                percentage: totalCapacity > 0 ? (occupiedEquivalentBins / totalCapacity) * 100 : 0
+                percentage: totalCapacity > 0 ? (occupiedEquivalentBins / totalCapacity) * 100 : 0,
+                temperature: latestTemp ? latestTemp.temperature : null,
             };
         });
 
@@ -399,7 +426,7 @@ export default function DashboardPage() {
             pendingHidroBins: calculatedPendingHidroBins,
         };
 
-    }, [chamberLots, otherFruitReceptions, processingLots, exporters, receptionLots, binMaterialStock, hidrocoolerLots, selectedClient, dateRange]);
+    }, [chamberLots, otherFruitReceptions, processingLots, exporters, receptionLots, binMaterialStock, hidrocoolerLots, selectedClient, dateRange, temperatures]);
 
 
     const fallCreekData = React.useMemo(() => {
@@ -449,7 +476,7 @@ export default function DashboardPage() {
     }, [selectedClient, otherFruitReceptions]);
 
 
-    const loading = loadingChamber || loadingOtherFruit || loadingProcessing || loadingDispatches || loadingExporters || loadingReception || loadingBinStock || loadingUsers || loadingProfiles || loadingHidroLots || loadingOtherClients;
+    const loading = loadingChamber || loadingOtherFruit || loadingProcessing || loadingDispatches || loadingExporters || loadingReception || loadingBinStock || loadingUsers || loadingProfiles || loadingHidroLots || loadingOtherClients || loadingTemps;
 
     const kpiCards = [
         { title: "Total Bins en Cámara (Fruta)", value: totalBinsInStock, icon: Warehouse },
@@ -639,7 +666,7 @@ export default function DashboardPage() {
                             </div>
                         ) : (
                         <ChartContainer config={occupancyChartConfig} className="h-[250px] w-full">
-                           <BarChart data={occupancyByChamber} layout="vertical" margin={{ left: 20, right: 80 }}>
+                           <BarChart data={occupancyByChamber} layout="vertical" margin={{ left: 20, right: 120 }}>
                                 <XAxis type="number" hide />
                                 <YAxis dataKey="name" type="category" tickLine={false} axisLine={false} tickMargin={10} width={80} />
                                 <ChartTooltip 
@@ -650,13 +677,7 @@ export default function DashboardPage() {
                                     content={<ChartTooltipContent />} 
                                 />
                                 <Bar dataKey="ocupacion" layout="vertical" radius={5} fill="var(--color-ocupacion)">
-                                    <LabelList 
-                                        dataKey="percentage" 
-                                        position="right" 
-                                        offset={8} 
-                                        className="fill-foreground font-semibold"
-                                        formatter={(value: number) => `${value.toFixed(1)}%`}
-                                    />
+                                     <LabelList dataKey="percentage" content={renderCustomizedLabel} />
                                     <LabelList 
                                         dataKey="ocupacion"
                                         position="insideLeft"
