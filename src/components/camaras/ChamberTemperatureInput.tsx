@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { buttonVariants } from '@/components/ui/button';
 import { Form, FormControl, FormField, FormItem, FormMessage } from '@/components/ui/form';
 import { Thermometer, Save } from 'lucide-react';
-import { useFirestore } from '@/firebase';
+import { useFirestore, useUser } from '@/firebase';
 import { collection, addDoc, serverTimestamp, query, onSnapshot, where } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
@@ -33,6 +33,7 @@ export function ChamberTemperatureInput({ chamberId }: ChamberTemperatureInputPr
   const [isPopoverOpen, setPopoverOpen] = React.useState(false);
   const firestore = useFirestore();
   const { toast } = useToast();
+  const { user } = useUser();
 
   const form = useForm<TempFormValues>({
     resolver: zodResolver(tempSchema),
@@ -44,10 +45,6 @@ export function ChamberTemperatureInput({ chamberId }: ChamberTemperatureInputPr
   React.useEffect(() => {
     if (!firestore) return;
 
-    // FIX: Removed orderBy and limit to prevent crash from missing Firestore index.
-    // This is less efficient as it fetches all documents for the chamber and sorts
-    // on the client, but it ensures the app works without manual index creation.
-    // For production, the ideal solution is to create the Firestore index from the link in the error.
     const q = query(
       collection(firestore, 'chamberTemperatures'),
       where('chamberId', '==', chamberId)
@@ -55,7 +52,6 @@ export function ChamberTemperatureInput({ chamberId }: ChamberTemperatureInputPr
     const unsubscribe = onSnapshot(q, (snapshot) => {
       if (!snapshot.empty) {
         const temps = snapshot.docs.map(doc => doc.data() as ChamberTemperature);
-        // Sort on the client to find the latest temperature
         temps.sort((a,b) => (b.timestamp?.toMillis() ?? 0) - (a.timestamp?.toMillis() ?? 0));
         setLatestTemp(temps[0] || null);
       } else {
@@ -77,6 +73,8 @@ export function ChamberTemperatureInput({ chamberId }: ChamberTemperatureInputPr
       chamberId,
       temperature: values.temperature,
       timestamp: serverTimestamp(),
+      userId: user?.uid,
+      userName: user?.email || (user?.isAnonymous ? 'Anónimo' : user?.displayName),
     };
 
     try {

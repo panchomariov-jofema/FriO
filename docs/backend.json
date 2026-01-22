@@ -781,6 +781,14 @@
           "type": "string",
           "format": "date-time",
           "description": "The timestamp of when the temperature was recorded."
+        },
+        "userId": {
+          "type": "string",
+          "description": "The ID of the user who recorded the temperature."
+        },
+        "userName": {
+          "type": "string",
+          "description": "The name/email of the user who recorded the temperature."
         }
       },
       "required": ["chamberId", "temperature", "timestamp"]

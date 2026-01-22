@@ -41,6 +41,11 @@ const reportList = [
         description: 'Listado de todos los despachos de fruta creados.',
         href: '/reportes/despachos'
     },
+    { 
+        title: 'Registro de Temperaturas', 
+        description: 'Historial de todas las temperaturas registradas en las cámaras.',
+        href: '/reportes/registro-temperaturas'
+    },
 ];
 
 export default function ReportesPage() {

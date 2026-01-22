@@ -229,6 +229,8 @@ export interface ChamberTemperature {
   chamberId: string;
   temperature: number;
   timestamp: Timestamp;
+  userId?: string;
+  userName?: string;
 }
 
 export interface Dispatch {
