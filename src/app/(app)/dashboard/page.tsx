@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { DateRange } from "react-day-picker"
 import { addDays, format } from "date-fns"
-import { Calendar as CalendarIcon, ChevronsRight, Download } from "lucide-react"
+import { Calendar as CalendarIcon, Thermometer } from "lucide-react"
 import {
   Card,
   CardContent,
@@ -19,7 +19,7 @@ import { ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent } from "
 import { chambersConfig } from '@/lib/chambers-config';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Boxes, PackageCheck, Truck, Warehouse, Archive, ChevronsLeft, Waves } from 'lucide-react';
+import { Boxes, PackageCheck, Truck, Warehouse, Archive, ChevronsLeft, Waves, Download } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { useFirestore, useUser } from '@/firebase';
@@ -147,24 +147,6 @@ function FallCreekExecutiveView({ data, clientName }: { data: any[], clientName:
         </div>
     );
 }
-
-const renderCustomizedLabel = (props: any) => {
-    const { x, y, width, height, value, payload } = props;
-    
-    if (!payload) return null;
-
-    const tempText = payload.temperature !== null && payload.temperature !== undefined
-        ? ` / ${payload.temperature.toFixed(1)}°C`
-        : '';
-    const fullLabel = `${value.toFixed(1)}%${tempText}`;
-
-    return (
-        <text x={x + width + 8} y={y + height / 2} textAnchor="start" dominantBaseline="middle" className="fill-foreground font-semibold" fontSize={12}>
-            {fullLabel}
-        </text>
-    );
-};
-
 
 export default function DashboardPage() {
     const { user } = useUser();
@@ -365,16 +347,13 @@ export default function DashboardPage() {
 
             const otherBins = otherFruitInChamber.filter(item => item.unit === 'Bins').reduce((sum, item) => sum + item.quantity, 0);
             const otherPallets = otherFruitInChamber.filter(item => item.unit === 'Pallets').reduce((sum, item) => sum + item.quantity, 0);
-            const occupiedEquivalentBins = binsInChamber + otherBins + (otherPallets * 2);
+            const occupiedEquivalentBins = binsInChamber + otherBins + (otherFruitPallets * 2);
             
-            const latestTemp = latestTemperatures[chamberId];
-
             return {
                 name: chamber.name,
                 ocupacion: occupiedEquivalentBins,
                 total: totalCapacity,
                 percentage: totalCapacity > 0 ? (occupiedEquivalentBins / totalCapacity) * 100 : 0,
-                temperature: latestTemp ? latestTemp.temperature : null,
             };
         });
 
@@ -630,6 +609,29 @@ export default function DashboardPage() {
                     </Card>
                 ))}
             </div>
+            
+            <div className="grid gap-4 grid-cols-2 sm:grid-cols-3 lg:grid-cols-6">
+                {Object.values(chambersConfig).map(chamber => {
+                    const latestTemp = latestTemperatures[chamber.id];
+                    return (
+                        <Card key={chamber.id}>
+                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                                <CardTitle className="text-sm font-medium">{chamber.name}</CardTitle>
+                                <Thermometer className="h-4 w-4 text-muted-foreground" />
+                            </CardHeader>
+                            <CardContent>
+                                {loading ? (
+                                    <Skeleton className="h-8 w-3/4" />
+                                ) : (
+                                    <div className="text-2xl font-bold">
+                                        {latestTemp ? `${latestTemp.temperature.toFixed(1)}°C` : '--.-°C'}
+                                    </div>
+                                )}
+                            </CardContent>
+                        </Card>
+                    );
+                })}
+            </div>
 
             <div className="grid gap-6 md:grid-cols-2">
                 <Card>
@@ -693,7 +695,13 @@ export default function DashboardPage() {
                                     content={<ChartTooltipContent />} 
                                 />
                                 <Bar dataKey="ocupacion" layout="vertical" radius={5} fill="var(--color-ocupacion)">
-                                     <LabelList dataKey="percentage" content={renderCustomizedLabel} />
+                                     <LabelList
+                                        dataKey="percentage"
+                                        position="right"
+                                        offset={8}
+                                        className="fill-foreground font-semibold"
+                                        formatter={(value: number) => `${value.toFixed(1)}%`}
+                                    />
                                     <LabelList 
                                         dataKey="ocupacion"
                                         position="insideLeft"
