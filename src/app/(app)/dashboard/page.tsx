@@ -22,7 +22,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Boxes, PackageCheck, Truck, Warehouse, Archive, ChevronsLeft, Waves } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
-import { useUser } from '@/firebase';
+import { useFirestore, useUser } from '@/firebase';
 import { Button } from "@/components/ui/button"
 import { Calendar } from "@/components/ui/calendar"
 import {
@@ -31,6 +31,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover"
 import { cn } from "@/lib/utils"
+import { collection, onSnapshot, query } from 'firebase/firestore';
 
 
 const CHART_COLORS = [
@@ -150,7 +151,9 @@ function FallCreekExecutiveView({ data, clientName }: { data: any[], clientName:
 const renderCustomizedLabel = (props: any) => {
     const { x, y, width, height, value, payload } = props;
     
-    const tempText = payload && payload.temperature !== null && payload.temperature !== undefined
+    if (!payload) return null;
+
+    const tempText = payload.temperature !== null && payload.temperature !== undefined
         ? ` / ${payload.temperature.toFixed(1)}°C`
         : '';
     const fullLabel = `${value.toFixed(1)}%${tempText}`;
@@ -165,6 +168,7 @@ const renderCustomizedLabel = (props: any) => {
 
 export default function DashboardPage() {
     const { user } = useUser();
+    const firestore = useFirestore();
     const { data: users, loading: loadingUsers } = useFirestoreCollection<UserMaster>('usersMaster');
     const { data: profiles, loading: loadingProfiles } = useFirestoreCollection<Profile>('profiles');
 
@@ -175,6 +179,7 @@ export default function DashboardPage() {
         from: addDays(new Date(), -7),
         to: new Date(),
     });
+    const [latestTemperatures, setLatestTemperatures] = React.useState<Record<string, ChamberTemperature | null>>({});
 
     const { data: chamberLots, loading: loadingChamber } = useFirestoreCollection<ChamberLot>('chamberLots');
     const { data: otherFruitReceptions, loading: loadingOtherFruit } = useFirestoreCollection<OtherFruitReception>('otherFruitReceptions');
@@ -185,7 +190,25 @@ export default function DashboardPage() {
     const { data: otherClients, loading: loadingOtherClients } = useFirestoreCollection<OtherClient>('otherClients');
     const { data: binMaterialStock, loading: loadingBinStock } = useFirestoreCollection<BinMaterialStock>('binMaterialStock');
     const { data: hidrocoolerLots, loading: loadingHidroLots } = useFirestoreCollection<HidrocoolerLot>('hidrocoolerLots');
-    const { data: temperatures, loading: loadingTemps } = useFirestoreCollection<ChamberTemperature>('chamberTemperatures');
+
+    React.useEffect(() => {
+        if (!firestore) return;
+        const q = query(collection(firestore, 'chamberTemperatures'));
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            const temps = snapshot.docs.map(doc => ({...doc.data(), id: doc.id} as ChamberTemperature));
+            
+            const newLatestTemps = temps.reduce((acc, temp) => {
+                if (!acc[temp.chamberId] || (temp.timestamp?.toMillis() ?? 0) > (acc[temp.chamberId]!.timestamp?.toMillis() ?? 0)) {
+                    acc[temp.chamberId] = temp;
+                }
+                return acc;
+            }, {} as Record<string, ChamberTemperature>);
+
+            setLatestTemperatures(newLatestTemps);
+        });
+        return () => unsubscribe();
+    }, [firestore]);
+
 
     const filterOptions = React.useMemo(() => {
         const allowedClientNames = ['SUBSOLE', 'MEYER', 'BLOSSOM', 'FALL CREEK', 'OLMUE'];
@@ -327,13 +350,6 @@ export default function DashboardPage() {
         const calculatedEmptyBins = stockForEmptyBins
             .filter(s => specificBinCodes.includes(s.binMaterialCode))
             .reduce((sum, s) => sum + s.quantity, 0);
-        
-        const latestTemps: Record<string, ChamberTemperature> = {};
-        (temperatures || []).forEach(temp => {
-            if (!latestTemps[temp.chamberId] || (temp.timestamp?.toMillis() ?? 0) > (latestTemps[temp.chamberId].timestamp?.toMillis() ?? 0)) {
-                latestTemps[temp.chamberId] = temp;
-            }
-        });
 
         const calculatedOccupancy = Object.keys(chambersConfig).map(chamberId => {
             const chamber = chambersConfig[chamberId];
@@ -351,7 +367,7 @@ export default function DashboardPage() {
             const otherPallets = otherFruitInChamber.filter(item => item.unit === 'Pallets').reduce((sum, item) => sum + item.quantity, 0);
             const occupiedEquivalentBins = binsInChamber + otherBins + (otherPallets * 2);
             
-            const latestTemp = latestTemps[chamberId];
+            const latestTemp = latestTemperatures[chamberId];
 
             return {
                 name: chamber.name,
@@ -426,7 +442,7 @@ export default function DashboardPage() {
             pendingHidroBins: calculatedPendingHidroBins,
         };
 
-    }, [chamberLots, otherFruitReceptions, processingLots, exporters, receptionLots, binMaterialStock, hidrocoolerLots, selectedClient, dateRange, temperatures]);
+    }, [chamberLots, otherFruitReceptions, processingLots, exporters, receptionLots, binMaterialStock, hidrocoolerLots, selectedClient, dateRange, latestTemperatures]);
 
 
     const fallCreekData = React.useMemo(() => {
@@ -476,7 +492,7 @@ export default function DashboardPage() {
     }, [selectedClient, otherFruitReceptions]);
 
 
-    const loading = loadingChamber || loadingOtherFruit || loadingProcessing || loadingDispatches || loadingExporters || loadingReception || loadingBinStock || loadingUsers || loadingProfiles || loadingHidroLots || loadingOtherClients || loadingTemps;
+    const loading = loadingChamber || loadingOtherFruit || loadingProcessing || loadingDispatches || loadingExporters || loadingReception || loadingBinStock || loadingUsers || loadingProfiles || loadingHidroLots || loadingOtherClients;
 
     const kpiCards = [
         { title: "Total Bins en Cámara (Fruta)", value: totalBinsInStock, icon: Warehouse },
