@@ -763,6 +763,28 @@
       },
       "required": ["id", "name", "capacity", "columns", "rows"]
     },
+    "ChamberTemperature": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "ChamberTemperature",
+      "type": "object",
+      "description": "Records a temperature reading for a specific chamber at a specific time.",
+      "properties": {
+        "chamberId": {
+          "type": "string",
+          "description": "The ID of the chamber (e.g., 'CAMARA-1')."
+        },
+        "temperature": {
+          "type": "number",
+          "description": "The recorded temperature in degrees Celsius."
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "The timestamp of when the temperature was recorded."
+        }
+      },
+      "required": ["chamberId", "temperature", "timestamp"]
+    },
     "Dispatch": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Dispatch",
@@ -1049,6 +1071,22 @@
             {
               "name": "chamberLotId",
               "description": "The unique identifier for the lot in the chamber."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/chamberTemperatures/{temperatureId}",
+        "definition": {
+          "entityName": "ChamberTemperature",
+          "schema": {
+            "$ref": "#/backend/entities/ChamberTemperature"
+          },
+          "description": "Stores temperature readings for the cooling chambers.",
+          "params": [
+            {
+              "name": "temperatureId",
+              "description": "The unique identifier for the temperature reading."
             }
           ]
         }

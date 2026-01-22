@@ -4,17 +4,17 @@ import * as React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
-import type { ChamberLot, Exporter, OtherFruitReception, StoredItem } from '@/lib/types';
+import type { ChamberLot, Exporter, OtherFruitReception, StoredItem, ChamberTemperature } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { StoreInChamberDialog } from '@/components/hidrocooler/StoreInChamberDialog';
-import { collection, doc, writeBatch, getDocs, updateDoc, getDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, doc, writeBatch, getDocs, updateDoc, getDoc, serverTimestamp, query, orderBy, limit, onSnapshot } from 'firebase/firestore';
 import { useFirestore } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
-import { chambersConfig, exporterChamberAssignments } from '@/lib/chambers-config';
+import { chambersConfig } from '@/lib/chambers-config';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn, naturalSort } from '@/lib/utils';
@@ -23,6 +23,7 @@ import { RelocateLotDialog } from '@/components/camaras/RelocateLotDialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Trash2 } from 'lucide-react';
 import { ExternalReceptionUploader } from '@/components/hidrocooler/ExternalReceptionUploader';
+import { ChamberTemperatureInput } from '@/components/camaras/ChamberTemperatureInput';
 
 // --- Color Palette Logic (Moved outside component to persist state) ---
 
@@ -63,10 +64,36 @@ export default function CamarasPage() {
   const [coordToRelocate, setCoordToRelocate] = React.useState<{ chamberId: string, coordinate: string } | null>(null);
   const [isStoreDialogOpen, setStoreDialogOpen] = React.useState(false);
   const [isRelocateDialogOpen, setRelocateDialogOpen] = React.useState(false);
+  const [latestTemperatures, setLatestTemperatures] = React.useState<Record<string, ChamberTemperature | null>>({});
   const firestore = useFirestore();
   const { toast } = useToast();
 
   const loading = loadingChamberLots || loadingOtherFruit || loadingExporters;
+  
+  React.useEffect(() => {
+    if (!firestore) return;
+
+    const unsubscribers = Object.keys(chambersConfig).map(chamberId => {
+      const q = query(
+        collection(firestore, 'chamberTemperatures'),
+        orderBy('timestamp', 'desc'),
+        limit(1)
+      );
+
+      return onSnapshot(q, (snapshot) => {
+        if (!snapshot.empty) {
+          const latestTemp = snapshot.docs[0].data() as ChamberTemperature;
+          setLatestTemperatures(prev => ({
+            ...prev,
+            [chamberId]: latestTemp
+          }));
+        }
+      });
+    });
+
+    return () => unsubscribers.forEach(unsub => unsub());
+  }, [firestore]);
+
 
   const { pendingLots, storedItemsByChamber, chamberOccupancy, totalNetWeightInStock, exporterMap, allLotsInChambers } = React.useMemo(() => {
     const allChamberLots = chamberLots || [];
@@ -517,7 +544,10 @@ export default function CamarasPage() {
                 <AccordionItem value={chamberId} key={chamberId}>
                     <AccordionTrigger>
                         <div className="flex w-full items-center justify-between pr-4">
-                            <span className="text-lg font-semibold">{config.name}</span>
+                            <div className="flex items-center gap-4">
+                                <span className="text-lg font-semibold">{config.name}</span>
+                                <ChamberTemperatureInput chamberId={chamberId} />
+                            </div>
                             <div className="text-right">
                                 <p className={cn("font-mono font-semibold", (chamberOccupancy[chamberId]?.percentage ?? 0) > 50 ? 'text-destructive' : 'text-foreground')}>
                                     {chamberOccupancy[chamberId]?.occupied ?? 0} / {chamberOccupancy[chamberId]?.total ?? 0} Bins Equiv.

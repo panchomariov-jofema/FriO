@@ -224,6 +224,13 @@ export interface Chamber {
     blocked?: string[];
 }
 
+export interface ChamberTemperature {
+  id: string;
+  chamberId: string;
+  temperature: number;
+  timestamp: Timestamp;
+}
+
 export interface Dispatch {
   id: string;
   exporterId: string;
