@@ -150,7 +150,7 @@ function FallCreekExecutiveView({ data, clientName }: { data: any[], clientName:
 const renderCustomizedLabel = (props: any) => {
     const { x, y, width, height, value, payload } = props;
     
-    const tempText = payload.temperature !== null && payload.temperature !== undefined
+    const tempText = payload && payload.temperature !== null && payload.temperature !== undefined
         ? ` / ${payload.temperature.toFixed(1)}°C`
         : '';
     const fullLabel = `${value.toFixed(1)}%${tempText}`;
