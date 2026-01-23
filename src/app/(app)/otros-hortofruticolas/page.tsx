@@ -20,20 +20,20 @@ export default function OtrosHortofruticolasPage() {
             <Tabs defaultValue="recepcion" className="w-full">
                 <TabsList className="grid w-full grid-cols-3">
                     <TabsTrigger value="recepcion">Recepción</TabsTrigger>
+                    <TabsTrigger value="almacenamiento">Almacenamiento y Stock</TabsTrigger>
                     <TabsTrigger value="salidas">Despacho</TabsTrigger>
-                    <TabsTrigger value="almacenamiento">Pendientes de Almacenar</TabsTrigger>
                 </TabsList>
                 
                 <TabsContent value="recepcion">
                     <OtherFruitReceptionTab />
                 </TabsContent>
 
-                <TabsContent value="salidas">
-                    <OtherFruitExitTab />
-                </TabsContent>
-                
                 <TabsContent value="almacenamiento">
                     <OtherFruitStorageTab />
+                </TabsContent>
+
+                <TabsContent value="salidas">
+                    <OtherFruitExitTab />
                 </TabsContent>
             </Tabs>
         </div>

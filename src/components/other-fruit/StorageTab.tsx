@@ -4,44 +4,21 @@ import * as React from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
-import type { ChamberLot, OtherFruitReception, OtherFruitReceptionItem } from '@/lib/types';
-import { Badge } from '@/components/ui/badge';
+import type { ChamberLot, OtherFruitReception, OtherFruitReceptionItem, StoredItem } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useFirestore } from '@/firebase';
-import { doc, serverTimestamp, updateDoc, writeBatch } from 'firebase/firestore';
+import { doc, updateDoc, serverTimestamp, writeBatch } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
+import { Progress } from '@/components/ui/progress';
+import { cn, naturalSort } from '@/lib/utils';
 import { chambersConfig } from '@/lib/chambers-config';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '../ui/form';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
-import { Input } from '../ui/input';
-import { useForm } from 'react-hook-form';
-import { z } from 'zod';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { cn } from '@/lib/utils';
-
-
-// Helper for natural sorting
-const naturalSort = (a: string, b: string) => {
-    const re = /(\d+)/;
-    const aNum = parseInt(a.split(re)[1] || '0', 10);
-    const bNum = parseInt(b.split(re)[1] || '0', 10);
-    const aLetter = a.split(re)[0];
-    const bLetter = b.split(re)[0];
-    if (aLetter < bLetter) return -1;
-    if (aLetter > bLetter) return 1;
-    return aNum - bNum;
-};
-
-const storeSchema = z.object({
-  chamberId: z.string({ required_error: 'Debe seleccionar una cámara.' }),
-  coordinate: z.string({ required_error: 'Debe seleccionar una coordenada de inicio.' }),
-  quantity: z.coerce.number().positive("La cantidad debe ser mayor a 0"),
-  storageType: z.enum(['secuencial', 'pareado'], { required_error: 'Debe seleccionar un tipo de almacenamiento.' }),
-});
-type StoreFormValues = z.infer<typeof storeSchema>;
+import { RelocateLotDialog } from '@/components/camaras/RelocateLotDialog';
+import { StoreOtherFruitDialog } from './StoreOtherFruitDialog';
 
 
 interface PendingItem extends OtherFruitReceptionItem {
@@ -52,294 +29,44 @@ interface PendingItem extends OtherFruitReceptionItem {
     unit: 'Bins' | 'Pallets';
 }
 
-function StorageForm({ item, onCancel, allReceptions, allChamberLots }: { item: PendingItem, onCancel: () => void, allReceptions: OtherFruitReception[], allChamberLots: ChamberLot[] }) {
-    const firestore = useFirestore();
-    const { toast } = useToast();
-    
-    const form = useForm<StoreFormValues>({
-        resolver: zodResolver(storeSchema),
-        defaultValues: { 
-            chamberId: undefined, 
-            coordinate: undefined, 
-            quantity: item.unit === 'Pallets' ? 1 : 9, 
-            storageType: 'secuencial',
-        },
-    });
-
-    const targetChamberId = form.watch('chamberId');
-
-    const { availableCoordinates, occupancyMap } = React.useMemo(() => {
-        if (!targetChamberId) return { availableCoordinates: [], occupancyMap: new Map() };
-        
-        const chamberConfig = chambersConfig[targetChamberId];
-        if (!chamberConfig) return { availableCoordinates: [], occupancyMap: new Map() };
-        
-        const allPossibleCoords = chamberConfig.columns.flatMap(col => chamberConfig.rows.map(row => `${col}${row}`)).sort(naturalSort);
-        
-        const currentOccupancyMap = new Map<string, { bins: number, pallets: number }>();
-
-        const getCoord = (coord: string) => {
-            if (!currentOccupancyMap.has(coord)) {
-                currentOccupancyMap.set(coord, { bins: 0, pallets: 0 });
-            }
-            return currentOccupancyMap.get(coord)!;
-        };
-
-        // Check OtherFruitReceptions
-        allReceptions.forEach(reception => {
-            if (reception.status !== 'Almacenado' && reception.status !== 'Parcialmente Almacenado') return;
-            reception.items.forEach(storedItem => {
-                if (storedItem.status === 'Almacenado' && storedItem.storageLocation?.chamberId === targetChamberId && storedItem.storageLocation.coordinate) {
-                    const coordData = getCoord(storedItem.storageLocation.coordinate);
-                    if (reception.unit === 'Bins') {
-                        coordData.bins += storedItem.quantity;
-                    } else {
-                        coordData.pallets += storedItem.quantity;
-                    }
-                }
-            });
-        });
-        
-        // Check ChamberLots (producer fruit)
-        allChamberLots.forEach(chamberLot => {
-            if (chamberLot.status === 'Almacenado' && chamberLot.chamberId === targetChamberId && chamberLot.coordinate) {
-                const coordData = getCoord(chamberLot.coordinate);
-                coordData.bins += chamberLot.binCount; // Chamber lots are always in Bins
-            }
-        });
-        
-        const available = allPossibleCoords.filter(coord => {
-            if (chamberConfig.blocked?.includes(coord)) {
-                return false;
-            }
-            const occupied = currentOccupancyMap.get(coord);
-            if (!occupied) return true; // Coordinate is empty
-
-            // Rules for what can be placed where
-            if (item.unit === 'Bins') {
-                return occupied.pallets === 0 && occupied.bins < 9; // Can add bins if no pallets and space available
-            }
-            if (item.unit === 'Pallets') {
-                return occupied.bins === 0 && occupied.pallets < 2; // Can add pallets if no bins and space available
-            }
-            return false;
-        });
-        
-        return { 
-            availableCoordinates: available, 
-            occupancyMap: currentOccupancyMap,
-        };
-    }, [targetChamberId, allReceptions, allChamberLots, item.unit]);
-
-    const handleStoreConfirm = async (values: StoreFormValues) => {
-        if (!firestore) return;
-        
-        const quantityPerCoord = values.quantity;
-
-        if (item.unit === 'Pallets') {
-            if (quantityPerCoord !== 1 && quantityPerCoord !== 2) {
-                form.setError('quantity', { message: `Para pallets, la cantidad debe ser 1 o 2.` });
-                return;
-            }
-        } else { // Bins
-             if (quantityPerCoord < 1 || quantityPerCoord > 9) {
-                form.setError('quantity', { message: `Para bins, la cantidad debe ser entre 1 y 9.` });
-                return;
-            }
-        }
-        
-        const chamberConfig = chambersConfig[values.chamberId];
-        if (!chamberConfig) return;
-
-        let coordsToIterate: string[] = [];
-
-        if (values.storageType === 'pareado') {
-            const generatedPairedCoords: string[] = [];
-            for (let i = 0; i < chamberConfig.columns.length; i += 2) {
-                if (chamberConfig.columns[i + 1]) {
-                    for (const row of chamberConfig.rows) {
-                        generatedPairedCoords.push(`${chamberConfig.columns[i]}${row}`);
-                        generatedPairedCoords.push(`${chamberConfig.columns[i + 1]}${row}`);
-                    }
-                }
-            }
-            
-            const filteredAndOrdered = generatedPairedCoords.filter(c => availableCoordinates.includes(c));
-            
-            const startIndex = filteredAndOrdered.indexOf(values.coordinate);
-            if (startIndex === -1) {
-                toast({ variant: 'destructive', title: 'Error de Coordenada', description: 'La coordenada de inicio seleccionada no está disponible en el orden pareado. Por favor, elija otra.' });
-                return;
-            }
-            coordsToIterate = filteredAndOrdered.slice(startIndex);
-
-        } else { // 'secuencial'
-            const startIndex = availableCoordinates.indexOf(values.coordinate);
-            if (startIndex === -1) {
-                toast({ variant: 'destructive', title: 'Error', description: 'La coordenada de inicio no está disponible.' });
-                return;
-            }
-            coordsToIterate = availableCoordinates.slice(startIndex);
-        }
-        
-        const maxCapacity = item.unit === 'Bins' ? 9 : 2;
-        let pendingToStore = item.quantity;
-        
-        const batch = writeBatch(firestore);
-        const receptionDocRef = doc(firestore, 'otherFruitReceptions', item.receptionId);
-        const originalReception = allReceptions.find(r => r.id === item.receptionId);
-        if (!originalReception) return;
-        const updatedItems = JSON.parse(JSON.stringify(originalReception.items));
-        const originalItemToUpdate = updatedItems[item.itemIndex] as OtherFruitReceptionItem;
-
-
-        try {
-            for (let i = 0; i < coordsToIterate.length && pendingToStore > 0; i++) {
-                const currentCoord = coordsToIterate[i];
-                const occupancy = occupancyMap.get(currentCoord) || { bins: 0, pallets: 0 };
-                const currentStockInCoord = item.unit === 'Bins' ? occupancy.bins : occupancy.pallets;
-                const spaceAvailable = maxCapacity - currentStockInCoord;
-
-                if (spaceAvailable > 0) {
-                    const amountToStoreInThisCoord = Math.min(pendingToStore, quantityPerCoord, spaceAvailable);
-                    
-                    if (amountToStoreInThisCoord > 0) {
-                        // For pallets, if user wants to store 2 but only 1 fits, skip.
-                        if (item.unit === 'Pallets' && quantityPerCoord === 2 && amountToStoreInThisCoord < 2) {
-                            continue;
-                        }
-
-                        const newItem: OtherFruitReceptionItem = {
-                            ...originalItemToUpdate,
-                            quantity: amountToStoreInThisCoord,
-                            status: 'Almacenado',
-                            storageLocation: { chamberId: values.chamberId, coordinate: currentCoord },
-                            storedAt: new Date(),
-                        };
-                        updatedItems.push(newItem);
-                        pendingToStore -= amountToStoreInThisCoord;
-                    }
-                }
-            }
-
-            if (pendingToStore > 0) {
-                 toast({ variant: 'destructive', title: 'Espacio Insuficiente', description: `Solo se pudieron almacenar ${item.quantity - pendingToStore} de ${item.quantity}. No hay suficientes coordenadas libres en la secuencia.` });
-            }
-
-            if (pendingToStore < item.quantity) { // If at least one item was stored
-                originalItemToUpdate.quantity = pendingToStore;
-                
-                 if (pendingToStore === 0) {
-                    // if all was stored, we can remove the original pending item
-                     updatedItems.splice(item.itemIndex, 1);
-                }
-                
-                const allItemsStored = updatedItems.every((i: OtherFruitReceptionItem) => i.status === 'Almacenado');
-                const newStatus = pendingToStore === 0 && allItemsStored ? 'Almacenado' : 'Parcialmente Almacenado';
-
-                batch.update(receptionDocRef, { 
-                    items: updatedItems,
-                    status: newStatus,
-                    updatedAt: serverTimestamp() 
-                });
-
-                await batch.commit();
-                toast({ title: 'Éxito', description: `${item.quantity - pendingToStore} ${item.unit} almacenados automáticamente.` });
-                onCancel();
-            } else {
-                 toast({ variant: 'destructive', title: 'Sin espacio', description: 'No se pudo almacenar ningún item. Verifique la disponibilidad y la secuencia.' });
-            }
-
-        } catch(error) {
-            console.error("Error storing fruit item automatically:", error);
-            toast({ variant: 'destructive', title: 'Error', description: 'No se pudo completar el almacenamiento automático.' });
-            errorEmitter.emit('permission-error', new FirestorePermissionError({ path: receptionDocRef.path, operation: 'update' }));
-        }
-    };
-
-    return (
-        <TableRow>
-            <TableCell colSpan={6} className="p-0">
-                <div className="p-4 bg-muted/50">
-                    <h4 className="font-semibold mb-4">Almacenamiento Automático: {item.quantity} {item.unit} de {item.productName}</h4>
-                     <Form {...form}>
-                        <form onSubmit={form.handleSubmit(handleStoreConfirm)} className="space-y-4">
-                            <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-                                <FormField control={form.control} name="chamberId" render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Cámara</FormLabel>
-                                        <Select onValueChange={(v) => { field.onChange(v); form.setValue('coordinate', '')}} value={field.value}>
-                                            <FormControl><SelectTrigger><SelectValue placeholder="Seleccione..." /></SelectTrigger></FormControl>
-                                            <SelectContent>{Object.values(chambersConfig).map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
-                                        </Select>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}/>
-                                <FormField control={form.control} name="coordinate" render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Coordenada de Inicio</FormLabel>
-                                        <Select onValueChange={field.onChange} value={field.value} disabled={!targetChamberId}>
-                                            <FormControl><SelectTrigger><SelectValue placeholder="Seleccione..." /></SelectTrigger></FormControl>
-                                            <SelectContent>
-                                                {availableCoordinates.length > 0 ? (
-                                                    availableCoordinates.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)
-                                                ) : (
-                                                    <div className="p-2 text-xs text-center text-muted-foreground">No hay coordenadas disponibles para {item.unit}.</div>
-                                                )}
-                                            </SelectContent>
-                                        </Select>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}/>
-                                <FormField control={form.control} name="quantity" render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Cantidad por Coordenada</FormLabel>
-                                        <FormControl>
-                                          <Input 
-                                            type="number" 
-                                            {...field}
-                                            inputMode="numeric"
-                                          />
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}/>
-                                <FormField control={form.control} name="storageType" render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Tipo Almacenamiento</FormLabel>
-                                        <Select onValueChange={field.onChange} value={field.value}>
-                                            <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
-                                            <SelectContent>
-                                                <SelectItem value="secuencial">Secuencial</SelectItem>
-                                                <SelectItem value="pareado">Pareado</SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}/>
-                            </div>
-                            <div className="flex justify-end gap-2">
-                                <Button type="button" variant="ghost" onClick={onCancel}>Cancelar</Button>
-                                <Button type="submit">Confirmar Almacenamiento</Button>
-                            </div>
-                        </form>
-                     </Form>
-                </div>
-            </TableCell>
-        </TableRow>
-    )
-}
+// --- Color Palette Logic ---
+const lotColorPalette = [
+    'hsl(221, 83%, 53%)', 'hsl(0, 72%, 51%)', 'hsl(48, 96%, 53%)', 'hsl(262, 83%, 60%)',
+    'hsl(170, 75%, 41%)', 'hsl(350, 75%, 55%)', 'hsl(25, 85%, 50%)', 'hsl(120, 50%, 50%)',
+    'hsl(310, 80%, 50%)', 'hsl(195, 100%, 45%)', 'hsl(60, 100%, 45%)', 'hsl(290, 60%, 50%)',
+];
+const lotColorMap = new Map<string, string>();
+let nextColorIndex = 0;
+const getColorForLot = (lotId: string) => {
+    if (!lotColorMap.has(lotId)) {
+        const color = lotColorPalette[nextColorIndex];
+        lotColorMap.set(lotId, color);
+        nextColorIndex = (nextColorIndex + 1) % lotColorPalette.length;
+    }
+    return lotColorMap.get(lotId)!;
+};
 
 
 export function OtherFruitStorageTab() {
   const { data: otherFruitReceptions, loading: loadingReceptions } = useFirestoreCollection<OtherFruitReception>('otherFruitReceptions');
   const { data: chamberLots, loading: loadingChamberLots } = useFirestoreCollection<ChamberLot>('chamberLots');
+  const firestore = useFirestore();
+  const { toast } = useToast();
+
   const [itemToStore, setItemToStore] = React.useState<PendingItem | null>(null);
+  const [dialogTarget, setDialogTarget] = React.useState<{ chamberId: string; coordinate: string } | null>(null);
+  const [isStoreDialogOpen, setStoreDialogOpen] = React.useState(false);
+  
+  const [coordToRelocate, setCoordToRelocate] = React.useState<{ chamberId: string, coordinate: string } | null>(null);
+  const [isRelocateDialogOpen, setRelocateDialogOpen] = React.useState(false);
 
   const loading = loadingReceptions || loadingChamberLots;
 
-  const pendingItems = React.useMemo(() => {
-    return (otherFruitReceptions || [])
+  const { pendingItems, storedItemsByChamber, chamberOccupancy } = React.useMemo(() => {
+    const allChamberLots = chamberLots || [];
+    const allOtherFruitReceptions = otherFruitReceptions || [];
+
+    const calculatedPendingItems: PendingItem[] = allOtherFruitReceptions
         .filter(lot => lot.status === 'Pendiente de almacenar' || lot.status === 'Parcialmente Almacenado')
         .flatMap((lot) => 
             lot.items
@@ -347,71 +74,281 @@ export function OtherFruitStorageTab() {
                 .filter(item => item.status === 'Pendiente de almacenar')
         )
         .sort((a,b) => {
-            const lotA = otherFruitReceptions.find(l => l.id === a.receptionId);
-            const lotB = otherFruitReceptions.find(l => l.id === b.receptionId);
+            const lotA = allOtherFruitReceptions.find(l => l.id === a.receptionId);
+            const lotB = allOtherFruitReceptions.find(l => l.id === b.receptionId);
             if (!lotA?.createdAt?.toMillis) return 1;
             if (!lotB?.createdAt?.toMillis) return -1;
             return lotA.createdAt.toMillis() - lotB.createdAt.toMillis();
         });
-  }, [otherFruitReceptions]);
+
+    const allStoredItems: StoredItem[] = [
+      ...allChamberLots
+        .filter(lot => lot.status === 'Almacenado' && lot.chamberId && lot.coordinate && lot.binCount > 0)
+        .map(lot => ({
+            id: lot.id, type: 'producerLot' as const, displayId: lot.displayLotId, lotIdForColor: lot.displayLotId,
+            ownerName: lot.producerShortName, varietyOrProduct: lot.variety, quantity: lot.binCount, unit: 'Bins' as const,
+            chamberId: lot.chamberId!, coordinate: lot.coordinate!, receptionId: null, itemIndex: -1, netWeightPerBin: lot.netWeightPerBin || 0,
+        })),
+      ...allOtherFruitReceptions
+        .flatMap(reception => reception.items
+            .filter(item => item.status === 'Almacenado' && item.storageLocation?.chamberId && item.storageLocation?.coordinate && item.quantity > 0)
+            .map((item, index) => ({
+                id: `${reception.id}-${index}`, type: 'otherFruit' as const, displayId: item.productCode,
+                lotIdForColor: reception.displayLotId || reception.id, ownerName: reception.clientName, varietyOrProduct: item.productName,
+                quantity: item.quantity, unit: reception.unit, chamberId: item.storageLocation!.chamberId, coordinate: item.storageLocation!.coordinate,
+                receptionId: reception.id, itemIndex: index,
+            }))
+        )
+    ];
+
+    const calculatedStoredItemsByChamber = allStoredItems.reduce((acc, item) => {
+        if (!acc[item.chamberId]) acc[item.chamberId] = {};
+        if (!acc[item.chamberId][item.coordinate]) acc[item.chamberId][item.coordinate] = [];
+        acc[item.chamberId][item.coordinate].push(item);
+        return acc;
+    }, {} as Record<string, Record<string, StoredItem[]>>);
+
+    const calculatedChamberOccupancy = Object.keys(chambersConfig).reduce((acc, chamberId) => {
+        const chamberConfig = chambersConfig[chamberId];
+        const itemsInChamber = allStoredItems.filter(item => item.chamberId === chamberId);
+        const occupiedEquivalentBins = itemsInChamber.reduce((sum, item) => {
+            return sum + (item.unit === 'Pallets' ? item.quantity * 2 : item.quantity);
+        }, 0);
+        acc[chamberId] = {
+            occupied: occupiedEquivalentBins, total: chamberConfig.capacity,
+            percentage: chamberConfig.capacity > 0 ? (occupiedEquivalentBins / chamberConfig.capacity) * 100 : 0,
+        };
+        return acc;
+    }, {} as Record<string, {occupied: number; total: number; percentage: number}>);
+
+    return { pendingItems: calculatedPendingItems, storedItemsByChamber: calculatedStoredItemsByChamber, chamberOccupancy: calculatedChamberOccupancy };
+  }, [otherFruitReceptions, chamberLots]);
+
+  const handleStoreClick = (item: PendingItem) => {
+    setItemToStore(item);
+  };
+  
+  const handleGridClick = (chamberId: string, coordinate: string) => {
+    if (itemToStore) {
+        setDialogTarget({ chamberId, coordinate });
+        setStoreDialogOpen(true);
+    } else {
+        const itemsInCoord = storedItemsByChamber[chamberId]?.[coordinate];
+        if (itemsInCoord && itemsInCoord.length > 0) {
+            setCoordToRelocate({ chamberId, coordinate });
+            setRelocateDialogOpen(true);
+        }
+    }
+  };
+
+  const handleStoreConfirm = async ({ quantity }: { quantity: number }) => {
+    if (!itemToStore || !dialogTarget || !firestore) return;
+
+    const { receptionId, itemIndex } = itemToStore;
+    const { chamberId, coordinate } = dialogTarget;
+
+    const receptionDocRef = doc(firestore, 'otherFruitReceptions', receptionId);
+    const originalReception = otherFruitReceptions.find(r => r.id === receptionId);
+    if (!originalReception) return;
+
+    const batch = writeBatch(firestore);
+    const updatedItems = JSON.parse(JSON.stringify(originalReception.items));
+    const originalItem = updatedItems[itemIndex];
+
+    originalItem.quantity -= quantity;
+
+    const newItem: OtherFruitReceptionItem = {
+      ...originalItem,
+      quantity: quantity,
+      status: 'Almacenado',
+      storageLocation: { chamberId, coordinate },
+      storedAt: new Date(),
+    };
+    updatedItems.push(newItem);
+    
+    if (originalItem.quantity <= 0) {
+      updatedItems.splice(itemIndex, 1);
+    }
+    
+    const allItemsStored = updatedItems.every((item: OtherFruitReceptionItem) => item.status === 'Almacenado');
+    const newStatus = allItemsStored ? 'Almacenado' : 'Parcialmente Almacenado';
+
+    batch.update(receptionDocRef, { items: updatedItems, status: newStatus, updatedAt: serverTimestamp() });
+    
+    try {
+        await batch.commit();
+        toast({ title: 'Éxito', description: `${quantity} ${itemToStore.unit} almacenados en ${chamberId}/${coordinate}.` });
+        setStoreDialogOpen(false);
+        setItemToStore(null);
+    } catch (error) {
+        console.error("Error storing fruit item:", error);
+        toast({ variant: 'destructive', title: 'Error', description: 'No se pudo actualizar la ubicación.' });
+        errorEmitter.emit('permission-error', new FirestorePermissionError({ path: receptionDocRef.path, operation: 'update' }));
+    }
+  };
+
+  const handleRelocate = async ({ targetChamberId, targetCoordinate }: { targetChamberId: string, targetCoordinate: string}) => {
+    if (!coordToRelocate || !firestore) return;
+    const { chamberId: sourceChamberId, coordinate: sourceCoordinate } = coordToRelocate;
+
+    const fruitItemsToMove = (otherFruitReceptions || []).flatMap(reception =>
+        reception.items
+            .filter(item => item.status === 'Almacenado' && item.storageLocation?.chamberId === sourceChamberId && item.storageLocation?.coordinate === sourceCoordinate)
+            .map((item, index) => ({ reception, item, index }))
+    );
+
+    if (fruitItemsToMove.length === 0) {
+      toast({ title: 'Error', description: 'No se encontró nada que mover en la coordenada de origen.', variant: 'destructive' });
+      setRelocateDialogOpen(false);
+      return;
+    }
+    
+    try {
+        const batch = writeBatch(firestore);
+        const fruitUpdatesByReception: Record<string, any[]> = {};
+        fruitItemsToMove.forEach(({ reception, index }) => {
+            if (!fruitUpdatesByReception[reception.id]) {
+                fruitUpdatesByReception[reception.id] = JSON.parse(JSON.stringify(reception.items));
+            }
+            const itemToUpdate = fruitUpdatesByReception[reception.id][index];
+            if (itemToUpdate) {
+                itemToUpdate.storageLocation = { chamberId: targetChamberId, coordinate: targetCoordinate };
+            }
+        });
+
+        Object.entries(fruitUpdatesByReception).forEach(([receptionId, updatedItems]) => {
+            const receptionRef = doc(firestore, 'otherFruitReceptions', receptionId);
+            batch.update(receptionRef, { items: updatedItems });
+        });
+
+        await batch.commit();
+        toast({ title: 'Éxito', description: `Coordenada reubicada a ${chambersConfig[targetChamberId].name} - ${targetCoordinate}.` });
+    } catch (e: any) {
+        console.error("Error al reubicar:", e);
+        toast({ variant: 'destructive', title: 'Error', description: 'Ocurrió un error al reubicar.' });
+    } finally {
+        setRelocateDialogOpen(false);
+    }
+  };
+  
+  const lotsInCoordToRelocate = coordToRelocate ? storedItemsByChamber[coordToRelocate.chamberId]?.[coordToRelocate.coordinate] || [] : [];
 
 
   return (
-    <Card>
-    <CardHeader>
-        <CardTitle>Productos Pendientes de Almacenar</CardTitle>
-        <CardDescription>Productos de fruta que han sido recepcionados y esperan una ubicación en cámara.</CardDescription>
-    </CardHeader>
-    <CardContent>
-        <div className="rounded-md border">
-        <Table>
-            <TableHeader>
-            <TableRow>
-                <TableHead>Cliente</TableHead>
-                <TableHead>Documento</TableHead>
-                <TableHead>Cód. Prod</TableHead>
-                <TableHead>Producto</TableHead>
-                <TableHead>Cantidad Pendiente</TableHead>
-                <TableHead className="text-right">Acciones</TableHead>
-            </TableRow>
-            </TableHeader>
-            <TableBody>
-            {loading ? (
-                Array.from({ length: 3 }).map((_, i) => (
-                <TableRow key={i}><TableCell colSpan={6}><Skeleton className="h-4 w-full" /></TableCell></TableRow>
-                ))
-            ) : pendingItems.length > 0 ? (
-                pendingItems.map((item) => (
-                    <React.Fragment key={`${item.receptionId}-${item.itemIndex}`}>
-                        <TableRow className={cn(itemToStore?.receptionId === item.receptionId && itemToStore?.itemIndex === item.itemIndex && "bg-muted/30")}>
-                            <TableCell>{item.clientName}</TableCell>
-                            <TableCell className="font-mono">{item.document}</TableCell>
-                            <TableCell className="font-mono">{item.productCode}</TableCell>
-                            <TableCell className="font-medium">{item.productName}</TableCell>
-                            <TableCell className="font-semibold">{item.quantity} {item.unit}</TableCell>
-                            <TableCell className="text-right">
-                                <Button size="sm" onClick={() => setItemToStore(item)} disabled={!!itemToStore}>Almacenar</Button>
-                            </TableCell>
-                        </TableRow>
-                        {itemToStore?.receptionId === item.receptionId && itemToStore?.itemIndex === item.itemIndex && (
-                            <StorageForm 
-                                item={itemToStore} 
-                                onCancel={() => setItemToStore(null)} 
-                                allReceptions={otherFruitReceptions} 
-                                allChamberLots={chamberLots || []}
-                            />
-                        )}
-                   </React.Fragment>
-                ))
-            ) : (
-                <TableRow>
-                <TableCell colSpan={6} className="h-24 text-center">No hay productos pendientes de almacenar.</TableCell>
-                </TableRow>
-            )}
-            </TableBody>
-        </Table>
-        </div>
-    </CardContent>
-    </Card>
+    <div className="space-y-6">
+        <Card>
+            <CardHeader>
+                <CardTitle>Productos Pendientes de Almacenar</CardTitle>
+                <CardDescription>Seleccione un producto para asignarle una ubicación en las cámaras de abajo.</CardDescription>
+            </CardHeader>
+            <CardContent>
+                <div className="rounded-md border">
+                <Table>
+                    <TableHeader><TableRow><TableHead>Cliente</TableHead><TableHead>Producto</TableHead><TableHead>Cantidad Pendiente</TableHead><TableHead className="text-right">Acciones</TableHead></TableRow></TableHeader>
+                    <TableBody>
+                    {loading ? (
+                        Array.from({ length: 3 }).map((_, i) => <TableRow key={i}><TableCell colSpan={4}><Skeleton className="h-4 w-full" /></TableCell></TableRow>)
+                    ) : pendingItems.length > 0 ? (
+                        pendingItems.map((item) => (
+                            <TableRow key={`${item.receptionId}-${item.itemIndex}`} data-state={itemToStore?.receptionId === item.receptionId && itemToStore?.itemIndex === item.itemIndex ? 'selected' : ''}>
+                                <TableCell>{item.clientName}</TableCell>
+                                <TableCell className="font-medium">{item.productName}</TableCell>
+                                <TableCell className="font-semibold">{item.quantity} {item.unit}</TableCell>
+                                <TableCell className="text-right">
+                                    <Button size="sm" onClick={() => handleStoreClick(item)} variant={itemToStore?.receptionId === item.receptionId && itemToStore?.itemIndex === item.itemIndex ? 'secondary' : 'default'}>
+                                        {itemToStore?.receptionId === item.receptionId && itemToStore?.itemIndex === item.itemIndex ? 'Seleccionado' : 'Almacenar'}
+                                    </Button>
+                                </TableCell>
+                            </TableRow>
+                        ))
+                    ) : (
+                        <TableRow><TableCell colSpan={4} className="h-24 text-center">No hay productos pendientes.</TableCell></TableRow>
+                    )}
+                    </TableBody>
+                </Table>
+                </div>
+            </CardContent>
+        </Card>
+
+        <Card>
+            <CardHeader><CardTitle>Estado de Cámaras</CardTitle><CardDescription>Haga click en una coordenada para almacenar el producto seleccionado o ver su contenido.</CardDescription></CardHeader>
+            <CardContent>
+                <Accordion type="single" collapsible className="w-full">
+                    {Object.entries(chambersConfig).map(([chamberId, config]) => (
+                        <AccordionItem value={chamberId} key={chamberId}>
+                            <AccordionTrigger>
+                                <div className="flex w-full items-center justify-between pr-4">
+                                    <span className="text-lg font-semibold">{config.name}</span>
+                                    <div className="text-right">
+                                        <p>{chamberOccupancy[chamberId]?.occupied ?? 0} / {chamberOccupancy[chamberId]?.total ?? 0} Bins Equiv. ({(chamberOccupancy[chamberId]?.percentage ?? 0).toFixed(1)}%)</p>
+                                        <Progress value={chamberOccupancy[chamberId]?.percentage ?? 0} className="w-48 h-2 mt-1" />
+                                    </div>
+                                </div>
+                            </AccordionTrigger>
+                            <AccordionContent>
+                                <div className="p-4 bg-muted/50 rounded-lg border">
+                                    <div className="grid gap-1" style={{ gridTemplateColumns: `repeat(${config.columns.length}, minmax(0, 1fr))` }}>
+                                    {config.rows.map(row => config.columns.map(col => {
+                                        const coord = `${col}${row}`;
+                                        if (config.blocked?.includes(coord)) {
+                                            return <div key={coord} className="h-12 w-full rounded border-2 bg-gray-200 dark:bg-gray-700" />;
+                                        }
+                                        const itemsInCoord = storedItemsByChamber[chamberId]?.[coord] || [];
+                                        const isOccupied = itemsInCoord.length > 0;
+                                        const firstItem = isOccupied ? itemsInCoord[0] : null;
+                                        const lotColor = firstItem ? getColorForLot(`${firstItem.type}-${firstItem.lotIdForColor}`) : 'transparent';
+                                        
+                                        return (
+                                            <Popover key={coord}>
+                                            <PopoverTrigger asChild>
+                                                <button onClick={() => handleGridClick(chamberId, coord)} style={{'--lot-color': lotColor, '--lot-color-bg': lotColor.replace(')', ', 0.2)')} as React.CSSProperties}
+                                                className={cn("h-12 w-full rounded border-2 flex items-center justify-center text-xs font-mono relative overflow-hidden", isOccupied ? 'border-[var(--lot-color)] bg-[var(--lot-color-bg)]' : 'bg-background border-dashed hover:border-primary', itemToStore && 'cursor-copy')}>
+                                                    {coord}
+                                                </button>
+                                            </PopoverTrigger>
+                                            {isOccupied && firstItem && (
+                                                <PopoverContent className="p-4 w-64">
+                                                <div className="space-y-2">
+                                                    <p><b>{firstItem.type === 'producerLot' ? `Lote: ${firstItem.displayId}` : `Producto: ${firstItem.displayId}`}</b></p>
+                                                    <p>{firstItem.type === 'producerLot' ? `Productor: ${firstItem.ownerName}` : `Cliente: ${firstItem.ownerName}`}</p>
+                                                    <p>Variedad/Producto: {firstItem.varietyOrProduct}</p>
+                                                    <p>Cantidad: {itemsInCoord.reduce((s,i)=> s + i.quantity, 0)} {firstItem.unit}</p>
+                                                    <Button size="sm" className="w-full mt-2" onClick={() => handleGridClick(chamberId, coord)}>Reubicar</Button>
+                                                </div>
+                                                </PopoverContent>
+                                            )}
+                                            </Popover>
+                                        );
+                                    }))}
+                                    </div>
+                                </div>
+                            </AccordionContent>
+                        </AccordionItem>
+                    ))}
+                </Accordion>
+            </CardContent>
+        </Card>
+
+        <StoreOtherFruitDialog
+            item={itemToStore}
+            target={dialogTarget}
+            open={isStoreDialogOpen}
+            onOpenChange={setStoreDialogOpen}
+            onConfirm={handleStoreConfirm}
+        />
+        
+        {coordToRelocate && (
+            <RelocateLotDialog
+                open={isRelocateDialogOpen}
+                onOpenChange={setRelocateDialogOpen}
+                onRelocate={handleRelocate}
+                sourceChamberId={coordToRelocate.chamberId}
+                sourceCoordinate={coordToRelocate.coordinate}
+                lotsInCoordinate={lotsInCoordToRelocate}
+                allChamberLots={chamberLots}
+                allOtherFruitReceptions={otherFruitReceptions}
+            />
+        )}
+    </div>
   );
 }
