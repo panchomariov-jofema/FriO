@@ -13,6 +13,8 @@ import { OtherFruitReception, ChamberLot, OtherFruitReceptionItem } from '@/lib/
 import { chambersConfig } from '@/lib/chambers-config';
 import { useToast } from '@/hooks/use-toast';
 import { naturalSort } from '@/lib/utils';
+import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
+import { Label } from '../ui/label';
 
 interface PendingItem extends OtherFruitReceptionItem {
     receptionId: string;
@@ -35,6 +37,7 @@ const storeSchema = z.object({
   chamberId: z.string({ required_error: 'Debe seleccionar una cámara.' }),
   coordinate: z.string({ required_error: 'Debe seleccionar una coordenada.' }),
   quantity: z.coerce.number().positive('La cantidad debe ser mayor a 0.'),
+  strategy: z.enum(['secuencial', 'pareado']).default('secuencial'),
 });
 
 type StoreFormValues = z.infer<typeof storeSchema>;
@@ -42,10 +45,37 @@ type StoreFormValues = z.infer<typeof storeSchema>;
 export function StoreOtherFruitDialog({ item, open, onOpenChange, onConfirm, allReceptions, allChamberLots }: StoreOtherFruitDialogProps) {
   const form = useForm<StoreFormValues>({
     resolver: zodResolver(storeSchema),
+    defaultValues: {
+      strategy: 'secuencial',
+    }
   });
   const { toast } = useToast();
 
   const selectedChamberId = form.watch('chamberId');
+  const storageStrategy = form.watch('strategy');
+
+  const pareadoSort = (a: string, b: string) => {
+    const re = /^([A-Z]+)(\d+)$/;
+    const matchA = a.match(re);
+    const matchB = b.match(re);
+
+    if (!matchA || !matchB) return 0;
+
+    const [, aLetter, aNumStr] = matchA;
+    const [, bLetter, bNumStr] = matchB;
+    
+    const aNum = parseInt(aNumStr, 10);
+    const bNum = parseInt(bNumStr, 10);
+
+    if (aNum < bNum) return -1;
+    if (aNum > bNum) return 1;
+
+    if (aLetter < bLetter) return -1;
+    if (aLetter > bLetter) return 1;
+    
+    return 0;
+  };
+
 
   const { availableCoordinates, suggestion } = React.useMemo(() => {
     if (!selectedChamberId || !item) {
@@ -92,12 +122,14 @@ export function StoreOtherFruitDialog({ item, open, onOpenChange, onConfirm, all
         });
     });
     
+    const sortFunction = storageStrategy === 'pareado' ? pareadoSort : naturalSort;
+
     const allPossibleCoords = chamberConfig.columns
       .flatMap(col => chamberConfig.rows.map(row => `${col}${row}`))
       .filter(coord => !chamberConfig.blocked?.includes(coord))
-      .sort(naturalSort);
+      .sort(sortFunction);
 
-    // Pareado: Find partially filled coordinate with the same product
+    // Pareado (Product-based): Find partially filled coordinate with the same product
     const partialSameProductCoord = allPossibleCoords.find(coord => {
       const occupiedBy = occupancyMap.get(coord);
       return occupiedBy && !occupiedBy.isMixed && occupiedBy.productCode === item.productCode && occupiedBy.quantity < capacity;
@@ -124,7 +156,7 @@ export function StoreOtherFruitDialog({ item, open, onOpenChange, onConfirm, all
     
     return { availableCoordinates: availableCoords, suggestion: currentSuggestion };
 
-  }, [selectedChamberId, item, allReceptions, allChamberLots]);
+  }, [selectedChamberId, item, allReceptions, allChamberLots, storageStrategy]);
 
   React.useEffect(() => {
     if (open && item) {
@@ -132,6 +164,7 @@ export function StoreOtherFruitDialog({ item, open, onOpenChange, onConfirm, all
         quantity: item.quantity,
         chamberId: undefined,
         coordinate: undefined,
+        strategy: 'secuencial',
        });
     }
   }, [item, open, form]);
@@ -178,7 +211,37 @@ export function StoreOtherFruitDialog({ item, open, onOpenChange, onConfirm, all
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-4">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 py-4">
+            <FormField
+              control={form.control}
+              name="strategy"
+              render={({ field }) => (
+                <FormItem className="space-y-3">
+                  <FormLabel>Estrategia de Almacenamiento</FormLabel>
+                  <FormControl>
+                    <RadioGroup
+                      onValueChange={field.onChange}
+                      defaultValue={field.value}
+                      className="flex space-x-4"
+                    >
+                      <FormItem className="flex items-center space-x-2 space-y-0">
+                        <FormControl>
+                          <RadioGroupItem value="secuencial" />
+                        </FormControl>
+                        <FormLabel className="font-normal">Secuencial (A1, A2, A3...)</FormLabel>
+                      </FormItem>
+                      <FormItem className="flex items-center space-x-2 space-y-0">
+                        <FormControl>
+                          <RadioGroupItem value="pareado" />
+                        </FormControl>
+                        <FormLabel className="font-normal">Pareado (A1, B1, A2...)</FormLabel>
+                      </FormItem>
+                    </RadioGroup>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
              <div className="grid grid-cols-2 gap-4">
                 <FormField control={form.control} name="chamberId" render={({ field }) => (
                     <FormItem>
