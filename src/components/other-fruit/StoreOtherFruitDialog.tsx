@@ -13,7 +13,6 @@ import { Button } from '@/components/ui/button';
 import { OtherFruitReception, ChamberLot, OtherFruitReceptionItem, Chamber } from '@/lib/types';
 import { chambersConfig } from '@/lib/chambers-config';
 import { useToast } from '@/hooks/use-toast';
-import { naturalSort } from '@/lib/utils';
 import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
 import { Label } from '../ui/label';
 
@@ -38,16 +37,19 @@ const BINS_PER_COORDINATE = 9;
 const PALLETS_PER_COORDINATE = 3; 
 
 // Helper function to get sorted coordinates based on strategy
-function getSortedCoordinates(chamberConfig: Chamber, strategy: 'secuencial' | 'pareado') {
+function getSortedCoordinates(chamberConfig: Chamber, strategy: 'secuencial' | 'pareado'): string[] {
     if (strategy === 'pareado') {
         const pairedCoords: string[] = [];
         const cols = [...chamberConfig.columns];
-        for (let i = 0; i < cols.length; i += 2) {
-            const col1 = cols[i];
-            const col2 = i + 1 < cols.length ? cols[i+1] : null;
-            
-            for (const row of chamberConfig.rows) {
-                 if (!chamberConfig.blocked?.includes(`${col1}${row}`)) {
+        
+        // Iterate through rows first to get the desired rightward movement
+        for (const row of chamberConfig.rows) {
+            // Then iterate through column pairs
+            for (let i = 0; i < cols.length; i += 2) {
+                const col1 = cols[i];
+                const col2 = i + 1 < cols.length ? cols[i + 1] : null;
+
+                if (!chamberConfig.blocked?.includes(`${col1}${row}`)) {
                     pairedCoords.push(`${col1}${row}`);
                 }
                 if (col2 && !chamberConfig.blocked?.includes(`${col2}${row}`)) {
@@ -55,15 +57,15 @@ function getSortedCoordinates(chamberConfig: Chamber, strategy: 'secuencial' | '
                 }
             }
         }
-        return pairedCoords;
-    } 
+        return pairedCoords.filter((coord: string) => !chamberConfig.blocked?.includes(coord));
+    }
     
-    // Default to 'secuencial'
+    // Default to 'secuencial': A1, A2, A3... B1, B2, B3...
     return chamberConfig.columns
         .flatMap((col: string) => chamberConfig.rows.map((row: number) => `${col}${row}`))
-        .filter((coord: string) => !chamberConfig.blocked?.includes(coord))
-        .sort(naturalSort);
+        .filter((coord: string) => !chamberConfig.blocked?.includes(coord));
 }
+
 
 const storeSchema = z.object({
   chamberId: z.string({ required_error: 'Debe seleccionar una cámara.' }),
@@ -89,7 +91,7 @@ export function StoreOtherFruitDialog({ item, open, onOpenChange, onConfirm, all
   const storageStrategy = form.watch('strategy');
   
   const capacityPerCoord = useMemo(() => {
-    if (!item) return PALLETS_PER_COORDINATE; // Default to pallet capacity if no item
+    if (!item) return PALLETS_PER_COORDINATE;
     return item.unit === 'Bins' ? BINS_PER_COORDINATE : PALLETS_PER_COORDINATE;
   }, [item]);
 
@@ -195,7 +197,7 @@ export function StoreOtherFruitDialog({ item, open, onOpenChange, onConfirm, all
                         <FormControl>
                           <RadioGroupItem value="pareado" />
                         </FormControl>
-                        <FormLabel className="font-normal">Pareado (A1, B1, A2...)</FormLabel>
+                        <FormLabel className="font-normal">Pareado (A1, B1, C1...)</FormLabel>
                       </FormItem>
                     </RadioGroup>
                   </FormControl>

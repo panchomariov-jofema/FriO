@@ -15,7 +15,6 @@ import { useToast } from '@/hooks/use-toast';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { chambersConfig } from '@/lib/chambers-config';
-import { naturalSort } from '@/lib/utils';
 
 interface PendingItem extends OtherFruitReceptionItem {
     receptionId: string;
@@ -29,12 +28,15 @@ function getSortedCoordinates(chamberConfig: Chamber, strategy: 'secuencial' | '
     if (strategy === 'pareado') {
         const pairedCoords: string[] = [];
         const cols = [...chamberConfig.columns];
-        for (let i = 0; i < cols.length; i += 2) {
-            const col1 = cols[i];
-            const col2 = i + 1 < cols.length ? cols[i+1] : null;
-            
-            for (const row of chamberConfig.rows) {
-                 if (!chamberConfig.blocked?.includes(`${col1}${row}`)) {
+        
+        // Iterate through rows first to get the desired rightward movement
+        for (const row of chamberConfig.rows) {
+            // Then iterate through column pairs
+            for (let i = 0; i < cols.length; i += 2) {
+                const col1 = cols[i];
+                const col2 = i + 1 < cols.length ? cols[i + 1] : null;
+
+                if (!chamberConfig.blocked?.includes(`${col1}${row}`)) {
                     pairedCoords.push(`${col1}${row}`);
                 }
                 if (col2 && !chamberConfig.blocked?.includes(`${col2}${row}`)) {
@@ -42,14 +44,13 @@ function getSortedCoordinates(chamberConfig: Chamber, strategy: 'secuencial' | '
                 }
             }
         }
-        return pairedCoords;
-    } 
+        return pairedCoords.filter((coord: string) => !chamberConfig.blocked?.includes(coord));
+    }
     
-    // Default to 'secuencial'
+    // Default to 'secuencial': A1, A2, A3... B1, B2, B3...
     return chamberConfig.columns
         .flatMap((col: string) => chamberConfig.rows.map((row: number) => `${col}${row}`))
-        .filter((coord: string) => !chamberConfig.blocked?.includes(coord))
-        .sort(naturalSort);
+        .filter((coord: string) => !chamberConfig.blocked?.includes(coord));
 }
 
 
