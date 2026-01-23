@@ -28,15 +28,16 @@ interface StoreOtherFruitDialogProps {
   item: PendingItem | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onConfirm: (data: { chamberId: string; coordinate: string; quantity: number }) => void;
+  onConfirm: (data: { chamberId: string; coordinate: string; totalQuantity: number; quantityPerLocation: number; strategy: 'secuencial' | 'pareado' }) => void;
   allReceptions: OtherFruitReception[];
   allChamberLots: ChamberLot[];
 }
 
 const storeSchema = z.object({
   chamberId: z.string({ required_error: 'Debe seleccionar una cámara.' }),
-  coordinate: z.string({ required_error: 'Debe seleccionar una coordenada.' }),
-  quantity: z.coerce.number().positive('La cantidad debe ser mayor a 0.'),
+  coordinate: z.string({ required_error: 'Debe seleccionar una coordenada de inicio.' }),
+  totalQuantity: z.coerce.number().positive('La cantidad total debe ser mayor a 0.'),
+  quantityPerLocation: z.coerce.number().positive('La cantidad por ubicación debe ser mayor a 0.'),
   strategy: z.enum(['secuencial', 'pareado']).default('secuencial'),
 });
 
@@ -53,6 +54,12 @@ export function StoreOtherFruitDialog({ item, open, onOpenChange, onConfirm, all
 
   const selectedChamberId = form.watch('chamberId');
   const storageStrategy = form.watch('strategy');
+  
+  if (!item) return null;
+
+  const BINS_PER_COORDINATE = 9;
+  const PALLETS_PER_COORDINATE = 3; 
+  const capacityPerCoord = item.unit === 'Bins' ? BINS_PER_COORDINATE : PALLETS_PER_COORDINATE;
 
   const pareadoSort = (a: string, b: string) => {
     const re = /^([A-Z]+)(\d+)$/;
@@ -87,37 +94,14 @@ export function StoreOtherFruitDialog({ item, open, onOpenChange, onConfirm, all
       return { availableCoordinates: [], suggestion: null };
     }
 
-    const BINS_PER_COORDINATE = 6;
-    const PALLETS_PER_COORDINATE = 3; 
-    const capacity = item.unit === 'Bins' ? BINS_PER_COORDINATE : PALLETS_PER_COORDINATE;
-
-    const occupancyMap = new Map<string, { productCode: string, quantity: number, isMixed: boolean }>();
-
-    // Mark coordinates with producer lots as unavailable/mixed
+    const occupiedCoords = new Set<string>();
     (allChamberLots || []).forEach(lot => {
-      if (lot.chamberId === selectedChamberId && lot.coordinate) {
-          occupancyMap.set(lot.coordinate, { productCode: 'PRODUCER_LOT', quantity: 99, isMixed: true });
-      }
+        if (lot.chamberId === selectedChamberId && lot.coordinate) occupiedCoords.add(lot.coordinate);
     });
-
-    // Build occupancy for other fruit
     (allReceptions || []).forEach(reception => {
         reception.items.forEach(storedItem => {
             if (storedItem.status === 'Almacenado' && storedItem.storageLocation?.chamberId === selectedChamberId && storedItem.storageLocation.coordinate) {
-                const coord = storedItem.storageLocation.coordinate;
-                const existing = occupancyMap.get(coord);
-                if (existing) {
-                    if (existing.productCode !== storedItem.productCode) {
-                        existing.isMixed = true;
-                    }
-                    existing.quantity += storedItem.quantity;
-                } else {
-                    occupancyMap.set(coord, {
-                        productCode: storedItem.productCode,
-                        quantity: storedItem.quantity,
-                        isMixed: false
-                    });
-                }
+                occupiedCoords.add(storedItem.storageLocation.coordinate);
             }
         });
     });
@@ -128,31 +112,9 @@ export function StoreOtherFruitDialog({ item, open, onOpenChange, onConfirm, all
       .flatMap(col => chamberConfig.rows.map(row => `${col}${row}`))
       .filter(coord => !chamberConfig.blocked?.includes(coord))
       .sort(sortFunction);
-
-    // Pareado (Product-based): Find partially filled coordinate with the same product
-    const partialSameProductCoord = allPossibleCoords.find(coord => {
-      const occupiedBy = occupancyMap.get(coord);
-      return occupiedBy && !occupiedBy.isMixed && occupiedBy.productCode === item.productCode && occupiedBy.quantity < capacity;
-    });
-
-    let currentSuggestion: string | null = null;
-    if (partialSameProductCoord) {
-      currentSuggestion = partialSameProductCoord;
-    } else {
-      // Secuencial: Find the first completely empty coordinate
-      const firstEmpty = allPossibleCoords.find(coord => !occupancyMap.has(coord));
-      if (firstEmpty) {
-        currentSuggestion = firstEmpty;
-      }
-    }
     
-    // The dropdown should only show completely empty coordinates OR the one we are suggesting if it's partially full
-    const availableCoords = allPossibleCoords.filter(coord => {
-        const occupiedBy = occupancyMap.get(coord);
-        if (!occupiedBy) return true; // It's empty
-        // It's not empty, check if it's the suggested one (pareado)
-        return coord === currentSuggestion;
-    });
+    const availableCoords = allPossibleCoords.filter(coord => !occupiedCoords.has(coord));
+    const currentSuggestion = availableCoords.length > 0 ? availableCoords[0] : null;
     
     return { availableCoordinates: availableCoords, suggestion: currentSuggestion };
 
@@ -161,13 +123,14 @@ export function StoreOtherFruitDialog({ item, open, onOpenChange, onConfirm, all
   React.useEffect(() => {
     if (open && item) {
       form.reset({
-        quantity: item.quantity,
+        totalQuantity: item.quantity,
+        quantityPerLocation: capacityPerCoord,
         chamberId: undefined,
         coordinate: undefined,
         strategy: 'secuencial',
        });
     }
-  }, [item, open, form]);
+  }, [item, open, form, capacityPerCoord]);
 
   React.useEffect(() => {
     if (suggestion) {
@@ -181,20 +144,11 @@ export function StoreOtherFruitDialog({ item, open, onOpenChange, onConfirm, all
   if (!item) return null;
   
   const onSubmit = (values: StoreFormValues) => {
-    const { unit } = item;
-    const { quantity } = values;
-    const BINS_PER_COORDINATE = 6;
-    const PALLETS_PER_COORDINATE = 3; 
-
-    if (unit === 'Bins' && quantity > BINS_PER_COORDINATE) {
-        toast({ variant: 'destructive', title: 'Límite Excedido', description: `Una coordenada no puede tener más de ${BINS_PER_COORDINATE} bins.`});
+    if (values.quantityPerLocation > capacityPerCoord) {
+        toast({ variant: 'destructive', title: 'Límite Excedido', description: `La cantidad por ubicación no puede ser mayor a ${capacityPerCoord}.`});
         return;
     }
-    if (unit === 'Pallets' && quantity > PALLETS_PER_COORDINATE) {
-        toast({ variant: 'destructive', title: 'Límite Excedido', description: `Una coordenada no puede tener más de ${PALLETS_PER_COORDINATE} pallets.`});
-        return;
-    }
-    if (quantity > item.quantity) {
+    if (values.totalQuantity > item.quantity) {
         toast({ variant: 'destructive', title: 'Cantidad Inválida', description: `No puede almacenar más de lo pendiente (${item.quantity}).`});
         return;
     }
@@ -259,7 +213,7 @@ export function StoreOtherFruitDialog({ item, open, onOpenChange, onConfirm, all
                 )} />
                 <FormField control={form.control} name="coordinate" render={({ field }) => (
                     <FormItem>
-                    <FormLabel>Coordenada</FormLabel>
+                    <FormLabel>Coordenada de Inicio</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value} disabled={!selectedChamberId}>
                         <FormControl><SelectTrigger><SelectValue placeholder={!selectedChamberId ? "Seleccione cámara" : "Seleccione..."} /></SelectTrigger></FormControl>
                         <SelectContent>
@@ -276,22 +230,40 @@ export function StoreOtherFruitDialog({ item, open, onOpenChange, onConfirm, all
                     </FormItem>
                 )} />
             </div>
-            <FormField
-              control={form.control}
-              name="quantity"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Cantidad a Almacenar ({item.unit})</FormLabel>
-                  <FormControl>
-                    <Input type="number" {...field} autoComplete="off" inputMode="numeric" />
-                  </FormControl>
-                  <p className="text-xs text-muted-foreground pt-1">
-                      Pendiente: {item.quantity} {item.unit}.
-                  </p>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+             <div className="grid grid-cols-2 gap-4">
+                <FormField
+                control={form.control}
+                name="totalQuantity"
+                render={({ field }) => (
+                    <FormItem>
+                    <FormLabel>Cantidad Total a Almacenar</FormLabel>
+                    <FormControl>
+                        <Input type="number" {...field} autoComplete="off" inputMode="numeric" />
+                    </FormControl>
+                    <p className="text-xs text-muted-foreground pt-1">
+                        Pendiente: {item.quantity} {item.unit}.
+                    </p>
+                    <FormMessage />
+                    </FormItem>
+                )}
+                />
+                 <FormField
+                control={form.control}
+                name="quantityPerLocation"
+                render={({ field }) => (
+                    <FormItem>
+                    <FormLabel>Cantidad por Ubicación</FormLabel>
+                    <FormControl>
+                        <Input type="number" {...field} autoComplete="off" inputMode="numeric" />
+                    </FormControl>
+                     <p className="text-xs text-muted-foreground pt-1">
+                        Máx: {capacityPerCoord}
+                    </p>
+                    <FormMessage />
+                    </FormItem>
+                )}
+                />
+            </div>
             <DialogFooter>
               <DialogClose asChild>
                 <Button type="button" variant="outline">Cancelar</Button>

@@ -10,10 +10,12 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { StoreOtherFruitDialog } from './StoreOtherFruitDialog';
 import { useFirestore } from '@/firebase';
-import { doc, serverTimestamp, updateDoc } from 'firebase/firestore';
+import { doc, serverTimestamp, updateDoc, writeBatch } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
+import { chambersConfig } from '@/lib/chambers-config';
+import { naturalSort } from '@/lib/utils';
 
 interface PendingItem extends OtherFruitReceptionItem {
     receptionId: string;
@@ -55,33 +57,104 @@ export function OtherFruitStorageTab() {
     setDialogOpen(true);
   };
 
-  const handleStoreConfirm = async (location: { chamberId: string; coordinate: string; quantity: number; }) => {
+  const handleStoreConfirm = async (data: { chamberId: string; coordinate: string; totalQuantity: number; quantityPerLocation: number; strategy: 'secuencial' | 'pareado' }) => {
     if (!selectedItem || !firestore) return;
     
-    const { chamberId, coordinate, quantity } = location;
+    const { chamberId, coordinate: startCoordinate, totalQuantity, quantityPerLocation, strategy } = data;
 
+    const chamberConfig = chambersConfig[chamberId];
+    if (!chamberConfig) return;
+
+    const BINS_PER_COORDINATE = 9;
+    const PALLETS_PER_COORDINATE = 3;
+    const capacityPerCoord = selectedItem.unit === 'Bins' ? BINS_PER_COORDINATE : PALLETS_PER_COORDINATE;
+
+    if (quantityPerLocation > capacityPerCoord) {
+        toast({ title: 'Error', description: `La cantidad por ubicación excede el máximo de ${capacityPerCoord}.`, variant: 'destructive'});
+        return;
+    }
+
+    const pareadoSort = (a: string, b: string) => {
+        const re = /^([A-Z]+)(\d+)$/;
+        const matchA = a.match(re);
+        const matchB = b.match(re);
+        if (!matchA || !matchB) return 0;
+        const [, aLetter, aNumStr] = matchA;
+        const [, bLetter, bNumStr] = matchB;
+        const aNum = parseInt(aNumStr, 10);
+        const bNum = parseInt(bNumStr, 10);
+        if (aNum < bNum) return -1;
+        if (aNum > bNum) return 1;
+        if (aLetter < bLetter) return -1;
+        if (aLetter > bLetter) return 1;
+        return 0;
+    };
+    const sortFunction = strategy === 'pareado' ? pareadoSort : naturalSort;
+    const allPossibleCoords = chamberConfig.columns
+      .flatMap(col => chamberConfig.rows.map(row => `${col}${row}`))
+      .filter(coord => !chamberConfig.blocked?.includes(coord))
+      .sort(sortFunction);
+
+    const occupiedCoords = new Set<string>();
+    (allChamberLots || []).forEach(lot => {
+        if (lot.chamberId === chamberId && lot.coordinate) occupiedCoords.add(lot.coordinate);
+    });
+    (allReceptions || []).forEach(reception => {
+        reception.items.forEach(item => {
+            if(item.status === 'Almacenado' && item.storageLocation?.chamberId === chamberId && item.storageLocation.coordinate) {
+                 occupiedCoords.add(item.storageLocation.coordinate);
+            }
+        });
+    });
+
+    const availableCoordinates = allPossibleCoords.filter(coord => !occupiedCoords.has(coord));
+    const startIndex = availableCoordinates.indexOf(startCoordinate);
+    if (startIndex === -1) {
+        toast({ title: 'Error', description: 'La coordenada de inicio ya no está disponible.', variant: 'destructive'});
+        return;
+    }
+
+    let remainingQuantityToStore = totalQuantity;
+    const coordsToUse: string[] = [];
+    const batch = writeBatch(firestore);
+    
     const receptionDocRef = doc(firestore, 'otherFruitReceptions', selectedItem.receptionId);
     const originalReception = allReceptions.find(r => r.id === selectedItem.receptionId);
     if (!originalReception) return;
 
     const updatedItems = JSON.parse(JSON.stringify(originalReception.items));
     const originalItem = updatedItems[selectedItem.itemIndex];
-
-    if (quantity > originalItem.quantity) {
+    
+    if (totalQuantity > originalItem.quantity) {
         toast({ title: 'Error', description: 'La cantidad a almacenar excede la pendiente.', variant: 'destructive'});
         return;
     }
-    
-    originalItem.quantity -= quantity;
 
-    const newItem: OtherFruitReceptionItem = {
-      ...originalItem,
-      quantity: quantity,
-      status: 'Almacenado',
-      storageLocation: { chamberId, coordinate },
-      storedAt: new Date(),
-    };
-    updatedItems.push(newItem);
+    originalItem.quantity -= totalQuantity;
+
+    for (let i = startIndex; i < availableCoordinates.length; i++) {
+        const coord = availableCoordinates[i];
+        if (remainingQuantityToStore <= 0) break;
+        coordsToUse.push(coord);
+
+        const quantityForThisCoord = Math.min(remainingQuantityToStore, quantityPerLocation);
+
+        const newItem: OtherFruitReceptionItem = {
+            ...originalItem,
+            quantity: quantityForThisCoord,
+            status: 'Almacenado',
+            storageLocation: { chamberId, coordinate: coord },
+            storedAt: new Date(),
+        };
+        updatedItems.push(newItem);
+
+        remainingQuantityToStore -= quantityForThisCoord;
+    }
+
+    if (remainingQuantityToStore > 0) {
+        toast({ title: 'Espacio Insuficiente', description: `No se encontraron suficientes coordenadas libres para almacenar todo. Quedaron ${remainingQuantityToStore} sin almacenar.`, variant: 'destructive', duration: 7000});
+        return;
+    }
 
     if (originalItem.quantity <= 0) {
         updatedItems.splice(selectedItem.itemIndex, 1);
@@ -96,9 +169,11 @@ export function OtherFruitStorageTab() {
         updatedAt: serverTimestamp(),
     };
     
+    batch.update(receptionDocRef, updateData);
+
     try {
-        await updateDoc(receptionDocRef, updateData);
-        toast({ title: 'Éxito', description: `${quantity} ${selectedItem.unit} almacenados en ${chamberId}/${coordinate}.` });
+        await batch.commit();
+        toast({ title: 'Éxito', description: `${totalQuantity} ${selectedItem.unit} almacenados en ${coordsToUse.length} ubicaciones.` });
         setDialogOpen(false);
     } catch (error) {
         console.error("Error storing fruit item:", error);
