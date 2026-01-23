@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -129,7 +128,7 @@ export default function DespachosPage() {
     return exporters?.find(e => e.exporterId === exporterId)?.name || exporterId;
   };
 
-  const { binsPerChamber, binsPerExporter } = React.useMemo(() => {
+  const { binsPerChamber, binsPerExporter, binsPerProducer } = React.useMemo(() => {
     const storedLots = (chamberLots || []).filter(lot => lot.status === 'Almacenado');
 
     const perChamber = storedLots.reduce((acc, lot) => {
@@ -144,7 +143,13 @@ export default function DespachosPage() {
       return acc;
     }, {} as Record<string, number>);
 
-    return { binsPerChamber: perChamber, binsPerExporter: perExporter };
+    const perProducer = storedLots.reduce((acc, lot) => {
+      const producerName = lot.producerShortName;
+      acc[producerName] = (acc[producerName] || 0) + lot.binCount;
+      return acc;
+    }, {} as Record<string, number>);
+
+    return { binsPerChamber, binsPerExporter, binsPerProducer };
   }, [chamberLots]);
 
   const onSubmit = async (values: DispatchFormValues) => {
@@ -392,7 +397,7 @@ const handleUndoDispatch = async (dispatchToUndo: Dispatch) => {
 };
 
 
-  const summaryIsLoading = loadingChamberLots || loadingExporters;
+  const summaryIsLoading = loadingChamberLots || loadingExporters || loadingProducers;
   const sortedDispatches = React.useMemo(() => {
     if (!dispatches) return [];
     return [...dispatches].sort((a, b) => {
@@ -403,7 +408,7 @@ const handleUndoDispatch = async (dispatchToUndo: Dispatch) => {
 
   return (
     <div className="space-y-6">
-      <div className="grid md:grid-cols-2 gap-6">
+      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
         <Card>
           <CardHeader>
             <CardTitle>Resumen: Bins por Cámara</CardTitle>
@@ -457,6 +462,38 @@ const handleUndoDispatch = async (dispatchToUndo: Dispatch) => {
                       Object.entries(binsPerExporter).map(([exporterId, count]) => (
                         <TableRow key={exporterId}>
                           <TableCell className="font-medium">{getExporterName(exporterId)}</TableCell>
+                          <TableCell className="text-right">{count}</TableCell>
+                        </TableRow>
+                      ))
+                    ) : (
+                      <TableRow><TableCell colSpan={2} className="h-24 text-center">No hay bins almacenados.</TableCell></TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+            </div>
+          </CardContent>
+        </Card>
+         <Card>
+          <CardHeader>
+            <CardTitle>Resumen: Bins por Productor</CardTitle>
+            <CardDescription>Total de bins en estado "Almacenado" por cada productor.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="rounded-md border max-h-48 overflow-y-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Productor</TableHead>
+                      <TableHead className="text-right">Total Bins</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {summaryIsLoading ? (
+                       <TableRow><TableCell colSpan={2}><Skeleton className="h-4 w-full my-1" /></TableCell></TableRow>
+                    ) : Object.keys(binsPerProducer).length > 0 ? (
+                      Object.entries(binsPerProducer).map(([producerName, count]) => (
+                        <TableRow key={producerName}>
+                          <TableCell className="font-medium">{producerName}</TableCell>
                           <TableCell className="text-right">{count}</TableCell>
                         </TableRow>
                       ))
