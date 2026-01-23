@@ -6,6 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { OtherFruitReceptionTab } from '@/components/other-fruit/ReceptionTab';
 import { OtherFruitStorageTab } from '@/components/other-fruit/StorageTab';
 import { OtherFruitExitTab } from '@/components/other-fruit/ExitTab';
+import { StockAndRelocationTab } from '@/components/other-fruit/StockAndRelocationTab';
 
 export default function OtrosHortofruticolasPage() {
     return (
@@ -18,10 +19,11 @@ export default function OtrosHortofruticolasPage() {
             </Card>
 
             <Tabs defaultValue="recepcion" className="w-full">
-                <TabsList className="grid w-full grid-cols-3">
+                <TabsList className="grid w-full grid-cols-4">
                     <TabsTrigger value="recepcion">Recepción</TabsTrigger>
                     <TabsTrigger value="almacenamiento">Almacenamiento</TabsTrigger>
                     <TabsTrigger value="salidas">Despacho</TabsTrigger>
+                    <TabsTrigger value="stock">Stock</TabsTrigger>
                 </TabsList>
                 
                 <TabsContent value="recepcion">
@@ -34,6 +36,10 @@ export default function OtrosHortofruticolasPage() {
 
                 <TabsContent value="salidas">
                     <OtherFruitExitTab />
+                </TabsContent>
+
+                <TabsContent value="stock">
+                    <StockAndRelocationTab />
                 </TabsContent>
             </Tabs>
         </div>
