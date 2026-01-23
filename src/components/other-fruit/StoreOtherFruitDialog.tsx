@@ -10,7 +10,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import { OtherFruitReception, ChamberLot, OtherFruitReceptionItem } from '@/lib/types';
+import { OtherFruitReception, ChamberLot, OtherFruitReceptionItem, Chamber } from '@/lib/types';
 import { chambersConfig } from '@/lib/chambers-config';
 import { useToast } from '@/hooks/use-toast';
 import { naturalSort } from '@/lib/utils';
@@ -34,6 +34,37 @@ interface StoreOtherFruitDialogProps {
   allChamberLots: ChamberLot[];
 }
 
+const BINS_PER_COORDINATE = 9;
+const PALLETS_PER_COORDINATE = 3; 
+
+// Helper function to get sorted coordinates based on strategy
+function getSortedCoordinates(chamberConfig: Chamber, strategy: 'secuencial' | 'pareado') {
+    if (strategy === 'pareado') {
+        const pairedCoords: string[] = [];
+        const cols = [...chamberConfig.columns];
+        for (let i = 0; i < cols.length; i += 2) {
+            const col1 = cols[i];
+            const col2 = i + 1 < cols.length ? cols[i+1] : null;
+            
+            for (const row of chamberConfig.rows) {
+                 if (!chamberConfig.blocked?.includes(`${col1}${row}`)) {
+                    pairedCoords.push(`${col1}${row}`);
+                }
+                if (col2 && !chamberConfig.blocked?.includes(`${col2}${row}`)) {
+                    pairedCoords.push(`${col2}${row}`);
+                }
+            }
+        }
+        return pairedCoords;
+    } 
+    
+    // Default to 'secuencial'
+    return chamberConfig.columns
+        .flatMap((col: string) => chamberConfig.rows.map((row: number) => `${col}${row}`))
+        .filter((coord: string) => !chamberConfig.blocked?.includes(coord))
+        .sort(naturalSort);
+}
+
 const storeSchema = z.object({
   chamberId: z.string({ required_error: 'Debe seleccionar una cámara.' }),
   coordinate: z.string({ required_error: 'Debe seleccionar una coordenada de inicio.' }),
@@ -43,9 +74,6 @@ const storeSchema = z.object({
 });
 
 type StoreFormValues = z.infer<typeof storeSchema>;
-
-const BINS_PER_COORDINATE = 9;
-const PALLETS_PER_COORDINATE = 3; 
 
 
 export function StoreOtherFruitDialog({ item, open, onOpenChange, onConfirm, allReceptions, allChamberLots }: StoreOtherFruitDialogProps) {
@@ -87,30 +115,7 @@ export function StoreOtherFruitDialog({ item, open, onOpenChange, onConfirm, all
         });
     });
     
-    let allPossibleCoords: string[];
-
-    if (storageStrategy === 'pareado') {
-        const pairedCoords: string[] = [];
-        const cols = [...chamberConfig.columns]; // Create a copy
-        // Generate by column pairs, iterating through rows for each pair
-        for (let i = 0; i < cols.length; i += 2) {
-            const col1 = cols[i];
-            const col2 = i + 1 < cols.length ? cols[i+1] : null;
-            
-            for (const row of chamberConfig.rows) {
-                pairedCoords.push(`${col1}${row}`);
-                if (col2) {
-                    pairedCoords.push(`${col2}${row}`);
-                }
-            }
-        }
-        allPossibleCoords = pairedCoords.filter(coord => !chamberConfig.blocked?.includes(coord));
-    } else { // 'secuencial'
-        allPossibleCoords = chamberConfig.columns
-            .flatMap(col => chamberConfig.rows.map(row => `${col}${row}`))
-            .filter(coord => !chamberConfig.blocked?.includes(coord))
-            .sort(naturalSort);
-    }
+    const allPossibleCoords = getSortedCoordinates(chamberConfig, storageStrategy);
     
     const availableCoords = allPossibleCoords.filter(coord => !occupiedCoords.has(coord));
     const currentSuggestion = availableCoords.length > 0 ? availableCoords[0] : null;
@@ -153,7 +158,6 @@ export function StoreOtherFruitDialog({ item, open, onOpenChange, onConfirm, all
     onConfirm(values);
   };
   
-  // Conditional rendering at the end, after all hooks are called.
   if (!item) {
     return null;
   }
