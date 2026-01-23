@@ -141,6 +141,11 @@ export function OtherFruitExitTab() {
       toast({ variant: 'destructive', title: 'Error', description: 'Debe ingresar una cantidad para al menos una ubicación.' });
       return;
     }
+
+    if (!document.trim()) {
+        toast({ variant: 'destructive', title: 'Error', description: 'El Documento de Despacho es obligatorio.' });
+        return;
+    }
     
     const client = fruitClients.find(c => c.clientId === selectedClientId);
     if (!client) {
@@ -203,7 +208,7 @@ export function OtherFruitExitTab() {
             clientId: client.clientId,
             clientName: client.name,
             unit: client.unit,
-            document: document || `SALIDA-${Date.now()}`,
+            document: document,
             items: movementItems,
             createdAt: serverTimestamp(),
         });
@@ -250,8 +255,8 @@ export function OtherFruitExitTab() {
               </Select>
             </div>
             <div>
-              <Label>Documento de Despacho (Opcional)</Label>
-              <Input placeholder="Ej: Vale de consumo, Guía..." value={document} onChange={(e) => setDocument(e.target.value)} disabled={!selectedClientId} />
+              <Label>Documento de Despacho</Label>
+              <Input type="number" placeholder="Ej: 12345" value={document} onChange={(e) => setDocument(e.target.value)} disabled={!selectedClientId} />
             </div>
         </div>
 
