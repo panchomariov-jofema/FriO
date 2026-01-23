@@ -43,6 +43,7 @@ export function OtherFruitExitTab() {
 
   const [selectedClientId, setSelectedClientId] = React.useState('');
   const [document, setDocument] = React.useState('');
+  const [lotFilter, setLotFilter] = React.useState('');
   const [quantitiesToDispatch, setQuantitiesToDispatch] = React.useState<Record<string, number>>({});
   const [isDispatching, setIsDispatching] = React.useState(false);
 
@@ -87,6 +88,15 @@ export function OtherFruitExitTab() {
     return Array.from(lotMap.values()).filter(lot => lot.totalQuantity > 0);
   }, [selectedClientId, allReceptions]);
   
+  const filteredLots = React.useMemo(() => {
+    if (!lotFilter) {
+        return aggregatedStockByLot;
+    }
+    return aggregatedStockByLot.filter(lot => 
+        lot.displayLotId.toLowerCase().includes(lotFilter.toLowerCase())
+    );
+  }, [aggregatedStockByLot, lotFilter]);
+
   const handleQuantityChange = (item: AggregatedLot['locations'][0], newQuantityStr: string) => {
     const key = getLocationKey(item.receptionId, item.itemIndex);
     const newQuantity = parseInt(newQuantityStr, 10);
@@ -244,7 +254,7 @@ export function OtherFruitExitTab() {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="grid md:grid-cols-2 gap-4">
+        <div className="grid md:grid-cols-3 gap-4">
             <div>
               <Label>Cliente</Label>
               <Select value={selectedClientId} onValueChange={(val) => {setSelectedClientId(val); setQuantitiesToDispatch({});}} disabled={loading}>
@@ -255,8 +265,12 @@ export function OtherFruitExitTab() {
               </Select>
             </div>
             <div>
+                <Label>Filtrar por Lote</Label>
+                <Input placeholder="Escriba para filtrar..." value={lotFilter} onChange={(e) => setLotFilter(e.target.value)} disabled={!selectedClientId} />
+            </div>
+            <div>
               <Label>Documento de Despacho</Label>
-              <Input type="number" placeholder="Ej: 12345" value={document} onChange={(e) => setDocument(e.target.value)} disabled={!selectedClientId} />
+              <Input type="number" placeholder="Ej: 12345" value={document} onChange={(e) => setDocument(e.target.value)} disabled={!selectedClientId} required />
             </div>
         </div>
 
@@ -265,7 +279,7 @@ export function OtherFruitExitTab() {
             : (
             <>
             <Accordion type="multiple" className="w-full">
-                {aggregatedStockByLot.map(lot => {
+                {filteredLots.map(lot => {
                     const allLocationKeysForLot = lot.locations.map(l => getLocationKey(l.receptionId, l.itemIndex));
                     const selectedKeysInLot = allLocationKeysForLot.filter(key => key in quantitiesToDispatch);
                     const isAllSelected = selectedKeysInLot.length === allLocationKeysForLot.length && allLocationKeysForLot.every(key => quantitiesToDispatch[key] === lot.locations.find(l => getLocationKey(l.receptionId, l.itemIndex) === key)?.quantity);
@@ -333,9 +347,9 @@ export function OtherFruitExitTab() {
                     );
                 })}
             </Accordion>
-             {aggregatedStockByLot.length === 0 && (
+             {filteredLots.length === 0 && (
                 <div className="text-center p-8 border-dashed border rounded-md text-sm text-muted-foreground">
-                    No hay stock disponible para este cliente.
+                    No hay stock disponible para este cliente y filtro.
                 </div>
             )}
 
