@@ -92,9 +92,20 @@ export function OtherFruitExitTab() {
     if (!lotFilter) {
         return aggregatedStockByLot;
     }
-    return aggregatedStockByLot.filter(lot => 
-        lot.displayLotId.toLowerCase().includes(lotFilter.toLowerCase())
-    );
+    const lowercasedFilter = lotFilter.toLowerCase();
+    return aggregatedStockByLot.filter(lot => {
+        // Check if the main displayLotId matches
+        const displayIdMatch = lot.displayLotId.toLowerCase().includes(lowercasedFilter);
+        if (displayIdMatch) {
+            return true;
+        }
+
+        // Also check if any of the clientLotIds within this aggregated lot match
+        const clientLotIdMatch = lot.locations.some(
+            loc => loc.clientLotId && loc.clientLotId.toLowerCase().includes(lowercasedFilter)
+        );
+        return clientLotIdMatch;
+    });
   }, [aggregatedStockByLot, lotFilter]);
 
   const handleQuantityChange = (item: AggregatedLot['locations'][0], newQuantityStr: string) => {
