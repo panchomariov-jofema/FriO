@@ -4,7 +4,7 @@ import * as React from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
-import type { OtherFruitReception, OtherFruitReceptionItem, ChamberLot } from '@/lib/types';
+import type { OtherFruitReception, OtherFruitReceptionItem, ChamberLot, Chamber } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -24,6 +24,34 @@ interface PendingItem extends OtherFruitReceptionItem {
     itemIndex: number;
     unit: 'Bins' | 'Pallets';
 }
+
+function getSortedCoordinates(chamberConfig: Chamber, strategy: 'secuencial' | 'pareado'): string[] {
+    if (strategy === 'pareado') {
+        const pairedCoords: string[] = [];
+        const cols = [...chamberConfig.columns];
+        for (let i = 0; i < cols.length; i += 2) {
+            const col1 = cols[i];
+            const col2 = i + 1 < cols.length ? cols[i+1] : null;
+            
+            for (const row of chamberConfig.rows) {
+                 if (!chamberConfig.blocked?.includes(`${col1}${row}`)) {
+                    pairedCoords.push(`${col1}${row}`);
+                }
+                if (col2 && !chamberConfig.blocked?.includes(`${col2}${row}`)) {
+                    pairedCoords.push(`${col2}${row}`);
+                }
+            }
+        }
+        return pairedCoords;
+    } 
+    
+    // Default to 'secuencial'
+    return chamberConfig.columns
+        .flatMap((col: string) => chamberConfig.rows.map((row: number) => `${col}${row}`))
+        .filter((coord: string) => !chamberConfig.blocked?.includes(coord))
+        .sort(naturalSort);
+}
+
 
 export function OtherFruitStorageTab() {
   const { data: allReceptions, loading: loadingReceptions } = useFirestoreCollection<OtherFruitReception>('otherFruitReceptions');
@@ -74,26 +102,7 @@ export function OtherFruitStorageTab() {
         return;
     }
 
-    const pareadoSort = (a: string, b: string) => {
-        const re = /^([A-Z]+)(\d+)$/;
-        const matchA = a.match(re);
-        const matchB = b.match(re);
-        if (!matchA || !matchB) return 0;
-        const [, aLetter, aNumStr] = matchA;
-        const [, bLetter, bNumStr] = matchB;
-        const aNum = parseInt(aNumStr, 10);
-        const bNum = parseInt(bNumStr, 10);
-        if (aNum < bNum) return -1;
-        if (aNum > bNum) return 1;
-        if (aLetter < bLetter) return -1;
-        if (aLetter > bLetter) return 1;
-        return 0;
-    };
-    const sortFunction = strategy === 'pareado' ? pareadoSort : naturalSort;
-    const allPossibleCoords = chamberConfig.columns
-      .flatMap(col => chamberConfig.rows.map(row => `${col}${row}`))
-      .filter(coord => !chamberConfig.blocked?.includes(coord))
-      .sort(sortFunction);
+    const allPossibleCoords = getSortedCoordinates(chamberConfig, strategy);
 
     const occupiedCoords = new Set<string>();
     (allChamberLots || []).forEach(lot => {
