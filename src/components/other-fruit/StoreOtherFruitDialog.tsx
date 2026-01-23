@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { useMemo, useEffect } from 'react';
 import { z } from 'zod';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -43,6 +44,10 @@ const storeSchema = z.object({
 
 type StoreFormValues = z.infer<typeof storeSchema>;
 
+const BINS_PER_COORDINATE = 9;
+const PALLETS_PER_COORDINATE = 3; 
+
+
 export function StoreOtherFruitDialog({ item, open, onOpenChange, onConfirm, allReceptions, allChamberLots }: StoreOtherFruitDialogProps) {
   const form = useForm<StoreFormValues>({
     resolver: zodResolver(storeSchema),
@@ -55,34 +60,12 @@ export function StoreOtherFruitDialog({ item, open, onOpenChange, onConfirm, all
   const selectedChamberId = form.watch('chamberId');
   const storageStrategy = form.watch('strategy');
   
-  const BINS_PER_COORDINATE = 9;
-  const PALLETS_PER_COORDINATE = 3; 
-  
-  const pareadoSort = (a: string, b: string) => {
-    const re = /^([A-Z]+)(\d+)$/;
-    const matchA = a.match(re);
-    const matchB = b.match(re);
+  const capacityPerCoord = useMemo(() => {
+    if (!item) return PALLETS_PER_COORDINATE; // Default to pallet capacity if no item
+    return item.unit === 'Bins' ? BINS_PER_COORDINATE : PALLETS_PER_COORDINATE;
+  }, [item]);
 
-    if (!matchA || !matchB) return 0;
-
-    const [, aLetter, aNumStr] = matchA;
-    const [, bLetter, bNumStr] = matchB;
-    
-    const aNum = parseInt(aNumStr, 10);
-    const bNum = parseInt(bNumStr, 10);
-
-    if (aNum < bNum) return -1;
-    if (aNum > bNum) return 1;
-
-    if (aLetter < bLetter) return -1;
-    if (aLetter > bLetter) return 1;
-    
-    return 0;
-  };
-
-  const capacityPerCoord = item?.unit === 'Bins' ? BINS_PER_COORDINATE : PALLETS_PER_COORDINATE;
-
-  const { availableCoordinates, suggestion } = React.useMemo(() => {
+  const { availableCoordinates, suggestion } = useMemo(() => {
     if (!selectedChamberId || !item) {
       return { availableCoordinates: [], suggestion: null };
     }
@@ -104,12 +87,30 @@ export function StoreOtherFruitDialog({ item, open, onOpenChange, onConfirm, all
         });
     });
     
-    const sortFunction = storageStrategy === 'pareado' ? pareadoSort : naturalSort;
+    let allPossibleCoords: string[];
 
-    const allPossibleCoords = chamberConfig.columns
-      .flatMap(col => chamberConfig.rows.map(row => `${col}${row}`))
-      .filter(coord => !chamberConfig.blocked?.includes(coord))
-      .sort(sortFunction);
+    if (storageStrategy === 'pareado') {
+        const pairedCoords: string[] = [];
+        const cols = [...chamberConfig.columns]; // Create a copy
+        // Generate by column pairs, iterating through rows for each pair
+        for (let i = 0; i < cols.length; i += 2) {
+            const col1 = cols[i];
+            const col2 = i + 1 < cols.length ? cols[i+1] : null;
+            
+            for (const row of chamberConfig.rows) {
+                pairedCoords.push(`${col1}${row}`);
+                if (col2) {
+                    pairedCoords.push(`${col2}${row}`);
+                }
+            }
+        }
+        allPossibleCoords = pairedCoords.filter(coord => !chamberConfig.blocked?.includes(coord));
+    } else { // 'secuencial'
+        allPossibleCoords = chamberConfig.columns
+            .flatMap(col => chamberConfig.rows.map(row => `${col}${row}`))
+            .filter(coord => !chamberConfig.blocked?.includes(coord))
+            .sort(naturalSort);
+    }
     
     const availableCoords = allPossibleCoords.filter(coord => !occupiedCoords.has(coord));
     const currentSuggestion = availableCoords.length > 0 ? availableCoords[0] : null;
@@ -118,9 +119,9 @@ export function StoreOtherFruitDialog({ item, open, onOpenChange, onConfirm, all
 
   }, [selectedChamberId, item, allReceptions, allChamberLots, storageStrategy]);
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (open && item) {
-      const defaultQtyPerLocation = item.unit === 'Pallets' ? 1 : capacityPerCoord;
+       const defaultQtyPerLocation = item.unit === 'Pallets' ? 1 : capacityPerCoord;
       form.reset({
         totalQuantity: item.quantity,
         quantityPerLocation: defaultQtyPerLocation,
@@ -131,7 +132,7 @@ export function StoreOtherFruitDialog({ item, open, onOpenChange, onConfirm, all
     }
   }, [item, open, form, capacityPerCoord]);
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (suggestion) {
         form.setValue('coordinate', suggestion, { shouldValidate: true });
     } else if (open) {
@@ -152,6 +153,7 @@ export function StoreOtherFruitDialog({ item, open, onOpenChange, onConfirm, all
     onConfirm(values);
   };
   
+  // Conditional rendering at the end, after all hooks are called.
   if (!item) {
     return null;
   }
@@ -258,7 +260,7 @@ export function StoreOtherFruitDialog({ item, open, onOpenChange, onConfirm, all
                         <Input type="number" {...field} autoComplete="off" inputMode="numeric" />
                     </FormControl>
                      <p className="text-xs text-muted-foreground pt-1">
-                        Máx: {item.unit === 'Bins' ? BINS_PER_COORDINATE : PALLETS_PER_COORDINATE}
+                        Máx: {capacityPerCoord}
                     </p>
                     <FormMessage />
                     </FormItem>
