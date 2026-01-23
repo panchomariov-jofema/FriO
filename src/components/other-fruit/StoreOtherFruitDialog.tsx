@@ -57,8 +57,7 @@ export function StoreOtherFruitDialog({ item, open, onOpenChange, onConfirm, all
   
   const BINS_PER_COORDINATE = 9;
   const PALLETS_PER_COORDINATE = 3; 
-  const capacityPerCoord = item?.unit === 'Bins' ? BINS_PER_COORDINATE : PALLETS_PER_COORDINATE;
-
+  
   const pareadoSort = (a: string, b: string) => {
     const re = /^([A-Z]+)(\d+)$/;
     const matchA = a.match(re);
@@ -81,6 +80,7 @@ export function StoreOtherFruitDialog({ item, open, onOpenChange, onConfirm, all
     return 0;
   };
 
+  const capacityPerCoord = item?.unit === 'Bins' ? BINS_PER_COORDINATE : PALLETS_PER_COORDINATE;
 
   const { availableCoordinates, suggestion } = React.useMemo(() => {
     if (!selectedChamberId || !item) {
@@ -120,9 +120,10 @@ export function StoreOtherFruitDialog({ item, open, onOpenChange, onConfirm, all
 
   React.useEffect(() => {
     if (open && item) {
+      const defaultQtyPerLocation = item.unit === 'Pallets' ? 1 : capacityPerCoord;
       form.reset({
         totalQuantity: item.quantity,
-        quantityPerLocation: capacityPerCoord,
+        quantityPerLocation: defaultQtyPerLocation,
         chamberId: undefined,
         coordinate: undefined,
         strategy: 'secuencial',
