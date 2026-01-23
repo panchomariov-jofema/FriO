@@ -149,7 +149,7 @@ export default function DespachosPage() {
       return acc;
     }, {} as Record<string, number>);
 
-    return { binsPerChamber, binsPerExporter, binsPerProducer };
+    return { binsPerChamber: perChamber, binsPerExporter: perExporter, binsPerProducer: perProducer };
   }, [chamberLots]);
 
   const onSubmit = async (values: DispatchFormValues) => {
