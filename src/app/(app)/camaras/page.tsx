@@ -128,8 +128,9 @@ export default function CamarasPage() {
         })),
       ...allOtherFruitReceptions
         .flatMap(reception => reception.items
-            .filter(item => item.status === 'Almacenado' && item.storageLocation?.chamberId && item.storageLocation?.coordinate && item.quantity > 0)
-            .map((item, index) => ({
+            .map((item, index) => ({ item, index })) // Map to include original index
+            .filter(({ item }) => item.status === 'Almacenado' && item.storageLocation?.chamberId && item.storageLocation?.coordinate && item.quantity > 0)
+            .map(({ item, index }) => ({ // Use original index
                 id: `${reception.id}-${index}`,
                 type: 'otherFruit' as const,
                 displayId: item.productCode,
@@ -141,8 +142,8 @@ export default function CamarasPage() {
                 chamberId: item.storageLocation!.chamberId,
                 coordinate: item.storageLocation!.coordinate,
                 receptionId: reception.id,
-                itemIndex: index,
-                netWeightPerBin: 0, // Other fruit don't have this concept for now
+                itemIndex: index, // This is now the correct original index
+                netWeightPerBin: 0,
             }))
         )
     ];
@@ -355,8 +356,9 @@ export default function CamarasPage() {
      // Find all other fruit items that are in the source coordinate
     const fruitItemsToMove = (otherFruitReceptions || []).flatMap(reception =>
         reception.items
-            .filter(item => item.status === 'Almacenado' && item.storageLocation?.chamberId === sourceChamberId && item.storageLocation?.coordinate === sourceCoordinate)
-            .map((item, index) => ({ reception, item, index }))
+            .map((item, index) => ({ item, index })) // Get original index
+            .filter(({ item }) => item.status === 'Almacenado' && item.storageLocation?.chamberId === sourceChamberId && item.storageLocation?.coordinate === sourceCoordinate)
+            .map(({item, index}) => ({ reception, item, index })) // Pass original index
     );
 
     if (lotsToMove.length === 0 && fruitItemsToMove.length === 0) {
