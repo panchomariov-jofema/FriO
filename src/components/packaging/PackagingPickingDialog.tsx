@@ -67,6 +67,7 @@ export function PackagingPickingDialog({ movement, open, onOpenChange, onConfirm
   const { toast } = useToast();
   const [confirmedPayload, setConfirmedPayload] = React.useState<ExitFormValues | null>(null);
   const [pickedItems, setPickedItems] = React.useState<Record<string, boolean>>({});
+  const [quantities, setQuantities] = React.useState<Record<string, number>>({});
 
   React.useEffect(() => {
     if (movement && allReceptions.length > 0) {
@@ -125,7 +126,7 @@ export function PackagingPickingDialog({ movement, open, onOpenChange, onConfirm
             for (const loc of itemStock.locations) {
                 if (needed > 0) {
                     const toWithdraw = Math.min(needed, loc.available);
-                    newItem.locations.push({
+                    newItem.locations!.push({
                         ...loc,
                         palletsToWithdraw: toWithdraw,
                     });
@@ -166,7 +167,29 @@ export function PackagingPickingDialog({ movement, open, onOpenChange, onConfirm
     ).filter(item => item.palletsToWithdraw > 0);
   }, [confirmedPayload]);
 
+  React.useEffect(() => {
+    if (flatItems) {
+        const initialQuantities = flatItems.reduce((acc, item) => {
+            acc[item.compositeKey] = item.palletsToWithdraw;
+            return acc;
+        }, {} as Record<string, number>);
+        setQuantities(initialQuantities);
+    }
+  }, [flatItems]);
+
+
   if (!movement || !confirmedPayload) return null; // Or a loading state
+
+  const handleQuantityChange = (compositeKey: string, originalCount: number, newCountStr: string) => {
+    let newCount = parseInt(newCountStr, 10);
+    if (isNaN(newCount) || newCount < 0) {
+        newCount = 0;
+    }
+    if (newCount > originalCount) {
+        newCount = originalCount; // Cannot exceed originally allocated amount
+    }
+    setQuantities(prev => ({ ...prev, [compositeKey]: newCount }));
+  };
 
   const handleSelectAll = (checked: boolean | 'indeterminate') => {
     const newPickedItems: Record<string, boolean> = {};
@@ -189,6 +212,41 @@ export function PackagingPickingDialog({ movement, open, onOpenChange, onConfirm
         return newPicked;
     });
   };
+
+  const handleConfirm = () => {
+    if (!confirmedPayload) return;
+
+    const newPayload: ExitFormValues = JSON.parse(JSON.stringify(confirmedPayload));
+    
+    let totalPalletsOverall = 0;
+
+    newPayload.items.forEach(item => {
+        let itemTotalPallets = 0;
+        if (item.locations) {
+            item.locations.forEach(loc => {
+                const compositeKey = `${item.packagingMasterCode}_${getLocationKey(loc.receptionId, loc.itemIndex)}`;
+                const pickedQty = quantities[compositeKey] ?? 0;
+                loc.palletsToWithdraw = pickedQty;
+                itemTotalPallets += pickedQty;
+            });
+        }
+        item.palletCount = itemTotalPallets;
+        totalPalletsOverall += itemTotalPallets;
+    });
+
+    newPayload.items = newPayload.items.filter(item => item.palletCount > 0);
+
+    if (totalPalletsOverall === 0) {
+        toast({
+            variant: 'destructive',
+            title: 'Nada para confirmar',
+            description: 'Debe ingresar una cantidad mayor a 0 para al menos un ítem.',
+        });
+        return;
+    }
+
+    onConfirmExit(newPayload);
+  };
   
   const checkedCount = Object.keys(pickedItems).length;
   const allItemsCount = flatItems.length;
@@ -200,7 +258,7 @@ export function PackagingPickingDialog({ movement, open, onOpenChange, onConfirm
         codigo: item.itemCode,
         articulo: item.itemName,
         ubicacion: item.locationString,
-        cantidad: item.palletsToWithdraw,
+        cantidad: quantities[item.compositeKey] ?? item.palletsToWithdraw,
     }));
     
     const headers = [
@@ -215,7 +273,7 @@ export function PackagingPickingDialog({ movement, open, onOpenChange, onConfirm
     downloadCSV(csv, `picking_embalaje_${clientName}_${date}.csv`);
   };
 
-  const totalPallets = confirmedPayload.items.reduce((sum, item) => sum + item.palletCount, 0);
+  const totalPallets = Object.values(quantities).reduce((sum, qty) => sum + qty, 0);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -260,9 +318,11 @@ export function PackagingPickingDialog({ movement, open, onOpenChange, onConfirm
                     <TableCell className="text-right">
                        <Input
                             type="number"
-                            value={item.palletsToWithdraw}
-                            readOnly
-                            className="h-8 w-24 ml-auto text-right bg-muted"
+                            value={quantities[item.compositeKey] ?? ''}
+                            onChange={(e) => handleQuantityChange(item.compositeKey, item.palletsToWithdraw, e.target.value)}
+                            max={item.palletsToWithdraw}
+                            min={0}
+                            className="h-8 w-24 ml-auto text-right"
                         />
                     </TableCell>
                   </TableRow>
@@ -280,7 +340,7 @@ export function PackagingPickingDialog({ movement, open, onOpenChange, onConfirm
             <DialogClose asChild>
               <Button type="button" variant="outline">Cancelar</Button>
             </DialogClose>
-            <Button onClick={() => onConfirmExit(confirmedPayload)} disabled={!allItemsPicked || isConfirming}>
+            <Button onClick={handleConfirm} disabled={!allItemsPicked || isConfirming}>
               {isConfirming ? 'Confirmando...' : 'Confirmar Salida'}
             </Button>
           </div>
