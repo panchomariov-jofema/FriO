@@ -337,18 +337,31 @@ export default function DashboardPage() {
             const chamber = chambersConfig[chamberId];
             const totalCapacity = chamber.capacity;
 
-            const binsInChamber = finalChamberLots
-                .filter(lot => lot.status === 'Almacenado' && lot.chamberId === chamberId)
+            const binsInChamber = (chamberLots || [])
+                .filter(lot => 
+                    lot.status === 'Almacenado' && 
+                    lot.chamberId === chamberId &&
+                    (!selectedClient || (selectedClient.type === 'exporter' && lot.exporterId === selectedClient.id))
+                )
                 .reduce((sum, lot) => sum + lot.binCount, 0);
-
-            const otherFruitInChamber = finalOtherFruitReceptions
-                .flatMap(r => r.items.map(item => ({ ...item, unit: r.unit, chamberId: item.storageLocation?.chamberId })))
-                .filter(item => item.status === 'Almacenado' && item.chamberId === chamberId);
-
-            const otherBins = otherFruitInChamber.filter(item => item.unit === 'Bins').reduce((sum, item) => sum + item.quantity, 0);
-            const otherPallets = otherFruitInChamber.filter(item => item.unit === 'Pallets').reduce((sum, item) => sum + item.quantity, 0);
-            const occupiedEquivalentBins = binsInChamber + otherBins + (otherFruitPallets * 2);
             
+            const otherFruitInChamberItems = (selectedClient && selectedClient.type === 'exporter') 
+                ? []
+                : (otherFruitReceptions || [])
+                    .filter(r => !selectedClient || (selectedClient.type === 'otherclient' && r.clientId === selectedClient.id))
+                    .flatMap(r => r.items.map(item => ({ ...item, unit: r.unit })))
+                    .filter(item => item.status === 'Almacenado' && item.storageLocation?.chamberId === chamberId);
+            
+            const otherBins = otherFruitInChamberItems
+                .filter(item => item.unit === 'Bins')
+                .reduce((sum, item) => sum + item.quantity, 0);
+
+            const otherPallets = otherFruitInChamberItems
+                .filter(item => item.unit === 'Pallets')
+                .reduce((sum, item) => sum + item.quantity, 0);
+            
+            const occupiedEquivalentBins = binsInChamber + otherBins + (otherPallets * 2);
+
             return {
                 name: chamber.name,
                 ocupacion: occupiedEquivalentBins,
@@ -690,6 +703,7 @@ export default function DashboardPage() {
                                 <ChartTooltip 
                                     formatter={(value, name, props) => {
                                         const { payload } = props;
+                                        if (!payload) return [`${value}`, name];
                                         return [`${value} / ${payload.total} Bins`, name];
                                     }}
                                     content={<ChartTooltipContent />} 
