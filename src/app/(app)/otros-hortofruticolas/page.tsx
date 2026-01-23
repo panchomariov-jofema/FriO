@@ -20,7 +20,7 @@ export default function OtrosHortofruticolasPage() {
             <Tabs defaultValue="recepcion" className="w-full">
                 <TabsList className="grid w-full grid-cols-3">
                     <TabsTrigger value="recepcion">Recepción</TabsTrigger>
-                    <TabsTrigger value="almacenamiento">Almacenamiento</TabsTrigger>
+                    <TabsTrigger value="almacenamiento">Almacenamiento y Stock</TabsTrigger>
                     <TabsTrigger value="salidas">Despacho</TabsTrigger>
                 </TabsList>
                 
