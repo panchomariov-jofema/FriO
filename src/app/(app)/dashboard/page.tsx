@@ -434,7 +434,7 @@ export default function DashboardPage() {
             pendingHidroBins: calculatedPendingHidroBins,
         };
 
-    }, [chamberLots, otherFruitReceptions, processingLots, exporters, receptionLots, binMaterialStock, hidrocoolerLots, selectedClient, dateRange, latestTemperatures]);
+    }, [chamberLots, otherFruitReceptions, processingLots, exporters, receptionLots, binMaterialStock, hidrocoolerLots, selectedClient, dateRange]);
 
 
     const fallCreekData = React.useMemo(() => {
@@ -623,7 +623,7 @@ export default function DashboardPage() {
                 ))}
             </div>
             
-            <div className="grid gap-4 grid-cols-2 sm:grid-cols-3 lg:grid-cols-6">
+            <div className="grid gap-4 grid-cols-3 sm:grid-cols-6">
                 {Object.values(chambersConfig).map(chamber => {
                     const latestTemp = latestTemperatures[chamber.id];
                     return (
