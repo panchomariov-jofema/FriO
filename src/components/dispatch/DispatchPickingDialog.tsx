@@ -140,51 +140,49 @@ export function DispatchPickingDialog({ dispatch, open, onOpenChange, onConfirmD
             Confirme la recolección física de cada ubicación. Total a despachar: {totalPickedBins} bins.
           </DialogDescription>
         </DialogHeader>
-        <div>
-          <ScrollArea className="max-h-96 border rounded-md">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[50px]">
+        <div className="overflow-y-auto max-h-96 border rounded-md">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-[50px]">
+                   <Checkbox
+                      checked={selectAllState}
+                      onCheckedChange={handleSelectAll}
+                      aria-label="Seleccionar todo"
+                    />
+                </TableHead>
+                <TableHead>Lote</TableHead>
+                <TableHead>Cámara</TableHead>
+                <TableHead>Coordenada</TableHead>
+                <TableHead className="w-24">Bins</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {allItems.map((bin) => (
+                <TableRow key={bin.chamberLotId}>
+                  <TableCell>
                      <Checkbox
-                        checked={selectAllState}
-                        onCheckedChange={handleSelectAll}
-                        aria-label="Seleccionar todo"
+                        checked={!!pickedItems[bin.chamberLotId]}
+                        onCheckedChange={(checked) => handleItemCheck(bin.chamberLotId, !!checked)}
                       />
-                  </TableHead>
-                  <TableHead>Lote</TableHead>
-                  <TableHead>Cámara</TableHead>
-                  <TableHead>Coordenada</TableHead>
-                  <TableHead className="w-24">Bins</TableHead>
+                  </TableCell>
+                  <TableCell>{bin.displayLotId}</TableCell>
+                  <TableCell>{bin.chamberId}</TableCell>
+                  <TableCell>{bin.coordinate}</TableCell>
+                  <TableCell>
+                    <Input
+                      type="number"
+                      value={quantities[bin.chamberLotId] ?? ''}
+                      onChange={(e) => handleQuantityChange(bin.chamberLotId, bin.binCount, e.target.value)}
+                      max={bin.binCount}
+                      min={0}
+                      className="h-8 w-20"
+                    />
+                  </TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {allItems.map((bin) => (
-                  <TableRow key={bin.chamberLotId}>
-                    <TableCell>
-                       <Checkbox
-                          checked={!!pickedItems[bin.chamberLotId]}
-                          onCheckedChange={(checked) => handleItemCheck(bin.chamberLotId, !!checked)}
-                        />
-                    </TableCell>
-                    <TableCell>{bin.displayLotId}</TableCell>
-                    <TableCell>{bin.chamberId}</TableCell>
-                    <TableCell>{bin.coordinate}</TableCell>
-                    <TableCell>
-                      <Input
-                        type="number"
-                        value={quantities[bin.chamberLotId] ?? ''}
-                        onChange={(e) => handleQuantityChange(bin.chamberLotId, bin.binCount, e.target.value)}
-                        max={bin.binCount}
-                        min={0}
-                        className="h-8 w-20"
-                      />
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </ScrollArea>
+              ))}
+            </TableBody>
+          </Table>
         </div>
         <DialogFooter className="sm:justify-between pt-4">
            <Button variant="outline" onClick={handleExportCSV}>
