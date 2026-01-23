@@ -55,6 +55,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ManualDispatchTab } from '@/components/dispatch/ManualDispatchTab';
 import { Download } from 'lucide-react';
 import { DispatchPickingDialog } from '@/components/dispatch/DispatchPickingDialog';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
 
 const dispatchSchema = z.object({
   exporterId: z.string().min(1, 'Debe seleccionar un cliente.'),
@@ -110,6 +112,7 @@ export default function DespachosPage() {
   const [isConfirming, setIsConfirming] = React.useState(false);
   const [isUndoing, setIsUndoing] = React.useState(false);
   const [pickingDispatch, setPickingDispatch] = React.useState<Dispatch | null>(null);
+  const [showOnlyPending, setShowOnlyPending] = React.useState(true);
 
   const form = useForm<DispatchFormValues>({
     resolver: zodResolver(dispatchSchema),
@@ -442,6 +445,14 @@ const handleUndoDispatch = async (dispatchToUndo: Dispatch) => {
     });
   }, [dispatches]);
 
+  const filteredDispatches = React.useMemo(() => {
+    if (showOnlyPending) {
+        return sortedDispatches.filter(d => d.status === 'Pendiente de Picking');
+    }
+    return sortedDispatches;
+  }, [sortedDispatches, showOnlyPending]);
+
+
   return (
     <div className="space-y-6">
       <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -653,8 +664,16 @@ const handleUndoDispatch = async (dispatchToUndo: Dispatch) => {
       
       <Card>
         <CardHeader>
-            <CardTitle>Solicitudes de Despacho</CardTitle>
-            <CardDescription>Lista de despachos pendientes de picking y completados.</CardDescription>
+          <div className="flex justify-between items-center">
+            <div>
+              <CardTitle>Solicitudes de Despacho</CardTitle>
+              <CardDescription>Lista de despachos pendientes de picking y completados.</CardDescription>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Checkbox id="show-pending" checked={showOnlyPending} onCheckedChange={(checked) => setShowOnlyPending(!!checked)} />
+              <Label htmlFor="show-pending" className="whitespace-nowrap">Solo Solicitudes Pendientes</Label>
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
             <div className="rounded-md border">
@@ -672,8 +691,8 @@ const handleUndoDispatch = async (dispatchToUndo: Dispatch) => {
                     <TableBody>
                         {loadingDispatches ? (
                              Array.from({ length: 3 }).map((_, i) => <TableRow key={i}><TableCell colSpan={6}><Skeleton className="h-4 w-full" /></TableCell></TableRow>)
-                        ) : sortedDispatches.length > 0 ? (
-                            sortedDispatches.map(dispatch => (
+                        ) : filteredDispatches.length > 0 ? (
+                            filteredDispatches.map(dispatch => (
                                 <TableRow key={dispatch.id}>
                                     <TableCell className="font-medium">{dispatch.exporterName}</TableCell>
                                     <TableCell>{dispatch.createdAt?.toDate().toLocaleDateString()}</TableCell>
@@ -723,7 +742,9 @@ const handleUndoDispatch = async (dispatchToUndo: Dispatch) => {
                             ))
                         ) : (
                             <TableRow>
-                                <TableCell colSpan={6} className="h-24 text-center">No hay despachos creados.</TableCell>
+                                <TableCell colSpan={6} className="h-24 text-center">
+                                    {showOnlyPending ? "No hay despachos pendientes." : "No hay despachos creados."}
+                                </TableCell>
                             </TableRow>
                         )}
                     </TableBody>
