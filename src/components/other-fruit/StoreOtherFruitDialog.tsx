@@ -55,11 +55,9 @@ export function StoreOtherFruitDialog({ item, open, onOpenChange, onConfirm, all
   const selectedChamberId = form.watch('chamberId');
   const storageStrategy = form.watch('strategy');
   
-  if (!item) return null;
-
   const BINS_PER_COORDINATE = 9;
   const PALLETS_PER_COORDINATE = 3; 
-  const capacityPerCoord = item.unit === 'Bins' ? BINS_PER_COORDINATE : PALLETS_PER_COORDINATE;
+  const capacityPerCoord = item?.unit === 'Bins' ? BINS_PER_COORDINATE : PALLETS_PER_COORDINATE;
 
   const pareadoSort = (a: string, b: string) => {
     const re = /^([A-Z]+)(\d+)$/;
@@ -139,11 +137,9 @@ export function StoreOtherFruitDialog({ item, open, onOpenChange, onConfirm, all
         form.resetField('coordinate');
     }
   }, [suggestion, open, form]);
-
-
-  if (!item) return null;
   
   const onSubmit = (values: StoreFormValues) => {
+    if (!item) return;
     if (values.quantityPerLocation > capacityPerCoord) {
         toast({ variant: 'destructive', title: 'Límite Excedido', description: `La cantidad por ubicación no puede ser mayor a ${capacityPerCoord}.`});
         return;
@@ -154,6 +150,10 @@ export function StoreOtherFruitDialog({ item, open, onOpenChange, onConfirm, all
     }
     onConfirm(values);
   };
+  
+  if (!item) {
+    return null;
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -257,7 +257,7 @@ export function StoreOtherFruitDialog({ item, open, onOpenChange, onConfirm, all
                         <Input type="number" {...field} autoComplete="off" inputMode="numeric" />
                     </FormControl>
                      <p className="text-xs text-muted-foreground pt-1">
-                        Máx: {capacityPerCoord}
+                        Máx: {item.unit === 'Bins' ? BINS_PER_COORDINATE : PALLETS_PER_COORDINATE}
                     </p>
                     <FormMessage />
                     </FormItem>
