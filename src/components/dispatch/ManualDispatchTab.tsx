@@ -100,6 +100,7 @@ export function ManualDispatchTab({ exporters, loadingExporters, chamberLots, lo
         setIsSubmitting(true);
 
         try {
+            const batch = writeBatch(firestore);
             const binsToDispatch = [];
             let totalBins = 0;
             let totalNetWeight = 0;
@@ -116,6 +117,10 @@ export function ManualDispatchTab({ exporters, loadingExporters, chamberLots, lo
                 if (lot.netWeightPerBin && lot.netWeightPerBin > 0) {
                     totalNetWeight += lot.binCount * lot.netWeightPerBin;
                 }
+                
+                // Reserve the lot by updating its status
+                const lotRef = doc(firestore, 'chamberLots', lot.id);
+                batch.update(lotRef, { status: 'Despachado' });
             }
 
             const dispatchData = {
@@ -129,7 +134,10 @@ export function ManualDispatchTab({ exporters, loadingExporters, chamberLots, lo
                 bins: binsToDispatch,
             };
 
-            await addDoc(collection(firestore, 'dispatches'), dispatchData);
+            const dispatchRef = doc(collection(firestore, 'dispatches'));
+            batch.set(dispatchRef, dispatchData);
+
+            await batch.commit();
             
             toast({ title: 'Éxito', description: `Solicitud de despacho creada con ${totalBins} bins.` });
             setSelectedLots({});

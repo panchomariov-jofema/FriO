@@ -207,7 +207,7 @@ export default function DespachosPage() {
             return;
         }
   
-        // 4. Create dispatch document without touching the chamberLots
+        // 4. Create dispatch document and reserve stock
         let totalNetWeight = 0;
 
         const dispatchBinsPayload = binsToDispatch.map(lot => {
@@ -234,7 +234,19 @@ export default function DespachosPage() {
           bins: dispatchBinsPayload,
         };
   
-        await addDoc(collection(firestore, 'dispatches'), dispatchData);
+        const batch = writeBatch(firestore);
+
+        // Mark lots as 'Despachado' to reserve them
+        binsToDispatch.forEach(lot => {
+            const lotRef = doc(firestore, 'chamberLots', lot.id);
+            batch.update(lotRef, { status: 'Despachado' });
+        });
+
+        // Create the dispatch document
+        const dispatchRef = doc(collection(firestore, 'dispatches'));
+        batch.set(dispatchRef, dispatchData);
+
+        await batch.commit();
         
         toast({
           title: 'Solicitud de Despacho Creada',
@@ -256,23 +268,45 @@ export default function DespachosPage() {
   };
 
   const handleConfirmDispatch = async (dispatchToConfirm: Dispatch, pickedQuantities: Record<string, number>) => {
-    if (!firestore) return;
+    if (!firestore || !chamberLots) return;
     setIsConfirming(true);
 
     try {
         const batch = writeBatch(firestore);
+        const chamberLotsCollectionRef = collection(firestore, 'chamberLots');
 
-        const chamberLotMap = new Map((chamberLots || []).map(lot => [lot.id, lot]));
-        
+        // Recalculate final values based on picked quantities
         const finalBins: Dispatch['bins'] = [];
         let finalTotalBins = 0;
         let finalTotalNetWeight = 0;
 
-        // Recalculate final values based on picked quantities
         for (const originalBin of dispatchToConfirm.bins) {
             const pickedCount = pickedQuantities[originalBin.chamberLotId] ?? 0;
+            const originalCount = originalBin.binCount;
+            const remainder = originalCount - pickedCount;
+
+            // The original dispatched lot is always removed from its 'Despachado' state.
+            const lotRef = doc(firestore, 'chamberLots', originalBin.chamberLotId);
+            batch.delete(lotRef);
+
+            // If there's a remainder, create a new lot with 'Almacenado' status.
+            if (remainder > 0) {
+                const originalLotData = chamberLots.find(l => l.id === originalBin.chamberLotId);
+                if (originalLotData) {
+                    const newLotData = {
+                        ...originalLotData,
+                        binCount: remainder,
+                        status: 'Almacenado' as const,
+                    };
+                    delete (newLotData as any).id; // Make sure firestore generates a new ID
+                    const newLotRef = doc(chamberLotsCollectionRef);
+                    batch.set(newLotRef, newLotData);
+                }
+            }
+
+            // Update the list of bins in the final dispatch document if any were picked.
             if (pickedCount > 0) {
-                const lotData = chamberLotMap.get(originalBin.chamberLotId);
+                const lotData = chamberLots.find(l => l.id === originalBin.chamberLotId);
                 finalTotalBins += pickedCount;
                 if (lotData?.netWeightPerBin) {
                     finalTotalNetWeight += pickedCount * lotData.netWeightPerBin;
@@ -281,7 +315,7 @@ export default function DespachosPage() {
             }
         }
         
-        // Update the dispatch document with the final corrected data
+        // Update the dispatch document with the final corrected data and 'Completado' status.
         const dispatchRef = doc(firestore, 'dispatches', dispatchToConfirm.id);
         batch.update(dispatchRef, {
             status: 'Completado',
@@ -289,13 +323,6 @@ export default function DespachosPage() {
             totalBins: finalTotalBins,
             totalNetWeight: finalTotalNetWeight,
         });
-
-        // Delete the original chamberLot documents associated with this dispatch.
-        // This is the "correction" part. The original record is removed.
-        for (const bin of dispatchToConfirm.bins) {
-             const lotRef = doc(firestore, 'chamberLots', bin.chamberLotId);
-             batch.delete(lotRef);
-        }
 
         await batch.commit();
 
@@ -326,10 +353,19 @@ const handleUndoDispatch = async (dispatchToUndo: Dispatch) => {
     setIsUndoing(true);
 
     try {
-        // For a pending picking request, we just need to delete the dispatch document.
-        // The stock in chamberLots was never touched.
+        const batch = writeBatch(firestore);
+
+        // 1. Set chamberLots status back to 'Almacenado'
+        dispatchToUndo.bins.forEach(bin => {
+            const lotRef = doc(firestore, 'chamberLots', bin.chamberLotId);
+            batch.update(lotRef, { status: 'Almacenado' });
+        });
+        
+        // 2. Delete the dispatch document
         const dispatchRef = doc(firestore, 'dispatches', dispatchToUndo.id);
-        await deleteDoc(dispatchRef);
+        batch.delete(dispatchRef);
+
+        await batch.commit();
 
         toast({
             title: 'Solicitud Deshecha',
@@ -658,7 +694,7 @@ const handleUndoDispatch = async (dispatchToUndo: Dispatch) => {
                                                     <AlertDialogHeader>
                                                         <AlertDialogTitle>¿Deshacer la solicitud?</AlertDialogTitle>
                                                         <AlertDialogDescription>
-                                                           Esta acción cancelará la solicitud de despacho. Podrá crearla de nuevo si es necesario.
+                                                           Esta acción cancelará la solicitud de despacho y devolverá los bins al stock.
                                                         </AlertDialogDescription>
                                                     </AlertDialogHeader>
                                                     <AlertDialogFooter>
