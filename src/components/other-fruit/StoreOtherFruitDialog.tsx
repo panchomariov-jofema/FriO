@@ -47,33 +47,84 @@ export function StoreOtherFruitDialog({ item, open, onOpenChange, onConfirm, all
 
   const selectedChamberId = form.watch('chamberId');
 
-  const availableCoordinates = React.useMemo(() => {
-    if (!selectedChamberId) return [];
+  const { availableCoordinates, suggestion } = React.useMemo(() => {
+    if (!selectedChamberId || !item) {
+      return { availableCoordinates: [], suggestion: null };
+    }
 
     const chamberConfig = chambersConfig[selectedChamberId];
-    if (!chamberConfig) return [];
+    if (!chamberConfig) {
+      return { availableCoordinates: [], suggestion: null };
+    }
 
-    const allPossibleCoords = chamberConfig.columns.flatMap(col => chamberConfig.rows.map(row => `${col}${row}`)).sort(naturalSort);
+    const BINS_PER_COORDINATE = 6;
+    const PALLETS_PER_COORDINATE = 3; 
+    const capacity = item.unit === 'Bins' ? BINS_PER_COORDINATE : PALLETS_PER_COORDINATE;
 
-    const occupiedCoords = new Set<string>();
-    // Producer Lots
+    const occupancyMap = new Map<string, { productCode: string, quantity: number, isMixed: boolean }>();
+
+    // Mark coordinates with producer lots as unavailable/mixed
     (allChamberLots || []).forEach(lot => {
-      if (lot.status === 'Almacenado' && lot.chamberId === selectedChamberId && lot.coordinate) {
-        occupiedCoords.add(lot.coordinate);
+      if (lot.chamberId === selectedChamberId && lot.coordinate) {
+          occupancyMap.set(lot.coordinate, { productCode: 'PRODUCER_LOT', quantity: 99, isMixed: true });
       }
     });
-    // Other Fruit Receptions
+
+    // Build occupancy for other fruit
     (allReceptions || []).forEach(reception => {
-        reception.items.forEach(item => {
-            if(item.status === 'Almacenado' && item.storageLocation?.chamberId === selectedChamberId && item.storageLocation.coordinate) {
-                 occupiedCoords.add(item.storageLocation.coordinate);
+        reception.items.forEach(storedItem => {
+            if (storedItem.status === 'Almacenado' && storedItem.storageLocation?.chamberId === selectedChamberId && storedItem.storageLocation.coordinate) {
+                const coord = storedItem.storageLocation.coordinate;
+                const existing = occupancyMap.get(coord);
+                if (existing) {
+                    if (existing.productCode !== storedItem.productCode) {
+                        existing.isMixed = true;
+                    }
+                    existing.quantity += storedItem.quantity;
+                } else {
+                    occupancyMap.set(coord, {
+                        productCode: storedItem.productCode,
+                        quantity: storedItem.quantity,
+                        isMixed: false
+                    });
+                }
             }
         });
     });
+    
+    const allPossibleCoords = chamberConfig.columns
+      .flatMap(col => chamberConfig.rows.map(row => `${col}${row}`))
+      .filter(coord => !chamberConfig.blocked?.includes(coord))
+      .sort(naturalSort);
 
-    return allPossibleCoords.filter(coord => !occupiedCoords.has(coord) && !chamberConfig.blocked?.includes(coord));
+    // Pareado: Find partially filled coordinate with the same product
+    const partialSameProductCoord = allPossibleCoords.find(coord => {
+      const occupiedBy = occupancyMap.get(coord);
+      return occupiedBy && !occupiedBy.isMixed && occupiedBy.productCode === item.productCode && occupiedBy.quantity < capacity;
+    });
 
-  }, [selectedChamberId, allReceptions, allChamberLots]);
+    let currentSuggestion: string | null = null;
+    if (partialSameProductCoord) {
+      currentSuggestion = partialSameProductCoord;
+    } else {
+      // Secuencial: Find the first completely empty coordinate
+      const firstEmpty = allPossibleCoords.find(coord => !occupancyMap.has(coord));
+      if (firstEmpty) {
+        currentSuggestion = firstEmpty;
+      }
+    }
+    
+    // The dropdown should only show completely empty coordinates OR the one we are suggesting if it's partially full
+    const availableCoords = allPossibleCoords.filter(coord => {
+        const occupiedBy = occupancyMap.get(coord);
+        if (!occupiedBy) return true; // It's empty
+        // It's not empty, check if it's the suggested one (pareado)
+        return coord === currentSuggestion;
+    });
+    
+    return { availableCoordinates: availableCoords, suggestion: currentSuggestion };
+
+  }, [selectedChamberId, item, allReceptions, allChamberLots]);
 
   React.useEffect(() => {
     if (open && item) {
@@ -84,6 +135,15 @@ export function StoreOtherFruitDialog({ item, open, onOpenChange, onConfirm, all
        });
     }
   }, [item, open, form]);
+
+  React.useEffect(() => {
+    if (suggestion) {
+        form.setValue('coordinate', suggestion, { shouldValidate: true });
+    } else if (open) {
+        form.resetField('coordinate');
+    }
+  }, [suggestion, open, form]);
+
 
   if (!item) return null;
   
@@ -145,7 +205,7 @@ export function StoreOtherFruitDialog({ item, open, onOpenChange, onConfirm, all
                             <SelectItem key={coord} value={coord}>{coord}</SelectItem>
                             ))
                         ) : (
-                            <div className="p-2 text-xs text-center text-muted-foreground">No hay coords. vacías.</div>
+                            <div className="p-2 text-xs text-center text-muted-foreground">No hay coords. disponibles.</div>
                         )}
                         </SelectContent>
                     </Select>
