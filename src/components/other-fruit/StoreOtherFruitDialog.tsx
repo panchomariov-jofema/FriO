@@ -42,13 +42,13 @@ function getSortedCoordinates(chamberConfig: Chamber, strategy: 'secuencial' | '
         const pairedCoords: string[] = [];
         const cols = [...chamberConfig.columns];
         
-        // Iterate through rows first to get the desired rightward movement
-        for (const row of chamberConfig.rows) {
-            // Then iterate through column pairs
-            for (let i = 0; i < cols.length; i += 2) {
-                const col1 = cols[i];
-                const col2 = i + 1 < cols.length ? cols[i + 1] : null;
+        // Iterate through column pairs first (e.g., A/B, then C/D)
+        for (let i = 0; i < cols.length; i += 2) {
+            const col1 = cols[i];
+            const col2 = i + 1 < cols.length ? cols[i + 1] : null;
 
+            // Then, for each pair, iterate down the rows to create the "Z" pattern
+            for (const row of chamberConfig.rows) {
                 if (!chamberConfig.blocked?.includes(`${col1}${row}`)) {
                     pairedCoords.push(`${col1}${row}`);
                 }
@@ -57,10 +57,10 @@ function getSortedCoordinates(chamberConfig: Chamber, strategy: 'secuencial' | '
                 }
             }
         }
-        return pairedCoords.filter((coord: string) => !chamberConfig.blocked?.includes(coord));
+        return pairedCoords;
     }
     
-    // Default to 'secuencial': A1, A2, A3... B1, B2, B3...
+    // 'secuencial': A1, A2, A3... B1, B2, B3...
     return chamberConfig.columns
         .flatMap((col: string) => chamberConfig.rows.map((row: number) => `${col}${row}`))
         .filter((coord: string) => !chamberConfig.blocked?.includes(coord));
@@ -197,7 +197,7 @@ export function StoreOtherFruitDialog({ item, open, onOpenChange, onConfirm, all
                         <FormControl>
                           <RadioGroupItem value="pareado" />
                         </FormControl>
-                        <FormLabel className="font-normal">Pareado (A1, B1, C1...)</FormLabel>
+                        <FormLabel className="font-normal">Pareado (A1, B1, A2, B2...)</FormLabel>
                       </FormItem>
                     </RadioGroup>
                   </FormControl>
