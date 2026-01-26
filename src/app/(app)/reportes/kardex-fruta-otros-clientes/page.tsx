@@ -49,44 +49,60 @@ export default function OtherFruitKardexReportPage() {
     
     const kardexData = React.useMemo(() => {
         const allMovements: any[] = [];
-        if(receptions) {
+
+        if (receptions) {
             receptions.forEach(reception => {
-                reception.items.forEach((item, index) => {
-                    allMovements.push({
-                        key: `${reception.id}-E-${index}`,
-                        date: reception.createdAt,
-                        type: 'entrada',
-                        clientName: reception.clientName,
-                        document: reception.document,
-                        clientLotId: item.clientLotId,
-                        productCode: item.productCode,
-                        productName: item.productName,
-                        quantity: item.quantity,
-                    });
+                const totalQuantity = reception.items.reduce((sum, item) => sum + item.quantity, 0);
+                const totalWeight = reception.items.reduce((sum, item) => sum + (item.weight || 0), 0);
+
+                const productNames = [...new Set(reception.items.map(i => i.productName))].join(', ');
+                const productCodes = [...new Set(reception.items.map(i => i.productCode))].join(', ');
+                const clientLotIds = [...new Set(reception.items.map(i => i.clientLotId).filter(Boolean))].join(', ');
+
+                allMovements.push({
+                    key: `${reception.id}-E`,
+                    date: reception.createdAt,
+                    type: 'entrada',
+                    clientName: reception.clientName,
+                    document: reception.document,
+                    clientLotId: clientLotIds || '-',
+                    productCode: productCodes,
+                    productName: productNames,
+                    quantity: totalQuantity,
+                    unit: reception.unit,
+                    weight: totalWeight > 0 ? totalWeight : undefined,
                 });
             });
         }
 
-        if(movements) {
+        if (movements) {
             movements.forEach(movement => {
                 if (movement.type !== 'salida') return;
-                movement.items.forEach((item, index) => {
-                     allMovements.push({
-                        key: `${movement.id}-S-${index}`,
-                        date: movement.createdAt,
-                        type: 'salida',
-                        clientName: movement.clientName,
-                        document: movement.document,
-                        clientLotId: item.clientLotId,
-                        productCode: item.productCode,
-                        productName: item.productName,
-                        quantity: -item.quantity,
-                    });
+
+                const totalQuantity = movement.items.reduce((sum, item) => sum + item.quantity, 0);
+                const totalWeight = movement.items.reduce((sum, item) => sum + (item.weight || 0), 0);
+
+                const productNames = [...new Set(movement.items.map(i => i.productName))].join(', ');
+                const productCodes = [...new Set(movement.items.map(i => i.productCode))].join(', ');
+                const clientLotIds = [...new Set(movement.items.map(i => i.clientLotId).filter(Boolean))].join(', ');
+
+                allMovements.push({
+                    key: `${movement.id}-S`,
+                    date: movement.createdAt,
+                    type: 'salida',
+                    clientName: movement.clientName,
+                    document: movement.document,
+                    clientLotId: clientLotIds || '-',
+                    productCode: productCodes,
+                    productName: productNames,
+                    quantity: -totalQuantity,
+                    unit: movement.unit,
+                    weight: totalWeight > 0 ? -totalWeight : undefined,
                 });
             });
         }
 
-        return allMovements.sort((a,b) => b.date.toMillis() - a.date.toMillis());
+        return allMovements.sort((a, b) => b.date.toMillis() - a.date.toMillis());
     }, [receptions, movements]);
 
     const [clientFilter, setClientFilter] = React.useState('all');
@@ -106,7 +122,7 @@ export default function OtherFruitKardexReportPage() {
 
 
     const handleExport = () => {
-         const dataToExport = filteredData.map(item => ({
+        const dataToExport = filteredData.map(item => ({
             "Fecha": item.date.toDate(),
             "Tipo": item.type,
             "Cliente": item.clientName,
@@ -114,9 +130,10 @@ export default function OtherFruitKardexReportPage() {
             "Lote Cliente": item.clientLotId || '',
             "Codigo Producto": item.productCode,
             "Nombre Producto": item.productName,
-            "Cantidad": item.quantity,
+            "Cantidad": `${item.quantity} ${item.unit}`,
+            "Peso (kg)": item.weight ? item.weight.toFixed(2) : '0.00',
         }));
-        const headers = ["Fecha", "Tipo", "Cliente", "Documento", "Lote Cliente", "Codigo Producto", "Nombre Producto", "Cantidad"];
+        const headers = ["Fecha", "Tipo", "Cliente", "Documento", "Lote Cliente", "Codigo Producto", "Nombre Producto", "Cantidad", "Peso (kg)"];
         const csv = convertToCSV(dataToExport, headers);
         downloadCSV(csv, 'kardex_fruta_otros_clientes.csv');
     };
@@ -160,11 +177,12 @@ export default function OtherFruitKardexReportPage() {
                                     <TableHead>Cód. Prod.</TableHead>
                                     <TableHead>Producto</TableHead>
                                     <TableHead>Cantidad</TableHead>
+                                    <TableHead>Peso (kg)</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
                                 {loading ? (
-                                    Array.from({ length: 5 }).map((_, i) => <TableRow key={i}><TableCell colSpan={8}><Skeleton className="h-4 w-full" /></TableCell></TableRow>)
+                                    Array.from({ length: 5 }).map((_, i) => <TableRow key={i}><TableCell colSpan={9}><Skeleton className="h-4 w-full" /></TableCell></TableRow>)
                                 ) : filteredData.length > 0 ? (
                                     filteredData.map((item) => (
                                     <TableRow key={item.key}>
@@ -180,12 +198,15 @@ export default function OtherFruitKardexReportPage() {
                                         <TableCell>{item.productCode}</TableCell>
                                         <TableCell>{item.productName}</TableCell>
                                         <TableCell className={item.quantity > 0 ? 'text-green-600' : 'text-red-600'}>
-                                            {item.quantity}
+                                            {item.quantity} {item.unit}
+                                        </TableCell>
+                                        <TableCell className={item.weight > 0 ? 'text-green-600' : 'text-red-600'}>
+                                            {item.weight ? `${item.weight.toFixed(2)} kg` : '-'}
                                         </TableCell>
                                     </TableRow>
                                     ))
                                 ) : (
-                                    <TableRow><TableCell colSpan={8} className="h-24 text-center">No hay movimientos para los filtros seleccionados.</TableCell></TableRow>
+                                    <TableRow><TableCell colSpan={9} className="h-24 text-center">No hay movimientos para los filtros seleccionados.</TableCell></TableRow>
                                 )}
                             </TableBody>
                         </Table>
@@ -195,3 +216,4 @@ export default function OtherFruitKardexReportPage() {
         </div>
     );
 }
+
