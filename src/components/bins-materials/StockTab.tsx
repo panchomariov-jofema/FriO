@@ -75,7 +75,7 @@ export function StockTab({ exporterId }: StockTabProps) {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Código</TableHead>
+                <TableHead className="hidden sm:table-cell">Código</TableHead>
                 <TableHead>Nombre del Material</TableHead>
                 {!exporterId && <TableHead>Exportador</TableHead>}
                 <TableHead className="text-right">Cantidad en Stock</TableHead>
@@ -91,7 +91,7 @@ export function StockTab({ exporterId }: StockTabProps) {
               ) : stock.length > 0 ? (
                 stock.map(item => (
                   <TableRow key={item.id}>
-                    <TableCell className="font-mono">{item.binMaterialCode}</TableCell>
+                    <TableCell className="font-mono hidden sm:table-cell">{item.binMaterialCode}</TableCell>
                     <TableCell className="font-medium">{item.binMaterialName}</TableCell>
                     {!exporterId && <TableCell>{exporterMap[item.exporterId] || item.exporterId}</TableCell>}
                     <TableCell className="text-right font-semibold">{item.quantity}</TableCell>

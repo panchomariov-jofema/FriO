@@ -325,8 +325,8 @@ export function OtherFruitExitTab() {
                                         </TableHead>
                                         <TableHead>Coordenada</TableHead>
                                         <TableHead>Producto</TableHead>
-                                        <TableHead>Lote Cliente</TableHead>
-                                        <TableHead>Peso</TableHead>
+                                        <TableHead className="hidden md:table-cell">Lote Cliente</TableHead>
+                                        <TableHead className="hidden md:table-cell">Peso</TableHead>
                                         <TableHead>Disp.</TableHead>
                                         <TableHead className="w-32">A Despachar</TableHead>
                                     </TableRow>
@@ -344,8 +344,8 @@ export function OtherFruitExitTab() {
                                                 </TableCell>
                                                 <TableCell className="font-mono">{loc.coordinate}</TableCell>
                                                 <TableCell>{loc.productName}</TableCell>
-                                                <TableCell className="font-mono">{loc.clientLotId || '-'}</TableCell>
-                                                <TableCell>{loc.weight ? loc.weight.toFixed(2) : '-'}</TableCell>
+                                                <TableCell className="font-mono hidden md:table-cell">{loc.clientLotId || '-'}</TableCell>
+                                                <TableCell className="hidden md:table-cell">{loc.weight ? loc.weight.toFixed(2) : '-'}</TableCell>
                                                 <TableCell>{loc.quantity}</TableCell>
                                                 <TableCell>
                                                     <Input

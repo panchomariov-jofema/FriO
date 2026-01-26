@@ -470,11 +470,11 @@ export default function CamarasPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Fecha Recepción</TableHead>
+                  <TableHead className="hidden sm:table-cell">Fecha Recepción</TableHead>
                   <TableHead>ID Lote</TableHead>
                   <TableHead className="hidden md:table-cell">Productor</TableHead>
                   <TableHead>N° Bins</TableHead>
-                  <TableHead>Exportador</TableHead>
+                  <TableHead className="hidden lg:table-cell">Exportador</TableHead>
                   <TableHead className="text-right">Acciones</TableHead>
                 </TableRow>
               </TableHeader>
@@ -484,11 +484,11 @@ export default function CamarasPage() {
                 ) : pendingLots.length > 0 ? (
                   pendingLots.map((lot) => (
                     <TableRow key={lot.id}>
-                      <TableCell>{lot.receptionDate?.toDate().toLocaleString('es-CL', { year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute:'2-digit' })}</TableCell>
+                      <TableCell className="hidden sm:table-cell">{lot.receptionDate?.toDate().toLocaleString('es-CL', { year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute:'2-digit' })}</TableCell>
                       <TableCell className="font-medium">{lot.displayLotId}</TableCell>
                       <TableCell className="hidden md:table-cell">{lot.producerShortName}</TableCell>
                       <TableCell>{lot.binCount}</TableCell>
-                      <TableCell>{exporterMap[lot.exporterId] || lot.exporterId}</TableCell>
+                      <TableCell className="hidden lg:table-cell">{exporterMap[lot.exporterId] || lot.exporterId}</TableCell>
                       <TableCell className="text-right">
                         <Button size="sm" onClick={() => handleStoreClick(lot)}>Almacenar</Button>
                       </TableCell>
@@ -560,8 +560,8 @@ export default function CamarasPage() {
                         </div>
                     </AccordionTrigger>
                     <AccordionContent>
-                        <div className="p-4 bg-muted/50 rounded-lg border">
-                            <div className="grid gap-1" style={{ gridTemplateColumns: `repeat(${config.columns.length}, minmax(0, 1fr))` }}>
+                        <div className="p-4 bg-muted/50 rounded-lg border overflow-x-auto">
+                            <div className="grid gap-1 min-w-[800px]" style={{ gridTemplateColumns: `repeat(${config.columns.length}, minmax(0, 1fr))` }}>
                               {config.rows.map(row =>
                                 config.columns.map(col => {
                                   const coord = `${col}${row}`;

@@ -164,8 +164,8 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
               <SidebarTrigger />
               <div className="flex-1" />
               <Button variant="ghost" size="sm" onClick={handleSignOut}>
-                  <LogOut className="mr-2 h-4 w-4" />
-                  Cerrar Sesión
+                  <LogOut className="h-4 w-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Cerrar Sesión</span>
               </Button>
           </header>
           <main className="p-4">

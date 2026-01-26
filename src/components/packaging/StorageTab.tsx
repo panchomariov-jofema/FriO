@@ -100,8 +100,8 @@ export function StorageTab() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Cliente</TableHead>
-                  <TableHead>Documento</TableHead>
-                  <TableHead>Código</TableHead>
+                  <TableHead className="hidden sm:table-cell">Documento</TableHead>
+                  <TableHead className="hidden md:table-cell">Código</TableHead>
                   <TableHead>Artículo</TableHead>
                   <TableHead>Cant. Pallets</TableHead>
                   <TableHead>Estado</TableHead>
@@ -117,8 +117,8 @@ export function StorageTab() {
                   pendingItems.map((item) => (
                     <TableRow key={`${item.receptionId}-${item.itemIndex}`}>
                         <TableCell>{item.clientName}</TableCell>
-                        <TableCell className="font-mono">{item.document}</TableCell>
-                        <TableCell className="font-mono">{item.packagingMasterCode}</TableCell>
+                        <TableCell className="font-mono hidden sm:table-cell">{item.document}</TableCell>
+                        <TableCell className="font-mono hidden md:table-cell">{item.packagingMasterCode}</TableCell>
                         <TableCell className="font-medium">{item.packagingMasterName}</TableCell>
                         <TableCell className="font-semibold">{item.palletCount}</TableCell>
                         <TableCell><Badge variant="secondary">{item.status}</Badge></TableCell>

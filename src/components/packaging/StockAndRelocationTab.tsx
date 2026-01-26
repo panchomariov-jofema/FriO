@@ -109,7 +109,7 @@ export function StockAndRelocationTab() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Código</TableHead>
+                  <TableHead className="hidden sm:table-cell">Código</TableHead>
                   <TableHead>Artículo</TableHead>
                   <TableHead>Cliente</TableHead>
                   <TableHead>Ubicación</TableHead>
@@ -125,7 +125,7 @@ export function StockAndRelocationTab() {
                 ) : storedItems.length > 0 ? (
                   storedItems.map((item) => (
                     <TableRow key={item.id}>
-                        <TableCell className="font-mono">{item.code}</TableCell>
+                        <TableCell className="font-mono hidden sm:table-cell">{item.code}</TableCell>
                         <TableCell className="font-medium">{item.name}</TableCell>
                         <TableCell>{item.clientName}</TableCell>
                         <TableCell>{item.location.warehouse} / {item.location.aisle}</TableCell>

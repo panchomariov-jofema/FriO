@@ -109,7 +109,7 @@ export function PendingPickingTab() {
                 <TableRow>
                   <TableHead>Fecha Solicitud</TableHead>
                   <TableHead>Cliente</TableHead>
-                  <TableHead>Documento</TableHead>
+                  <TableHead className="hidden sm:table-cell">Documento</TableHead>
                   <TableHead>Artículos</TableHead>
                   <TableHead>Estado</TableHead>
                   <TableHead className="text-right">Acciones</TableHead>
@@ -125,7 +125,7 @@ export function PendingPickingTab() {
                     <TableRow key={mov.id}>
                       <TableCell>{mov.createdAt.toDate().toLocaleString()}</TableCell>
                       <TableCell>{clientMap[mov.clientId] || mov.clientId}</TableCell>
-                      <TableCell>{mov.document}</TableCell>
+                      <TableCell className="hidden sm:table-cell">{mov.document}</TableCell>
                       <TableCell>{mov.items.reduce((sum, item) => sum + item.palletCount, 0)} pallets</TableCell>
                       <TableCell><Badge variant="secondary">{mov.status}</Badge></TableCell>
                       <TableCell className="text-right">

@@ -216,9 +216,9 @@ export function ManualDispatchTab({ exporters, loadingExporters, chamberLots, lo
                                 <TableHead>Cámara</TableHead>
                                 <TableHead>Coord.</TableHead>
                                 <TableHead>Bins</TableHead>
-                                <TableHead>Peso Neto/Bin</TableHead>
-                                <TableHead>Productor</TableHead>
-                                <TableHead>Variedad</TableHead>
+                                <TableHead className="hidden md:table-cell">Peso Neto/Bin</TableHead>
+                                <TableHead className="hidden md:table-cell">Productor</TableHead>
+                                <TableHead className="hidden md:table-cell">Variedad</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -237,9 +237,9 @@ export function ManualDispatchTab({ exporters, loadingExporters, chamberLots, lo
                                         <TableCell>{lot.chamberId}</TableCell>
                                         <TableCell>{lot.coordinate}</TableCell>
                                         <TableCell>{lot.binCount}</TableCell>
-                                        <TableCell>{lot.netWeightPerBin ? `${lot.netWeightPerBin.toFixed(2)} kg` : '-'}</TableCell>
-                                        <TableCell>{lot.producerShortName}</TableCell>
-                                        <TableCell>{lot.variety}</TableCell>
+                                        <TableCell className="hidden md:table-cell">{lot.netWeightPerBin ? `${lot.netWeightPerBin.toFixed(2)} kg` : '-'}</TableCell>
+                                        <TableCell className="hidden md:table-cell">{lot.producerShortName}</TableCell>
+                                        <TableCell className="hidden md:table-cell">{lot.variety}</TableCell>
                                     </TableRow>
                                 ))
                             ) : (

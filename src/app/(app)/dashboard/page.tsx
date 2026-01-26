@@ -123,7 +123,7 @@ function FallCreekExecutiveView({ dashboardData, clientName }: { dashboardData: 
 
     return (
         <div className="space-y-6">
-            <div className="grid gap-4 md:grid-cols-3">
+            <div className="grid gap-4 grid-cols-2 md:grid-cols-3">
                 {kpiCards.map(kpi => (
                     <Card key={kpi.title}>
                         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -737,7 +737,7 @@ export default function DashboardPage() {
         <div className="space-y-6">
             {renderDashboardHeader()}
 
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+            <div className="grid gap-4 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5">
                 {kpiCards.map(kpi => (
                     <Card key={kpi.title}>
                         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -755,7 +755,7 @@ export default function DashboardPage() {
                 ))}
             </div>
             
-            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
                 {Object.values(chambersConfig).map(chamber => {
                     const latestTemp = latestTemperatures[chamber.id];
                     return (
@@ -874,8 +874,8 @@ export default function DashboardPage() {
                                 <TableRow>
                                     <TableHead>Fecha y Hora</TableHead>
                                     <TableHead>ID Lote</TableHead>
-                                    <TableHead>Productor</TableHead>
-                                    <TableHead>Variedad</TableHead>
+                                    <TableHead className="hidden sm:table-cell">Productor</TableHead>
+                                    <TableHead className="hidden md:table-cell">Variedad</TableHead>
                                     <TableHead>N° Bins</TableHead>
                                     <TableHead>Estado</TableHead>
                                 </TableRow>
@@ -888,8 +888,8 @@ export default function DashboardPage() {
                                         <TableRow key={lot.id}>
                                             <TableCell>{lot.createdAt?.toDate().toLocaleString()}</TableCell>
                                             <TableCell className="font-mono">{lot.displayLotId}</TableCell>
-                                            <TableCell>{lot.producerId}</TableCell>
-                                            <TableCell>{lot.variety}</TableCell>
+                                            <TableCell className="hidden sm:table-cell">{lot.producerId}</TableCell>
+                                            <TableCell className="hidden md:table-cell">{lot.variety}</TableCell>
                                             <TableCell>{lot.binCount}</TableCell>
                                             <TableCell><Badge variant="secondary">{lot.status}</Badge></TableCell>
                                         </TableRow>

@@ -147,12 +147,12 @@ export function LotList({ exporterId }: LotListProps) {
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-[150px]">ID Lote</TableHead>
-                  <TableHead>Variedad</TableHead>
+                  <TableHead className="hidden md:table-cell">Variedad</TableHead>
                   <TableHead>Bins</TableHead>
-                  <TableHead>Totes</TableHead>
+                  <TableHead className="hidden md:table-cell">Totes</TableHead>
                   <TableHead>Estado</TableHead>
                   <TableHead>Peso Total</TableHead>
-                  <TableHead>Peso Neto</TableHead>
+                  <TableHead className="hidden md:table-cell">Peso Neto</TableHead>
                   <TableHead>T° Pre</TableHead>
                   <TableHead>T° Post</TableHead>
                   <TableHead className="text-right">Acciones</TableHead>
@@ -174,14 +174,14 @@ export function LotList({ exporterId }: LotListProps) {
                     return (
                     <TableRow key={lot.id}>
                       <TableCell className="font-medium">{lot.displayLotId || lot.id}</TableCell>
-                      <TableCell>{lot.variety}</TableCell>
+                      <TableCell className="hidden md:table-cell">{lot.variety}</TableCell>
                       <TableCell>{lot.binCount}</TableCell>
-                      <TableCell>{lot.toteCount}</TableCell>
+                      <TableCell className="hidden md:table-cell">{lot.toteCount}</TableCell>
                       <TableCell>
                         <Badge variant={getStatusVariant(lot.status)}>{lot.status}</Badge>
                       </TableCell>
                       <TableCell>{renderCellContent(lot, 'totalWeight')}</TableCell>
-                      <TableCell>{pesoNeto !== null ? `${pesoNeto.toFixed(2)} kg` : '-'}</TableCell>
+                      <TableCell className="hidden md:table-cell">{pesoNeto !== null ? `${pesoNeto.toFixed(2)} kg` : '-'}</TableCell>
                       <TableCell>{renderCellContent(lot, 'preHydroTemp')}</TableCell>
                       <TableCell>{renderCellContent(lot, 'postHydroTemp')}</TableCell>
                        <TableCell className="text-right">

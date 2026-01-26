@@ -88,7 +88,7 @@ export default function EmbalajesPage() {
             </AlertDialog>
           </CardHeader>
           <CardContent>
-            <TabsList className="grid w-full grid-cols-2 md:grid-cols-5">
+            <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 md:grid-cols-5">
               <TabsTrigger value="recepcion">Recepción</TabsTrigger>
               <TabsTrigger value="almacenamiento">Almacenamiento</TabsTrigger>
               <TabsTrigger value="salidas">Despacho</TabsTrigger>
