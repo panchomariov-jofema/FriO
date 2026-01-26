@@ -201,13 +201,7 @@ export function OtherFruitExitTab() {
             const itemToUpdate = updatedItems[itemIndex];
             
             if (itemToUpdate && itemToUpdate.quantity >= quantityToDispatch) {
-                const weightPerUnit = (itemToUpdate.weight || 0) / itemToUpdate.quantity;
-                const dispatchedWeight = quantityToDispatch * weightPerUnit;
-
                 itemToUpdate.quantity -= quantityToDispatch;
-                if (itemToUpdate.weight) {
-                    itemToUpdate.weight -= dispatchedWeight;
-                }
                 
                 const newItemForMovement: {
                     productCode: string;
@@ -219,7 +213,6 @@ export function OtherFruitExitTab() {
                     productCode: itemToUpdate.productCode,
                     productName: itemToUpdate.productName,
                     quantity: quantityToDispatch,
-                    weight: dispatchedWeight > 0 ? dispatchedWeight : undefined,
                 };
 
                 if (typeof itemToUpdate.clientLotId !== 'undefined') {
@@ -227,7 +220,6 @@ export function OtherFruitExitTab() {
                 }
                 
                 movementItems.push(newItemForMovement);
-
             }
         }
 
