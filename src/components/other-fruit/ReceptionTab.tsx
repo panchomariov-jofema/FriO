@@ -28,6 +28,7 @@ const defaultItem = {
   productCode: '',
   productName: '',
   quantity: 1,
+  weight: undefined,
 };
 
 export function OtherFruitReceptionTab() {
@@ -74,6 +75,7 @@ export function OtherFruitReceptionTab() {
     
     const itemsWithStatus: OtherFruitReceptionItem[] = values.items.map(item => ({
         ...item,
+        weight: item.weight || undefined,
         status: 'Pendiente de almacenar'
     }));
 
@@ -174,7 +176,7 @@ export function OtherFruitReceptionTab() {
               <FormLabel>Ítems Recibidos</FormLabel>
               {fields.map((field, index) => (
                 <div key={field.id} className="flex items-end gap-2 p-3 border rounded-md">
-                  <div className="flex-1 grid sm:grid-cols-4 gap-4 items-end">
+                  <div className="flex-1 grid sm:grid-cols-5 gap-4 items-end">
                     <FormField
                       control={form.control}
                       name={`items.${index}.clientLotId`}
@@ -230,6 +232,28 @@ export function OtherFruitReceptionTab() {
                         <FormItem>
                           <FormLabel>Cantidad ({selectedClient?.unit || 'Unidades'})</FormLabel>
                           <FormControl><Input type="number" {...field} autoComplete="off" min="1" inputMode="numeric" /></FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name={`items.${index}.weight`}
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Peso (kg)</FormLabel>
+                          <FormControl>
+                            <Input
+                                type="number"
+                                {...field}
+                                autoComplete="off"
+                                min="0"
+                                step="0.01"
+                                inputMode="decimal"
+                                value={field.value ?? ''}
+                                onChange={(e) => field.onChange(e.target.value === '' ? undefined : e.target.value)}
+                            />
+                          </FormControl>
                           <FormMessage />
                         </FormItem>
                       )}

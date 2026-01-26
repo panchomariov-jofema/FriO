@@ -24,11 +24,13 @@ interface AggregatedLot {
   displayLotId: string;
   unit: 'Bins' | 'Pallets';
   totalQuantity: number;
+  totalWeight: number;
   locations: {
     receptionId: string;
     itemIndex: number;
     coordinate: string;
     quantity: number;
+    weight?: number;
     productName: string;
     productCode: string;
     clientLotId?: string;
@@ -67,17 +69,20 @@ export function OtherFruitExitTab() {
               displayLotId: reception.displayLotId,
               unit: reception.unit,
               totalQuantity: 0,
+              totalWeight: 0,
               locations: [],
             });
           }
 
           const lot = lotMap.get(reception.displayLotId)!;
           lot.totalQuantity += item.quantity;
+          lot.totalWeight += item.weight || 0;
           lot.locations.push({
             receptionId: reception.id,
             itemIndex: index,
             coordinate: item.storageLocation.coordinate,
             quantity: item.quantity,
+            weight: item.weight,
             productName: item.productName,
             productCode: item.productCode,
             clientLotId: item.clientLotId,
@@ -196,17 +201,25 @@ export function OtherFruitExitTab() {
             const itemToUpdate = updatedItems[itemIndex];
             
             if (itemToUpdate && itemToUpdate.quantity >= quantityToDispatch) {
+                const weightPerUnit = (itemToUpdate.weight || 0) / itemToUpdate.quantity;
+                const dispatchedWeight = quantityToDispatch * weightPerUnit;
+
                 itemToUpdate.quantity -= quantityToDispatch;
+                if (itemToUpdate.weight) {
+                    itemToUpdate.weight -= dispatchedWeight;
+                }
                 
                 const newItemForMovement: {
                     productCode: string;
                     productName: string;
                     quantity: number;
+                    weight?: number;
                     clientLotId?: string;
                 } = {
                     productCode: itemToUpdate.productCode,
                     productName: itemToUpdate.productName,
                     quantity: quantityToDispatch,
+                    weight: dispatchedWeight > 0 ? dispatchedWeight : undefined,
                 };
 
                 if (typeof itemToUpdate.clientLotId !== 'undefined') {
@@ -301,7 +314,10 @@ export function OtherFruitExitTab() {
                             <AccordionTrigger>
                                 <div className="flex justify-between w-full pr-4">
                                     <span className="font-mono">{lot.displayLotId}</span>
-                                    <span className="font-semibold">{lot.totalQuantity} {lot.unit}</span>
+                                    <div className="flex items-center gap-4 text-sm">
+                                      {lot.totalWeight > 0 && <span className="font-semibold text-muted-foreground">{lot.totalWeight.toFixed(2)} kg</span>}
+                                      <span className="font-semibold">{lot.totalQuantity} {lot.unit}</span>
+                                    </div>
                                 </div>
                             </AccordionTrigger>
                             <AccordionContent>
@@ -318,6 +334,7 @@ export function OtherFruitExitTab() {
                                         <TableHead>Coordenada</TableHead>
                                         <TableHead>Producto</TableHead>
                                         <TableHead>Lote Cliente</TableHead>
+                                        <TableHead>Peso</TableHead>
                                         <TableHead>Disp.</TableHead>
                                         <TableHead className="w-32">A Despachar</TableHead>
                                     </TableRow>
@@ -336,6 +353,7 @@ export function OtherFruitExitTab() {
                                                 <TableCell className="font-mono">{loc.coordinate}</TableCell>
                                                 <TableCell>{loc.productName}</TableCell>
                                                 <TableCell className="font-mono">{loc.clientLotId || '-'}</TableCell>
+                                                <TableCell>{loc.weight ? loc.weight.toFixed(2) : '-'}</TableCell>
                                                 <TableCell>{loc.quantity}</TableCell>
                                                 <TableCell>
                                                     <Input

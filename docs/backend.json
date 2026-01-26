@@ -358,6 +358,7 @@
               "productCode": { "type": "string" },
               "productName": { "type": "string" },
               "quantity": { "type": "number" },
+              "weight": { "type": "number", "description": "Weight of the items in kilograms." },
               "status": { "type": "string", "enum": ["Pendiente de almacenar", "Almacenado"] },
               "storageLocation": {
                 "type": "object",
@@ -444,6 +445,7 @@
               "productCode": { "type": "string" },
               "productName": { "type": "string" },
               "quantity": { "type": "number" },
+              "weight": { "type": "number", "description": "Weight of the items in kilograms." },
               "clientLotId": { "type": "string" }
             },
             "required": ["productCode", "productName", "quantity"]
