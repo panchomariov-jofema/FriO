@@ -76,7 +76,9 @@ function downloadCSV(csvString: string, filename: string) {
 }
 
 
-function FallCreekExecutiveView({ data, clientName }: { data: any[], clientName: string }) {
+function FallCreekExecutiveView({ dashboardData, clientName }: { dashboardData: any, clientName: string }) {
+    const { kpis, charts, tableData } = dashboardData;
+
     const handleExport = () => {
         const headers = [
             { key: 'receptionDate', label: 'Fecha Recepción' },
@@ -86,11 +88,11 @@ function FallCreekExecutiveView({ data, clientName }: { data: any[], clientName:
             { key: 'unit', label: 'Unidad' },
         ];
         
-        const csv = convertToCSV(data, headers);
+        const csv = convertToCSV(tableData, headers);
         downloadCSV(csv, `resumen_fall_creek_${new Date().toISOString().split('T')[0]}.csv`);
     };
 
-    if (data.length === 0) {
+    if (tableData.length === 0) {
         return (
              <Card>
                 <CardHeader className="flex flex-row items-start justify-between">
@@ -106,15 +108,99 @@ function FallCreekExecutiveView({ data, clientName }: { data: any[], clientName:
         )
     }
 
+    const kpiCards = [
+        { title: "Total en Cámara (Bins Equiv.)", value: kpis.totalInChamber, icon: Warehouse },
+        { title: "Pendiente por Almacenar", value: kpis.pendingStorage, icon: PackageCheck },
+        { title: "Total Lotes de Cliente", value: kpis.totalLots, icon: Boxes },
+    ];
+    
+    const productChartConfig: ChartConfig = {
+        quantity: { label: "Cantidad", color: "hsl(var(--chart-1))" },
+    };
+    const occupancyChartConfig: ChartConfig = {
+        ocupacion: { label: "Bins Equivalentes", color: "hsl(var(--chart-2))" },
+    };
+
     return (
         <div className="space-y-6">
+            <div className="grid gap-4 md:grid-cols-3">
+                {kpiCards.map(kpi => (
+                    <Card key={kpi.title}>
+                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                            <CardTitle className="text-sm font-medium">{kpi.title}</CardTitle>
+                            <kpi.icon className="h-4 w-4 text-muted-foreground" />
+                        </CardHeader>
+                        <CardContent>
+                            <div className="text-4xl font-bold">{kpi.value.toLocaleString('es-CL')}</div>
+                        </CardContent>
+                    </Card>
+                ))}
+            </div>
+
+            <div className="grid gap-6 md:grid-cols-2">
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Cantidad por Producto</CardTitle>
+                        <CardDescription>Total de Bins/Pallets por cada tipo de producto en stock.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <ChartContainer config={productChartConfig} className="h-[250px] w-full">
+                           <BarChart data={charts.quantityByProduct} layout="vertical" margin={{ right: 80, left: 20 }}>
+                                <XAxis type="number" dataKey="quantity" hide />
+                                <YAxis dataKey="name" type="category" tickLine={false} axisLine={false} tickMargin={10} width={80} />
+                                <ChartTooltip content={<ChartTooltipContent />} />
+                                <Bar dataKey="quantity" layout="vertical" radius={5} fill="var(--color-quantity)">
+                                    <LabelList 
+                                        dataKey="quantity" 
+                                        position="right" 
+                                        offset={8} 
+                                        className="fill-foreground font-semibold"
+                                        formatter={(value: number) => value.toLocaleString('es-CL')}
+                                    />
+                                </Bar>
+                            </BarChart>
+                        </ChartContainer>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Ocupación por Cámara</CardTitle>
+                        <CardDescription>Capacidad utilizada en cada cámara para {clientName}.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <ChartContainer config={occupancyChartConfig} className="h-[250px] w-full">
+                           <BarChart data={charts.occupancyByChamber} layout="vertical" margin={{ left: 20, right: 120 }}>
+                                <XAxis type="number" hide />
+                                <YAxis dataKey="name" type="category" tickLine={false} axisLine={false} tickMargin={10} width={80} />
+                                <ChartTooltip formatter={(value, name, props) => [`${value} Bins Equiv.`, name]} content={<ChartTooltipContent />} />
+                                <Bar dataKey="ocupacion" layout="vertical" radius={5} fill="var(--color-ocupacion)">
+                                     <LabelList
+                                        dataKey="percentage"
+                                        position="right"
+                                        offset={8}
+                                        className="fill-foreground font-semibold"
+                                        formatter={(value: number) => `${value.toFixed(1)}%`}
+                                    />
+                                    <LabelList 
+                                        dataKey="ocupacion"
+                                        position="insideLeft"
+                                        offset={8}
+                                        className="fill-primary-foreground font-bold"
+                                        formatter={(value: number) => value > 0 ? `${value.toLocaleString('es-CL')}` : ''}
+                                    />
+                                </Bar>
+                            </BarChart>
+                        </ChartContainer>
+                    </CardContent>
+                </Card>
+            </div>
+
             <Card>
                 <CardHeader className="flex flex-row items-start justify-between">
                     <div>
-                        <CardTitle>Resumen Ejecutivo: {clientName}</CardTitle>
-                        <CardDescription>Resumen de lotes de cliente almacenados en cámara.</CardDescription>
+                        <CardTitle>Detalle de Lotes de Cliente Almacenados</CardTitle>
                     </div>
-                     <Button onClick={handleExport} variant="outline" size="sm" disabled={data.length === 0}>
+                     <Button onClick={handleExport} variant="outline" size="sm" disabled={tableData.length === 0}>
                         <Download className="mr-2 h-4 w-4" />
                         Exportar
                     </Button>
@@ -131,7 +217,7 @@ function FallCreekExecutiveView({ data, clientName }: { data: any[], clientName:
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {data.map(lot => (
+                                {tableData.map((lot: any) => (
                                     <TableRow key={lot.clientLotId}>
                                         <TableCell>{lot.receptionDate?.toDate().toLocaleString('es-CL')}</TableCell>
                                         <TableCell className="font-mono">{lot.clientLotId}</TableCell>
@@ -437,50 +523,96 @@ export default function DashboardPage() {
     }, [chamberLots, otherFruitReceptions, processingLots, exporters, receptionLots, binMaterialStock, hidrocoolerLots, selectedClient, dateRange]);
 
 
-    const fallCreekData = React.useMemo(() => {
+    const fallCreekDashboardData = React.useMemo(() => {
         if (selectedClient?.name !== 'FALL CREEK' || !otherFruitReceptions) {
             return null;
         }
         
         const clientReceptions = otherFruitReceptions.filter(r => r.clientId === selectedClient.id);
-        
-        const lots = new Map<string, {
-            productName: string,
-            unit: 'Bins' | 'Pallets',
-            totalQuantity: number,
-            locations: { coordinate: string, quantity: number }[],
-            receptionDate: any,
-        }>();
-        
+
+        // KPIs
+        let totalInChamber = 0; // in equivalent bins
+        let pendingStorage = 0; // in equivalent bins
+        const clientLotIds = new Set<string>();
+
+        // Chart Data
+        const quantityByProduct: Record<string, {name: string, quantity: number, unit: 'Bins' | 'Pallets'}> = {};
+        const occupancyByChamber: Record<string, { name: string; ocupacion: number; total: number; percentage: number; }> = {};
+
+
         clientReceptions.forEach(reception => {
             reception.items.forEach(item => {
-                if (item.status === 'Almacenado' && item.clientLotId && item.quantity > 0) {
-                    if (!lots.has(item.clientLotId)) {
-                        lots.set(item.clientLotId, {
-                            productName: item.productName,
-                            unit: reception.unit,
-                            totalQuantity: 0,
-                            locations: [],
-                            receptionDate: reception.createdAt,
-                        });
+                const equivalentBins = reception.unit === 'Pallets' ? item.quantity * 2 : item.quantity;
+                if (item.status === 'Almacenado') {
+                    totalInChamber += equivalentBins;
+                    if (item.clientLotId) {
+                        clientLotIds.add(item.clientLotId);
                     }
-                    const lotSummary = lots.get(item.clientLotId)!;
-                    lotSummary.totalQuantity += item.quantity;
-                    if(item.storageLocation?.coordinate && item.storageLocation?.chamberId) {
-                        lotSummary.locations.push({
-                            coordinate: `${item.storageLocation.chamberId}/${item.storageLocation.coordinate}`,
-                            quantity: item.quantity
-                        });
+
+                    // For quantity by product chart
+                    if (!quantityByProduct[item.productName]) {
+                        quantityByProduct[item.productName] = { name: item.productName, quantity: 0, unit: reception.unit };
                     }
+                    quantityByProduct[item.productName].quantity += item.quantity;
+
+                    // For occupancy by chamber
+                    if (item.storageLocation?.chamberId) {
+                        const chamberId = item.storageLocation.chamberId;
+                        if (!occupancyByChamber[chamberId]) {
+                            const chamberConfig = chambersConfig[chamberId];
+                            occupancyByChamber[chamberId] = { 
+                                name: chamberConfig?.name || chamberId, 
+                                ocupacion: 0,
+                                total: chamberConfig?.capacity || 0,
+                                percentage: 0,
+                            };
+                        }
+                        occupancyByChamber[chamberId].ocupacion += equivalentBins;
+                    }
+
+                } else if (item.status === 'Pendiente de almacenar') {
+                    pendingStorage += equivalentBins;
                 }
             });
         });
-        
-        return Array.from(lots.entries()).map(([clientLotId, summary]) => ({
-            clientLotId,
-            ...summary
-        }));
 
+        // Finalize chamber occupancy percentages
+        Object.keys(occupancyByChamber).forEach(chamberId => {
+            const chamber = occupancyByChamber[chamberId];
+            chamber.percentage = chamber.total > 0 ? (chamber.ocupacion / chamber.total) * 100 : 0;
+        });
+
+        const lotDetails = Array.from(clientLotIds).map(clientLotId => {
+            const receptionsForItem = clientReceptions.filter(r => r.items.some(i => i.clientLotId === clientLotId));
+            const firstReception = receptionsForItem[0];
+            const firstItem = firstReception?.items.find(i => i.clientLotId === clientLotId);
+            
+            const totalQuantity = receptionsForItem.reduce((sum, r) => 
+                sum + r.items.filter(i => i.clientLotId === clientLotId && i.status === 'Almacenado').reduce((itemSum, i) => itemSum + i.quantity, 0), 0
+            );
+
+            return {
+                clientLotId,
+                productName: firstItem?.productName || 'N/A',
+                receptionDate: firstReception?.createdAt,
+                totalQuantity,
+                unit: firstReception?.unit,
+            };
+        }).sort((a,b) => (b.receptionDate?.toMillis() ?? 0) - (a.receptionDate?.toMillis() ?? 0));
+
+
+        return {
+            kpis: {
+                totalInChamber,
+                pendingStorage,
+                totalLots: clientLotIds.size,
+            },
+            charts: {
+                quantityByProduct: Object.values(quantityByProduct),
+                occupancyByChamber: Object.values(occupancyByChamber),
+            },
+            tableData: lotDetails,
+        };
     }, [selectedClient, otherFruitReceptions]);
 
 
@@ -592,11 +724,11 @@ export default function DashboardPage() {
         </Card>
     );
 
-    if (selectedClient?.name === 'FALL CREEK' && fallCreekData) {
+    if (selectedClient?.name === 'FALL CREEK' && fallCreekDashboardData) {
         return (
              <div className="space-y-6">
                 {renderDashboardHeader()}
-                <FallCreekExecutiveView data={fallCreekData} clientName={selectedClient.name} />
+                <FallCreekExecutiveView dashboardData={fallCreekDashboardData} clientName={selectedClient.name} />
              </div>
         )
     }
