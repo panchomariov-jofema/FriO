@@ -130,7 +130,7 @@ export default function LoginPage() {
 
   return (
     <div className="flex items-center justify-center min-h-screen login-background">
-      <Card className="w-full max-w-md">
+      <Card className="w-full max-w-md bg-card/95 backdrop-blur-sm border-border/20">
         <CardHeader className="text-center">
           <div className="flex justify-center items-center mb-4">
             <Apple className="w-10 h-10 text-primary" />
