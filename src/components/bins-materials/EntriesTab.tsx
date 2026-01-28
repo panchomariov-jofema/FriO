@@ -215,7 +215,7 @@ export function EntriesTab({ exporterId, exporterName, producerId, isDirectDispa
         <CardTitle>Registrar Entrada</CardTitle>
         <CardDescription>
           {isDirectDispatch 
-            ? 'Registrar un despacho directo del exportador al productor. Este movimiento no afectará el stock del frigorífico.'
+            ? <span className="text-primary font-medium">Registrar un despacho directo del exportador al productor. Este movimiento no afectará el stock del frigorífico.</span>
             : 'Ingrese un documento y las cantidades de los materiales que ingresan al inventario.'
           }
         </CardDescription>
