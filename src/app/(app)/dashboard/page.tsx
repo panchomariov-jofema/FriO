@@ -32,6 +32,7 @@ import {
 } from "@/components/ui/popover"
 import { cn } from "@/lib/utils"
 import { collection, onSnapshot, query } from 'firebase/firestore';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 
 const CHART_COLORS = [
@@ -77,7 +78,7 @@ function downloadCSV(csvString: string, filename: string) {
 
 
 function FallCreekExecutiveView({ dashboardData, clientName }: { dashboardData: any, clientName: string }) {
-    const { kpis, charts, tableData } = dashboardData;
+    const { summaryData, charts, tableData } = dashboardData;
 
     const handleExport = () => {
         const headers = [
@@ -92,7 +93,7 @@ function FallCreekExecutiveView({ dashboardData, clientName }: { dashboardData: 
         downloadCSV(csv, `resumen_fall_creek_${new Date().toISOString().split('T')[0]}.csv`);
     };
 
-    if (tableData.length === 0) {
+    if (tableData.length === 0 && summaryData.length === 0) {
         return (
              <Card>
                 <CardHeader className="flex flex-row items-start justify-between">
@@ -107,12 +108,6 @@ function FallCreekExecutiveView({ dashboardData, clientName }: { dashboardData: 
             </Card>
         )
     }
-
-    const kpiCards = [
-        { title: "Total en Cámara (Bins Equiv.)", value: kpis.totalInChamber, icon: Warehouse },
-        { title: "Pendiente por Almacenar", value: kpis.pendingStorage, icon: PackageCheck },
-        { title: "Total Lotes de Cliente", value: kpis.totalLots, icon: Boxes },
-    ];
     
     const productChartConfig: ChartConfig = {
         quantity: { label: "Cantidad", color: "hsl(var(--chart-1))" },
@@ -123,19 +118,42 @@ function FallCreekExecutiveView({ dashboardData, clientName }: { dashboardData: 
 
     return (
         <div className="space-y-6">
-            <div className="grid gap-4 grid-cols-2 md:grid-cols-3">
-                {kpiCards.map(kpi => (
-                    <Card key={kpi.title}>
-                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                            <CardTitle className="text-sm font-medium">{kpi.title}</CardTitle>
-                            <kpi.icon className="h-4 w-4 text-muted-foreground" />
-                        </CardHeader>
-                        <CardContent>
-                            <div className="text-4xl font-bold">{kpi.value.toLocaleString('es-CL')}</div>
-                        </CardContent>
-                    </Card>
-                ))}
-            </div>
+            <Card>
+                <CardHeader>
+                    <CardTitle>Resumen de Stock en Cámara</CardTitle>
+                    <CardDescription>Detalle de lotes del cliente actualmente almacenados.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <ScrollArea className="h-72">
+                        <div className="rounded-md border">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Fecha Recepción</TableHead>
+                                        <TableHead>Lote</TableHead>
+                                        <TableHead>Cantidad</TableHead>
+                                        <TableHead>Cámara</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {summaryData && summaryData.length > 0 ? summaryData.map((item: any) => (
+                                        <TableRow key={item.id}>
+                                            <TableCell>{item.receptionDate?.toDate().toLocaleDateString('es-CL')}</TableCell>
+                                            <TableCell className="font-mono">{item.lot}</TableCell>
+                                            <TableCell>{item.quantity} {item.unit}</TableCell>
+                                            <TableCell>{item.chamber}</TableCell>
+                                        </TableRow>
+                                    )) : (
+                                        <TableRow>
+                                            <TableCell colSpan={4} className="h-24 text-center">No hay stock en cámara.</TableCell>
+                                        </TableRow>
+                                    )}
+                                </TableBody>
+                            </Table>
+                        </div>
+                    </ScrollArea>
+                </CardContent>
+            </Card>
 
             <div className="grid gap-6 md:grid-cols-2">
                 <Card>
@@ -530,12 +548,21 @@ export default function DashboardPage() {
         
         const clientReceptions = otherFruitReceptions.filter(r => r.clientId === selectedClient.id);
 
-        // KPIs
-        let totalInChamber = 0; // in equivalent bins
-        let pendingStorage = 0; // in equivalent bins
-        const clientLotIds = new Set<string>();
+        const summaryTableData = clientReceptions.flatMap(reception => 
+            reception.items
+                .filter(item => item.status === 'Almacenado' && item.storageLocation?.chamberId && item.quantity > 0)
+                .map((item, index) => ({
+                    id: `${reception.id}-${index}`,
+                    receptionDate: reception.createdAt,
+                    lot: item.clientLotId || reception.displayLotId || 'N/A',
+                    quantity: item.quantity,
+                    unit: reception.unit,
+                    chamber: chambersConfig[item.storageLocation!.chamberId]?.name || item.storageLocation!.chamberId,
+                }))
+        ).sort((a, b) => (b.receptionDate?.toMillis() ?? 0) - (a.receptionDate?.toMillis() ?? 0));
 
-        // Chart Data
+
+        const clientLotIds = new Set<string>();
         const quantityByProduct: Record<string, {name: string, quantity: number, unit: 'Bins' | 'Pallets'}> = {};
         const occupancyByChamber: Record<string, { name: string; ocupacion: number; total: number; percentage: number; }> = {};
 
@@ -543,19 +570,16 @@ export default function DashboardPage() {
         clientReceptions.forEach(reception => {
             reception.items.forEach(item => {
                 const equivalentBins = reception.unit === 'Pallets' ? item.quantity * 2 : item.quantity;
-                if (item.status === 'Almacenado') {
-                    totalInChamber += equivalentBins;
+                if (item.status === 'Almacenado' && item.quantity > 0) {
                     if (item.clientLotId) {
                         clientLotIds.add(item.clientLotId);
                     }
 
-                    // For quantity by product chart
                     if (!quantityByProduct[item.productName]) {
                         quantityByProduct[item.productName] = { name: item.productName, quantity: 0, unit: reception.unit };
                     }
                     quantityByProduct[item.productName].quantity += item.quantity;
 
-                    // For occupancy by chamber
                     if (item.storageLocation?.chamberId) {
                         const chamberId = item.storageLocation.chamberId;
                         if (!occupancyByChamber[chamberId]) {
@@ -570,13 +594,10 @@ export default function DashboardPage() {
                         occupancyByChamber[chamberId].ocupacion += equivalentBins;
                     }
 
-                } else if (item.status === 'Pendiente de almacenar') {
-                    pendingStorage += equivalentBins;
                 }
             });
         });
 
-        // Finalize chamber occupancy percentages
         Object.keys(occupancyByChamber).forEach(chamberId => {
             const chamber = occupancyByChamber[chamberId];
             chamber.percentage = chamber.total > 0 ? (chamber.ocupacion / chamber.total) * 100 : 0;
@@ -602,11 +623,7 @@ export default function DashboardPage() {
 
 
         return {
-            kpis: {
-                totalInChamber,
-                pendingStorage,
-                totalLots: clientLotIds.size,
-            },
+            summaryData: summaryTableData,
             charts: {
                 quantityByProduct: Object.values(quantityByProduct),
                 occupancyByChamber: Object.values(occupancyByChamber),
