@@ -286,7 +286,7 @@ export function OtherFruitExitTab() {
             </div>
             <div>
               <Label>Documento de Despacho</Label>
-              <Input type="number" placeholder="Ej: 12345" value={document} onChange={(e) => setDocument(e.target.value)} disabled={!selectedClientId} required />
+              <Input type="text" inputMode="numeric" pattern="[0-9]*" placeholder="Ej: 12345" value={document} onChange={(e) => setDocument(e.target.value)} disabled={!selectedClientId} required />
             </div>
         </div>
 
