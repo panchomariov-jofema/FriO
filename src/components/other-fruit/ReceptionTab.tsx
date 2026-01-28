@@ -42,6 +42,7 @@ export function OtherFruitReceptionTab() {
     defaultValues: {
       clientId: '',
       document: '',
+      temperature: undefined,
       items: [defaultItem],
     },
   });
@@ -87,6 +88,7 @@ export function OtherFruitReceptionTab() {
         clientName: selectedClient.name,
         unit: selectedClient.unit,
         document: values.document,
+        temperature: values.temperature,
         displayLotId: displayLotId,
         items: itemsWithStatus,
         status: 'Pendiente de almacenar' as const,
@@ -100,6 +102,7 @@ export function OtherFruitReceptionTab() {
         form.reset({
             clientId: values.clientId,
             document: '',
+            temperature: undefined,
             items: [defaultItem],
         });
     } catch (error) {
@@ -130,7 +133,7 @@ export function OtherFruitReceptionTab() {
       <CardContent>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-            <div className="grid md:grid-cols-3 gap-4 items-end">
+            <div className="grid md:grid-cols-4 gap-4 items-end">
               <FormField
                 control={form.control}
                 name="clientId"
@@ -164,6 +167,27 @@ export function OtherFruitReceptionTab() {
                   </FormItem>
                 )}
               />
+              <FormField
+                control={form.control}
+                name="temperature"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Temperatura (°C) <span className="text-muted-foreground text-xs">(Opcional)</span></FormLabel>
+                    <FormControl>
+                        <Input 
+                            type="number"
+                            step="0.1"
+                            {...field}
+                            value={field.value ?? ''}
+                            onChange={(e) => field.onChange(e.target.value === '' ? undefined : e.target.value)}
+                            autoComplete="off"
+                            inputMode="decimal"
+                        />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+                />
               {selectedClient && (
                 <div>
                   <Label>Unidad</Label>

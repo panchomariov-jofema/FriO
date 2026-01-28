@@ -154,6 +154,7 @@ export const otherFruitReceptionItemSchema = z.object({
 export const otherFruitReceptionSchema = z.object({
     clientId: z.string().min(1, "Debe seleccionar un cliente."),
     document: z.string().min(1, "El documento es obligatorio."),
+    temperature: z.coerce.number().optional(),
     items: z.array(otherFruitReceptionItemSchema).min(1, "Debe agregar al menos un producto."),
 });
 

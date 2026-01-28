@@ -346,6 +346,10 @@
         "displayLotId": { "type": "string", "description": "User-friendly lot identifier."},
         "unit": { "type": "string", "enum": ["Bins", "Pallets"] },
         "document": { "type": "string", "description": "Reception document number." },
+        "temperature": {
+          "type": "number",
+          "description": "Optional temperature reading at reception."
+        },
         "items": {
           "type": "array",
           "items": {

@@ -272,6 +272,7 @@ export interface OtherFruitReception {
   displayLotId?: string;
   unit: 'Bins' | 'Pallets';
   document: string;
+  temperature?: number;
   items: OtherFruitReceptionItem[];
   status: 'Pendiente de almacenar' | 'Parcialmente Almacenado' | 'Almacenado';
   createdAt: Timestamp;
