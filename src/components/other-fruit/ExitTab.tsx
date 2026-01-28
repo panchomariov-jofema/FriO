@@ -349,6 +349,8 @@ export function OtherFruitExitTab() {
                         <Label htmlFor="third-party-rut">RUT Cliente Destino</Label>
                         <Input
                             id="third-party-rut"
+                            type="text"
+                            inputMode="tel"
                             placeholder="Ingrese el RUT del cliente"
                             value={thirdPartyClientRUT}
                             onChange={(e) => setThirdPartyClientRUT(e.target.value)}
