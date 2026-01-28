@@ -548,18 +548,40 @@ export default function DashboardPage() {
         
         const clientReceptions = otherFruitReceptions.filter(r => r.clientId === selectedClient.id);
 
-        const summaryTableData = clientReceptions.flatMap(reception => 
+        const summaryItems = clientReceptions.flatMap(reception => 
             reception.items
                 .filter(item => item.status === 'Almacenado' && item.storageLocation?.chamberId && item.quantity > 0)
                 .map((item, index) => ({
-                    id: `${reception.id}-${index}`,
                     receptionDate: reception.createdAt,
                     lot: item.clientLotId || reception.displayLotId || 'N/A',
                     quantity: item.quantity,
                     unit: reception.unit,
                     chamber: chambersConfig[item.storageLocation!.chamberId]?.name || item.storageLocation!.chamberId,
                 }))
-        ).sort((a, b) => (b.receptionDate?.toMillis() ?? 0) - (a.receptionDate?.toMillis() ?? 0));
+        );
+
+        const groupedSummary = summaryItems.reduce((acc, item) => {
+            const dateString = item.receptionDate?.toDate().toLocaleDateString('es-CL');
+            const key = `${dateString}-${item.lot}-${item.chamber}`;
+            
+            if (!acc[key]) {
+                acc[key] = {
+                    id: key,
+                    receptionDate: item.receptionDate,
+                    lot: item.lot,
+                    quantity: 0,
+                    unit: item.unit,
+                    chamber: item.chamber,
+                };
+            }
+            
+            acc[key].quantity += item.quantity;
+            
+            return acc;
+        }, {} as Record<string, { id: string, receptionDate: any, lot: string, quantity: number, unit: string, chamber: string }>);
+
+        const summaryTableData = Object.values(groupedSummary)
+            .sort((a, b) => (b.receptionDate?.toMillis() ?? 0) - (a.receptionDate?.toMillis() ?? 0));
 
 
         const clientLotIds = new Set<string>();
