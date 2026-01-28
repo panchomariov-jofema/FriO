@@ -49,6 +49,10 @@ export function OtherFruitExitTab() {
   const [quantitiesToDispatch, setQuantitiesToDispatch] = React.useState<Record<string, number>>({});
   const [isDispatching, setIsDispatching] = React.useState(false);
 
+  // New state for third-party dispatch
+  const [isThirdPartyDispatch, setIsThirdPartyDispatch] = React.useState(false);
+  const [thirdPartyClientName, setThirdPartyClientName] = React.useState('');
+
   const fruitClients = React.useMemo(() => (allClients || []).filter(c => c.type.toUpperCase() === 'FRUTA'), [allClients]);
   const loading = loadingClients || loadingReceptions;
 
@@ -172,6 +176,11 @@ export function OtherFruitExitTab() {
         toast({ variant: 'destructive', title: 'Error', description: 'El Documento de Despacho es obligatorio.' });
         return;
     }
+
+    if (isThirdPartyDispatch && !thirdPartyClientName.trim()) {
+        toast({ variant: 'destructive', title: 'Error', description: 'El nombre del cliente de destino es obligatorio para despachos a terceros.' });
+        return;
+    }
     
     const client = fruitClients.find(c => c.clientId === selectedClientId);
     if (!client) {
@@ -229,7 +238,8 @@ export function OtherFruitExitTab() {
         });
 
         const movementRef = doc(collection(firestore, 'otherFruitMovements'));
-        batch.set(movementRef, {
+        
+        const movementData: Partial<OtherFruitMovement> = {
             type: 'salida',
             clientId: client.clientId,
             clientName: client.name,
@@ -237,12 +247,20 @@ export function OtherFruitExitTab() {
             document: document,
             items: movementItems,
             createdAt: serverTimestamp(),
-        });
+        };
+
+        if (isThirdPartyDispatch) {
+            movementData.destinationClient = thirdPartyClientName;
+        }
+
+        batch.set(movementRef, movementData);
         
         await batch.commit();
         toast({ title: 'Éxito', description: 'Despacho registrado y stock actualizado.' });
         setQuantitiesToDispatch({});
         setDocument('');
+        setIsThirdPartyDispatch(false);
+        setThirdPartyClientName('');
 
     } catch (error) {
          console.error("Error creating fruit dispatch:", error);
@@ -286,9 +304,39 @@ export function OtherFruitExitTab() {
             </div>
             <div>
               <Label>Documento de Despacho</Label>
-              <Input type="text" inputMode="numeric" pattern="[0-9]*" placeholder="Ej: 12345" value={document} onChange={(e) => setDocument(e.target.value)} disabled={!selectedClientId} required />
+              <Input type="text" inputMode="numeric" placeholder="Ej: 12345" value={document} onChange={(e) => setDocument(e.target.value)} disabled={!selectedClientId} required />
             </div>
         </div>
+
+        <div className="flex items-center space-x-4 pt-2">
+            <div className="flex items-center space-x-2">
+                <Checkbox
+                    id="third-party-dispatch"
+                    checked={isThirdPartyDispatch}
+                    onCheckedChange={(checked) => {
+                        setIsThirdPartyDispatch(!!checked);
+                        if (!checked) {
+                            setThirdPartyClientName('');
+                        }
+                    }}
+                    disabled={!selectedClientId}
+                />
+                <Label htmlFor="third-party-dispatch">Despacho a Terceros</Label>
+            </div>
+            {isThirdPartyDispatch && (
+                <div className="flex-1">
+                    <Label htmlFor="third-party-name">Nombre Cliente Destino</Label>
+                    <Input
+                        id="third-party-name"
+                        placeholder="Ingrese el nombre del cliente de destino"
+                        value={thirdPartyClientName}
+                        onChange={(e) => setThirdPartyClientName(e.target.value)}
+                        disabled={!selectedClientId}
+                    />
+                </div>
+            )}
+        </div>
+
 
         {selectedClientId && (
             loadingReceptions ? <Skeleton className="h-24 w-full" />
