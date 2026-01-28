@@ -65,6 +65,7 @@ export default function OtherFruitKardexReportPage() {
                     type: 'entrada',
                     clientName: reception.clientName,
                     document: reception.document,
+                    temperature: reception.temperature,
                     clientLotId: clientLotIds || '-',
                     productCode: productCodes,
                     productName: productNames,
@@ -127,13 +128,14 @@ export default function OtherFruitKardexReportPage() {
             "Tipo": item.type,
             "Cliente": item.clientName,
             "Documento": item.document,
+            "Temperatura": item.temperature ? `${item.temperature.toFixed(1)}°C` : '',
             "Lote Cliente": item.clientLotId || '',
             "Codigo Producto": item.productCode,
             "Nombre Producto": item.productName,
             "Cantidad": `${item.quantity} ${item.unit}`,
             "Peso (kg)": item.weight ? item.weight.toFixed(2) : '0.00',
         }));
-        const headers = ["Fecha", "Tipo", "Cliente", "Documento", "Lote Cliente", "Codigo Producto", "Nombre Producto", "Cantidad", "Peso (kg)"];
+        const headers = ["Fecha", "Tipo", "Cliente", "Documento", "Temperatura", "Lote Cliente", "Codigo Producto", "Nombre Producto", "Cantidad", "Peso (kg)"];
         const csv = convertToCSV(dataToExport, headers);
         downloadCSV(csv, 'kardex_fruta_otros_clientes.csv');
     };
@@ -173,6 +175,7 @@ export default function OtherFruitKardexReportPage() {
                                     <TableHead>Tipo</TableHead>
                                     <TableHead>Cliente</TableHead>
                                     <TableHead>Documento</TableHead>
+                                    <TableHead>Temp (°C)</TableHead>
                                     <TableHead>Lote Cliente</TableHead>
                                     <TableHead>Cód. Prod.</TableHead>
                                     <TableHead>Producto</TableHead>
@@ -182,7 +185,7 @@ export default function OtherFruitKardexReportPage() {
                             </TableHeader>
                             <TableBody>
                                 {loading ? (
-                                    Array.from({ length: 5 }).map((_, i) => <TableRow key={i}><TableCell colSpan={9}><Skeleton className="h-4 w-full" /></TableCell></TableRow>)
+                                    Array.from({ length: 5 }).map((_, i) => <TableRow key={i}><TableCell colSpan={10}><Skeleton className="h-4 w-full" /></TableCell></TableRow>)
                                 ) : filteredData.length > 0 ? (
                                     filteredData.map((item) => (
                                     <TableRow key={item.key}>
@@ -194,6 +197,7 @@ export default function OtherFruitKardexReportPage() {
                                         </TableCell>
                                         <TableCell>{item.clientName}</TableCell>
                                         <TableCell>{item.document}</TableCell>
+                                        <TableCell>{item.temperature ? item.temperature.toFixed(1) : '-'}</TableCell>
                                         <TableCell className="font-mono">{item.clientLotId || '-'}</TableCell>
                                         <TableCell>{item.productCode}</TableCell>
                                         <TableCell>{item.productName}</TableCell>
@@ -206,7 +210,7 @@ export default function OtherFruitKardexReportPage() {
                                     </TableRow>
                                     ))
                                 ) : (
-                                    <TableRow><TableCell colSpan={9} className="h-24 text-center">No hay movimientos para los filtros seleccionados.</TableCell></TableRow>
+                                    <TableRow><TableCell colSpan={10} className="h-24 text-center">No hay movimientos para los filtros seleccionados.</TableCell></TableRow>
                                 )}
                             </TableBody>
                         </Table>
@@ -216,4 +220,3 @@ export default function OtherFruitKardexReportPage() {
         </div>
     );
 }
-
