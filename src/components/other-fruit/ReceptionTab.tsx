@@ -12,7 +12,7 @@ import { Button } from '@/components/ui/button';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
 import type { OtherClient, OtherFruitReceptionItem } from '@/lib/types';
 import { otherFruitReceptionSchema } from '@/lib/schemas';
-import { PlusCircle, Trash2 } from 'lucide-react';
+import { PlusCircle, ScanLine, Trash2 } from 'lucide-react';
 import { useFirestore } from '@/firebase';
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
@@ -207,9 +207,15 @@ export function OtherFruitReceptionTab() {
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Lote Cliente (Opcional)</FormLabel>
-                          <FormControl>
-                            <Input {...field} value={field.value ?? ''} autoComplete="off" />
-                          </FormControl>
+                          <div className="flex items-center gap-2">
+                            <FormControl>
+                              <Input {...field} value={field.value ?? ''} autoComplete="off" />
+                            </FormControl>
+                            <Button type="button" variant="outline" size="icon" className="shrink-0">
+                                <ScanLine className="h-4 w-4" />
+                                <span className="sr-only">Escanear código</span>
+                            </Button>
+                          </div>
                           <FormMessage />
                         </FormItem>
                       )}
