@@ -20,6 +20,7 @@ import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { Label } from '@/components/ui/label';
 import { usePackagingMastersByClient } from '@/hooks/usePackagingMastersByClient';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '../ui/alert-dialog';
 
 type ReceptionFormValues = z.infer<typeof otherFruitReceptionSchema>;
 
@@ -36,6 +37,8 @@ export function OtherFruitReceptionTab() {
   const firestore = useFirestore();
   const { toast } = useToast();
   const [selectedClient, setSelectedClient] = React.useState<OtherClient | null>(null);
+  const [scanningIndex, setScanningIndex] = React.useState<number | null>(null);
+  const [scannedValue, setScannedValue] = React.useState('');
 
   const form = useForm<ReceptionFormValues>({
     resolver: zodResolver(otherFruitReceptionSchema),
@@ -69,6 +72,14 @@ export function OtherFruitReceptionTab() {
       clientId: clientId,
       items: [defaultItem]
     });
+  };
+  
+  const handleScanConfirm = () => {
+    if (scanningIndex !== null) {
+        form.setValue(`items.${scanningIndex}.clientLotId`, scannedValue);
+        setScanningIndex(null);
+        setScannedValue('');
+    }
   };
 
   const onSubmit = async (values: ReceptionFormValues) => {
@@ -211,10 +222,37 @@ export function OtherFruitReceptionTab() {
                             <FormControl>
                               <Input {...field} value={field.value ?? ''} autoComplete="off" />
                             </FormControl>
-                            <Button type="button" variant="outline" size="icon" className="shrink-0">
-                                <ScanLine className="h-4 w-4" />
-                                <span className="sr-only">Escanear código</span>
-                            </Button>
+                             <AlertDialog open={scanningIndex === index} onOpenChange={(isOpen) => { if (!isOpen) setScanningIndex(null); }}>
+                              <AlertDialogTrigger asChild>
+                                <Button type="button" variant="outline" size="icon" className="shrink-0" onClick={() => setScanningIndex(index)}>
+                                    <ScanLine className="h-4 w-4" />
+                                    <span className="sr-only">Escanear código</span>
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Simulación de Escáner</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    En la aplicación final, esto abriría la cámara para escanear un código de barras. Por ahora, puede ingresar el valor manualmente.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <Input 
+                                    value={scannedValue} 
+                                    onChange={(e) => setScannedValue(e.target.value)} 
+                                    placeholder="Ingrese el valor del código de barras..."
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                            e.preventDefault();
+                                            handleScanConfirm();
+                                        }
+                                    }}
+                                />
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel onClick={() => setScannedValue('')}>Cancelar</AlertDialogCancel>
+                                  <AlertDialogAction onClick={handleScanConfirm}>Aceptar</AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
                           </div>
                           <FormMessage />
                         </FormItem>
