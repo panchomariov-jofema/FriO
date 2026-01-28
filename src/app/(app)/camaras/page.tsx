@@ -125,6 +125,7 @@ export default function CamarasPage() {
             receptionId: null, // Not applicable for producer lots
             itemIndex: -1, // Not applicable
             netWeightPerBin: lot.netWeightPerBin || 0,
+            clientLotId: undefined,
         })),
       ...allOtherFruitReceptions
         .flatMap(reception => reception.items
@@ -144,6 +145,7 @@ export default function CamarasPage() {
                 receptionId: reception.id,
                 itemIndex: index, // This is now the correct original index
                 netWeightPerBin: 0,
+                clientLotId: item.clientLotId,
             }))
         )
     ];
@@ -572,7 +574,7 @@ export default function CamarasPage() {
                                   const totalBins = itemsInCoord.filter(i => i.unit === 'Bins').reduce((s, i) => s + i.quantity, 0);
                                   const totalPallets = itemsInCoord.filter(i => i.unit === 'Pallets').reduce((s, i) => s + i.quantity, 0);
                                   const totalNetWeight = itemsInCoord.reduce((sum, i) => sum + (i.quantity * (i.netWeightPerBin || 0)), 0);
-
+                                  const clientLotIds = Array.from(new Set(itemsInCoord.map(i => i.clientLotId).filter(Boolean)));
                                   
                                   const occupancyPercentage = isOccupied ? (totalBins + totalPallets * 2) / 6 * 100 : 0; // Approx. 1 pallet = 2 bins
                                   const firstItem = isOccupied ? itemsInCoord[0] : null;
@@ -613,6 +615,9 @@ export default function CamarasPage() {
                                             <p className="font-bold">
                                               {firstItem.type === 'producerLot' ? `Lote: ${firstItem.displayId}` : `Producto: ${firstItem.displayId}`}
                                             </p>
+                                            {clientLotIds.length > 0 && (
+                                              <p>Lote Cliente: <span className="font-mono">{clientLotIds.join(', ')}</span></p>
+                                            )}
                                             <p>
                                               {firstItem.type === 'producerLot' ? `Productor: ${firstItem.ownerName}` : `Cliente: ${firstItem.ownerName}`}
                                             </p>
