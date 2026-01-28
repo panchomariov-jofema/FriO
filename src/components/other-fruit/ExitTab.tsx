@@ -52,6 +52,7 @@ export function OtherFruitExitTab() {
   // New state for third-party dispatch
   const [isThirdPartyDispatch, setIsThirdPartyDispatch] = React.useState(false);
   const [thirdPartyClientName, setThirdPartyClientName] = React.useState('');
+  const [thirdPartyClientRUT, setThirdPartyClientRUT] = React.useState('');
 
   const fruitClients = React.useMemo(() => (allClients || []).filter(c => c.type.toUpperCase() === 'FRUTA'), [allClients]);
   const loading = loadingClients || loadingReceptions;
@@ -177,9 +178,15 @@ export function OtherFruitExitTab() {
         return;
     }
 
-    if (isThirdPartyDispatch && !thirdPartyClientName.trim()) {
-        toast({ variant: 'destructive', title: 'Error', description: 'El nombre del cliente de destino es obligatorio para despachos a terceros.' });
-        return;
+    if (isThirdPartyDispatch) {
+        if (!thirdPartyClientName.trim()) {
+            toast({ variant: 'destructive', title: 'Error', description: 'El nombre del cliente de destino es obligatorio para despachos a terceros.' });
+            return;
+        }
+        if (!thirdPartyClientRUT.trim()) {
+            toast({ variant: 'destructive', title: 'Error', description: 'El RUT del cliente de destino es obligatorio para despachos a terceros.' });
+            return;
+        }
     }
     
     const client = fruitClients.find(c => c.clientId === selectedClientId);
@@ -251,6 +258,7 @@ export function OtherFruitExitTab() {
 
         if (isThirdPartyDispatch) {
             movementData.destinationClient = thirdPartyClientName;
+            movementData.destinationClientRUT = thirdPartyClientRUT;
         }
 
         batch.set(movementRef, movementData);
@@ -261,6 +269,7 @@ export function OtherFruitExitTab() {
         setDocument('');
         setIsThirdPartyDispatch(false);
         setThirdPartyClientName('');
+        setThirdPartyClientRUT('');
 
     } catch (error) {
          console.error("Error creating fruit dispatch:", error);
@@ -317,6 +326,7 @@ export function OtherFruitExitTab() {
                         setIsThirdPartyDispatch(!!checked);
                         if (!checked) {
                             setThirdPartyClientName('');
+                            setThirdPartyClientRUT('');
                         }
                     }}
                     disabled={!selectedClientId}
@@ -324,15 +334,27 @@ export function OtherFruitExitTab() {
                 <Label htmlFor="third-party-dispatch">Despacho a Terceros</Label>
             </div>
             {isThirdPartyDispatch && (
-                <div className="flex-1">
-                    <Label htmlFor="third-party-name">Nombre Cliente Destino</Label>
-                    <Input
-                        id="third-party-name"
-                        placeholder="Ingrese el nombre del cliente de destino"
-                        value={thirdPartyClientName}
-                        onChange={(e) => setThirdPartyClientName(e.target.value)}
-                        disabled={!selectedClientId}
-                    />
+                <div className="flex-1 grid sm:grid-cols-2 gap-4">
+                    <div>
+                        <Label htmlFor="third-party-name">Nombre Cliente Destino</Label>
+                        <Input
+                            id="third-party-name"
+                            placeholder="Ingrese el nombre del cliente"
+                            value={thirdPartyClientName}
+                            onChange={(e) => setThirdPartyClientName(e.target.value)}
+                            disabled={!selectedClientId}
+                        />
+                    </div>
+                     <div>
+                        <Label htmlFor="third-party-rut">RUT Cliente Destino</Label>
+                        <Input
+                            id="third-party-rut"
+                            placeholder="Ingrese el RUT del cliente"
+                            value={thirdPartyClientRUT}
+                            onChange={(e) => setThirdPartyClientRUT(e.target.value)}
+                            disabled={!selectedClientId}
+                        />
+                    </div>
                 </div>
             )}
         </div>

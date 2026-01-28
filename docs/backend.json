@@ -445,6 +445,10 @@
           "type": "string",
           "description": "Optional name of the third-party destination client for a dispatch."
         },
+        "destinationClientRUT": {
+          "type": "string",
+          "description": "Optional RUT of the third-party destination client for a dispatch."
+        },
         "items": {
           "type": "array",
           "items": {
