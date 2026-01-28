@@ -41,6 +41,7 @@ export function OtherFruitReceptionTab() {
   const [scanningIndex, setScanningIndex] = React.useState<number | null>(null);
   const [scannedValue, setScannedValue] = React.useState('');
   const [showClientLot, setShowClientLot] = React.useState(false);
+  const [showTemperature, setShowTemperature] = React.useState(false);
 
   const form = useForm<ReceptionFormValues>({
     resolver: zodResolver(otherFruitReceptionSchema),
@@ -54,6 +55,12 @@ export function OtherFruitReceptionTab() {
   
   const selectedClientId = form.watch('clientId');
   const { data: clientProducts, loading: loadingProducts } = usePackagingMastersByClient(selectedClientId);
+
+  React.useEffect(() => {
+    if (!showTemperature) {
+      form.setValue('temperature', undefined);
+    }
+  }, [showTemperature, form]);
 
 
   const { fields, append, remove } = useFieldArray({
@@ -117,7 +124,7 @@ export function OtherFruitReceptionTab() {
         createdAt: serverTimestamp(),
     };
 
-    if (typeof values.temperature === 'number' && !isNaN(values.temperature)) {
+    if (showTemperature && typeof values.temperature === 'number' && !isNaN(values.temperature)) {
         receptionData.temperature = values.temperature;
     }
     
@@ -161,7 +168,7 @@ export function OtherFruitReceptionTab() {
       <CardContent>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-            <div className="grid md:grid-cols-4 gap-4 items-end">
+            <div className="grid md:grid-cols-3 gap-4 items-end">
               <FormField
                 control={form.control}
                 name="clientId"
@@ -195,27 +202,6 @@ export function OtherFruitReceptionTab() {
                   </FormItem>
                 )}
               />
-              <FormField
-                control={form.control}
-                name="temperature"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Temperatura (°C) <span className="text-muted-foreground text-xs">(Opcional)</span></FormLabel>
-                    <FormControl>
-                        <Input 
-                            type="number"
-                            step="0.1"
-                            {...field}
-                            value={field.value ?? ''}
-                            onChange={(e) => field.onChange(e.target.value === '' ? undefined : e.target.value)}
-                            autoComplete="off"
-                            inputMode="decimal"
-                        />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-                />
               {selectedClient && (
                 <div>
                   <Label>Unidad</Label>
@@ -223,22 +209,62 @@ export function OtherFruitReceptionTab() {
                 </div>
               )}
             </div>
-            
-             <div className="flex items-center space-x-2 pt-4">
-              <Checkbox
-                id="show-client-lot"
-                checked={showClientLot}
-                onCheckedChange={(checked) => setShowClientLot(!!checked)}
-                disabled={!selectedClient}
-              />
-              <Label
-                htmlFor="show-client-lot"
-                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-              >
-                Registrar Lote de Cliente
-              </Label>
+
+            <div className="flex items-center space-x-6 pt-2">
+                <div className="flex items-center space-x-2">
+                    <Checkbox
+                        id="show-client-lot"
+                        checked={showClientLot}
+                        onCheckedChange={(checked) => setShowClientLot(!!checked)}
+                        disabled={!selectedClient}
+                    />
+                    <Label
+                        htmlFor="show-client-lot"
+                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                    >
+                        Registrar Lote de Cliente
+                    </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                    <Checkbox
+                        id="show-temperature"
+                        checked={showTemperature}
+                        onCheckedChange={(checked) => setShowTemperature(!!checked)}
+                        disabled={!selectedClient}
+                    />
+                    <Label
+                        htmlFor="show-temperature"
+                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                    >
+                        Registrar Temperatura
+                    </Label>
+                </div>
             </div>
 
+            {showTemperature && (
+                 <FormField
+                    control={form.control}
+                    name="temperature"
+                    render={({ field }) => (
+                    <FormItem className="max-w-xs">
+                        <FormLabel>Temperatura (°C)</FormLabel>
+                        <FormControl>
+                            <Input 
+                                type="number"
+                                step="0.1"
+                                {...field}
+                                value={field.value ?? ''}
+                                onChange={(e) => field.onChange(e.target.value === '' ? undefined : e.target.value)}
+                                autoComplete="off"
+                                inputMode="decimal"
+                            />
+                        </FormControl>
+                        <FormMessage />
+                    </FormItem>
+                    )}
+                />
+            )}
+            
             <div className="space-y-4">
               <FormLabel>Ítems Recibidos</FormLabel>
               {fields.map((field, index) => (
