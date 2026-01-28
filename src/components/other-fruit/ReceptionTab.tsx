@@ -87,26 +87,39 @@ export function OtherFruitReceptionTab() {
   const onSubmit = async (values: ReceptionFormValues) => {
     if (!firestore || !selectedClient) return;
     
-    const itemsWithStatus: OtherFruitReceptionItem[] = values.items.map(item => ({
-        ...item,
-        weight: item.weight || undefined,
-        status: 'Pendiente de almacenar'
-    }));
+    const itemsWithStatus = values.items.map(item => {
+        const newItem: Partial<OtherFruitReceptionItem> = {
+            ...item,
+            status: 'Pendiente de almacenar'
+        };
+
+        if (typeof item.weight !== 'number' || isNaN(item.weight)) {
+            delete newItem.weight;
+        }
+        if (!item.clientLotId) {
+            delete newItem.clientLotId;
+        }
+
+        return newItem as OtherFruitReceptionItem;
+    });
 
     const clientAbbreviation = selectedClient.name.substring(0, 4).toUpperCase();
     const displayLotId = `${clientAbbreviation}-${values.document}`;
 
-    const receptionData = {
+    const receptionData: any = {
         clientId: values.clientId,
         clientName: selectedClient.name,
         unit: selectedClient.unit,
         document: values.document,
-        temperature: values.temperature,
         displayLotId: displayLotId,
         items: itemsWithStatus,
         status: 'Pendiente de almacenar' as const,
         createdAt: serverTimestamp(),
     };
+
+    if (typeof values.temperature === 'number' && !isNaN(values.temperature)) {
+        receptionData.temperature = values.temperature;
+    }
     
     try {
         const collRef = collection(firestore, 'otherFruitReceptions');
