@@ -12,7 +12,7 @@ import {
   CardDescription,
 } from '@/components/ui/card';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
-import type { ChamberLot, Dispatch, Exporter, ProcessingLot, ReceptionLot, BinMaterialStock, OtherFruitReception, Profile, UserMaster, HidrocoolerLot, OtherClient, ChamberTemperature } from '@/lib/types';
+import type { ChamberLot, Dispatch, Exporter, ProcessingLot, ReceptionLot, BinMaterialStock, OtherFruitReception, Profile, UserMaster, HidrocoolerLot, OtherClient, ChamberTemperature, OtherFruitMovement } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis, Cell, Legend, LabelList } from 'recharts';
 import { ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
@@ -78,22 +78,27 @@ function downloadCSV(csvString: string, filename: string) {
 
 
 function FallCreekExecutiveView({ dashboardData, clientName }: { dashboardData: any, clientName: string }) {
-    const { summaryData, charts, tableData } = dashboardData;
+    const { summaryData, charts, dispatchReportData } = dashboardData;
 
     const handleExport = () => {
-        const headers = [
-            { key: 'receptionDate', label: 'Fecha Recepción' },
-            { key: 'clientLotId', label: 'Lote Cliente' },
-            { key: 'productName', label: 'Producto' },
+         const headers = [
+            { key: 'dispatchDate', label: 'Fecha Despacho' },
+            { key: 'document', label: 'Documento' },
+            { key: 'clientLotIds', label: 'Lotes Cliente' },
+            { key: 'productNames', label: 'Productos' },
             { key: 'totalQuantity', label: 'Cantidad Total' },
-            { key: 'unit', label: 'Unidad' },
         ];
         
-        const csv = convertToCSV(tableData, headers);
-        downloadCSV(csv, `resumen_fall_creek_${new Date().toISOString().split('T')[0]}.csv`);
+        const csvData = dispatchReportData.map((d: any) => ({
+            ...d,
+            totalQuantity: `${d.totalQuantity} ${d.unit}`
+        }));
+        
+        const csv = convertToCSV(csvData, headers);
+        downloadCSV(csv, `reporte_despachos_fall_creek_${new Date().toISOString().split('T')[0]}.csv`);
     };
 
-    if (tableData.length === 0 && summaryData.length === 0) {
+    if (summaryData.length === 0 && dispatchReportData.length === 0) {
         return (
              <Card>
                 <CardHeader className="flex flex-row items-start justify-between">
@@ -103,7 +108,7 @@ function FallCreekExecutiveView({ dashboardData, clientName }: { dashboardData: 
                     </div>
                 </CardHeader>
                 <CardContent className="h-48 flex items-center justify-center">
-                    <p className="text-muted-foreground">No se encontraron lotes de cliente almacenados para {clientName}.</p>
+                    <p className="text-muted-foreground">No se encontraron datos para {clientName}.</p>
                 </CardContent>
             </Card>
         )
@@ -216,9 +221,9 @@ function FallCreekExecutiveView({ dashboardData, clientName }: { dashboardData: 
             <Card>
                 <CardHeader className="flex flex-row items-start justify-between">
                     <div>
-                        <CardTitle>Detalle de Lotes de Cliente Almacenados</CardTitle>
+                        <CardTitle>Reporte de Despachos</CardTitle>
                     </div>
-                     <Button onClick={handleExport} variant="outline" size="sm" disabled={tableData.length === 0}>
+                     <Button onClick={handleExport} variant="outline" size="sm" disabled={dispatchReportData.length === 0}>
                         <Download className="mr-2 h-4 w-4" />
                         Exportar
                     </Button>
@@ -228,21 +233,28 @@ function FallCreekExecutiveView({ dashboardData, clientName }: { dashboardData: 
                         <Table>
                             <TableHeader>
                                 <TableRow>
-                                    <TableHead>Fecha Recepción</TableHead>
-                                    <TableHead>Lote Cliente</TableHead>
-                                    <TableHead>Producto</TableHead>
+                                    <TableHead>Fecha Despacho</TableHead>
+                                    <TableHead>Documento</TableHead>
+                                    <TableHead>Lotes Cliente</TableHead>
+                                    <TableHead>Productos</TableHead>
                                     <TableHead>Cantidad Total</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {tableData.map((lot: any) => (
-                                    <TableRow key={lot.clientLotId}>
-                                        <TableCell>{lot.receptionDate?.toDate().toLocaleString('es-CL')}</TableCell>
-                                        <TableCell className="font-mono">{lot.clientLotId}</TableCell>
-                                        <TableCell>{lot.productName}</TableCell>
-                                        <TableCell className="font-semibold">{lot.totalQuantity} {lot.unit}</TableCell>
+                                {dispatchReportData && dispatchReportData.length > 0 ? (
+                                    dispatchReportData.map((dispatch: any) => (
+                                    <TableRow key={dispatch.id}>
+                                        <TableCell>{dispatch.dispatchDate?.toDate().toLocaleString('es-CL')}</TableCell>
+                                        <TableCell className="font-mono">{dispatch.document}</TableCell>
+                                        <TableCell className="font-mono">{dispatch.clientLotIds}</TableCell>
+                                        <TableCell>{dispatch.productNames}</TableCell>
+                                        <TableCell className="font-semibold">{dispatch.totalQuantity} {dispatch.unit}</TableCell>
                                     </TableRow>
-                                ))}
+                                ))) : (
+                                    <TableRow>
+                                        <TableCell colSpan={5} className="h-24 text-center">No hay despachos registrados para este cliente.</TableCell>
+                                    </TableRow>
+                                )}
                             </TableBody>
                         </Table>
                     </div>
@@ -269,6 +281,7 @@ export default function DashboardPage() {
 
     const { data: chamberLots, loading: loadingChamber } = useFirestoreCollection<ChamberLot>('chamberLots');
     const { data: otherFruitReceptions, loading: loadingOtherFruit } = useFirestoreCollection<OtherFruitReception>('otherFruitReceptions');
+    const { data: otherFruitMovements, loading: loadingOtherFruitMovements } = useFirestoreCollection<OtherFruitMovement>('otherFruitMovements');
     const { data: processingLots, loading: loadingProcessing } = useFirestoreCollection<ProcessingLot>('processingLots');
     const { data: dispatches, loading: loadingDispatches } = useFirestoreCollection<Dispatch>('dispatches');
     const { data: receptionLots, loading: loadingReception } = useFirestoreCollection<ReceptionLot>('receptionLots');
@@ -584,7 +597,6 @@ export default function DashboardPage() {
             .sort((a, b) => (b.receptionDate?.toMillis() ?? 0) - (a.receptionDate?.toMillis() ?? 0));
 
 
-        const clientLotIds = new Set<string>();
         const quantityByProduct: Record<string, {name: string, quantity: number, unit: 'Bins' | 'Pallets'}> = {};
         const occupancyByChamber: Record<string, { name: string; ocupacion: number; total: number; percentage: number; }> = {};
 
@@ -593,10 +605,6 @@ export default function DashboardPage() {
             reception.items.forEach(item => {
                 const equivalentBins = reception.unit === 'Pallets' ? item.quantity * 2 : item.quantity;
                 if (item.status === 'Almacenado' && item.quantity > 0) {
-                    if (item.clientLotId) {
-                        clientLotIds.add(item.clientLotId);
-                    }
-
                     if (!quantityByProduct[item.productName]) {
                         quantityByProduct[item.productName] = { name: item.productName, quantity: 0, unit: reception.unit };
                     }
@@ -625,23 +633,24 @@ export default function DashboardPage() {
             chamber.percentage = chamber.total > 0 ? (chamber.ocupacion / chamber.total) * 100 : 0;
         });
 
-        const lotDetails = Array.from(clientLotIds).map(clientLotId => {
-            const receptionsForItem = clientReceptions.filter(r => r.items.some(i => i.clientLotId === clientLotId));
-            const firstReception = receptionsForItem[0];
-            const firstItem = firstReception?.items.find(i => i.clientLotId === clientLotId);
-            
-            const totalQuantity = receptionsForItem.reduce((sum, r) => 
-                sum + r.items.filter(i => i.clientLotId === clientLotId && i.status === 'Almacenado').reduce((itemSum, i) => itemSum + i.quantity, 0), 0
-            );
+        const dispatchReportData = (otherFruitMovements || [])
+            .filter(m => m.clientId === selectedClient.id && m.type === 'salida')
+            .map(movement => {
+                const totalQuantity = movement.items.reduce((sum, item) => sum + item.quantity, 0);
+                const productNames = [...new Set(movement.items.map(i => i.productName))].join(', ');
+                const clientLotIds = [...new Set(movement.items.map(i => i.clientLotId).filter(Boolean))].join(', ');
 
-            return {
-                clientLotId,
-                productName: firstItem?.productName || 'N/A',
-                receptionDate: firstReception?.createdAt,
-                totalQuantity,
-                unit: firstReception?.unit,
-            };
-        }).sort((a,b) => (b.receptionDate?.toMillis() ?? 0) - (a.receptionDate?.toMillis() ?? 0));
+                return {
+                    id: movement.id,
+                    dispatchDate: movement.createdAt,
+                    document: movement.document,
+                    clientLotIds: clientLotIds,
+                    productNames: productNames,
+                    totalQuantity: totalQuantity,
+                    unit: movement.unit,
+                };
+            })
+            .sort((a,b) => b.dispatchDate.toMillis() - a.dispatchDate.toMillis());
 
 
         return {
@@ -650,12 +659,12 @@ export default function DashboardPage() {
                 quantityByProduct: Object.values(quantityByProduct),
                 occupancyByChamber: Object.values(occupancyByChamber),
             },
-            tableData: lotDetails,
+            dispatchReportData,
         };
-    }, [selectedClient, otherFruitReceptions]);
+    }, [selectedClient, otherFruitReceptions, otherFruitMovements]);
 
 
-    const loading = loadingChamber || loadingOtherFruit || loadingProcessing || loadingDispatches || loadingExporters || loadingReception || loadingBinStock || loadingUsers || loadingProfiles || loadingHidroLots || loadingOtherClients;
+    const loading = loadingChamber || loadingOtherFruit || loadingProcessing || loadingDispatches || loadingExporters || loadingReception || loadingBinStock || loadingUsers || loadingProfiles || loadingHidroLots || loadingOtherClients || loadingOtherFruitMovements;
 
     const kpiCards = [
         { title: "Total Bins en Cámara (Fruta)", value: totalBinsInStock, icon: Warehouse },
