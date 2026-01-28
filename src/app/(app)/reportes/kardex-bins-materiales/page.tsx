@@ -79,6 +79,7 @@ export default function BinMaterialKardexReportPage() {
 
         // 1. Entradas y Salidas de Bins y Materiales
         (movements || []).forEach(mov => {
+            const isDirectDispatch = mov.observation === 'Despacho Directo';
             mov.items.forEach((item, index) => {
                 allItems.push({
                     key: `mov-${mov.id}-${index}`,
@@ -88,8 +89,8 @@ export default function BinMaterialKardexReportPage() {
                     codigoProducto: item.binMaterialCode,
                     nombreProducto: item.binMaterialName,
                     cantidad: item.quantity,
-                    movimiento: 'Bins y Materiales',
-                    tipo: mov.type === 'entrada' ? 'Entrada' : 'Salida',
+                    movimiento: isDirectDispatch ? 'Despacho Directo' : 'Bins y Materiales',
+                    tipo: (mov.type === 'entrada' && !isDirectDispatch) ? 'Entrada' : 'Salida',
                 });
             });
         });
