@@ -21,6 +21,7 @@ import { FirestorePermissionError } from '@/firebase/errors';
 import { Label } from '@/components/ui/label';
 import { usePackagingMastersByClient } from '@/hooks/usePackagingMastersByClient';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '../ui/alert-dialog';
+import { Checkbox } from '../ui/checkbox';
 
 type ReceptionFormValues = z.infer<typeof otherFruitReceptionSchema>;
 
@@ -39,6 +40,7 @@ export function OtherFruitReceptionTab() {
   const [selectedClient, setSelectedClient] = React.useState<OtherClient | null>(null);
   const [scanningIndex, setScanningIndex] = React.useState<number | null>(null);
   const [scannedValue, setScannedValue] = React.useState('');
+  const [showClientLot, setShowClientLot] = React.useState(false);
 
   const form = useForm<ReceptionFormValues>({
     resolver: zodResolver(otherFruitReceptionSchema),
@@ -135,6 +137,8 @@ export function OtherFruitReceptionTab() {
     }
   }
 
+  const gridColsClass = showClientLot ? 'sm:grid-cols-5' : 'sm:grid-cols-4';
+
   return (
     <Card>
       <CardHeader>
@@ -207,17 +211,33 @@ export function OtherFruitReceptionTab() {
               )}
             </div>
             
+             <div className="flex items-center space-x-2 pt-4">
+              <Checkbox
+                id="show-client-lot"
+                checked={showClientLot}
+                onCheckedChange={(checked) => setShowClientLot(!!checked)}
+                disabled={!selectedClient}
+              />
+              <Label
+                htmlFor="show-client-lot"
+                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+              >
+                Registrar Lote de Cliente
+              </Label>
+            </div>
+
             <div className="space-y-4">
               <FormLabel>Ítems Recibidos</FormLabel>
               {fields.map((field, index) => (
                 <div key={field.id} className="flex items-end gap-2 p-3 border rounded-md">
-                  <div className="flex-1 grid sm:grid-cols-5 gap-4 items-end">
+                  <div className={`flex-1 grid ${gridColsClass} gap-4 items-end`}>
+                    {showClientLot && (
                     <FormField
                       control={form.control}
                       name={`items.${index}.clientLotId`}
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Lote Cliente (Opcional)</FormLabel>
+                          <FormLabel>Lote Cliente</FormLabel>
                           <div className="flex items-center gap-2">
                             <FormControl>
                               <Input {...field} value={field.value ?? ''} autoComplete="off" />
@@ -258,6 +278,7 @@ export function OtherFruitReceptionTab() {
                         </FormItem>
                       )}
                     />
+                    )}
                     <FormField
                       control={form.control}
                       name={`items.${index}.productCode`}
