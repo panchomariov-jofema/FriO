@@ -60,7 +60,11 @@ export default function FallCreekPage() {
     const [selectedCoords, setSelectedCoords] = React.useState<Record<string, StoredItem[]>>({});
     const [documentoDespacho, setDocumentoDespacho] = React.useState('');
     const [isSubmitting, setIsSubmitting] = React.useState(false);
-
+    
+    // State for drag-to-select functionality
+    const [isMouseDown, setIsMouseDown] = React.useState(false);
+    const [selectionAction, setSelectionAction] = React.useState<'select' | 'deselect' | null>(null);
+    
 
     const fallCreekClient = React.useMemo(() => {
         if (!allClients) return null;
@@ -89,6 +93,7 @@ export default function FallCreekPage() {
                     receptionId: reception.id,
                     itemIndex: index,
                     clientLotId: item.clientLotId,
+                    netWeightPerBin: 0, // This is not applicable for other fruits
                 }))
             );
         
@@ -126,13 +131,31 @@ export default function FallCreekPage() {
 
     }, [fallCreekClient, allReceptions]);
 
-    const handleCoordClick = (chamberId: string, coord: string) => {
+    // --- Drag-to-select handlers ---
+    React.useEffect(() => {
+        const handleGlobalMouseUp = () => {
+            setIsMouseDown(false);
+            setSelectionAction(null);
+        };
+        window.addEventListener('mouseup', handleGlobalMouseUp);
+        return () => {
+            window.removeEventListener('mouseup', handleGlobalMouseUp);
+        };
+    }, []);
+
+    const handleMouseDown = (chamberId: string, coord: string) => {
         if (!selectionMode) return;
-
+        
         const key = `${chamberId}_${coord}`;
+        const isCurrentlySelected = !!selectedCoords[key];
+        const action = isCurrentlySelected ? 'deselect' : 'select';
+        
+        setSelectionAction(action);
+        setIsMouseDown(true);
+        
+        // Perform the action on the first cell
         const newSelectedCoords = { ...selectedCoords };
-
-        if (newSelectedCoords[key]) {
+        if (action === 'deselect') {
             delete newSelectedCoords[key];
         } else {
             const itemsInCoord = storedItemsByChamber[chamberId]?.[coord];
@@ -142,6 +165,25 @@ export default function FallCreekPage() {
         }
         setSelectedCoords(newSelectedCoords);
     };
+
+    const handleMouseEnter = (chamberId: string, coord: string) => {
+        if (!isMouseDown || !selectionMode || !selectionAction) return;
+        
+        const key = `${chamberId}_${coord}`;
+        const newSelectedCoords = { ...selectedCoords };
+
+        if (selectionAction === 'select' && !newSelectedCoords[key]) {
+             const itemsInCoord = storedItemsByChamber[chamberId]?.[coord];
+            if (itemsInCoord) {
+                newSelectedCoords[key] = itemsInCoord;
+                setSelectedCoords(newSelectedCoords);
+            }
+        } else if (selectionAction === 'deselect' && newSelectedCoords[key]) {
+            delete newSelectedCoords[key];
+            setSelectedCoords(newSelectedCoords);
+        }
+    };
+    // --- End drag-to-select handlers ---
     
     const handleToggleSelectionMode = () => {
         const newMode = !selectionMode;
@@ -180,13 +222,7 @@ export default function FallCreekPage() {
                 if(itemToUpdate) {
                     itemToUpdate.status = 'Despachado'; // Reserve the stock
                     
-                    const newItemForMovement: {
-                        productCode: string;
-                        productName: string;
-                        quantity: number;
-                        weight?: number;
-                        clientLotId?: string;
-                    } = {
+                    const newItemForMovement: any = {
                         productCode: itemToUpdate.productCode,
                         productName: itemToUpdate.productName,
                         quantity: itemToUpdate.quantity,
@@ -297,7 +333,7 @@ export default function FallCreekPage() {
     }
     
     return (
-        <div className="space-y-6">
+        <div className="space-y-6" onMouseUp={isMouseDown ? () => { setIsMouseDown(false); setSelectionAction(null); } : undefined}>
             <Card>
                 <CardHeader className="flex flex-row items-start justify-between">
                     <div>
@@ -325,7 +361,7 @@ export default function FallCreekPage() {
                                         </div>
                                     </AccordionTrigger>
                                     <AccordionContent>
-                                        <div className="p-4 bg-muted/50 rounded-lg border overflow-x-auto">
+                                        <div className="p-4 bg-muted/50 rounded-lg border overflow-x-auto" onMouseDown={(e) => e.preventDefault()}>
                                              <div className="grid gap-1 min-w-[800px]" style={{ gridTemplateColumns: `repeat(${config.columns.length}, minmax(0, 1fr))` }}>
                                                 {config.rows.map(row =>
                                                     config.columns.map(col => {
@@ -346,7 +382,8 @@ export default function FallCreekPage() {
 
                                                         return (
                                                             <div key={coord}
-                                                                onClick={() => handleCoordClick(chamberId, coord)}
+                                                                onMouseDown={() => handleMouseDown(chamberId, coord)}
+                                                                onMouseEnter={() => handleMouseEnter(chamberId, coord)}
                                                                 className={cn(
                                                                     "h-12 w-full rounded border-2 flex items-center justify-center text-xs font-mono relative overflow-hidden",
                                                                     isOccupied && "bg-[var(--lot-color-bg)]",
