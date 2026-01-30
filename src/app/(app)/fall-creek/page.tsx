@@ -404,7 +404,7 @@ export default function FallCreekPage() {
     }
     
     return (
-        <div className="relative min-h-[calc(100vh-10rem)] pb-52" onMouseUp={isMouseDown ? () => { setIsMouseDown(false); setSelectionAction(null); } : undefined}>
+        <div className="min-h-[calc(100vh-10rem)] pb-52">
             <div className="space-y-6">
                 <Card>
                     <CardHeader className="flex flex-row items-start justify-between">
