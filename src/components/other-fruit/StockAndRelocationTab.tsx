@@ -29,7 +29,7 @@ interface StoredOtherFruitItem {
     }
 }
 
-export function StockAndRelocationTab() {
+export function StockAndRelocationTab({ clientId: fixedClientId }: { clientId?: string }) {
   const { data: allReceptions, loading: loadingReceptions } = useFirestoreCollection<OtherFruitReception>('otherFruitReceptions');
   const { data: allChamberLots, loading: loadingChamberLots } = useFirestoreCollection<ChamberLot>('chamberLots');
   const [itemToRelocate, setItemToRelocate] = React.useState<StoredOtherFruitItem | null>(null);
@@ -40,7 +40,8 @@ export function StockAndRelocationTab() {
   const loading = loadingReceptions || loadingChamberLots;
 
   const storedItems = React.useMemo(() => {
-    return (allReceptions || [])
+    const filteredReceptions = (allReceptions || []).filter(r => !fixedClientId || r.clientId === fixedClientId);
+    return filteredReceptions
         .flatMap((reception) => 
             reception.items
                 .map((item, index) => ({ item, index, reception }))
@@ -57,7 +58,7 @@ export function StockAndRelocationTab() {
                 } as StoredOtherFruitItem))
         )
         .sort((a,b) => a.location.chamberId.localeCompare(b.location.chamberId) || a.location.coordinate.localeCompare(b.location.coordinate));
-  }, [allReceptions]);
+  }, [allReceptions, fixedClientId]);
 
   const handleRelocateClick = (item: StoredOtherFruitItem) => {
     setItemToRelocate(item);

@@ -59,6 +59,7 @@ const defaultNavItems = [
     { href: '/despachos', label: 'Despachos', icon: Truck },
     { href: '/embalajes', label: 'Embalajes', icon: Package },
     { href: '/otros-hortofruticolas', label: 'Otros Hortofrutícolas', icon: Grape },
+    { href: '/fall-creek', label: 'Fall Creek', icon: Grape },
     { href: '/reportes', label: 'Reportes', icon: PieChart },
     { href: '/datos-maestros', label: 'Datos Maestros', icon: Database },
 ];

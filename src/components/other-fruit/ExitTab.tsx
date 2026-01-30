@@ -37,7 +37,7 @@ interface AggregatedLot {
   }[];
 }
 
-export function OtherFruitExitTab() {
+export function OtherFruitExitTab({ clientId: fixedClientId }: { clientId?: string }) {
   const { data: allClients, loading: loadingClients } = useFirestoreCollection<OtherClient>('otherClients');
   const { data: allReceptions, loading: loadingReceptions } = useFirestoreCollection<OtherFruitReception>('otherFruitReceptions');
   const firestore = useFirestore();
@@ -56,6 +56,17 @@ export function OtherFruitExitTab() {
 
   const fruitClients = React.useMemo(() => (allClients || []).filter(c => c.type.toUpperCase() === 'FRUTA'), [allClients]);
   const loading = loadingClients || loadingReceptions;
+  
+  React.useEffect(() => {
+    if (fixedClientId) {
+      setSelectedClientId(fixedClientId);
+      // Also reset state when client changes
+      setQuantitiesToDispatch({});
+      setDocument('');
+      setLotFilter('');
+    }
+  }, [fixedClientId]);
+
 
   const aggregatedStockByLot = React.useMemo(() => {
     if (!selectedClientId || !allReceptions) return [];
@@ -117,6 +128,13 @@ export function OtherFruitExitTab() {
         return clientLotIdMatch;
     });
   }, [aggregatedStockByLot, lotFilter]);
+
+  const handleClientChange = (val: string) => {
+    setSelectedClientId(val);
+    setQuantitiesToDispatch({});
+    setDocument('');
+    setLotFilter('');
+  };
 
   const handleQuantityChange = (item: AggregatedLot['locations'][0], newQuantityStr: string) => {
     const key = getLocationKey(item.receptionId, item.itemIndex);
@@ -298,15 +316,17 @@ export function OtherFruitExitTab() {
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="grid md:grid-cols-3 gap-4">
-            <div>
-              <Label>Cliente</Label>
-              <Select value={selectedClientId} onValueChange={(val) => {setSelectedClientId(val); setQuantitiesToDispatch({});}} disabled={loading}>
-                <SelectTrigger><SelectValue placeholder="Seleccione un cliente..." /></SelectTrigger>
-                <SelectContent>
-                  {fruitClients.map(c => <SelectItem key={c.id} value={c.clientId}>{c.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
+            {!fixedClientId && (
+              <div>
+                <Label>Cliente</Label>
+                <Select value={selectedClientId} onValueChange={handleClientChange} disabled={loading}>
+                  <SelectTrigger><SelectValue placeholder="Seleccione un cliente..." /></SelectTrigger>
+                  <SelectContent>
+                    {fruitClients.map(c => <SelectItem key={c.id} value={c.clientId}>{c.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <div>
                 <Label>Filtrar por Lote</Label>
                 <Input placeholder="Escriba para filtrar..." value={lotFilter} onChange={(e) => setLotFilter(e.target.value)} disabled={!selectedClientId} />

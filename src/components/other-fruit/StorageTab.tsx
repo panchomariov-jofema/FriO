@@ -54,7 +54,7 @@ function getSortedCoordinates(chamberConfig: Chamber, strategy: 'secuencial' | '
 }
 
 
-export function OtherFruitStorageTab() {
+export function OtherFruitStorageTab({ clientId: fixedClientId }: { clientId?: string }) {
   const { data: allReceptions, loading: loadingReceptions } = useFirestoreCollection<OtherFruitReception>('otherFruitReceptions');
   const { data: allChamberLots, loading: loadingChamberLots } = useFirestoreCollection<ChamberLot>('chamberLots');
   const [selectedItem, setSelectedItem] = React.useState<PendingItem | null>(null);
@@ -66,7 +66,10 @@ export function OtherFruitStorageTab() {
 
   const pendingItems = React.useMemo(() => {
     return (allReceptions || [])
-        .filter(lot => lot.status === 'Pendiente de almacenar' || lot.status === 'Parcialmente Almacenado')
+        .filter(lot => 
+            (lot.status === 'Pendiente de almacenar' || lot.status === 'Parcialmente Almacenado') &&
+            (!fixedClientId || lot.clientId === fixedClientId)
+        )
         .flatMap((lot) => 
             lot.items
                 .map((item, itemIndex) => ({ ...item, receptionId: lot.id, clientName: lot.clientName, document: lot.document, itemIndex, unit: lot.unit }))
@@ -79,7 +82,7 @@ export function OtherFruitStorageTab() {
             if (!lotB?.createdAt?.toMillis) return -1;
             return lotA.createdAt.toMillis() - lotB.createdAt.toMillis();
         });
-  }, [allReceptions]);
+  }, [allReceptions, fixedClientId]);
 
   const handleStoreClick = (item: PendingItem) => {
     setSelectedItem(item);

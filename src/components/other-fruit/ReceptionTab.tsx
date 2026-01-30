@@ -33,7 +33,7 @@ const defaultItem = {
   weight: undefined,
 };
 
-export function OtherFruitReceptionTab() {
+export function OtherFruitReceptionTab({ clientId: fixedClientId }: { clientId?: string }) {
   const { data: allClients, loading: loadingClients } = useFirestoreCollection<OtherClient>('otherClients');
   const firestore = useFirestore();
   const { toast } = useToast();
@@ -72,13 +72,36 @@ export function OtherFruitReceptionTab() {
     return (allClients || []).filter(c => c.type.toUpperCase() === 'FRUTA');
   }, [allClients]);
 
+  React.useEffect(() => {
+    if (fixedClientId && fruitClients.length > 0) {
+      const client = fruitClients.find(c => c.clientId === fixedClientId);
+      setSelectedClient(client || null);
+      if (client) {
+          form.reset({
+              clientId: client.clientId,
+              document: '',
+              temperature: undefined,
+              items: [defaultItem],
+          });
+      }
+    } else if (!fixedClientId) {
+        setSelectedClient(null);
+        form.reset({
+            clientId: '',
+            document: '',
+            temperature: undefined,
+            items: [defaultItem],
+        });
+    }
+  }, [fixedClientId, fruitClients, form]);
+
   const handleClientChange = (clientId: string) => {
     const client = fruitClients.find(c => c.clientId === clientId);
     setSelectedClient(client || null);
-    form.setValue('clientId', clientId);
     form.reset({
-      ...form.getValues(),
       clientId: clientId,
+      document: '',
+      temperature: undefined,
       items: [defaultItem]
     });
   };
@@ -169,28 +192,30 @@ export function OtherFruitReceptionTab() {
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
             <div className="grid md:grid-cols-3 gap-4 items-end">
-              <FormField
-                control={form.control}
-                name="clientId"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Cliente de Fruta</FormLabel>
-                    <Select onValueChange={handleClientChange} value={field.value} disabled={loadingClients}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Seleccione un cliente..." />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {fruitClients.map(c => (
-                          <SelectItem key={c.id} value={c.clientId}>{c.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              {!fixedClientId && (
+                <FormField
+                  control={form.control}
+                  name="clientId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Cliente de Fruta</FormLabel>
+                      <Select onValueChange={handleClientChange} value={field.value} disabled={loadingClients}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Seleccione un cliente..." />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {fruitClients.map(c => (
+                            <SelectItem key={c.id} value={c.clientId}>{c.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
               <FormField
                 control={form.control}
                 name="document"
