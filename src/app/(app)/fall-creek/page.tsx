@@ -115,6 +115,10 @@ export default function FallCreekPage() {
         }, {} as Record<string, {occupied: number; total: number; percentage: number}>);
     }, [storedFallCreekItems]);
 
+    const chambersWithStock = Object.entries(chambersConfig).filter(
+        ([chamberId]) => (chamberOccupancy[chamberId]?.occupied ?? 0) > 0
+    );
+
     const fallCreekMovements = React.useMemo(() => {
         if (!fallCreekClient || !allMovements) return [];
         return allMovements
@@ -247,79 +251,85 @@ export default function FallCreekPage() {
                     <CardDescription>Haga clic en una ubicación para ver el detalle y seleccionar para despacho.</CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <Accordion type="single" collapsible className="w-full" defaultValue={Object.keys(chambersConfig)[0]}>
-                    {Object.entries(chambersConfig).map(([chamberId, config]) => (
-                        <AccordionItem value={chamberId} key={chamberId}>
-                            <AccordionTrigger>
-                                <div className="flex w-full items-center justify-between pr-4">
-                                    <span className="text-lg font-semibold">{config.name}</span>
-                                    <div className="text-right">
-                                        <p className="font-mono font-semibold">
-                                            {chamberOccupancy[chamberId]?.occupied ?? 0} {fallCreekClient.unit}
-                                        </p>
-                                        <Progress value={chamberOccupancy[chamberId]?.percentage ?? 0} className="w-48 h-2 mt-1" />
-                                    </div>
-                                </div>
-                            </AccordionTrigger>
-                            <AccordionContent>
-                                <div className="p-4 bg-muted/50 rounded-lg border overflow-x-auto">
-                                    <div className="grid gap-1 min-w-[800px]" style={{ gridTemplateColumns: `repeat(${config.columns.length}, minmax(0, 1fr))` }}>
-                                      {config.rows.map(row =>
-                                        config.columns.map(col => {
-                                          const coord = `${col}${row}`;
-                                          const isBlocked = config.blocked?.includes(coord);
-                                          const itemsInCoord = storedItemsByChamber[chamberId]?.[coord] || [];
-                                          const isOccupied = itemsInCoord.length > 0;
-                                          const firstItem = isOccupied ? itemsInCoord[0] : null;
+                    {chambersWithStock.length > 0 ? (
+                        <Accordion type="single" collapsible className="w-full" defaultValue={chambersWithStock[0][0]}>
+                            {chambersWithStock.map(([chamberId, config]) => (
+                                <AccordionItem value={chamberId} key={chamberId}>
+                                    <AccordionTrigger>
+                                        <div className="flex w-full items-center justify-between pr-4">
+                                            <span className="text-lg font-semibold">{config.name}</span>
+                                            <div className="text-right">
+                                                <p className="font-mono font-semibold">
+                                                    {chamberOccupancy[chamberId]?.occupied ?? 0} {fallCreekClient.unit}
+                                                </p>
+                                                <Progress value={chamberOccupancy[chamberId]?.percentage ?? 0} className="w-48 h-2 mt-1" />
+                                            </div>
+                                        </div>
+                                    </AccordionTrigger>
+                                    <AccordionContent>
+                                        <div className="p-4 bg-muted/50 rounded-lg border overflow-x-auto">
+                                            <div className="grid gap-1 min-w-[800px]" style={{ gridTemplateColumns: `repeat(${config.columns.length}, minmax(0, 1fr))` }}>
+                                              {config.rows.map(row =>
+                                                config.columns.map(col => {
+                                                  const coord = `${col}${row}`;
+                                                  const isBlocked = config.blocked?.includes(coord);
+                                                  const itemsInCoord = storedItemsByChamber[chamberId]?.[coord] || [];
+                                                  const isOccupied = itemsInCoord.length > 0;
+                                                  const firstItem = isOccupied ? itemsInCoord[0] : null;
 
-                                          if (isBlocked) {
-                                            return <div key={coord} className="h-12 w-full rounded border-2 bg-gray-200 dark:bg-gray-700" />;
-                                          }
-                                          
-                                          const lotColor = firstItem ? getColorForLot(`${firstItem.type}-${firstItem.lotIdForColor}`) : 'transparent';
-                                          const cellStyle = { '--lot-color': lotColor, '--lot-color-bg': lotColor.replace(')', ', 0.2)') } as React.CSSProperties;
+                                                  if (isBlocked) {
+                                                    return <div key={coord} className="h-12 w-full rounded border-2 bg-gray-200 dark:bg-gray-700" />;
+                                                  }
+                                                  
+                                                  const lotColor = firstItem ? getColorForLot(`${firstItem.type}-${firstItem.lotIdForColor}`) : 'transparent';
+                                                  const cellStyle = { '--lot-color': lotColor, '--lot-color-bg': lotColor.replace(')', ', 0.2)') } as React.CSSProperties;
 
-                                          return (
-                                            <Popover key={coord}>
-                                              <PopoverTrigger asChild disabled={!isOccupied}>
-                                                <div 
-                                                  className={cn("h-12 w-full rounded border-2 flex items-center justify-center text-xs font-mono relative overflow-hidden",
-                                                    isOccupied ? 'border-[var(--lot-color)] bg-[var(--lot-color-bg)] cursor-pointer' : 'bg-background border-dashed'
-                                                  )}
-                                                  style={cellStyle}
-                                                >
-                                                  <span className="relative z-10 font-semibold">{coord}</span>
-                                                </div>
-                                              </PopoverTrigger>
-                                              {isOccupied && firstItem && (
-                                                <PopoverContent className="p-4 w-64 space-y-3">
-                                                  {itemsInCoord.map(item => (
-                                                      <div key={item.id} className="text-sm">
-                                                          <p><span className="font-semibold">Producto:</span> {item.varietyOrProduct}</p>
-                                                          {item.clientLotId && <p><span className="font-semibold">Lote Cliente:</span> {item.clientLotId}</p>}
-                                                          <p><span className="font-semibold">Cantidad:</span> {item.quantity} {item.unit}</p>
-                                                          <div className="flex items-center space-x-2 mt-2">
-                                                            <Checkbox 
-                                                                id={`select-${item.id}`}
-                                                                checked={!!selectedItems[item.id]}
-                                                                onCheckedChange={(checked) => handleSelectItem(item, !!checked)}
-                                                            />
-                                                            <Label htmlFor={`select-${item.id}`} className="font-normal">Seleccionar para despacho</Label>
-                                                          </div>
-                                                      </div>
-                                                  ))}
-                                                </PopoverContent>
+                                                  return (
+                                                    <Popover key={coord}>
+                                                      <PopoverTrigger asChild disabled={!isOccupied}>
+                                                        <div 
+                                                          className={cn("h-12 w-full rounded border-2 flex items-center justify-center text-xs font-mono relative overflow-hidden",
+                                                            isOccupied ? 'border-[var(--lot-color)] bg-[var(--lot-color-bg)] cursor-pointer' : 'bg-background border-dashed'
+                                                          )}
+                                                          style={cellStyle}
+                                                        >
+                                                          <span className="relative z-10 font-semibold">{coord}</span>
+                                                        </div>
+                                                      </PopoverTrigger>
+                                                      {isOccupied && firstItem && (
+                                                        <PopoverContent className="p-4 w-64 space-y-3">
+                                                          {itemsInCoord.map(item => (
+                                                              <div key={item.id} className="text-sm">
+                                                                  <p><span className="font-semibold">Producto:</span> {item.varietyOrProduct}</p>
+                                                                  {item.clientLotId && <p><span className="font-semibold">Lote Cliente:</span> {item.clientLotId}</p>}
+                                                                  <p><span className="font-semibold">Cantidad:</span> {item.quantity} {item.unit}</p>
+                                                                  <div className="flex items-center space-x-2 mt-2">
+                                                                    <Checkbox 
+                                                                        id={`select-${item.id}`}
+                                                                        checked={!!selectedItems[item.id]}
+                                                                        onCheckedChange={(checked) => handleSelectItem(item, !!checked)}
+                                                                    />
+                                                                    <Label htmlFor={`select-${item.id}`} className="font-normal">Seleccionar para despacho</Label>
+                                                                  </div>
+                                                              </div>
+                                                          ))}
+                                                        </PopoverContent>
+                                                      )}
+                                                    </Popover>
+                                                  );
+                                                })
                                               )}
-                                            </Popover>
-                                          );
-                                        })
-                                      )}
-                                    </div>
-                                </div>
-                            </AccordionContent>
-                        </AccordionItem>
-                    ))}
-                  </Accordion>
+                                            </div>
+                                        </div>
+                                    </AccordionContent>
+                                </AccordionItem>
+                            ))}
+                        </Accordion>
+                    ) : (
+                        <div className="text-center p-8 border-dashed border rounded-md text-sm text-muted-foreground">
+                            No se encontró stock en ninguna cámara para Fall Creek.
+                        </div>
+                    )}
                 </CardContent>
             </Card>
             
