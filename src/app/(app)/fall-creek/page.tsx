@@ -20,7 +20,7 @@ import { chambersConfig } from '@/lib/chambers-config';
 import { CheckCircle2, CircleDot, Eye, Pencil, Trash2, X } from 'lucide-react';
 import { Timestamp } from 'firebase/firestore';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 
@@ -417,7 +417,7 @@ export default function FallCreekPage() {
                         </Button>
                     </CardHeader>
                     <CardContent>
-                        <Accordion type="multiple" className="w-full">
+                        <Accordion type="multiple" className="w-full" defaultValue={chambersWithFallCreekStock}>
                             {chambersWithFallCreekStock.map(chamberId => {
                                 const config = chambersConfig[chamberId];
                                 const occupancy = chamberOccupancy[chamberId];
