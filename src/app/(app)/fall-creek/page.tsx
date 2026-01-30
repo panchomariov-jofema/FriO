@@ -59,6 +59,8 @@ export default function FallCreekPage() {
     const [selectionMode, setSelectionMode] = React.useState(false);
     const [selectedCoords, setSelectedCoords] = React.useState<Record<string, StoredItem[]>>({});
     const [documentoDespacho, setDocumentoDespacho] = React.useState('');
+    const [clienteDestino, setClienteDestino] = React.useState('');
+    const [rutDestino, setRutDestino] = React.useState('');
     const [isSubmitting, setIsSubmitting] = React.useState(false);
     
     // State for drag-to-select functionality
@@ -191,6 +193,8 @@ export default function FallCreekPage() {
         if (!newMode) { // If turning off, clear selection
             setSelectedCoords({});
             setDocumentoDespacho('');
+            setClienteDestino('');
+            setRutDestino('');
         }
     };
     
@@ -201,17 +205,13 @@ export default function FallCreekPage() {
             return;
         }
 
-        if (!documentoDespacho.trim()) {
-            toast({ variant: 'destructive', title: 'Error', description: 'Debe ingresar un documento de despacho.' });
-            return;
-        }
         if (!firestore || !fallCreekClient) return;
 
         setIsSubmitting(true);
         try {
             const batch = writeBatch(firestore);
             const receptionUpdates: Record<string, any> = {};
-            const movementItems: OtherFruitMovement['items'] = [];
+            const movementItems: Partial<OtherFruitMovement['items'][0]>[] = [];
             
             for(const item of selectedItems) {
                 if(!receptionUpdates[item.receptionId!]) {
@@ -222,7 +222,7 @@ export default function FallCreekPage() {
                 if(itemToUpdate) {
                     itemToUpdate.status = 'Despachado'; // Reserve the stock
                     
-                    const newItemForMovement: any = {
+                    const newItemForMovement: Partial<OtherFruitMovement['items'][0]> = {
                         productCode: itemToUpdate.productCode,
                         productName: itemToUpdate.productName,
                         quantity: itemToUpdate.quantity,
@@ -246,15 +246,18 @@ export default function FallCreekPage() {
                 batch.update(receptionRef, { items: updatedItems, status: newStatus, updatedAt: serverTimestamp() });
             });
 
-            const movementData: Partial<OtherFruitMovement> = {
+            const movementData: any = {
                 type: 'salida',
                 clientId: fallCreekClient.clientId,
                 clientName: fallCreekClient.name,
                 unit: fallCreekClient.unit,
-                document: documentoDespacho,
                 items: movementItems,
                 createdAt: serverTimestamp(),
             };
+
+            if (documentoDespacho) movementData.document = documentoDespacho;
+            if (clienteDestino) movementData.destinationClientName = clienteDestino;
+            if (rutDestino) movementData.destinationClientRUT = rutDestino;
 
             const newMovementRef = doc(collection(firestore, 'otherFruitMovements'));
             batch.set(newMovementRef, movementData);
@@ -427,11 +430,21 @@ export default function FallCreekPage() {
                                 <p className="text-3xl font-bold">{selectedSummary.totalQuantity} <span className="text-xl font-normal text-muted-foreground">{selectedSummary.unit}</span></p>
                             </div>
                         </div>
-                         <div className="flex flex-col sm:flex-row gap-4 items-end pt-4">
-                            <div className="flex-1">
-                                <label htmlFor="dispatch-doc" className="text-sm font-medium">Documento de Despacho (Ej: Orden de Compra)</label>
-                                <Input id="dispatch-doc" value={documentoDespacho} onChange={e => setDocumentoDespacho(e.target.value)} placeholder="Ingrese un documento..." />
+                         <div className="grid sm:grid-cols-3 gap-4 items-end pt-4">
+                            <div className="space-y-1">
+                                <label htmlFor="dispatch-doc" className="text-sm font-medium">Documento Despacho (Opcional)</label>
+                                <Input id="dispatch-doc" value={documentoDespacho} onChange={e => setDocumentoDespacho(e.target.value)} placeholder="Ej: Orden de Compra" />
                             </div>
+                             <div className="space-y-1">
+                                <label htmlFor="dispatch-client" className="text-sm font-medium">Nombre Cliente Destino</label>
+                                <Input id="dispatch-client" value={clienteDestino} onChange={e => setClienteDestino(e.target.value)} placeholder="Ingrese nombre" />
+                            </div>
+                             <div className="space-y-1">
+                                <label htmlFor="dispatch-rut" className="text-sm font-medium">RUT Cliente Destino</label>
+                                <Input id="dispatch-rut" value={rutDestino} onChange={e => setRutDestino(e.target.value)} placeholder="Ingrese RUT" />
+                            </div>
+                        </div>
+                        <div className="flex justify-end pt-4">
                             <Button onClick={handleCreatePreDispatch} disabled={isSubmitting} size="lg" className="w-full sm:w-auto">
                                 {isSubmitting ? 'Creando Solicitud...' : 'Crear Solicitud de Pre-Despacho'}
                             </Button>
