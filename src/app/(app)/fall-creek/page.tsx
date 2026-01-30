@@ -289,7 +289,7 @@ export default function FallCreekPage() {
                     </Button>
                 </CardHeader>
                 <CardContent>
-                    <Accordion type="multiple" className="w-full" defaultValue={chambersWithFallCreekStock}>
+                    <Accordion type="multiple" className="w-full">
                         {chambersWithFallCreekStock.map(chamberId => {
                             const config = chambersConfig[chamberId];
                             const occupancy = chamberOccupancy[chamberId];
