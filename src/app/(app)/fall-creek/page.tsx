@@ -178,16 +178,27 @@ export default function FallCreekPage() {
                 }
                 const itemToUpdate = receptionUpdates[item.receptionId!][item.itemIndex];
                 if(itemToUpdate) {
-                    // This logic is simplified: it assumes you dispatch the WHOLE coordinate.
-                    // To dispatch partials, the UI would need quantity inputs.
                     itemToUpdate.status = 'Despachado'; // Reserve the stock
-                    movementItems.push({
-                         productCode: itemToUpdate.productCode,
-                         productName: itemToUpdate.productName,
-                         quantity: itemToUpdate.quantity,
-                         weight: itemToUpdate.weight,
-                         clientLotId: itemToUpdate.clientLotId,
-                    });
+                    
+                    const newItemForMovement: {
+                        productCode: string;
+                        productName: string;
+                        quantity: number;
+                        weight?: number;
+                        clientLotId?: string;
+                    } = {
+                        productCode: itemToUpdate.productCode,
+                        productName: itemToUpdate.productName,
+                        quantity: itemToUpdate.quantity,
+                    };
+
+                    if (itemToUpdate.weight) {
+                        newItemForMovement.weight = itemToUpdate.weight;
+                    }
+                    if (itemToUpdate.clientLotId) {
+                        newItemForMovement.clientLotId = itemToUpdate.clientLotId;
+                    }
+                    movementItems.push(newItemForMovement);
                 }
             }
             
@@ -247,9 +258,19 @@ export default function FallCreekPage() {
 
     const fallCreekMovements = React.useMemo(() => {
         if (!fallCreekClient || !allMovements) return [];
-        return allMovements
+        const sortedMovements = (allMovements || [])
             .filter(m => m.clientId === fallCreekClient.clientId && m.type === 'salida')
             .sort((a,b) => b.createdAt.toMillis() - a.createdAt.toMillis());
+
+        return sortedMovements.map(mov => {
+            const totalQuantity = mov.items.reduce((sum, item) => sum + item.quantity, 0);
+            const lotes = [...new Set(mov.items.map(item => item.clientLotId || item.productName))].join(', ');
+            return {
+                ...mov,
+                totalQuantity,
+                lotes,
+            };
+        });
     }, [fallCreekClient, allMovements]);
     
     const loading = loadingClients || loadingReceptions || loadingMovements || loadingChamberLots;
@@ -398,14 +419,12 @@ export default function FallCreekPage() {
                             </TableHeader>
                             <TableBody>
                             {fallCreekMovements.length > 0 ? fallCreekMovements.map(mov => {
-                                const totalQuantity = mov.items.reduce((sum, item) => sum + item.quantity, 0);
-                                const lotes = [...new Set(mov.items.map(item => item.clientLotId || item.productName))].join(', ');
                                 return (
                                     <TableRow key={mov.id}>
                                         <TableCell>{mov.createdAt.toDate().toLocaleString()}</TableCell>
                                         <TableCell className="font-mono">{mov.document}</TableCell>
-                                        <TableCell className="font-mono text-xs">{lotes}</TableCell>
-                                        <TableCell>{totalQuantity} {mov.unit}</TableCell>
+                                        <TableCell className="font-mono text-xs">{mov.lotes}</TableCell>
+                                        <TableCell>{mov.totalQuantity} {mov.unit}</TableCell>
                                         <TableCell><Badge>Enviado</Badge></TableCell>
                                     </TableRow>
                                 );
