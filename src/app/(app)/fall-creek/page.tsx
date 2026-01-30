@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { useFirestore } from '@/firebase';
-import { collection, writeBatch, doc, serverTimestamp, addDoc } from 'firebase/firestore';
+import { collection, writeBatch, doc, serverTimestamp, addDoc, deleteDoc, updateDoc } from 'firebase/firestore';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -17,8 +17,11 @@ import { Badge } from '@/components/ui/badge';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { cn } from '@/lib/utils';
 import { chambersConfig } from '@/lib/chambers-config';
-import { CheckCircle2, CircleDot, X } from 'lucide-react';
+import { CheckCircle2, CircleDot, Eye, Pencil, Trash2, X } from 'lucide-react';
 import { Timestamp } from 'firebase/firestore';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+
 
 const FALL_CREEK_CLIENT_NAME = 'FALL CREEK';
 
@@ -51,7 +54,6 @@ export default function FallCreekPage() {
     const { data: allClients, loading: loadingClients } = useFirestoreCollection<OtherClient>('otherClients');
     const { data: allReceptions, loading: loadingReceptions } = useFirestoreCollection<OtherFruitReception>('otherFruitReceptions');
     const { data: allMovements, loading: loadingMovements } = useFirestoreCollection<OtherFruitMovement>('otherFruitMovements');
-    // Need chamberlots to know which coordinates are occupied by other clients
     const { data: allChamberLots, loading: loadingChamberLots } = useFirestoreCollection<ChamberLot>('chamberLots');
 
     const { toast } = useToast();
@@ -63,10 +65,12 @@ export default function FallCreekPage() {
     const [clienteDestino, setClienteDestino] = React.useState('');
     const [rutDestino, setRutDestino] = React.useState('');
     const [isSubmitting, setIsSubmitting] = React.useState(false);
-    
-    // State for drag-to-select functionality
     const [isMouseDown, setIsMouseDown] = React.useState(false);
     const [selectionAction, setSelectionAction] = React.useState<'select' | 'deselect' | null>(null);
+
+    const [movementToView, setMovementToView] = React.useState<OtherFruitMovement | null>(null);
+    const [editingMovement, setEditingMovement] = React.useState<OtherFruitMovement | null>(null);
+    const isEditing = editingMovement !== null;
     
 
     const fallCreekClient = React.useMemo(() => {
@@ -96,7 +100,7 @@ export default function FallCreekPage() {
                     receptionId: reception.id,
                     itemIndex: index,
                     clientLotId: item.clientLotId,
-                    netWeightPerBin: 0, // This is not applicable for other fruits
+                    netWeightPerBin: 0,
                 }))
             );
         
@@ -134,7 +138,6 @@ export default function FallCreekPage() {
 
     }, [fallCreekClient, allReceptions]);
 
-    // --- Drag-to-select handlers ---
     React.useEffect(() => {
         const handleGlobalMouseUp = () => {
             setIsMouseDown(false);
@@ -156,7 +159,6 @@ export default function FallCreekPage() {
         setSelectionAction(action);
         setIsMouseDown(true);
         
-        // Perform the action on the first cell
         const newSelectedCoords = { ...selectedCoords };
         if (action === 'deselect') {
             delete newSelectedCoords[key];
@@ -186,20 +188,24 @@ export default function FallCreekPage() {
             setSelectedCoords(newSelectedCoords);
         }
     };
-    // --- End drag-to-select handlers ---
+    
+    const clearSelectionState = () => {
+        setSelectedCoords({});
+        setDocumentoDespacho('');
+        setClienteDestino('');
+        setRutDestino('');
+        setEditingMovement(null);
+    }
     
     const handleToggleSelectionMode = () => {
         const newMode = !selectionMode;
         setSelectionMode(newMode);
-        if (!newMode) { // If turning off, clear selection
-            setSelectedCoords({});
-            setDocumentoDespacho('');
-            setClienteDestino('');
-            setRutDestino('');
+        if (!newMode) {
+            clearSelectionState();
         }
     };
     
-    const handleCreatePreDispatch = async () => {
+    const handleSubmitPreDispatch = async () => {
         const selectedItems = Object.values(selectedCoords).flat();
         if (selectedItems.length === 0) {
             toast({ variant: 'destructive', title: 'Error', description: 'Debe seleccionar al menos una coordenada.' });
@@ -210,13 +216,12 @@ export default function FallCreekPage() {
     
         setIsSubmitting(true);
         try {
-            // This is the detailed list for the picker
             const locationsToPick: OtherFruitMovementLocation[] = selectedItems.map(item => ({
                 receptionId: item.receptionId!,
                 itemIndex: item.itemIndex,
                 quantity: item.quantity,
                 unit: item.unit,
-                productCode: item.displayId, // Pass productCode from StoredItem.displayId
+                productCode: item.displayId,
                 productName: item.varietyOrProduct,
                 clientLotId: item.clientLotId,
                 location: {
@@ -225,9 +230,8 @@ export default function FallCreekPage() {
                 }
             }));
     
-            // This is the summarized list for the movement record
             const summaryItems = selectedItems.reduce((acc, item) => {
-                const key = item.displayId; // Group by product code
+                const key = item.displayId;
                 if (!acc[key]) {
                     acc[key] = {
                         productCode: item.displayId,
@@ -243,21 +247,15 @@ export default function FallCreekPage() {
                 return acc;
             }, {} as Record<string, { productCode: string; productName: string; quantity: number, clientLotIds: Set<string> }>);
             
-            const movementItems = Object.values(summaryItems).map(summary => {
-                const item: any = {
-                    productCode: summary.productCode,
-                    productName: summary.productName,
-                    quantity: summary.quantity,
-                };
-                const clientLotId = Array.from(summary.clientLotIds).join(', ');
-                if (clientLotId) {
-                    item.clientLotId = clientLotId;
-                }
-                return item;
-            });
+            const movementItems = Object.values(summaryItems).map(summary => ({
+                productCode: summary.productCode,
+                productName: summary.productName,
+                quantity: summary.quantity,
+                clientLotId: Array.from(summary.clientLotIds).join(', ') || undefined
+            }));
     
-            const movementData: Omit<OtherFruitMovement, 'id' | 'createdAt'> = {
-                type: 'salida',
+            const movementData = {
+                type: 'salida' as const,
                 clientId: fallCreekClient.clientId,
                 clientName: fallCreekClient.name,
                 unit: fallCreekClient.unit,
@@ -266,32 +264,67 @@ export default function FallCreekPage() {
                 destinationClientRUT: rutDestino || undefined,
                 items: movementItems,
                 locations: locationsToPick,
-                status: 'Pendiente de Picking',
+                status: 'Pendiente de Picking' as const,
             };
-    
-            // Add server timestamp just before sending
-            const finalMovementData = {
-                ...movementData,
-                createdAt: serverTimestamp(),
-            };
-    
-            await addDoc(collection(firestore, 'otherFruitMovements'), finalMovementData);
-    
-            toast({ title: 'Éxito', description: 'Solicitud de Pre-Despacho creada y enviada a la bodega para picking.' });
-            handleToggleSelectionMode();
+
+            if (isEditing) {
+                const movementRef = doc(firestore, 'otherFruitMovements', editingMovement.id);
+                await updateDoc(movementRef, {...movementData, updatedAt: serverTimestamp()});
+                toast({ title: 'Éxito', description: 'Solicitud de Pre-Despacho actualizada.' });
+            } else {
+                 await addDoc(collection(firestore, 'otherFruitMovements'), {...movementData, createdAt: serverTimestamp()});
+                 toast({ title: 'Éxito', description: 'Solicitud de Pre-Despacho creada y enviada a la bodega para picking.' });
+            }
+
+            setSelectionMode(false);
+            clearSelectionState();
     
         } catch (e) {
-            console.error("Error creating pre-dispatch", e);
-            toast({ variant: 'destructive', title: 'Error', description: 'Ocurrió un error al crear la solicitud.' });
-            errorEmitter.emit('permission-error', new FirestorePermissionError({ path: 'otherFruitMovements', operation: 'create' }));
+            console.error("Error creating/updating pre-dispatch", e);
+            toast({ variant: 'destructive', title: 'Error', description: 'Ocurrió un error al guardar la solicitud.' });
+            errorEmitter.emit('permission-error', new FirestorePermissionError({ path: 'otherFruitMovements', operation: 'write' }));
         } finally {
             setIsSubmitting(false);
         }
     };
+    
+    const handleEditMovement = (movementToEdit: OtherFruitMovement) => {
+        setEditingMovement(movementToEdit);
+        setSelectionMode(true);
+        setDocumentoDespacho(movementToEdit.document || '');
+        setClienteDestino(movementToEdit.destinationClientName || '');
+        setRutDestino(movementToEdit.destinationClientRUT || '');
 
+        const initialSelectedCoords: Record<string, StoredItem[]> = {};
+        if (movementToEdit.locations) {
+            for (const location of movementToEdit.locations) {
+                const chamberItems = storedItemsByChamber[location.location.chamberId];
+                if (chamberItems) {
+                    const coordItems = chamberItems[location.location.coordinate];
+                    if (coordItems) {
+                        const key = `${location.location.chamberId}_${location.location.coordinate}`;
+                        initialSelectedCoords[key] = coordItems;
+                    }
+                }
+            }
+        }
+        setSelectedCoords(initialSelectedCoords);
+    };
+
+    const handleDeleteMovement = async (movementToDelete: OtherFruitMovement) => {
+        if (!firestore) return;
+        try {
+            await deleteDoc(doc(firestore, 'otherFruitMovements', movementToDelete.id));
+            toast({ title: 'Éxito', description: 'La solicitud de pre-despacho ha sido eliminada.' });
+        } catch (e) {
+            console.error("Error deleting movement", e);
+            toast({ variant: 'destructive', title: 'Error', description: 'No se pudo eliminar la solicitud.' });
+        }
+    };
+    
     const selectedSummary = React.useMemo(() => {
         const items = Object.values(selectedCoords).flat();
-        if (items.length === 0) return { totalQuantity: 0, unit: 'Pallets', products: [] };
+        if (items.length === 0) return { totalQuantity: 0, unit: fallCreekClient?.unit || 'Pallets', products: [] };
 
         const unit = items[0].unit;
         const totalQuantity = items.reduce((sum, item) => sum + item.quantity, 0);
@@ -305,7 +338,7 @@ export default function FallCreekPage() {
         }, {} as Record<string, number>);
 
         return { totalQuantity, unit, products: Object.entries(productMap) };
-    }, [selectedCoords]);
+    }, [selectedCoords, fallCreekClient]);
     
 
     const fallCreekMovements = React.useMemo(() => {
@@ -363,7 +396,7 @@ export default function FallCreekPage() {
                         </div>
                         <Button onClick={handleToggleSelectionMode} variant={selectionMode ? "destructive" : "default"}>
                             {selectionMode ? <X className="mr-2 h-4 w-4"/> : <CircleDot className="mr-2 h-4 w-4"/>}
-                            {selectionMode ? 'Cancelar Selección' : 'Iniciar Selección de Despacho'}
+                            {selectionMode ? (isEditing ? 'Cancelar Edición' : 'Cancelar Selección') : 'Iniciar Selección de Despacho'}
                         </Button>
                     </CardHeader>
                     <CardContent>
@@ -442,6 +475,7 @@ export default function FallCreekPage() {
                                         <TableHead>Lotes Involucrados</TableHead>
                                         <TableHead>Cantidad Total</TableHead>
                                         <TableHead>Estado</TableHead>
+                                        <TableHead className="text-right">Acciones</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
@@ -457,9 +491,42 @@ export default function FallCreekPage() {
                                                     {mov.status === 'Pendiente de Picking' ? 'En Proceso' : mov.status}
                                                 </Badge>
                                             </TableCell>
+                                            <TableCell className="text-right">
+                                                <div className="flex items-center justify-end gap-1">
+                                                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setMovementToView(mov)}>
+                                                        <Eye className="h-4 w-4" />
+                                                    </Button>
+                                                    {mov.status !== 'Completado' && (
+                                                        <>
+                                                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEditMovement(mov)}>
+                                                                <Pencil className="h-4 w-4" />
+                                                            </Button>
+                                                             <AlertDialog>
+                                                                <AlertDialogTrigger asChild>
+                                                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive">
+                                                                        <Trash2 className="h-4 w-4" />
+                                                                    </Button>
+                                                                </AlertDialogTrigger>
+                                                                <AlertDialogContent>
+                                                                    <AlertDialogHeader>
+                                                                        <AlertDialogTitle>¿Eliminar Solicitud?</AlertDialogTitle>
+                                                                        <AlertDialogDescription>
+                                                                            Esta acción eliminará la solicitud de pre-despacho. No se puede deshacer.
+                                                                        </AlertDialogDescription>
+                                                                    </AlertDialogHeader>
+                                                                    <AlertDialogFooter>
+                                                                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                                                        <AlertDialogAction onClick={() => handleDeleteMovement(mov)} className="bg-destructive hover:bg-destructive/90">Eliminar</AlertDialogAction>
+                                                                    </AlertDialogFooter>
+                                                                </AlertDialogContent>
+                                                            </AlertDialog>
+                                                        </>
+                                                    )}
+                                                </div>
+                                            </TableCell>
                                         </TableRow>
                                     );
-                                }) : <TableRow><TableCell colSpan={5} className="h-24 text-center">No hay solicitudes de despacho.</TableCell></TableRow>}
+                                }) : <TableRow><TableCell colSpan={6} className="h-24 text-center">No hay solicitudes de despacho.</TableCell></TableRow>}
                                 </TableBody>
                             </Table>
                         </div>
@@ -467,19 +534,21 @@ export default function FallCreekPage() {
                 </Card>
             </div>
 
-            {Object.keys(selectedCoords).length > 0 && (
+            {selectionMode && (
                  <div className="sticky bottom-4 z-20">
                     <Card className="max-w-5xl mx-auto shadow-2xl bg-card/95 backdrop-blur-sm">
                          <CardHeader>
-                            <CardTitle>Resumen de Pre-Despacho</CardTitle>
+                            <CardTitle>{isEditing ? 'Editar Solicitud de Pre-Despacho' : 'Resumen de Pre-Despacho'}</CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-4">
                             <div className="grid md:grid-cols-2 gap-4">
                                 <div className="rounded-md border p-4 space-y-2">
                                 <h4 className="font-semibold">Productos Seleccionados</h4>
-                                <ul>
-                                    {selectedSummary.products.map(([name, qty]) => <li key={name}>{qty} {selectedSummary.unit} de {name}</li>)}
-                                </ul>
+                                {selectedSummary.products.length > 0 ? (
+                                    <ul>{selectedSummary.products.map(([name, qty]) => <li key={name}>{qty} {selectedSummary.unit} de {name}</li>)}</ul>
+                                ) : (
+                                    <p className="text-sm text-muted-foreground">Ningún producto seleccionado.</p>
+                                )}
                                 </div>
                                 <div className="rounded-md border p-4 space-y-2 flex flex-col justify-center">
                                     <p className="text-sm text-muted-foreground">Total a Despachar</p>
@@ -500,14 +569,58 @@ export default function FallCreekPage() {
                                     <Input id="dispatch-rut" value={rutDestino} onChange={e => setRutDestino(e.target.value)} placeholder="Ingrese RUT" />
                                 </div>
                             </div>
-                            <div className="flex justify-end pt-4">
-                                <Button onClick={handleCreatePreDispatch} disabled={isSubmitting} size="lg" className="w-full sm:w-auto">
-                                    {isSubmitting ? 'Creando Solicitud...' : 'Crear Solicitud de Pre-Despacho'}
+                            <div className="flex justify-end gap-2 pt-4">
+                                {isEditing && (
+                                     <Button onClick={handleToggleSelectionMode} variant="outline" size="lg" className="w-full sm:w-auto">
+                                        Cancelar Edición
+                                    </Button>
+                                )}
+                                <Button onClick={handleSubmitPreDispatch} disabled={isSubmitting || selectedSummary.totalQuantity === 0} size="lg" className="w-full sm:w-auto">
+                                    {isSubmitting ? (isEditing ? 'Guardando...' : 'Creando Solicitud...') : (isEditing ? 'Guardar Cambios' : 'Crear Solicitud de Pre-Despacho')}
                                 </Button>
                             </div>
                         </CardContent>
                     </Card>
                 </div>
+            )}
+             {movementToView && (
+                <Dialog open={!!movementToView} onOpenChange={(isOpen) => !isOpen && setMovementToView(null)}>
+                    <DialogContent className="max-w-2xl">
+                        <DialogHeader>
+                            <DialogTitle>Detalle de Solicitud</DialogTitle>
+                            <DialogDescription>
+                                Cliente: {movementToView.clientName} - Documento: {movementToView.document || 'N/A'}
+                            </DialogDescription>
+                        </DialogHeader>
+                        <div className="max-h-96 overflow-y-auto">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Producto</TableHead>
+                                        <TableHead>Lote Cliente</TableHead>
+                                        <TableHead>Ubicación</TableHead>
+                                        <TableHead className="text-right">Cantidad</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {movementToView.locations?.map((loc, index) => (
+                                        <TableRow key={index}>
+                                            <TableCell>{loc.productName}</TableCell>
+                                            <TableCell className="font-mono">{loc.clientLotId || 'N/A'}</TableCell>
+                                            <TableCell className="font-mono">{loc.location.chamberId} / {loc.location.coordinate}</TableCell>
+                                            <TableCell className="text-right">{loc.quantity} {loc.unit}</TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </div>
+                        <DialogFooter>
+                            <DialogClose asChild>
+                                <Button type="button" variant="secondary">Cerrar</Button>
+                            </DialogClose>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
             )}
         </div>
     );
