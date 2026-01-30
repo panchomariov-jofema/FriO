@@ -123,7 +123,7 @@ export default function FallCreekPage() {
         }, {} as Record<string, { occupied: number; total: number; percentage: number }>);
         
         const calculatedChambersWithStock = Object.keys(calculatedStoredItemsByChamber).filter(chamberId =>
-            Object.keys(calculatedStoredItemsByChamber[chamberId]).length > 0
+            Object.values(calculatedStoredItemsByChamber[chamberId] || {}).some(items => items.length > 0)
         );
 
         return {
@@ -311,8 +311,12 @@ export default function FallCreekPage() {
     const fallCreekMovements = React.useMemo(() => {
         if (!fallCreekClient || !allMovements) return [];
         const sortedMovements = (allMovements || [])
-            .filter(m => m.clientId === fallCreekClient.clientId && m.type === 'salida' && m.status === 'Completado')
-            .sort((a, b) => (b.createdAt?.toMillis() ?? 0) - (a.createdAt?.toMillis() ?? 0));
+            .filter(m => m.clientId === fallCreekClient.clientId && m.type === 'salida')
+            .sort((a, b) => {
+                const timeA = a.createdAt?.toMillis() ?? 0;
+                const timeB = b.createdAt?.toMillis() ?? 0;
+                return timeB - timeA;
+            });
 
         return sortedMovements.map(mov => {
             const totalQuantity = mov.items.reduce((sum, item) => sum + item.quantity, 0);
@@ -448,7 +452,11 @@ export default function FallCreekPage() {
                                             <TableCell className="font-mono">{mov.document}</TableCell>
                                             <TableCell className="font-mono text-xs">{mov.lotes}</TableCell>
                                             <TableCell>{mov.totalQuantity} {mov.unit}</TableCell>
-                                            <TableCell><Badge>Completado</Badge></TableCell>
+                                            <TableCell>
+                                                <Badge variant={mov.status === 'Completado' ? 'default' : 'secondary'}>
+                                                    {mov.status === 'Pendiente de Picking' ? 'En Proceso' : mov.status}
+                                                </Badge>
+                                            </TableCell>
                                         </TableRow>
                                     );
                                 }) : <TableRow><TableCell colSpan={5} className="h-24 text-center">No hay solicitudes de despacho.</TableCell></TableRow>}
