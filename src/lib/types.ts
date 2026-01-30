@@ -284,6 +284,7 @@ export interface OtherFruitMovementLocation {
   itemIndex: number;
   quantity: number;
   unit: 'Bins' | 'Pallets';
+  productCode: string;
   productName: string;
   clientLotId?: string;
   location: {

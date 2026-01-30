@@ -216,6 +216,7 @@ export default function FallCreekPage() {
                 itemIndex: item.itemIndex,
                 quantity: item.quantity,
                 unit: item.unit,
+                productCode: item.displayId, // Pass productCode from StoredItem.displayId
                 productName: item.varietyOrProduct,
                 clientLotId: item.clientLotId,
                 location: {
@@ -226,10 +227,10 @@ export default function FallCreekPage() {
     
             // This is the summarized list for the movement record
             const summaryItems = selectedItems.reduce((acc, item) => {
-                const key = item.varietyOrProduct; // Group by product name
+                const key = item.displayId; // Group by product code
                 if (!acc[key]) {
                     acc[key] = {
-                        productCode: item.displayId, // Using displayId as productCode
+                        productCode: item.displayId,
                         productName: item.varietyOrProduct,
                         quantity: 0,
                         clientLotIds: new Set<string>()
@@ -311,11 +312,7 @@ export default function FallCreekPage() {
         if (!fallCreekClient || !allMovements) return [];
         const sortedMovements = (allMovements || [])
             .filter(m => m.clientId === fallCreekClient.clientId && m.type === 'salida' && m.status === 'Completado')
-            .sort((a,b) => {
-                if (!a.createdAt) return 1;
-                if (!b.createdAt) return -1;
-                return b.createdAt.toMillis() - a.createdAt.toMillis()
-            });
+            .sort((a, b) => (b.createdAt?.toMillis() ?? 0) - (a.createdAt?.toMillis() ?? 0));
 
         return sortedMovements.map(mov => {
             const totalQuantity = mov.items.reduce((sum, item) => sum + item.quantity, 0);

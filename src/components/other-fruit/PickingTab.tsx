@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
-import type { OtherFruitMovement, OtherFruitReception, OtherClient } from '@/lib/types';
+import type { OtherFruitMovement, OtherFruitReception, OtherClient, OtherFruitMovementLocation } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -49,21 +49,33 @@ export function OtherFruitPickingTab() {
             items: confirmedMovement.items, // Update items with actual picked quantities
         });
 
-        // 2. Update the stock in the OtherFruitReception documents
-        for(const location of confirmedMovement.locations || []) {
-            const receptionDoc = allReceptions.find(r => r.id === location.receptionId);
-            if (receptionDoc) {
-                const receptionRef = doc(firestore, 'otherFruitReceptions', location.receptionId);
-                const newItems = JSON.parse(JSON.stringify(receptionDoc.items));
-                const itemToUpdate = newItems[location.itemIndex];
+        // 2. Group updates by receptionId to correctly update stock
+        const updatesByReceptionId: Record<string, OtherFruitMovementLocation[]> = {};
+        (confirmedMovement.locations || []).forEach(loc => {
+            if (!updatesByReceptionId[loc.receptionId]) {
+                updatesByReceptionId[loc.receptionId] = [];
+            }
+            updatesByReceptionId[loc.receptionId].push(loc);
+        });
 
-                if (itemToUpdate && itemToUpdate.quantity >= location.quantity) {
-                    itemToUpdate.quantity -= location.quantity;
-                    if (itemToUpdate.quantity === 0) {
-                        // Instead of removing, we mark as dispatched to keep historical record if needed
-                        itemToUpdate.status = 'Despachado';
+        // 3. Iterate over grouped updates and apply them to the batch
+        for (const receptionId in updatesByReceptionId) {
+            const receptionDoc = allReceptions.find(r => r.id === receptionId);
+            if (receptionDoc) {
+                const receptionRef = doc(firestore, 'otherFruitReceptions', receptionId);
+                const newItems = JSON.parse(JSON.stringify(receptionDoc.items)); // Copy once per reception
+
+                // Apply all updates for this specific reception document
+                updatesByReceptionId[receptionId].forEach(location => {
+                    const itemToUpdate = newItems[location.itemIndex];
+                    if (itemToUpdate && itemToUpdate.quantity >= location.quantity) {
+                        itemToUpdate.quantity -= location.quantity;
+                        if (itemToUpdate.quantity === 0) {
+                             itemToUpdate.status = 'Despachado';
+                        }
                     }
-                }
+                });
+
                 batch.update(receptionRef, { items: newItems, updatedAt: serverTimestamp() });
             }
         }

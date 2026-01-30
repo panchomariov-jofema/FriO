@@ -133,19 +133,35 @@ export function OtherFruitPickingDialog({ movement, open, onOpenChange, onConfir
     
     // Recalculate summary items based on what was actually picked
     const summaryItems = newLocations.reduce((acc, loc) => {
-      const key = loc.productName;
+      const key = loc.productCode;
       if (!acc[key]) {
           acc[key] = {
-              productCode: loc.clientLotId || loc.productName, // Fallback
+              productCode: loc.productCode,
               productName: loc.productName,
               quantity: 0,
+              clientLotIds: new Set<string>(),
           };
       }
       acc[key].quantity += loc.quantity;
+      if (loc.clientLotId) {
+          acc[key].clientLotIds.add(loc.clientLotId);
+      }
       return acc;
-    }, {} as Record<string, { productCode: string; productName: string; quantity: number }>);
+    }, {} as Record<string, { productCode: string; productName: string; quantity: number; clientLotIds: Set<string> }>);
     
-    newMovement.items = Object.values(summaryItems);
+    newMovement.items = Object.values(summaryItems).map(summary => {
+        const item: any = {
+            productCode: summary.productCode,
+            productName: summary.productName,
+            quantity: summary.quantity,
+        };
+        const clientLotIds = Array.from(summary.clientLotIds).join(', ');
+        if (clientLotIds) {
+            item.clientLotId = clientLotIds;
+        }
+        return item;
+    });
+
 
     if (totalPickedOverall === 0) {
         toast({
