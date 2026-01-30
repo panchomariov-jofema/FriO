@@ -49,11 +49,6 @@ export function OtherFruitExitTab({ clientId: fixedClientId }: { clientId?: stri
   const [quantitiesToDispatch, setQuantitiesToDispatch] = React.useState<Record<string, number>>({});
   const [isDispatching, setIsDispatching] = React.useState(false);
 
-  // New state for third-party dispatch
-  const [isThirdPartyDispatch, setIsThirdPartyDispatch] = React.useState(false);
-  const [thirdPartyClientName, setThirdPartyClientName] = React.useState('');
-  const [thirdPartyClientRUT, setThirdPartyClientRUT] = React.useState('');
-
   const fruitClients = React.useMemo(() => (allClients || []).filter(c => c.type.toUpperCase() === 'FRUTA'), [allClients]);
   const loading = loadingClients || loadingReceptions;
   
@@ -195,17 +190,6 @@ export function OtherFruitExitTab({ clientId: fixedClientId }: { clientId?: stri
         toast({ variant: 'destructive', title: 'Error', description: 'El Documento de Despacho es obligatorio.' });
         return;
     }
-
-    if (isThirdPartyDispatch) {
-        if (!thirdPartyClientName.trim()) {
-            toast({ variant: 'destructive', title: 'Error', description: 'El nombre del cliente de destino es obligatorio para despachos a terceros.' });
-            return;
-        }
-        if (!thirdPartyClientRUT.trim()) {
-            toast({ variant: 'destructive', title: 'Error', description: 'El RUT del cliente de destino es obligatorio para despachos a terceros.' });
-            return;
-        }
-    }
     
     const client = fruitClients.find(c => c.clientId === selectedClientId);
     if (!client) {
@@ -274,20 +258,12 @@ export function OtherFruitExitTab({ clientId: fixedClientId }: { clientId?: stri
             createdAt: serverTimestamp(),
         };
 
-        if (isThirdPartyDispatch) {
-            movementData.destinationClient = thirdPartyClientName;
-            movementData.destinationClientRUT = thirdPartyClientRUT;
-        }
-
         batch.set(movementRef, movementData);
         
         await batch.commit();
         toast({ title: 'Éxito', description: 'Despacho registrado y stock actualizado.' });
         setQuantitiesToDispatch({});
         setDocument('');
-        setIsThirdPartyDispatch(false);
-        setThirdPartyClientName('');
-        setThirdPartyClientRUT('');
 
     } catch (error) {
          console.error("Error creating fruit dispatch:", error);
@@ -333,54 +309,9 @@ export function OtherFruitExitTab({ clientId: fixedClientId }: { clientId?: stri
             </div>
             <div>
               <Label>Documento de Despacho</Label>
-              <Input type="text" inputMode="numeric" placeholder="Ej: 12345" value={document} onChange={(e) => setDocument(e.target.value)} disabled={!selectedClientId} required />
+              <Input type="text" placeholder="Ej: 12345" value={document} onChange={(e) => setDocument(e.target.value)} disabled={!selectedClientId} required />
             </div>
         </div>
-
-        <div className="flex items-center space-x-4 pt-2">
-            <div className="flex items-center space-x-2">
-                <Checkbox
-                    id="third-party-dispatch"
-                    checked={isThirdPartyDispatch}
-                    onCheckedChange={(checked) => {
-                        setIsThirdPartyDispatch(!!checked);
-                        if (!checked) {
-                            setThirdPartyClientName('');
-                            setThirdPartyClientRUT('');
-                        }
-                    }}
-                    disabled={!selectedClientId}
-                />
-                <Label htmlFor="third-party-dispatch">Despacho a Terceros</Label>
-            </div>
-            {isThirdPartyDispatch && (
-                <div className="flex-1 grid sm:grid-cols-2 gap-4">
-                    <div>
-                        <Label htmlFor="third-party-name">Nombre Cliente Destino</Label>
-                        <Input
-                            id="third-party-name"
-                            placeholder="Ingrese el nombre del cliente"
-                            value={thirdPartyClientName}
-                            onChange={(e) => setThirdPartyClientName(e.target.value)}
-                            disabled={!selectedClientId}
-                        />
-                    </div>
-                     <div>
-                        <Label htmlFor="third-party-rut">RUT Cliente Destino</Label>
-                        <Input
-                            id="third-party-rut"
-                            type="text"
-                            inputMode="tel"
-                            placeholder="Ingrese el RUT del cliente"
-                            value={thirdPartyClientRUT}
-                            onChange={(e) => setThirdPartyClientRUT(e.target.value)}
-                            disabled={!selectedClientId}
-                        />
-                    </div>
-                </div>
-            )}
-        </div>
-
 
         {selectedClientId && (
             loadingReceptions ? <Skeleton className="h-24 w-full" />

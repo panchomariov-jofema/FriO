@@ -286,8 +286,6 @@ export interface OtherFruitMovement {
   clientName: string;
   unit: 'Bins' | 'Pallets';
   document: string;
-  destinationClient?: string;
-  destinationClientRUT?: string;
   items: {
     productCode: string;
     productName: string;
