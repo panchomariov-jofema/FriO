@@ -17,6 +17,9 @@ import {
   Truck,
   Waves,
   Sprout,
+  Cherry,
+  Users,
+  ChevronRight,
 } from 'lucide-react';
 import {
   Sidebar,
@@ -37,33 +40,38 @@ import { LoadingScreen } from '@/components/LoadingScreen';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
 import type { UserMaster, Profile, ModulePermission } from '@/lib/types';
 import { signOut } from 'firebase/auth';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { cn } from '@/lib/utils';
 
-const navIcons: { [key: string]: React.ElementType } = {
-  Dashboard: LayoutDashboard,
-  'Bins y Materiales': Archive,
-  Recepción: PanelLeft,
-  Hidrocooler: Waves,
-  Cámaras: Building2,
-  Despachos: Truck,
-  Reportes: PieChart,
-  Embalajes: Package,
-  'Otros Hortofrutícolas': Grape,
-  'Datos Maestros': Database,
-};
-
-const defaultNavItems = [
-    { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { href: '/bins-y-materiales', label: 'Bins y Materiales', icon: Archive },
-    { href: '/recepcion', label: 'Recepción', icon: PanelLeft },
-    { href: '/hidrocooler', label: 'Hidrocooler', icon: Waves },
-    { href: '/camaras', label: 'Cámaras', icon: Building2 },
-    { href: '/despachos', label: 'Despachos', icon: Truck },
-    { href: '/embalajes', label: 'Embalajes', icon: Package },
-    { href: '/otros-hortofruticolas', label: 'Otros Hortofrutícolas', icon: Grape },
-    { href: '/fall-creek', label: 'Fall Creek', icon: Sprout },
-    { href: '/reportes', label: 'Reportes', icon: PieChart },
-    { href: '/datos-maestros', label: 'Datos Maestros', icon: Database },
+// Define the structure with types and potential nesting
+const navStructure: any[] = [
+    { type: 'item', href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    {
+        type: 'group',
+        label: 'Cereza',
+        icon: Cherry, // New Icon
+        items: [
+            { type: 'item', href: '/bins-y-materiales', label: 'Bins y Materiales', icon: Archive },
+            { type: 'item', href: '/recepcion', label: 'Recepción', icon: PanelLeft },
+            { type: 'item', href: '/hidrocooler', label: 'Hidrocooler', icon: Waves },
+            { type: 'item', href: '/camaras', label: 'Cámaras', icon: Building2 },
+            { type: 'item', href: '/despachos', label: 'Despachos', icon: Truck },
+        ]
+    },
+    {
+        type: 'group',
+        label: 'Otros clientes',
+        icon: Users, // New Icon
+        items: [
+            { type: 'item', href: '/embalajes', label: 'Embalajes', icon: Package },
+            { type: 'item', href: '/otros-hortofruticolas', label: 'Otros Hortofrutícolas', icon: Grape },
+            { type: 'item', href: '/fall-creek', label: 'Fall Creek', icon: Sprout },
+        ]
+    },
+    { type: 'item', href: '/reportes', label: 'Reportes', icon: PieChart },
+    { type: 'item', href: '/datos-maestros', label: 'Datos Maestros', icon: Database },
 ];
+
 
 function AppLayoutContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -72,51 +80,89 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
   const { user, isUserLoading } = useUser();
   const { data: users, loading: loadingUsers } = useFirestoreCollection<UserMaster>('usersMaster');
   const { data: profiles, loading: loadingProfiles } = useFirestoreCollection<Profile>('profiles');
-  const [navItems, setNavItems] = React.useState<{ href: string; label: string; icon: React.ElementType }[] | null>(null);
+  const [accessibleNav, setAccessibleNav] = React.useState<any[] | null>(null);
   const { setOpenMobile } = useSidebar();
+  
+  const [openCollapsibles, setOpenCollapsibles] = React.useState<Record<string, boolean>>({});
+
+  const isChildActive = React.useCallback((items: any[]): boolean => {
+    return items.some(item => 
+        (item.type === 'item' && pathname.startsWith(item.href)) ||
+        (item.type === 'group' && isChildActive(item.items))
+    );
+  }, [pathname]);
 
   React.useEffect(() => {
-    if (!isUserLoading && !user) {
-      router.push('/login');
-    }
-  }, [user, isUserLoading, router]);
-
-  React.useEffect(() => {
-    if (user && !loadingUsers && !loadingProfiles) {
-      if (user.isAnonymous) {
-        // Anonymous users get full access for this dev build
-        setNavItems(defaultNavItems);
-        return;
-      }
-      
-      const emailUsername = user.email ? user.email.split('@')[0].toLowerCase() : null;
-      if (emailUsername) {
-        const currentUserMaster = users.find(u => u.userName.toLowerCase() === emailUsername);
-        if (currentUserMaster) {
-          const userProfile = profiles.find(p => p.profileId === currentUserMaster.profileId);
-          if (userProfile) {
-            const accessibleNavs = userProfile.modulesAccess
-              .map((permission: ModulePermission) => {
-                const moduleName = typeof permission === 'string' ? permission : permission.name;
-                const href = `/${moduleName.toLowerCase().replace(/\s/g, '-').replace(/y-/, '-')}`;
-                return defaultNavItems.find(item => item.href === href);
-              })
-              .filter(Boolean) as { href: string; label: string; icon: React.ElementType }[];
-            setNavItems(accessibleNavs);
-          } else {
-            setNavItems(defaultNavItems); // Profile referenced but not found, grant all
+    // When path changes, open the parent collapsible if a child is active
+    const newOpenState: Record<string, boolean> = {};
+    const checkAndSetOpen = (items: any[]) => {
+      items.forEach(item => {
+        if (item.type === 'group') {
+          if (isChildActive(item.items)) {
+            newOpenState[item.label] = true;
           }
-        } else {
-          setNavItems(defaultNavItems); // User not in master list, grant all
+          checkAndSetOpen(item.items); // Recurse
         }
-      } else {
-        // Fallback for users without email (should not happen for non-anonymous)
-        setNavItems([]);
-      }
+      });
     }
-  }, [user, users, profiles, loadingUsers, loadingProfiles]);
+    checkAndSetOpen(navStructure);
+    setOpenCollapsibles(newOpenState);
+  }, [pathname, isChildActive]);
 
-  const loading = isUserLoading || navItems === null;
+  React.useEffect(() => {
+    if (isUserLoading) return;
+
+    if (!user) {
+      router.push('/login');
+      return;
+    }
+
+    if (loadingUsers || loadingProfiles) return;
+      
+    let accessibleModuleNames: Set<string>;
+
+    if (user.isAnonymous) {
+        accessibleModuleNames = new Set(navStructure.flatMap(item => 
+            item.type === 'item' ? [item.label] : [item.label, ...item.items.map((sub: any) => sub.label)]
+        ));
+    } else {
+        const emailUsername = user.email ? user.email.split('@')[0].toLowerCase() : null;
+        const currentUserMaster = emailUsername ? users.find(u => u.userName.toLowerCase() === emailUsername) : null;
+        const userProfile = currentUserMaster ? profiles.find(p => p.profileId === currentUserMaster.profileId) : null;
+
+        if (userProfile) {
+             accessibleModuleNames = new Set(userProfile.modulesAccess.map((permission: ModulePermission) => 
+                typeof permission === 'string' ? permission : permission.name
+            ));
+        } else {
+            accessibleModuleNames = new Set(navStructure.flatMap(item => 
+                item.type === 'item' ? [item.label] : [item.label, ...item.items.map((sub: any) => sub.label)]
+            ));
+        }
+    }
+      
+    const filterNavItems = (items: any[], accessibleNames: Set<string>): any[] => {
+      return items.map(item => {
+        if (item.type === 'item') {
+          return accessibleNames.has(item.label) ? item : null;
+        }
+        if (item.type === 'group') {
+          const accessibleSubItems = filterNavItems(item.items, accessibleNames);
+          if (accessibleSubItems.length > 0) {
+            return { ...item, items: accessibleSubItems };
+          }
+          return null;
+        }
+        return null;
+      }).filter(Boolean);
+    };
+
+    const filteredNav = filterNavItems(navStructure, accessibleModuleNames);
+    setAccessibleNav(filteredNav);
+
+  }, [user, isUserLoading, router, users, profiles, loadingUsers, loadingProfiles]);
+
+  const loading = isUserLoading || accessibleNav === null;
 
   if (loading || !user) {
     return <LoadingScreen />;
@@ -127,6 +173,59 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
         await signOut(auth);
         router.push('/login');
     }
+  }
+
+  const renderNavItem = (item: any, isSubmenu: boolean = false) => {
+    if (item.type === 'item') {
+        const menuItemContent = (
+            <Link href={item.href} className="w-full">
+            <SidebarMenuButton
+                isActive={pathname.startsWith(item.href)}
+                tooltip={item.label}
+            >
+                <item.icon />
+                <span>{item.label}</span>
+            </SidebarMenuButton>
+            </Link>
+        );
+
+        return (
+            <SidebarMenuItem key={item.href} onClick={() => setOpenMobile(false)}>
+                {menuItemContent}
+            </SidebarMenuItem>
+        )
+    }
+
+    if (item.type === 'group') {
+        const active = isChildActive(item.items);
+
+        return (
+            <Collapsible 
+                key={item.label} 
+                open={openCollapsibles[item.label]}
+                onOpenChange={(isOpen) => setOpenCollapsibles(prev => ({...prev, [item.label]: isOpen}))}
+                className="w-full"
+            >
+                <SidebarMenuItem>
+                    <CollapsibleTrigger asChild>
+                        <SidebarMenuButton isActive={active} className="w-full justify-between pr-2">
+                            <div className="flex items-center gap-2">
+                                <item.icon />
+                                <span>{item.label}</span>
+                            </div>
+                            <ChevronRight className={cn("h-4 w-4 shrink-0 transition-transform duration-200", openCollapsibles[item.label] && "rotate-90")} />
+                        </SidebarMenuButton>
+                    </CollapsibleTrigger>
+                </SidebarMenuItem>
+                <CollapsibleContent>
+                    <SidebarMenu className="pl-6">
+                        {item.items.map((subItem: any) => renderNavItem(subItem, true))}
+                    </SidebarMenu>
+                </CollapsibleContent>
+            </Collapsible>
+        )
+    }
+    return null;
   }
 
   return (
@@ -142,19 +241,7 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
           </SidebarHeader>
           <SidebarContent>
             <SidebarMenu>
-              {navItems.map((item) => (
-                <SidebarMenuItem key={item.href} onClick={() => setOpenMobile(false)}>
-                  <Link href={item.href}>
-                    <SidebarMenuButton
-                      isActive={pathname.startsWith(item.href)}
-                      tooltip={item.label}
-                    >
-                      <item.icon />
-                      <span>{item.label}</span>
-                    </SidebarMenuButton>
-                  </Link>
-                </SidebarMenuItem>
-              ))}
+              {accessibleNav.map((item) => renderNavItem(item))}
             </SidebarMenu>
           </SidebarContent>
           <SidebarFooter className='group-data-[collapsible=icon]:hidden'>
@@ -181,7 +268,7 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
-    <SidebarProvider defaultOpen={false}>
+    <SidebarProvider defaultOpen={true}>
       <AppLayoutContent>{children}</AppLayoutContent>
     </SidebarProvider>
   )
