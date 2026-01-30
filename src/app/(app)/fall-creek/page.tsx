@@ -20,7 +20,7 @@ import { chambersConfig } from '@/lib/chambers-config';
 import { CheckCircle2, CircleDot, Eye, Pencil, Trash2, X } from 'lucide-react';
 import { Timestamp } from 'firebase/firestore';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 
 
 const FALL_CREEK_CLIENT_NAME = 'FALL CREEK';
@@ -247,25 +247,32 @@ export default function FallCreekPage() {
                 return acc;
             }, {} as Record<string, { productCode: string; productName: string; quantity: number, clientLotIds: Set<string> }>);
             
-            const movementItems = Object.values(summaryItems).map(summary => ({
-                productCode: summary.productCode,
-                productName: summary.productName,
-                quantity: summary.quantity,
-                clientLotId: Array.from(summary.clientLotIds).join(', ') || undefined
-            }));
+            const movementItems = Object.values(summaryItems).map(summary => {
+                const item: any = {
+                    productCode: summary.productCode,
+                    productName: summary.productName,
+                    quantity: summary.quantity,
+                };
+                const clientLotId = Array.from(summary.clientLotIds).join(', ');
+                if (clientLotId) {
+                  item.clientLotId = clientLotId;
+                }
+                return item;
+            });
     
-            const movementData = {
+            const movementData: Partial<OtherFruitMovement> = {
                 type: 'salida' as const,
                 clientId: fallCreekClient.clientId,
                 clientName: fallCreekClient.name,
                 unit: fallCreekClient.unit,
-                document: documentoDespacho || undefined,
-                destinationClientName: clienteDestino || undefined,
-                destinationClientRUT: rutDestino || undefined,
                 items: movementItems,
                 locations: locationsToPick,
                 status: 'Pendiente de Picking' as const,
             };
+
+            if (documentoDespacho) movementData.document = documentoDespacho;
+            if (clienteDestino) movementData.destinationClientName = clienteDestino;
+            if (rutDestino) movementData.destinationClientRUT = rutDestino;
 
             if (isEditing) {
                 const movementRef = doc(firestore, 'otherFruitMovements', editingMovement.id);
@@ -345,7 +352,7 @@ export default function FallCreekPage() {
         if (!fallCreekClient || !allMovements) return [];
         const sortedMovements = (allMovements || [])
             .filter(m => m.clientId === fallCreekClient.clientId && m.type === 'salida')
-            .sort((a, b) => {
+            .sort((a,b) => {
                 const timeA = a.createdAt?.toMillis() ?? 0;
                 const timeB = b.createdAt?.toMillis() ?? 0;
                 return timeB - timeA;
@@ -535,8 +542,8 @@ export default function FallCreekPage() {
             </div>
 
             {selectionMode && (
-                 <div className="sticky bottom-4 z-20">
-                    <Card className="max-w-5xl mx-auto shadow-2xl bg-card/95 backdrop-blur-sm">
+                <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-20 w-full max-w-5xl px-4">
+                    <Card className="shadow-2xl bg-card/95 backdrop-blur-sm">
                          <CardHeader>
                             <CardTitle>{isEditing ? 'Editar Solicitud de Pre-Despacho' : 'Resumen de Pre-Despacho'}</CardTitle>
                         </CardHeader>
@@ -555,7 +562,7 @@ export default function FallCreekPage() {
                                     <p className="text-3xl font-bold">{selectedSummary.totalQuantity} <span className="text-xl font-normal text-muted-foreground">{selectedSummary.unit}</span></p>
                                 </div>
                             </div>
-                            <div className="grid sm:grid-cols-3 gap-4 items-end pt-4">
+                            <div className="grid sm:grid-cols-3 gap-4 pt-4">
                                 <div className="space-y-1">
                                     <label htmlFor="dispatch-doc" className="text-sm font-medium">Documento Despacho (Opcional)</label>
                                     <Input id="dispatch-doc" value={documentoDespacho} onChange={e => setDocumentoDespacho(e.target.value)} placeholder="Ej: Orden de Compra" />
