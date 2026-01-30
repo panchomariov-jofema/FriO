@@ -242,12 +242,18 @@ export default function FallCreekPage() {
                 return acc;
             }, {} as Record<string, { productCode: string; productName: string; quantity: number, clientLotIds: Set<string> }>);
             
-            const movementItems = Object.values(summaryItems).map(summary => ({
-                productCode: summary.productCode,
-                productName: summary.productName,
-                quantity: summary.quantity,
-                clientLotId: Array.from(summary.clientLotIds).join(', ')
-            }));
+            const movementItems = Object.values(summaryItems).map(summary => {
+                const item: any = {
+                    productCode: summary.productCode,
+                    productName: summary.productName,
+                    quantity: summary.quantity,
+                };
+                const clientLotId = Array.from(summary.clientLotIds).join(', ');
+                if (clientLotId) {
+                    item.clientLotId = clientLotId;
+                }
+                return item;
+            });
     
             const movementData: Omit<OtherFruitMovement, 'id' | 'createdAt'> = {
                 type: 'salida',
@@ -346,156 +352,158 @@ export default function FallCreekPage() {
     }
     
     return (
-        <div className="space-y-6" onMouseUp={isMouseDown ? () => { setIsMouseDown(false); setSelectionAction(null); } : undefined}>
-            <Card>
-                <CardHeader className="flex flex-row items-start justify-between">
-                    <div>
-                        <CardTitle>Portal Cliente: {fallCreekClient.name}</CardTitle>
-                        <CardDescription>Visualice su stock y genere solicitudes de pre-despacho.</CardDescription>
-                    </div>
-                     <Button onClick={handleToggleSelectionMode} variant={selectionMode ? "destructive" : "default"}>
-                        {selectionMode ? <X className="mr-2 h-4 w-4"/> : <CircleDot className="mr-2 h-4 w-4"/>}
-                        {selectionMode ? 'Cancelar Selección' : 'Iniciar Selección de Despacho'}
-                    </Button>
-                </CardHeader>
-                <CardContent>
-                    <Accordion type="multiple" className="w-full">
-                        {chambersWithFallCreekStock.map(chamberId => {
-                            const config = chambersConfig[chamberId];
-                            const occupancy = chamberOccupancy[chamberId];
-                            return (
-                                <AccordionItem value={chamberId} key={chamberId}>
-                                    <AccordionTrigger>
-                                        <div className="flex w-full items-center justify-between pr-4">
-                                            <span className="text-lg font-semibold">{config.name}</span>
-                                            <div className="text-right">
-                                                <p className="font-mono font-semibold">{occupancy?.occupied ?? 0} {fallCreekClient.unit}</p>
-                                            </div>
-                                        </div>
-                                    </AccordionTrigger>
-                                    <AccordionContent>
-                                        <div className="p-4 bg-muted/50 rounded-lg border overflow-x-auto" onMouseDown={(e) => e.preventDefault()}>
-                                             <div className="grid gap-1 min-w-[800px]" style={{ gridTemplateColumns: `repeat(${config.columns.length}, minmax(0, 1fr))` }}>
-                                                {config.rows.map(row =>
-                                                    config.columns.map(col => {
-                                                        const coord = `${col}${row}`;
-                                                        if (config.blocked?.includes(coord)) {
-                                                            return <div key={coord} className="h-12 w-full rounded border-2 bg-gray-200 dark:bg-gray-700 relative"><div className="absolute inset-0 bg-repeat bg-[length:10px_10px]" style={{backgroundImage: "repeating-linear-gradient(-45deg, #a0aec0, #a0aec0 1px, transparent 1px, transparent 5px)"}} /></div>;
-                                                        }
-                                                        
-                                                        const itemsInCoord = storedItemsByChamber[chamberId]?.[coord] || [];
-                                                        const isOccupied = itemsInCoord.length > 0;
-                                                        const isSelected = !!selectedCoords[`${chamberId}_${coord}`];
-                                                        
-                                                        const lotColor = isOccupied ? getColorForLot(itemsInCoord[0].lotIdForColor) : 'transparent';
-                                                        const cellStyle = { 
-                                                            '--lot-color': lotColor,
-                                                            '--lot-color-bg': lotColor.replace(')', ', 0.2)'),
-                                                        } as React.CSSProperties;
-
-                                                        return (
-                                                            <div key={coord}
-                                                                onMouseDown={() => handleMouseDown(chamberId, coord)}
-                                                                onMouseEnter={() => handleMouseEnter(chamberId, coord)}
-                                                                className={cn(
-                                                                    "h-12 w-full rounded border-2 flex items-center justify-center text-xs font-mono relative overflow-hidden",
-                                                                    isOccupied && "bg-[var(--lot-color-bg)]",
-                                                                    !isOccupied && "bg-background border-dashed",
-                                                                    selectionMode && isOccupied && "cursor-pointer hover:border-primary",
-                                                                    isSelected && "ring-2 ring-primary ring-offset-2"
-                                                                )}
-                                                                style={cellStyle}
-                                                            >
-                                                                <span className="relative z-10 font-semibold">{coord}</span>
-                                                                {isSelected && <div className="absolute inset-0 bg-primary/30 flex items-center justify-center"><CheckCircle2 className="h-6 w-6 text-primary" /></div>}
-                                                            </div>
-                                                        );
-                                                    })
-                                                )}
-                                            </div>
-                                        </div>
-                                    </AccordionContent>
-                                </AccordionItem>
-                            );
-                        })}
-                    </Accordion>
-                </CardContent>
-            </Card>
-
-            {Object.keys(selectedCoords).length > 0 && (
-                <Card className="sticky bottom-4 z-20 shadow-2xl">
-                     <CardHeader>
-                        <CardTitle>Resumen de Pre-Despacho</CardTitle>
+        <div className="relative min-h-[calc(100vh-10rem)]" onMouseUp={isMouseDown ? () => { setIsMouseDown(false); setSelectionAction(null); } : undefined}>
+            <div className="space-y-6">
+                <Card>
+                    <CardHeader className="flex flex-row items-start justify-between">
+                        <div>
+                            <CardTitle>Portal Cliente: {fallCreekClient.name}</CardTitle>
+                            <CardDescription>Visualice su stock y genere solicitudes de pre-despacho.</CardDescription>
+                        </div>
+                        <Button onClick={handleToggleSelectionMode} variant={selectionMode ? "destructive" : "default"}>
+                            {selectionMode ? <X className="mr-2 h-4 w-4"/> : <CircleDot className="mr-2 h-4 w-4"/>}
+                            {selectionMode ? 'Cancelar Selección' : 'Iniciar Selección de Despacho'}
+                        </Button>
                     </CardHeader>
-                    <CardContent className="space-y-4">
-                        <div className="grid md:grid-cols-2 gap-4">
-                            <div className="rounded-md border p-4 space-y-2">
-                               <h4 className="font-semibold">Productos Seleccionados</h4>
-                               <ul>
-                                {selectedSummary.products.map(([name, qty]) => <li key={name}>{qty} {selectedSummary.unit} de {name}</li>)}
-                               </ul>
-                            </div>
-                            <div className="rounded-md border p-4 space-y-2 flex flex-col justify-center">
-                                <p className="text-sm text-muted-foreground">Total a Despachar</p>
-                                <p className="text-3xl font-bold">{selectedSummary.totalQuantity} <span className="text-xl font-normal text-muted-foreground">{selectedSummary.unit}</span></p>
-                            </div>
-                        </div>
-                         <div className="grid sm:grid-cols-3 gap-4 items-end pt-4">
-                            <div className="space-y-1">
-                                <label htmlFor="dispatch-doc" className="text-sm font-medium">Documento Despacho (Opcional)</label>
-                                <Input id="dispatch-doc" value={documentoDespacho} onChange={e => setDocumentoDespacho(e.target.value)} placeholder="Ej: Orden de Compra" />
-                            </div>
-                             <div className="space-y-1">
-                                <label htmlFor="dispatch-client" className="text-sm font-medium">Nombre Cliente Destino</label>
-                                <Input id="dispatch-client" value={clienteDestino} onChange={e => setClienteDestino(e.target.value)} placeholder="Ingrese nombre" />
-                            </div>
-                             <div className="space-y-1">
-                                <label htmlFor="dispatch-rut" className="text-sm font-medium">RUT Cliente Destino</label>
-                                <Input id="dispatch-rut" value={rutDestino} onChange={e => setRutDestino(e.target.value)} placeholder="Ingrese RUT" />
-                            </div>
-                        </div>
-                        <div className="flex justify-end pt-4">
-                            <Button onClick={handleCreatePreDispatch} disabled={isSubmitting} size="lg" className="w-full sm:w-auto">
-                                {isSubmitting ? 'Creando Solicitud...' : 'Crear Solicitud de Pre-Despacho'}
-                            </Button>
+                    <CardContent>
+                        <Accordion type="multiple" className="w-full">
+                            {chambersWithFallCreekStock.map(chamberId => {
+                                const config = chambersConfig[chamberId];
+                                const occupancy = chamberOccupancy[chamberId];
+                                return (
+                                    <AccordionItem value={chamberId} key={chamberId}>
+                                        <AccordionTrigger>
+                                            <div className="flex w-full items-center justify-between pr-4">
+                                                <span className="text-lg font-semibold">{config.name}</span>
+                                                <div className="text-right">
+                                                    <p className="font-mono font-semibold">{occupancy?.occupied ?? 0} {fallCreekClient.unit}</p>
+                                                </div>
+                                            </div>
+                                        </AccordionTrigger>
+                                        <AccordionContent>
+                                            <div className="p-4 bg-muted/50 rounded-lg border overflow-x-auto" onMouseDown={(e) => e.preventDefault()}>
+                                                <div className="grid gap-1 min-w-[800px]" style={{ gridTemplateColumns: `repeat(${config.columns.length}, minmax(0, 1fr))` }}>
+                                                    {config.rows.map(row =>
+                                                        config.columns.map(col => {
+                                                            const coord = `${col}${row}`;
+                                                            if (config.blocked?.includes(coord)) {
+                                                                return <div key={coord} className="h-12 w-full rounded border-2 bg-gray-200 dark:bg-gray-700 relative"><div className="absolute inset-0 bg-repeat bg-[length:10px_10px]" style={{backgroundImage: "repeating-linear-gradient(-45deg, #a0aec0, #a0aec0 1px, transparent 1px, transparent 5px)"}} /></div>;
+                                                            }
+                                                            
+                                                            const itemsInCoord = storedItemsByChamber[chamberId]?.[coord] || [];
+                                                            const isOccupied = itemsInCoord.length > 0;
+                                                            const isSelected = !!selectedCoords[`${chamberId}_${coord}`];
+                                                            
+                                                            const lotColor = isOccupied ? getColorForLot(itemsInCoord[0].lotIdForColor) : 'transparent';
+                                                            const cellStyle = { 
+                                                                '--lot-color': lotColor,
+                                                                '--lot-color-bg': lotColor.replace(')', ', 0.2)'),
+                                                            } as React.CSSProperties;
+
+                                                            return (
+                                                                <div key={coord}
+                                                                    onMouseDown={() => handleMouseDown(chamberId, coord)}
+                                                                    onMouseEnter={() => handleMouseEnter(chamberId, coord)}
+                                                                    className={cn(
+                                                                        "h-12 w-full rounded border-2 flex items-center justify-center text-xs font-mono relative overflow-hidden",
+                                                                        isOccupied && "bg-[var(--lot-color-bg)]",
+                                                                        !isOccupied && "bg-background border-dashed",
+                                                                        selectionMode && isOccupied && "cursor-pointer hover:border-primary",
+                                                                        isSelected && "ring-2 ring-primary ring-offset-2"
+                                                                    )}
+                                                                    style={cellStyle}
+                                                                >
+                                                                    <span className="relative z-10 font-semibold">{coord}</span>
+                                                                    {isSelected && <div className="absolute inset-0 bg-primary/30 flex items-center justify-center"><CheckCircle2 className="h-6 w-6 text-primary" /></div>}
+                                                                </div>
+                                                            );
+                                                        })
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </AccordionContent>
+                                    </AccordionItem>
+                                );
+                            })}
+                        </Accordion>
+                    </CardContent>
+                </Card>
+
+                <Card>
+                    <CardHeader><CardTitle>Historial de Solicitudes</CardTitle></CardHeader>
+                    <CardContent>
+                        <div className="rounded-md border max-h-96 overflow-y-auto">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Fecha</TableHead>
+                                        <TableHead>Documento</TableHead>
+                                        <TableHead>Lotes Involucrados</TableHead>
+                                        <TableHead>Cantidad Total</TableHead>
+                                        <TableHead>Estado</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                {fallCreekMovements.length > 0 ? fallCreekMovements.map(mov => {
+                                    return (
+                                        <TableRow key={mov.id}>
+                                            <TableCell>{mov.createdAt?.toDate().toLocaleString()}</TableCell>
+                                            <TableCell className="font-mono">{mov.document}</TableCell>
+                                            <TableCell className="font-mono text-xs">{mov.lotes}</TableCell>
+                                            <TableCell>{mov.totalQuantity} {mov.unit}</TableCell>
+                                            <TableCell><Badge>Completado</Badge></TableCell>
+                                        </TableRow>
+                                    );
+                                }) : <TableRow><TableCell colSpan={5} className="h-24 text-center">No hay solicitudes de despacho.</TableCell></TableRow>}
+                                </TableBody>
+                            </Table>
                         </div>
                     </CardContent>
                 </Card>
-            )}
+            </div>
 
-            <Card>
-                <CardHeader><CardTitle>Historial de Solicitudes</CardTitle></CardHeader>
-                <CardContent>
-                    <div className="rounded-md border max-h-96 overflow-y-auto">
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Fecha</TableHead>
-                                    <TableHead>Documento</TableHead>
-                                    <TableHead>Lotes Involucrados</TableHead>
-                                    <TableHead>Cantidad Total</TableHead>
-                                    <TableHead>Estado</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                            {fallCreekMovements.length > 0 ? fallCreekMovements.map(mov => {
-                                return (
-                                    <TableRow key={mov.id}>
-                                        <TableCell>{mov.createdAt?.toDate().toLocaleString()}</TableCell>
-                                        <TableCell className="font-mono">{mov.document}</TableCell>
-                                        <TableCell className="font-mono text-xs">{mov.lotes}</TableCell>
-                                        <TableCell>{mov.totalQuantity} {mov.unit}</TableCell>
-                                        <TableCell><Badge>Completado</Badge></TableCell>
-                                    </TableRow>
-                                );
-                            }) : <TableRow><TableCell colSpan={5} className="h-24 text-center">No hay solicitudes de despacho.</TableCell></TableRow>}
-                            </TableBody>
-                        </Table>
-                    </div>
-                </CardContent>
-            </Card>
+            {Object.keys(selectedCoords).length > 0 && (
+                 <div className="sticky bottom-4 z-20">
+                    <Card className="max-w-5xl mx-auto shadow-2xl bg-card/95 backdrop-blur-sm">
+                         <CardHeader>
+                            <CardTitle>Resumen de Pre-Despacho</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <div className="grid md:grid-cols-2 gap-4">
+                                <div className="rounded-md border p-4 space-y-2">
+                                <h4 className="font-semibold">Productos Seleccionados</h4>
+                                <ul>
+                                    {selectedSummary.products.map(([name, qty]) => <li key={name}>{qty} {selectedSummary.unit} de {name}</li>)}
+                                </ul>
+                                </div>
+                                <div className="rounded-md border p-4 space-y-2 flex flex-col justify-center">
+                                    <p className="text-sm text-muted-foreground">Total a Despachar</p>
+                                    <p className="text-3xl font-bold">{selectedSummary.totalQuantity} <span className="text-xl font-normal text-muted-foreground">{selectedSummary.unit}</span></p>
+                                </div>
+                            </div>
+                            <div className="grid sm:grid-cols-3 gap-4 items-end pt-4">
+                                <div className="space-y-1">
+                                    <label htmlFor="dispatch-doc" className="text-sm font-medium">Documento Despacho (Opcional)</label>
+                                    <Input id="dispatch-doc" value={documentoDespacho} onChange={e => setDocumentoDespacho(e.target.value)} placeholder="Ej: Orden de Compra" />
+                                </div>
+                                <div className="space-y-1">
+                                    <label htmlFor="dispatch-client" className="text-sm font-medium">Nombre Cliente Destino</label>
+                                    <Input id="dispatch-client" value={clienteDestino} onChange={e => setClienteDestino(e.target.value)} placeholder="Ingrese nombre" />
+                                </div>
+                                <div className="space-y-1">
+                                    <label htmlFor="dispatch-rut" className="text-sm font-medium">RUT Cliente Destino</label>
+                                    <Input id="dispatch-rut" value={rutDestino} onChange={e => setRutDestino(e.target.value)} placeholder="Ingrese RUT" />
+                                </div>
+                            </div>
+                            <div className="flex justify-end pt-4">
+                                <Button onClick={handleCreatePreDispatch} disabled={isSubmitting} size="lg" className="w-full sm:w-auto">
+                                    {isSubmitting ? 'Creando Solicitud...' : 'Crear Solicitud de Pre-Despacho'}
+                                </Button>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
+            )}
         </div>
     );
 }
-
-    
