@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
-import type { OtherClient, OtherFruitReception, OtherFruitMovement } from '@/lib/types';
+import type { OtherClient, OtherFruitReception, OtherFruitMovement, StoredItem, ChamberLot } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -14,87 +14,151 @@ import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Label } from '@/components/ui/label';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { cn } from '@/lib/utils';
 import { chambersConfig } from '@/lib/chambers-config';
+import { CheckCircle2, CircleDot, X } from 'lucide-react';
 
 const FALL_CREEK_CLIENT_NAME = 'FALL CREEK';
 
-const getLocationKey = (receptionId: string, itemIndex: number) => `${receptionId}_${itemIndex}`;
+// --- Color Palette Logic (Moved outside component to persist state) ---
+const lotColorPalette = [
+  'hsl(221, 83%, 53%)', // Blue
+  'hsl(0, 72%, 51%)',   // Red
+  'hsl(48, 96%, 53%)',  // Yellow
+  'hsl(262, 83%, 60%)', // Violet
+  'hsl(170, 75%, 41%)', // Cyan
+  'hsl(350, 75%, 55%)', // Pink
+  'hsl(25, 85%, 50%)',  // Orange
+  'hsl(120, 50%, 50%)', // Green
+];
+
+const lotColorMap = new Map<string, string>();
+let nextColorIndex = 0;
+
+const getColorForLot = (lotId: string) => {
+    if (!lotColorMap.has(lotId)) {
+        const color = lotColorPalette[nextColorIndex];
+        lotColorMap.set(lotId, color);
+        nextColorIndex = (nextColorIndex + 1) % lotColorPalette.length;
+    }
+    return lotColorMap.get(lotId)!;
+};
+
 
 export default function FallCreekPage() {
     const { data: allClients, loading: loadingClients } = useFirestoreCollection<OtherClient>('otherClients');
     const { data: allReceptions, loading: loadingReceptions } = useFirestoreCollection<OtherFruitReception>('otherFruitReceptions');
     const { data: allMovements, loading: loadingMovements } = useFirestoreCollection<OtherFruitMovement>('otherFruitMovements');
+    // Need chamberlots to know which coordinates are occupied by other clients
+    const { data: allChamberLots, loading: loadingChamberLots } = useFirestoreCollection<ChamberLot>('chamberLots');
+
     const { toast } = useToast();
     const firestore = useFirestore();
 
-    const [quantitiesToDispatch, setQuantitiesToDispatch] = React.useState<Record<string, number>>({});
+    const [selectionMode, setSelectionMode] = React.useState(false);
+    const [selectedCoords, setSelectedCoords] = React.useState<Record<string, StoredItem[]>>({});
     const [documentoDespacho, setDocumentoDespacho] = React.useState('');
     const [isSubmitting, setIsSubmitting] = React.useState(false);
-    const [lotFilter, setLotFilter] = React.useState('');
-    const [productFilter, setProductFilter] = React.useState('');
+
 
     const fallCreekClient = React.useMemo(() => {
         if (!allClients) return null;
         return allClients.find(c => c.name.toUpperCase() === FALL_CREEK_CLIENT_NAME) || null;
     }, [allClients]);
 
-    const availableStock = React.useMemo(() => {
-        if (!fallCreekClient || !allReceptions) return [];
+    const { storedItemsByChamber, chamberOccupancy, chambersWithFallCreekStock } = React.useMemo(() => {
+        if (!fallCreekClient) return { storedItemsByChamber: {}, chamberOccupancy: {}, chambersWithFallCreekStock: [] };
 
-        return allReceptions
+        const fallCreekStoredItems: StoredItem[] = (allReceptions || [])
             .filter(r => r.clientId === fallCreekClient.clientId)
-            .flatMap(reception =>
-                reception.items.map((item, index) => ({
-                    ...item,
+            .flatMap(reception => reception.items
+                .map((item, index) => ({ item, index }))
+                .filter(({ item }) => item.status === 'Almacenado' && item.storageLocation?.chamberId && item.storageLocation?.coordinate && item.quantity > 0)
+                .map(({ item, index }) => ({
+                    id: `${reception.id}-${index}`,
+                    type: 'otherFruit' as const,
+                    displayId: item.productCode,
+                    lotIdForColor: reception.displayLotId || reception.id,
+                    ownerName: reception.clientName,
+                    varietyOrProduct: item.productName,
+                    quantity: item.quantity,
+                    unit: reception.unit,
+                    chamberId: item.storageLocation!.chamberId,
+                    coordinate: item.storageLocation!.coordinate,
                     receptionId: reception.id,
                     itemIndex: index,
-                    unit: reception.unit,
-                    id: getLocationKey(reception.id, index),
-                    chamberName: item.storageLocation ? chambersConfig[item.storageLocation.chamberId]?.name : 'N/A',
+                    clientLotId: item.clientLotId,
                 }))
-            )
-            .filter(item => item.status === 'Almacenado' && item.quantity > 0 && item.storageLocation?.coordinate);
+            );
+        
+        const calculatedStoredItemsByChamber = fallCreekStoredItems.reduce((acc, item) => {
+            if (!acc[item.chamberId]) acc[item.chamberId] = {};
+            if (!acc[item.chamberId][item.coordinate]) acc[item.chamberId][item.coordinate] = [];
+            acc[item.chamberId][item.coordinate].push(item);
+            return acc;
+        }, {} as Record<string, Record<string, StoredItem[]>>);
+
+        const calculatedChamberOccupancy = Object.keys(chambersConfig).reduce((acc, chamberId) => {
+            const itemsInChamber = fallCreekStoredItems.filter(item => item.chamberId === chamberId);
+            const occupiedEquivalentBins = itemsInChamber.reduce((sum, item) => {
+                const equivalent = item.unit === 'Pallets' ? item.quantity * 2 : item.quantity;
+                return sum + equivalent;
+            }, 0);
+            
+            acc[chamberId] = {
+                occupied: occupiedEquivalentBins,
+                total: chambersConfig[chamberId].capacity,
+                percentage: chambersConfig[chamberId].capacity > 0 ? (occupiedEquivalentBins / chambersConfig[chamberId].capacity) * 100 : 0,
+            };
+            return acc;
+        }, {} as Record<string, { occupied: number; total: number; percentage: number }>);
+        
+        const calculatedChambersWithStock = Object.keys(calculatedStoredItemsByChamber).filter(chamberId =>
+            Object.keys(calculatedStoredItemsByChamber[chamberId]).length > 0
+        );
+
+        return {
+            storedItemsByChamber: calculatedStoredItemsByChamber,
+            chamberOccupancy: calculatedChamberOccupancy,
+            chambersWithFallCreekStock: calculatedChambersWithStock
+        };
+
     }, [fallCreekClient, allReceptions]);
 
-    const filteredStock = React.useMemo(() => {
-        return availableStock.filter(item => {
-            const lotMatch = lotFilter ? (item.clientLotId || '').toLowerCase().includes(lotFilter.toLowerCase()) : true;
-            const productMatch = productFilter ? item.productName.toLowerCase().includes(productFilter.toLowerCase()) : true;
-            return lotMatch && productMatch;
-        });
-    }, [availableStock, lotFilter, productFilter]);
+    const handleCoordClick = (chamberId: string, coord: string) => {
+        if (!selectionMode) return;
 
-    const handleQuantityChange = (key: string, available: number, newQuantityStr: string) => {
-        const newQuantity = parseInt(newQuantityStr, 10);
-        if (isNaN(newQuantity) || newQuantity <= 0) {
-            setQuantitiesToDispatch(prev => {
-                const newState = { ...prev };
-                delete newState[key];
-                return newState;
-            });
-            return;
+        const key = `${chamberId}_${coord}`;
+        const newSelectedCoords = { ...selectedCoords };
+
+        if (newSelectedCoords[key]) {
+            delete newSelectedCoords[key];
+        } else {
+            const itemsInCoord = storedItemsByChamber[chamberId]?.[coord];
+            if (itemsInCoord) {
+                newSelectedCoords[key] = itemsInCoord;
+            }
         }
-
-        if (newQuantity > available) {
-            toast({
-                title: 'Cantidad excede el stock',
-                description: `Solo hay ${available} disponibles en esta ubicación.`,
-                variant: 'destructive'
-            });
-            setQuantitiesToDispatch(prev => ({ ...prev, [key]: available }));
-            return;
-        }
-
-        setQuantitiesToDispatch(prev => ({ ...prev, [key]: newQuantity, }));
+        setSelectedCoords(newSelectedCoords);
     };
-
+    
+    const handleToggleSelectionMode = () => {
+        const newMode = !selectionMode;
+        setSelectionMode(newMode);
+        if (!newMode) { // If turning off, clear selection
+            setSelectedCoords({});
+            setDocumentoDespacho('');
+        }
+    };
+    
     const handleCreatePreDispatch = async () => {
-        const itemsToDispatch = Object.entries(quantitiesToDispatch).filter(([, qty]) => qty > 0);
-        if (itemsToDispatch.length === 0) {
-            toast({ variant: 'destructive', title: 'Error', description: 'Debe ingresar una cantidad para al menos un ítem.' });
+        const selectedItems = Object.values(selectedCoords).flat();
+        if (selectedItems.length === 0) {
+            toast({ variant: 'destructive', title: 'Error', description: 'Debe seleccionar al menos una coordenada.' });
             return;
         }
+
         if (!documentoDespacho.trim()) {
             toast({ variant: 'destructive', title: 'Error', description: 'Debe ingresar un documento de despacho.' });
             return;
@@ -104,45 +168,35 @@ export default function FallCreekPage() {
         setIsSubmitting(true);
         try {
             const batch = writeBatch(firestore);
+            const receptionUpdates: Record<string, any> = {};
             const movementItems: OtherFruitMovement['items'] = [];
-            const receptionUpdates: Record<string, { items: OtherFruitReception['items'] }> = {};
-
-            for (const [key, quantity] of itemsToDispatch) {
-                const stockItem = availableStock.find(item => item.id === key);
-                if (!stockItem) continue;
-
-                if (!receptionUpdates[stockItem.receptionId]) {
-                    const originalReception = allReceptions.find(r => r.id === stockItem.receptionId);
-                    if (originalReception) {
-                        receptionUpdates[stockItem.receptionId] = { items: JSON.parse(JSON.stringify(originalReception.items)) };
-                    }
+            
+            for(const item of selectedItems) {
+                if(!receptionUpdates[item.receptionId!]) {
+                     const originalReception = allReceptions.find(r => r.id === item.receptionId)!;
+                     receptionUpdates[item.receptionId!] = JSON.parse(JSON.stringify(originalReception.items));
                 }
-
-                if (receptionUpdates[stockItem.receptionId]) {
-                    const itemToUpdate = receptionUpdates[stockItem.receptionId].items[stockItem.itemIndex];
-                    if(itemToUpdate && itemToUpdate.quantity >= quantity) {
-                        itemToUpdate.quantity -= quantity; // Reduce stock
-
-                        movementItems.push({
-                            productCode: itemToUpdate.productCode,
-                            productName: itemToUpdate.productName,
-                            quantity: quantity,
-                            weight: itemToUpdate.weight ? (itemToUpdate.weight / itemToUpdate.quantity) * quantity : undefined, // prorate weight
-                            clientLotId: itemToUpdate.clientLotId,
-                        });
-                    }
+                const itemToUpdate = receptionUpdates[item.receptionId!][item.itemIndex];
+                if(itemToUpdate) {
+                    // This logic is simplified: it assumes you dispatch the WHOLE coordinate.
+                    // To dispatch partials, the UI would need quantity inputs.
+                    itemToUpdate.status = 'Despachado'; // Reserve the stock
+                    movementItems.push({
+                         productCode: itemToUpdate.productCode,
+                         productName: itemToUpdate.productName,
+                         quantity: itemToUpdate.quantity,
+                         weight: itemToUpdate.weight,
+                         clientLotId: itemToUpdate.clientLotId,
+                    });
                 }
             }
-
-            Object.entries(receptionUpdates).forEach(([receptionId, { items }]) => {
-                const allItemsProcessed = items.every(i => i.status === 'Almacenado' && i.quantity === 0) || items.length === 0;
-                const newStatus = allItemsProcessed ? 'Almacenado' : 'Parcialmente Almacenado';
-
-                batch.update(doc(firestore, 'otherFruitReceptions', receptionId), {
-                    items: items.filter(i => i.quantity > 0),
-                    status: newStatus,
-                    updatedAt: serverTimestamp()
-                });
+            
+            Object.entries(receptionUpdates).forEach(([receptionId, updatedItems]) => {
+                const receptionRef = doc(firestore, 'otherFruitReceptions', receptionId);
+                // After marking items as 'Despachado', check the reception's overall status.
+                const allItemsGone = updatedItems.every((i: StoredItem) => i.status !== 'Pendiente de almacenar' && i.status !== 'Almacenado');
+                const newStatus = allItemsGone ? 'Despachado' : 'Parcialmente Almacenado'; // Or a more appropriate status
+                batch.update(receptionRef, { items: updatedItems, status: newStatus, updatedAt: serverTimestamp() });
             });
 
             const movementData: Partial<OtherFruitMovement> = {
@@ -161,10 +215,7 @@ export default function FallCreekPage() {
             await batch.commit();
 
             toast({ title: 'Éxito', description: 'Solicitud de Pre-Despacho creada correctamente.' });
-            setQuantitiesToDispatch({});
-            setDocumentoDespacho('');
-            setLotFilter('');
-            setProductFilter('');
+            handleToggleSelectionMode(); // Exit selection mode and clear state
 
         } catch (e) {
             console.error("Error creating pre-dispatch", e);
@@ -174,28 +225,25 @@ export default function FallCreekPage() {
             setIsSubmitting(false);
         }
     };
-    
-    const { totalSelectedQuantity, selectedUnit } = React.useMemo(() => {
-        let total = 0;
-        let unit: 'Bins' | 'Pallets' = 'Pallets';
-        const itemsToDispatch = Object.entries(quantitiesToDispatch).filter(([, qty]) => qty > 0);
-        
-        if (itemsToDispatch.length > 0) {
-            const firstKey = itemsToDispatch[0][0];
-            const firstItem = availableStock.find(i => i.id === firstKey);
-            if (firstItem) {
-                unit = firstItem.unit;
-            }
-        }
 
-        for (const [key, quantity] of itemsToDispatch) {
-            const stockItem = availableStock.find(item => item.id === key);
-            if(stockItem && stockItem.unit === unit) {
-                 total += quantity;
+    const selectedSummary = React.useMemo(() => {
+        const items = Object.values(selectedCoords).flat();
+        if (items.length === 0) return { totalQuantity: 0, unit: 'Pallets', products: [] };
+
+        const unit = items[0].unit;
+        const totalQuantity = items.reduce((sum, item) => sum + item.quantity, 0);
+        
+        const productMap = items.reduce((acc, item) => {
+            if(!acc[item.varietyOrProduct]) {
+                acc[item.varietyOrProduct] = 0;
             }
-        }
-        return { totalSelectedQuantity: total, selectedUnit: unit };
-    }, [quantitiesToDispatch, availableStock]);
+            acc[item.varietyOrProduct] += item.quantity;
+            return acc;
+        }, {} as Record<string, number>);
+
+        return { totalQuantity, unit, products: Object.entries(productMap) };
+    }, [selectedCoords]);
+    
 
     const fallCreekMovements = React.useMemo(() => {
         if (!fallCreekClient || !allMovements) return [];
@@ -204,7 +252,7 @@ export default function FallCreekPage() {
             .sort((a,b) => b.createdAt.toMillis() - a.createdAt.toMillis());
     }, [fallCreekClient, allMovements]);
     
-    const loading = loadingClients || loadingReceptions || loadingMovements;
+    const loading = loadingClients || loadingReceptions || loadingMovements || loadingChamberLots;
 
     if (loading) {
         return (
@@ -226,92 +274,125 @@ export default function FallCreekPage() {
             </Card>
         );
     }
-
+    
     return (
         <div className="space-y-6">
             <Card>
-                <CardHeader>
-                    <CardTitle>Portal Cliente: {fallCreekClient.name}</CardTitle>
-                    <CardDescription>Seleccione stock de sus ubicaciones para generar una solicitud de pre-despacho.</CardDescription>
+                <CardHeader className="flex flex-row items-start justify-between">
+                    <div>
+                        <CardTitle>Portal Cliente: {fallCreekClient.name}</CardTitle>
+                        <CardDescription>Visualice su stock y genere solicitudes de pre-despacho.</CardDescription>
+                    </div>
+                     <Button onClick={handleToggleSelectionMode} variant={selectionMode ? "destructive" : "default"}>
+                        {selectionMode ? <X className="mr-2 h-4 w-4"/> : <CircleDot className="mr-2 h-4 w-4"/>}
+                        {selectionMode ? 'Cancelar Selección' : 'Iniciar Selección de Despacho'}
+                    </Button>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                    <div className="grid sm:grid-cols-2 gap-4">
-                        <div>
-                            <Label htmlFor="lot-filter">Filtrar por Lote Cliente</Label>
-                            <Input id="lot-filter" value={lotFilter} onChange={e => setLotFilter(e.target.value)} placeholder="Escriba un lote..." />
-                        </div>
-                        <div>
-                            <Label htmlFor="product-filter">Filtrar por Producto</Label>
-                            <Input id="product-filter" value={productFilter} onChange={e => setProductFilter(e.target.value)} placeholder="Escriba un producto..." />
-                        </div>
-                    </div>
-                    <div className="rounded-md border max-h-96 overflow-y-auto">
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Lote Cliente</TableHead>
-                                    <TableHead>Producto</TableHead>
-                                    <TableHead>Ubicación</TableHead>
-                                    <TableHead>Cant. Disp.</TableHead>
-                                    <TableHead className="w-40">A Despachar</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {filteredStock.length > 0 ? filteredStock.map(item => (
-                                    <TableRow key={item.id}>
-                                        <TableCell className="font-mono">{item.clientLotId || '-'}</TableCell>
-                                        <TableCell className="font-medium">{item.productName}</TableCell>
-                                        <TableCell>{item.chamberName} / {item.storageLocation?.coordinate}</TableCell>
-                                        <TableCell>{item.quantity} {item.unit}</TableCell>
-                                        <TableCell>
-                                            <Input
-                                                type="number"
-                                                placeholder="0"
-                                                min={0}
-                                                max={item.quantity}
-                                                value={quantitiesToDispatch[item.id] || ''}
-                                                onChange={(e) => handleQuantityChange(item.id, item.quantity, e.target.value)}
-                                                className="h-8"
-                                            />
-                                        </TableCell>
-                                    </TableRow>
-                                )) : (
-                                    <TableRow><TableCell colSpan={5} className="h-24 text-center">No se encontró stock con los filtros actuales.</TableCell></TableRow>
-                                )}
-                            </TableBody>
-                        </Table>
-                    </div>
-                     {Object.keys(quantitiesToDispatch).length > 0 && (
-                        <div className="flex flex-col sm:flex-row gap-4 items-end pt-4">
-                            <div className="flex-1">
-                                <Label htmlFor="dispatch-doc">Documento de Despacho (Ej: Orden de Compra)</Label>
-                                <Input id="dispatch-doc" value={documentoDespacho} onChange={e => setDocumentoDespacho(e.target.value)} placeholder="Ingrese un documento..." />
-                            </div>
-                            <div className="flex items-center gap-4">
-                                <div className="text-right">
-                                    <p className="font-bold text-lg">{totalSelectedQuantity}</p>
-                                    <p className="text-sm text-muted-foreground -mt-1">{selectedUnit}</p>
-                                </div>
-                                <Button onClick={handleCreatePreDispatch} disabled={isSubmitting} className="w-full sm:w-auto">
-                                    {isSubmitting ? 'Creando Solicitud...' : 'Crear Solicitud de Pre-Despacho'}
-                                </Button>
-                            </div>
-                        </div>
-                    )}
+                <CardContent>
+                    <Accordion type="multiple" className="w-full">
+                        {chambersWithFallCreekStock.map(chamberId => {
+                            const config = chambersConfig[chamberId];
+                            const occupancy = chamberOccupancy[chamberId];
+                            return (
+                                <AccordionItem value={chamberId} key={chamberId}>
+                                    <AccordionTrigger>
+                                        <div className="flex w-full items-center justify-between pr-4">
+                                            <span className="text-lg font-semibold">{config.name}</span>
+                                            <div className="text-right">
+                                                <p className="font-mono font-semibold">{occupancy?.occupied ?? 0} {fallCreekClient.unit}</p>
+                                            </div>
+                                        </div>
+                                    </AccordionTrigger>
+                                    <AccordionContent>
+                                        <div className="p-4 bg-muted/50 rounded-lg border overflow-x-auto">
+                                             <div className="grid gap-1 min-w-[800px]" style={{ gridTemplateColumns: `repeat(${config.columns.length}, minmax(0, 1fr))` }}>
+                                                {config.rows.map(row =>
+                                                    config.columns.map(col => {
+                                                        const coord = `${col}${row}`;
+                                                        if (config.blocked?.includes(coord)) {
+                                                            return <div key={coord} className="h-12 w-full rounded border-2 bg-gray-200 dark:bg-gray-700 relative"><div className="absolute inset-0 bg-repeat bg-[length:10px_10px]" style={{backgroundImage: "repeating-linear-gradient(-45deg, #a0aec0, #a0aec0 1px, transparent 1px, transparent 5px)"}} /></div>;
+                                                        }
+                                                        
+                                                        const itemsInCoord = storedItemsByChamber[chamberId]?.[coord] || [];
+                                                        const isOccupied = itemsInCoord.length > 0;
+                                                        const isSelected = !!selectedCoords[`${chamberId}_${coord}`];
+                                                        
+                                                        const lotColor = isOccupied ? getColorForLot(itemsInCoord[0].lotIdForColor) : 'transparent';
+                                                        const cellStyle = { 
+                                                            '--lot-color': lotColor,
+                                                            '--lot-color-bg': lotColor.replace(')', ', 0.2)'),
+                                                        } as React.CSSProperties;
+
+                                                        return (
+                                                            <div key={coord}
+                                                                onClick={() => handleCoordClick(chamberId, coord)}
+                                                                className={cn(
+                                                                    "h-12 w-full rounded border-2 flex items-center justify-center text-xs font-mono relative overflow-hidden",
+                                                                    isOccupied && "bg-[var(--lot-color-bg)]",
+                                                                    !isOccupied && "bg-background border-dashed",
+                                                                    selectionMode && isOccupied && "cursor-pointer hover:border-primary",
+                                                                    isSelected && "ring-2 ring-primary ring-offset-2"
+                                                                )}
+                                                                style={cellStyle}
+                                                            >
+                                                                <span className="relative z-10 font-semibold">{coord}</span>
+                                                                {isSelected && <div className="absolute inset-0 bg-primary/30 flex items-center justify-center"><CheckCircle2 className="h-6 w-6 text-primary" /></div>}
+                                                            </div>
+                                                        );
+                                                    })
+                                                )}
+                                            </div>
+                                        </div>
+                                    </AccordionContent>
+                                </AccordionItem>
+                            );
+                        })}
+                    </Accordion>
                 </CardContent>
             </Card>
+
+            {Object.keys(selectedCoords).length > 0 && (
+                <Card className="sticky bottom-4 z-20 shadow-2xl">
+                     <CardHeader>
+                        <CardTitle>Resumen de Pre-Despacho</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        <div className="grid md:grid-cols-2 gap-4">
+                            <div className="rounded-md border p-4 space-y-2">
+                               <h4 className="font-semibold">Productos Seleccionados</h4>
+                               <ul>
+                                {selectedSummary.products.map(([name, qty]) => <li key={name}>{qty} {selectedSummary.unit} de {name}</li>)}
+                               </ul>
+                            </div>
+                            <div className="rounded-md border p-4 space-y-2 flex flex-col justify-center">
+                                <p className="text-sm text-muted-foreground">Total a Despachar</p>
+                                <p className="text-3xl font-bold">{selectedSummary.totalQuantity} <span className="text-xl font-normal text-muted-foreground">{selectedSummary.unit}</span></p>
+                            </div>
+                        </div>
+                         <div className="flex flex-col sm:flex-row gap-4 items-end pt-4">
+                            <div className="flex-1">
+                                <label htmlFor="dispatch-doc" className="text-sm font-medium">Documento de Despacho (Ej: Orden de Compra)</label>
+                                <Input id="dispatch-doc" value={documentoDespacho} onChange={e => setDocumentoDespacho(e.target.value)} placeholder="Ingrese un documento..." />
+                            </div>
+                            <Button onClick={handleCreatePreDispatch} disabled={isSubmitting} size="lg" className="w-full sm:w-auto">
+                                {isSubmitting ? 'Creando Solicitud...' : 'Crear Solicitud de Pre-Despacho'}
+                            </Button>
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
 
             <Card>
                 <CardHeader><CardTitle>Historial de Solicitudes</CardTitle></CardHeader>
                 <CardContent>
-                    <div className="rounded-md border">
+                    <div className="rounded-md border max-h-96 overflow-y-auto">
                         <Table>
                             <TableHeader><TableRow><TableHead>Fecha</TableHead><TableHead>Documento</TableHead><TableHead>Items</TableHead><TableHead>Estado</TableHead></TableRow></TableHeader>
                             <TableBody>
                             {fallCreekMovements.length > 0 ? fallCreekMovements.map(mov => (
                                 <TableRow key={mov.id}>
                                     <TableCell>{mov.createdAt.toDate().toLocaleString()}</TableCell>
-                                    <TableCell>{mov.document}</TableCell>
+                                    <TableCell className="font-mono">{mov.document}</TableCell>
                                     <TableCell>{mov.items.map(i => `${i.quantity} ${mov.unit} de ${i.productName}`).join(', ')}</TableCell>
                                     <TableCell><Badge>Enviado</Badge></TableCell>
                                 </TableRow>
