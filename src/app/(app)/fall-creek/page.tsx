@@ -211,7 +211,7 @@ export default function FallCreekPage() {
         try {
             const batch = writeBatch(firestore);
             const receptionUpdates: Record<string, any> = {};
-            const movementItems: Partial<OtherFruitMovement['items'][0]>[] = [];
+            const movementItems: OtherFruitMovement['items'] = [];
             
             for(const item of selectedItems) {
                 if(!receptionUpdates[item.receptionId!]) {
@@ -222,13 +222,19 @@ export default function FallCreekPage() {
                 if(itemToUpdate) {
                     itemToUpdate.status = 'Despachado'; // Reserve the stock
                     
-                    const newItemForMovement: Partial<OtherFruitMovement['items'][0]> = {
+                    const newItemForMovement: {
+                        productCode: string;
+                        productName: string;
+                        quantity: number;
+                        weight?: number;
+                        clientLotId?: string;
+                    } = {
                         productCode: itemToUpdate.productCode,
                         productName: itemToUpdate.productName,
                         quantity: itemToUpdate.quantity,
                     };
 
-                    if (itemToUpdate.weight) {
+                    if (typeof itemToUpdate.weight === 'number' && !isNaN(itemToUpdate.weight)) {
                         newItemForMovement.weight = itemToUpdate.weight;
                     }
                     if (itemToUpdate.clientLotId) {
@@ -299,7 +305,7 @@ export default function FallCreekPage() {
         if (!fallCreekClient || !allMovements) return [];
         const sortedMovements = (allMovements || [])
             .filter(m => m.clientId === fallCreekClient.clientId && m.type === 'salida')
-            .sort((a,b) => b.createdAt.toMillis() - a.createdAt.toMillis());
+            .sort((a,b) => (b.createdAt?.toMillis() ?? 0) - (a.createdAt?.toMillis() ?? 0));
 
         return sortedMovements.map(mov => {
             const totalQuantity = mov.items.reduce((sum, item) => sum + item.quantity, 0);
@@ -471,7 +477,7 @@ export default function FallCreekPage() {
                             {fallCreekMovements.length > 0 ? fallCreekMovements.map(mov => {
                                 return (
                                     <TableRow key={mov.id}>
-                                        <TableCell>{mov.createdAt.toDate().toLocaleString()}</TableCell>
+                                        <TableCell>{mov.createdAt?.toDate().toLocaleString()}</TableCell>
                                         <TableCell className="font-mono">{mov.document}</TableCell>
                                         <TableCell className="font-mono text-xs">{mov.lotes}</TableCell>
                                         <TableCell>{mov.totalQuantity} {mov.unit}</TableCell>
