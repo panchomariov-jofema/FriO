@@ -20,7 +20,7 @@ import { chambersConfig } from '@/lib/chambers-config';
 import { CheckCircle2, CircleDot, Eye, Pencil, Trash2, X } from 'lucide-react';
 import { Timestamp } from 'firebase/firestore';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 
@@ -417,7 +417,7 @@ export default function FallCreekPage() {
                         </Button>
                     </CardHeader>
                     <CardContent>
-                        <Accordion type="multiple" className="w-full" defaultValue={chambersWithFallCreekStock}>
+                        <Accordion type="multiple" className="w-full">
                             {chambersWithFallCreekStock.map(chamberId => {
                                 const config = chambersConfig[chamberId];
                                 const occupancy = chamberOccupancy[chamberId];
@@ -505,7 +505,7 @@ export default function FallCreekPage() {
                                 </TableHeader>
                                 <TableBody>
                                 {filteredMovements.length > 0 ? filteredMovements.map(mov => {
-                                    const status = mov.status === 'Pendiente de Picking' ? 'En Proceso' : mov.status;
+                                    const status = mov.status === 'Pendiente de Picking' ? 'En Proceso' : 'Completado';
                                     return (
                                         <TableRow key={mov.id}>
                                             <TableCell>{mov.createdAt?.toDate().toLocaleString()}</TableCell>
@@ -631,7 +631,7 @@ export default function FallCreekPage() {
                                         <TableRow key={index}>
                                             <TableCell>{loc.productName}</TableCell>
                                             <TableCell className="font-mono">{loc.clientLotId || 'N/A'}</TableCell>
-                                            <TableCell className="font-mono">{loc.location.chamberId} / {loc.location.coordinate}</TableCell>
+                                            <TableCell className="font-mono">{chambersConfig[loc.location.chamberId]?.name} / {loc.location.coordinate}</TableCell>
                                             <TableCell className="text-right">{loc.quantity} {loc.unit}</TableCell>
                                         </TableRow>
                                     ))}
@@ -649,3 +649,5 @@ export default function FallCreekPage() {
         </div>
     );
 }
+
+    
