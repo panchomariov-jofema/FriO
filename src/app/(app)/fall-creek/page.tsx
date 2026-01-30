@@ -289,7 +289,7 @@ export default function FallCreekPage() {
                     </Button>
                 </CardHeader>
                 <CardContent>
-                    <Accordion type="multiple" className="w-full">
+                    <Accordion type="multiple" className="w-full" defaultValue={chambersWithFallCreekStock}>
                         {chambersWithFallCreekStock.map(chamberId => {
                             const config = chambersConfig[chamberId];
                             const occupancy = chamberOccupancy[chamberId];
@@ -387,16 +387,29 @@ export default function FallCreekPage() {
                 <CardContent>
                     <div className="rounded-md border max-h-96 overflow-y-auto">
                         <Table>
-                            <TableHeader><TableRow><TableHead>Fecha</TableHead><TableHead>Documento</TableHead><TableHead>Items</TableHead><TableHead>Estado</TableHead></TableRow></TableHeader>
-                            <TableBody>
-                            {fallCreekMovements.length > 0 ? fallCreekMovements.map(mov => (
-                                <TableRow key={mov.id}>
-                                    <TableCell>{mov.createdAt.toDate().toLocaleString()}</TableCell>
-                                    <TableCell className="font-mono">{mov.document}</TableCell>
-                                    <TableCell>{mov.items.map(i => `${i.quantity} ${mov.unit} de ${i.productName}`).join(', ')}</TableCell>
-                                    <TableCell><Badge>Enviado</Badge></TableCell>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Fecha</TableHead>
+                                    <TableHead>Documento</TableHead>
+                                    <TableHead>Lotes Involucrados</TableHead>
+                                    <TableHead>Cantidad Total</TableHead>
+                                    <TableHead>Estado</TableHead>
                                 </TableRow>
-                            )) : <TableRow><TableCell colSpan={4} className="h-24 text-center">No hay solicitudes de despacho.</TableCell></TableRow>}
+                            </TableHeader>
+                            <TableBody>
+                            {fallCreekMovements.length > 0 ? fallCreekMovements.map(mov => {
+                                const totalQuantity = mov.items.reduce((sum, item) => sum + item.quantity, 0);
+                                const lotes = [...new Set(mov.items.map(item => item.clientLotId || item.productName))].join(', ');
+                                return (
+                                    <TableRow key={mov.id}>
+                                        <TableCell>{mov.createdAt.toDate().toLocaleString()}</TableCell>
+                                        <TableCell className="font-mono">{mov.document}</TableCell>
+                                        <TableCell className="font-mono text-xs">{lotes}</TableCell>
+                                        <TableCell>{totalQuantity} {mov.unit}</TableCell>
+                                        <TableCell><Badge>Enviado</Badge></TableCell>
+                                    </TableRow>
+                                );
+                            }) : <TableRow><TableCell colSpan={5} className="h-24 text-center">No hay solicitudes de despacho.</TableCell></TableRow>}
                             </TableBody>
                         </Table>
                     </div>
