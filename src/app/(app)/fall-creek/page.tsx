@@ -20,7 +20,7 @@ import { chambersConfig } from '@/lib/chambers-config';
 import { CheckCircle2, CircleDot, Eye, Pencil, Trash2, X } from 'lucide-react';
 import { Timestamp } from 'firebase/firestore';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger, AlertDialogDescription } from '@/components/ui/alert-dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 
@@ -69,6 +69,7 @@ export default function FallCreekPage() {
     const [isSubmitting, setIsSubmitting] = React.useState(false);
     const [isMouseDown, setIsMouseDown] = React.useState(false);
     const [selectionAction, setSelectionAction] = React.useState<'select' | 'deselect' | null>(null);
+    const [openAccordions, setOpenAccordions] = React.useState<string[]>([]);
 
     const [movementToView, setMovementToView] = React.useState<OtherFruitMovement | null>(null);
     const [editingMovement, setEditingMovement] = React.useState<OtherFruitMovement | null>(null);
@@ -403,7 +404,7 @@ export default function FallCreekPage() {
     }
     
     return (
-        <div className="relative min-h-[calc(100vh-10rem)] pb-52" onMouseUp={isMouseDown ? () => { setIsMouseDown(false); setSelectionAction(null); } : undefined}>
+        <div className="relative min-h-[calc(100vh-10rem)]" onMouseUp={isMouseDown ? () => { setIsMouseDown(false); setSelectionAction(null); } : undefined}>
             <div className="space-y-6">
                 <Card>
                     <CardHeader className="flex flex-row items-start justify-between">
@@ -417,7 +418,7 @@ export default function FallCreekPage() {
                         </Button>
                     </CardHeader>
                     <CardContent>
-                        <Accordion type="multiple" className="w-full">
+                        <Accordion type="multiple" value={openAccordions} onValueChange={setOpenAccordions} className="w-full">
                             {chambersWithFallCreekStock.map(chamberId => {
                                 const config = chambersConfig[chamberId];
                                 const occupancy = chamberOccupancy[chamberId];
@@ -505,7 +506,7 @@ export default function FallCreekPage() {
                                 </TableHeader>
                                 <TableBody>
                                 {filteredMovements.length > 0 ? filteredMovements.map(mov => {
-                                    const status = mov.status === 'Pendiente de Picking' ? 'En Proceso' : 'Completado';
+                                    const status = mov.status === 'Completado' ? 'Completado' : 'En Proceso';
                                     return (
                                         <TableRow key={mov.id}>
                                             <TableCell>{mov.createdAt?.toDate().toLocaleString()}</TableCell>
@@ -561,8 +562,8 @@ export default function FallCreekPage() {
             </div>
 
             {selectionMode && (
-                <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-20 w-full max-w-5xl px-4">
-                    <Card className="shadow-2xl bg-card/95 backdrop-blur-sm">
+                <div className="fixed bottom-0 left-0 w-full z-20 px-4 pb-4">
+                    <Card className="shadow-2xl bg-card/95 backdrop-blur-sm max-w-5xl mx-auto">
                          <CardHeader>
                             <CardTitle>{isEditing ? 'Editar Solicitud de Pre-Despacho' : 'Resumen de Pre-Despacho'}</CardTitle>
                         </CardHeader>
@@ -649,5 +650,3 @@ export default function FallCreekPage() {
         </div>
     );
 }
-
-    
