@@ -20,7 +20,7 @@ import { chambersConfig } from '@/lib/chambers-config';
 import { CheckCircle2, CircleDot, Eye, Pencil, Trash2, X } from 'lucide-react';
 import { Timestamp } from 'firebase/firestore';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger, AlertDialogDescription } from '@/components/ui/alert-dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 
@@ -404,7 +404,7 @@ export default function FallCreekPage() {
     }
     
     return (
-        <div className="relative min-h-[calc(100vh-10rem)]" onMouseUp={isMouseDown ? () => { setIsMouseDown(false); setSelectionAction(null); } : undefined}>
+        <div className="relative min-h-[calc(100vh-10rem)] pb-52" onMouseUp={isMouseDown ? () => { setIsMouseDown(false); setSelectionAction(null); } : undefined}>
             <div className="space-y-6">
                 <Card>
                     <CardHeader className="flex flex-row items-start justify-between">
@@ -418,7 +418,7 @@ export default function FallCreekPage() {
                         </Button>
                     </CardHeader>
                     <CardContent>
-                        <Accordion type="multiple" value={openAccordions} onValueChange={setOpenAccordions} className="w-full">
+                        <Accordion type="multiple" onValueChange={setOpenAccordions}>
                             {chambersWithFallCreekStock.map(chamberId => {
                                 const config = chambersConfig[chamberId];
                                 const occupancy = chamberOccupancy[chamberId];
@@ -562,7 +562,7 @@ export default function FallCreekPage() {
             </div>
 
             {selectionMode && (
-                <div className="fixed bottom-0 left-0 w-full z-20 px-4 pb-4">
+                <div className="fixed bottom-0 left-0 right-0 z-20 px-4 pb-4">
                     <Card className="shadow-2xl bg-card/95 backdrop-blur-sm max-w-5xl mx-auto">
                          <CardHeader>
                             <CardTitle>{isEditing ? 'Editar Solicitud de Pre-Despacho' : 'Resumen de Pre-Despacho'}</CardTitle>
