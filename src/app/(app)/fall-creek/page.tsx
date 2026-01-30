@@ -20,7 +20,9 @@ import { chambersConfig } from '@/lib/chambers-config';
 import { CheckCircle2, CircleDot, Eye, Pencil, Trash2, X } from 'lucide-react';
 import { Timestamp } from 'firebase/firestore';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
 
 
 const FALL_CREEK_CLIENT_NAME = 'FALL CREEK';
@@ -71,6 +73,7 @@ export default function FallCreekPage() {
     const [movementToView, setMovementToView] = React.useState<OtherFruitMovement | null>(null);
     const [editingMovement, setEditingMovement] = React.useState<OtherFruitMovement | null>(null);
     const isEditing = editingMovement !== null;
+    const [showOnlyPending, setShowOnlyPending] = React.useState(true);
     
 
     const fallCreekClient = React.useMemo(() => {
@@ -368,6 +371,13 @@ export default function FallCreekPage() {
             };
         });
     }, [fallCreekClient, allMovements]);
+
+    const filteredMovements = React.useMemo(() => {
+        if (showOnlyPending) {
+            return fallCreekMovements.filter(mov => mov.status === 'Pendiente de Picking');
+        }
+        return fallCreekMovements;
+    }, [fallCreekMovements, showOnlyPending]);
     
     const loading = loadingClients || loadingReceptions || loadingMovements || loadingChamberLots;
 
@@ -393,7 +403,7 @@ export default function FallCreekPage() {
     }
     
     return (
-        <div className="relative min-h-[calc(100vh-10rem)]" onMouseUp={isMouseDown ? () => { setIsMouseDown(false); setSelectionAction(null); } : undefined}>
+        <div className="relative min-h-[calc(100vh-10rem)] pb-52" onMouseUp={isMouseDown ? () => { setIsMouseDown(false); setSelectionAction(null); } : undefined}>
             <div className="space-y-6">
                 <Card>
                     <CardHeader className="flex flex-row items-start justify-between">
@@ -471,7 +481,15 @@ export default function FallCreekPage() {
                 </Card>
 
                 <Card>
-                    <CardHeader><CardTitle>Historial de Solicitudes</CardTitle></CardHeader>
+                    <CardHeader>
+                        <div className="flex justify-between items-center">
+                            <CardTitle>Historial de Solicitudes</CardTitle>
+                            <div className="flex items-center space-x-2">
+                                <Checkbox id="show-pending" checked={showOnlyPending} onCheckedChange={(checked) => setShowOnlyPending(!!checked)} />
+                                <Label htmlFor="show-pending">Solo Solicitudes Pendientes</Label>
+                            </div>
+                        </div>
+                    </CardHeader>
                     <CardContent>
                         <div className="rounded-md border max-h-96 overflow-y-auto">
                             <Table>
@@ -486,7 +504,8 @@ export default function FallCreekPage() {
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                {fallCreekMovements.length > 0 ? fallCreekMovements.map(mov => {
+                                {filteredMovements.length > 0 ? filteredMovements.map(mov => {
+                                    const status = mov.status === 'Pendiente de Picking' ? 'En Proceso' : mov.status;
                                     return (
                                         <TableRow key={mov.id}>
                                             <TableCell>{mov.createdAt?.toDate().toLocaleString()}</TableCell>
@@ -494,8 +513,8 @@ export default function FallCreekPage() {
                                             <TableCell className="font-mono text-xs">{mov.lotes}</TableCell>
                                             <TableCell>{mov.totalQuantity} {mov.unit}</TableCell>
                                             <TableCell>
-                                                <Badge variant={mov.status === 'Completado' ? 'default' : 'secondary'}>
-                                                    {mov.status === 'Pendiente de Picking' ? 'En Proceso' : mov.status}
+                                                <Badge variant={status === 'Completado' ? 'default' : 'secondary'}>
+                                                    {status}
                                                 </Badge>
                                             </TableCell>
                                             <TableCell className="text-right">
@@ -503,7 +522,7 @@ export default function FallCreekPage() {
                                                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setMovementToView(mov)}>
                                                         <Eye className="h-4 w-4" />
                                                     </Button>
-                                                    {mov.status !== 'Completado' && (
+                                                    {status !== 'Completado' && (
                                                         <>
                                                             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEditMovement(mov)}>
                                                                 <Pencil className="h-4 w-4" />
@@ -533,7 +552,7 @@ export default function FallCreekPage() {
                                             </TableCell>
                                         </TableRow>
                                     );
-                                }) : <TableRow><TableCell colSpan={6} className="h-24 text-center">No hay solicitudes de despacho.</TableCell></TableRow>}
+                                }) : <TableRow><TableCell colSpan={6} className="h-24 text-center">No hay solicitudes que coincidan con el filtro.</TableCell></TableRow>}
                                 </TableBody>
                             </Table>
                         </div>
@@ -562,26 +581,24 @@ export default function FallCreekPage() {
                                     <p className="text-3xl font-bold">{selectedSummary.totalQuantity} <span className="text-xl font-normal text-muted-foreground">{selectedSummary.unit}</span></p>
                                 </div>
                             </div>
-                            <div className="grid sm:grid-cols-3 gap-4 pt-4">
+                             <div className="grid sm:grid-cols-3 gap-4 pt-4">
                                 <div className="space-y-1">
-                                    <label htmlFor="dispatch-doc" className="text-sm font-medium">Documento Despacho (Opcional)</label>
-                                    <Input id="dispatch-doc" value={documentoDespacho} onChange={e => setDocumentoDespacho(e.target.value)} placeholder="Ej: Orden de Compra" />
+                                    <Label htmlFor="dispatch-doc">Documento Despacho</Label>
+                                    <Input id="dispatch-doc" value={documentoDespacho} onChange={e => setDocumentoDespacho(e.target.value)} placeholder="Opcional. Ej: OC-123" />
                                 </div>
                                 <div className="space-y-1">
-                                    <label htmlFor="dispatch-client" className="text-sm font-medium">Nombre Cliente Destino</label>
+                                    <Label htmlFor="dispatch-client">Nombre Cliente Destino</Label>
                                     <Input id="dispatch-client" value={clienteDestino} onChange={e => setClienteDestino(e.target.value)} placeholder="Ingrese nombre" />
                                 </div>
                                 <div className="space-y-1">
-                                    <label htmlFor="dispatch-rut" className="text-sm font-medium">RUT Cliente Destino</label>
+                                    <Label htmlFor="dispatch-rut">RUT Cliente Destino</Label>
                                     <Input id="dispatch-rut" value={rutDestino} onChange={e => setRutDestino(e.target.value)} placeholder="Ingrese RUT" />
                                 </div>
                             </div>
                             <div className="flex justify-end gap-2 pt-4">
-                                {isEditing && (
-                                     <Button onClick={handleToggleSelectionMode} variant="outline" size="lg" className="w-full sm:w-auto">
-                                        Cancelar Edición
-                                    </Button>
-                                )}
+                                <Button onClick={handleToggleSelectionMode} variant="outline" size="lg" className="w-full sm:w-auto">
+                                    {isEditing ? 'Cancelar Edición' : 'Cancelar Selección'}
+                                </Button>
                                 <Button onClick={handleSubmitPreDispatch} disabled={isSubmitting || selectedSummary.totalQuantity === 0} size="lg" className="w-full sm:w-auto">
                                     {isSubmitting ? (isEditing ? 'Guardando...' : 'Creando Solicitud...') : (isEditing ? 'Guardar Cambios' : 'Crear Solicitud de Pre-Despacho')}
                                 </Button>
