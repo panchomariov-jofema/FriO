@@ -3,13 +3,13 @@
 import * as React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
-import type { OtherClient, OtherFruitReception, OtherFruitMovement, StoredItem, ChamberLot } from '@/lib/types';
+import type { OtherClient, OtherFruitReception, OtherFruitMovement, StoredItem, ChamberLot, OtherFruitMovementLocation } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { useFirestore } from '@/firebase';
-import { collection, writeBatch, doc, serverTimestamp } from 'firebase/firestore';
+import { collection, writeBatch, doc, serverTimestamp, addDoc } from 'firebase/firestore';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -18,6 +18,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { cn } from '@/lib/utils';
 import { chambersConfig } from '@/lib/chambers-config';
 import { CheckCircle2, CircleDot, X } from 'lucide-react';
+import { Timestamp } from 'firebase/firestore';
 
 const FALL_CREEK_CLIENT_NAME = 'FALL CREEK';
 
@@ -204,75 +205,74 @@ export default function FallCreekPage() {
             toast({ variant: 'destructive', title: 'Error', description: 'Debe seleccionar al menos una coordenada.' });
             return;
         }
-
+    
         if (!firestore || !fallCreekClient) return;
-
+    
         setIsSubmitting(true);
         try {
-            const batch = writeBatch(firestore);
-            const receptionUpdates: Record<string, any> = {};
-            const movementItems: OtherFruitMovement['items'] = [];
-            
-            for(const item of selectedItems) {
-                if(!receptionUpdates[item.receptionId!]) {
-                     const originalReception = allReceptions.find(r => r.id === item.receptionId)!;
-                     receptionUpdates[item.receptionId!] = JSON.parse(JSON.stringify(originalReception.items));
+            // This is the detailed list for the picker
+            const locationsToPick: OtherFruitMovementLocation[] = selectedItems.map(item => ({
+                receptionId: item.receptionId!,
+                itemIndex: item.itemIndex,
+                quantity: item.quantity,
+                unit: item.unit,
+                productName: item.varietyOrProduct,
+                clientLotId: item.clientLotId,
+                location: {
+                    chamberId: item.chamberId,
+                    coordinate: item.coordinate
                 }
-                const itemToUpdate = receptionUpdates[item.receptionId!][item.itemIndex];
-                if(itemToUpdate) {
-                    itemToUpdate.status = 'Despachado'; // Reserve the stock
-                    
-                    const newItemForMovement: {
-                        productCode: string;
-                        productName: string;
-                        quantity: number;
-                        weight?: number;
-                        clientLotId?: string;
-                    } = {
-                        productCode: itemToUpdate.productCode,
-                        productName: itemToUpdate.productName,
-                        quantity: itemToUpdate.quantity,
+            }));
+    
+            // This is the summarized list for the movement record
+            const summaryItems = selectedItems.reduce((acc, item) => {
+                const key = item.varietyOrProduct; // Group by product name
+                if (!acc[key]) {
+                    acc[key] = {
+                        productCode: item.displayId, // Using displayId as productCode
+                        productName: item.varietyOrProduct,
+                        quantity: 0,
+                        clientLotIds: new Set<string>()
                     };
-
-                    if (typeof itemToUpdate.weight === 'number' && !isNaN(itemToUpdate.weight)) {
-                        newItemForMovement.weight = itemToUpdate.weight;
-                    }
-                    if (itemToUpdate.clientLotId) {
-                        newItemForMovement.clientLotId = itemToUpdate.clientLotId;
-                    }
-                    movementItems.push(newItemForMovement);
                 }
-            }
+                acc[key].quantity += item.quantity;
+                if(item.clientLotId) {
+                    acc[key].clientLotIds.add(item.clientLotId);
+                }
+                return acc;
+            }, {} as Record<string, { productCode: string; productName: string; quantity: number, clientLotIds: Set<string> }>);
             
-            Object.entries(receptionUpdates).forEach(([receptionId, updatedItems]) => {
-                const receptionRef = doc(firestore, 'otherFruitReceptions', receptionId);
-                // After marking items as 'Despachado', check the reception's overall status.
-                const allItemsGone = updatedItems.every((i: StoredItem) => i.status !== 'Pendiente de almacenar' && i.status !== 'Almacenado');
-                const newStatus = allItemsGone ? 'Despachado' : 'Parcialmente Almacenado'; // Or a more appropriate status
-                batch.update(receptionRef, { items: updatedItems, status: newStatus, updatedAt: serverTimestamp() });
-            });
-
-            const movementData: any = {
+            const movementItems = Object.values(summaryItems).map(summary => ({
+                productCode: summary.productCode,
+                productName: summary.productName,
+                quantity: summary.quantity,
+                clientLotId: Array.from(summary.clientLotIds).join(', ')
+            }));
+    
+            const movementData: Omit<OtherFruitMovement, 'id' | 'createdAt'> = {
                 type: 'salida',
                 clientId: fallCreekClient.clientId,
                 clientName: fallCreekClient.name,
                 unit: fallCreekClient.unit,
+                document: documentoDespacho || undefined,
+                destinationClientName: clienteDestino || undefined,
+                destinationClientRUT: rutDestino || undefined,
                 items: movementItems,
+                locations: locationsToPick,
+                status: 'Pendiente de Picking',
+            };
+    
+            // Add server timestamp just before sending
+            const finalMovementData = {
+                ...movementData,
                 createdAt: serverTimestamp(),
             };
-
-            if (documentoDespacho) movementData.document = documentoDespacho;
-            if (clienteDestino) movementData.destinationClientName = clienteDestino;
-            if (rutDestino) movementData.destinationClientRUT = rutDestino;
-
-            const newMovementRef = doc(collection(firestore, 'otherFruitMovements'));
-            batch.set(newMovementRef, movementData);
-
-            await batch.commit();
-
-            toast({ title: 'Éxito', description: 'Solicitud de Pre-Despacho creada correctamente.' });
-            handleToggleSelectionMode(); // Exit selection mode and clear state
-
+    
+            await addDoc(collection(firestore, 'otherFruitMovements'), finalMovementData);
+    
+            toast({ title: 'Éxito', description: 'Solicitud de Pre-Despacho creada y enviada a la bodega para picking.' });
+            handleToggleSelectionMode();
+    
         } catch (e) {
             console.error("Error creating pre-dispatch", e);
             toast({ variant: 'destructive', title: 'Error', description: 'Ocurrió un error al crear la solicitud.' });
@@ -304,8 +304,12 @@ export default function FallCreekPage() {
     const fallCreekMovements = React.useMemo(() => {
         if (!fallCreekClient || !allMovements) return [];
         const sortedMovements = (allMovements || [])
-            .filter(m => m.clientId === fallCreekClient.clientId && m.type === 'salida')
-            .sort((a,b) => (b.createdAt?.toMillis() ?? 0) - (a.createdAt?.toMillis() ?? 0));
+            .filter(m => m.clientId === fallCreekClient.clientId && m.type === 'salida' && m.status === 'Completado')
+            .sort((a,b) => {
+                if (!a.createdAt) return 1;
+                if (!b.createdAt) return -1;
+                return b.createdAt.toMillis() - a.createdAt.toMillis()
+            });
 
         return sortedMovements.map(mov => {
             const totalQuantity = mov.items.reduce((sum, item) => sum + item.quantity, 0);
@@ -481,7 +485,7 @@ export default function FallCreekPage() {
                                         <TableCell className="font-mono">{mov.document}</TableCell>
                                         <TableCell className="font-mono text-xs">{mov.lotes}</TableCell>
                                         <TableCell>{mov.totalQuantity} {mov.unit}</TableCell>
-                                        <TableCell><Badge>Enviado</Badge></TableCell>
+                                        <TableCell><Badge>Completado</Badge></TableCell>
                                     </TableRow>
                                 );
                             }) : <TableRow><TableCell colSpan={5} className="h-24 text-center">No hay solicitudes de despacho.</TableCell></TableRow>}
@@ -493,3 +497,5 @@ export default function FallCreekPage() {
         </div>
     );
 }
+
+    

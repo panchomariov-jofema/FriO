@@ -460,6 +460,35 @@
         "createdAt": {
           "type": "string",
           "format": "date-time"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["Pendiente de Picking", "Completado"],
+          "description": "The status of the exit movement, used for the picking process."
+        },
+        "locations": {
+          "type": "array",
+          "description": "Detailed list of items and their specific locations to be picked.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "receptionId": { "type": "string" },
+              "itemIndex": { "type": "number" },
+              "quantity": { "type": "number" },
+              "unit": { "type": "string", "enum": ["Bins", "Pallets"] },
+              "productName": { "type": "string" },
+              "clientLotId": { "type": "string" },
+              "location": {
+                "type": "object",
+                "properties": {
+                  "chamberId": { "type": "string" },
+                  "coordinate": { "type": "string" }
+                },
+                "required": ["chamberId", "coordinate"]
+              }
+            },
+            "required": ["receptionId", "itemIndex", "quantity", "unit", "productName", "location"]
+          }
         }
       },
       "required": ["type", "clientId", "clientName", "unit", "items", "createdAt"]
@@ -1191,3 +1220,4 @@
     "reasoning": "The Firestore data structure is designed to support the FrigoManager application, focusing on master data management and related operational modules.  The design prioritizes authorization independence and easy debugging. Each master data entity (Exporter, Producer, BinMaterial, OtherClient, PackagingMaster, UserMaster, Profile) is stored in its own top-level collection. This Structural Segregation ensures a homogeneous security posture for each entity type. The `exporterId`, `producerId`, `clientId`, and `profileId` fields are used as logical keys to relate data between modules, but are not used for access control.  User authentication is handled by Firebase Auth, and user roles can be managed through the `profiles` and `usersMaster` collections.  Since user roles are managed in the database, no custom claims are required. This design inherently supports QAPs because list operations are secured by collection-level rules, and all documents within a collection share the same security requirements.  There are no hierarchical dependencies, so complex filtering within rules is avoided."
   }
 }
+    

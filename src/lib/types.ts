@@ -257,7 +257,7 @@ export interface OtherFruitReceptionItem {
     productName: string;
     quantity: number;
     weight?: number;
-    status: 'Pendiente de almacenar' | 'Almacenado';
+    status: 'Pendiente de almacenar' | 'Almacenado' | 'Despachado';
     storageLocation?: {
       chamberId: string;
       coordinate: string;
@@ -274,9 +274,22 @@ export interface OtherFruitReception {
   document: string;
   temperature?: number;
   items: OtherFruitReceptionItem[];
-  status: 'Pendiente de almacenar' | 'Parcialmente Almacenado' | 'Almacenado';
+  status: 'Pendiente de almacenar' | 'Parcialmente Almacenado' | 'Almacenado' | 'Despachado';
   createdAt: Timestamp;
   updatedAt?: Timestamp;
+}
+
+export interface OtherFruitMovementLocation {
+  receptionId: string;
+  itemIndex: number;
+  quantity: number;
+  unit: 'Bins' | 'Pallets';
+  productName: string;
+  clientLotId?: string;
+  location: {
+    chamberId: string;
+    coordinate: string;
+  };
 }
 
 export interface OtherFruitMovement {
@@ -296,6 +309,8 @@ export interface OtherFruitMovement {
     clientLotId?: string;
   }[];
   createdAt: Timestamp;
+  status?: 'Pendiente de Picking' | 'Completado';
+  locations?: OtherFruitMovementLocation[];
 }
 
 // Unified type for any stored item in a chamber
@@ -318,3 +333,5 @@ export type StoredItem = {
 
 
 export type MasterData = Exporter | Producer | BinMaterial | OtherClient | PackagingMaster | UserMaster | Profile | Packing;
+
+    
