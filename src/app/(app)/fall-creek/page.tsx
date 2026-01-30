@@ -252,7 +252,7 @@ export default function FallCreekPage() {
                 </CardHeader>
                 <CardContent>
                     {chambersWithStock.length > 0 ? (
-                        <Accordion type="single" collapsible className="w-full" defaultValue={chambersWithStock[0][0]}>
+                        <Accordion type="single" collapsible className="w-full">
                             {chambersWithStock.map(([chamberId, config]) => (
                                 <AccordionItem value={chamberId} key={chamberId}>
                                     <AccordionTrigger>
