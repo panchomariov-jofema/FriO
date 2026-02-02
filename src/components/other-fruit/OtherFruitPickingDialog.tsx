@@ -14,10 +14,13 @@ import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '../ui/scroll-area';
-import { Download } from 'lucide-react';
+import { FileText } from 'lucide-react';
 import { Input } from '../ui/input';
 import { OtherFruitMovement, OtherFruitMovementLocation } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
+
 
 interface OtherFruitPickingDialogProps {
   movement: OtherFruitMovement | null;
@@ -29,31 +32,6 @@ interface OtherFruitPickingDialogProps {
 
 interface PickingItem extends OtherFruitMovementLocation {
     compositeKey: string;
-}
-
-function convertToCSV(data: any[], headers: {key: string, label: string}[]) {
-    const headerRow = headers.map(h => h.label).join(';');
-    const rows = data.map(row => 
-        headers.map(header => {
-            const stringValue = String(row[header.key] ?? '');
-            return `"${stringValue.replace(/"/g, '""')}"`;
-        }).join(';')
-    );
-    return [headerRow, ...rows].join('\n');
-}
-
-function downloadCSV(csvString: string, filename: string) {
-    const blob = new Blob([`\uFEFF${csvString}`], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    if (link.download !== undefined) {
-        const url = URL.createObjectURL(blob);
-        link.setAttribute('href', url);
-        link.setAttribute('download', filename);
-        link.style.visibility = 'hidden';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-    }
 }
 
 export function OtherFruitPickingDialog({ movement, open, onOpenChange, onConfirmExit, isConfirming }: OtherFruitPickingDialogProps) {
@@ -179,29 +157,41 @@ export function OtherFruitPickingDialog({ movement, open, onOpenChange, onConfir
   const allItemsCount = flatItems.length;
   const selectAllState = checkedCount === allItemsCount && allItemsCount > 0 ? true : checkedCount === 0 ? false : 'indeterminate';
   const allItemsPicked = allItemsCount > 0 && checkedCount === allItemsCount;
+  
+  const handleGeneratePDF = () => {
+    if (!movement) return;
 
-  const handleExportCSV = () => {
-    const dataToExport = flatItems.map(item => ({
-        lote_cliente: item.clientLotId || 'N/A',
-        producto: item.productName,
-        camara: item.location.chamberId,
-        coordenada: item.location.coordinate,
-        cantidad: quantities[item.compositeKey] ?? item.quantity,
-        unidad: item.unit
-    }));
+    const doc = new jsPDF();
     
-    const headers = [
-        { key: 'lote_cliente', label: 'Lote Cliente' },
-        { key: 'producto', label: 'Producto' },
-        { key: 'camara', label: 'Cámara' },
-        { key: 'coordenada', label: 'Coordenada' },
-        { key: 'cantidad', label: 'Cantidad a Retirar' },
-        { key: 'unidad', label: 'Unidad' },
-    ];
+    doc.setFontSize(18);
+    doc.text(`Picking de Despacho de Fruta: ${movement.clientName}`, 14, 22);
 
-    const csv = convertToCSV(dataToExport, headers);
-    const date = new Date().toISOString().split('T')[0];
-    downloadCSV(csv, `picking_fruta_${movement.clientName}_${date}.csv`);
+    doc.setFontSize(11);
+    doc.setTextColor(100);
+    doc.text(`Confirme la recolección física de cada artículo y ubicación.`, 14, 30);
+    
+    const tableData = flatItems.map(item => [
+      item.productName,
+      item.clientLotId || 'N/A',
+      `${item.location.chamberId} / ${item.location.coordinate}`,
+      quantities[item.compositeKey] ?? item.quantity,
+    ]);
+    
+    const tableHeaders = [['Producto', 'Lote Cliente', 'Ubicación', 'Cantidad a Retirar']];
+
+    (doc as any).autoTable({
+      startY: 35,
+      head: tableHeaders,
+      body: tableData,
+      theme: 'grid',
+      headStyles: { fillColor: [22, 163, 74] },
+    });
+    
+    const finalY = (doc as any).lastAutoTable.finalY;
+    doc.setFontSize(12);
+    doc.text(`Total a Retirar: ${totalPicked} ${movement.unit}`, 14, finalY + 10);
+    
+    doc.output('dataurlnewwindow');
   };
   
   const totalPicked = Object.values(quantities).reduce((sum, qty) => sum + qty, 0);
@@ -263,9 +253,9 @@ export function OtherFruitPickingDialog({ movement, open, onOpenChange, onConfir
           </ScrollArea>
         </div>
         <DialogFooter className="sm:justify-between pt-4">
-           <Button variant="outline" onClick={handleExportCSV}>
-            <Download className="mr-2 h-4 w-4" />
-            Exportar CSV
+           <Button variant="outline" onClick={handleGeneratePDF}>
+            <FileText className="mr-2 h-4 w-4" />
+            Generar PDF
           </Button>
           <div className="flex gap-2">
             <DialogClose asChild>
@@ -280,5 +270,3 @@ export function OtherFruitPickingDialog({ movement, open, onOpenChange, onConfir
     </Dialog>
   );
 }
-
-    
