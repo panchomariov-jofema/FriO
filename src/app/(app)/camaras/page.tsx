@@ -21,7 +21,7 @@ import { cn, naturalSort } from '@/lib/utils';
 import { Progress } from '@/components/ui/progress';
 import { RelocateLotDialog } from '@/components/camaras/RelocateLotDialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Trash2 } from 'lucide-react';
+import { Trash2, Upload } from 'lucide-react';
 import { ExternalReceptionUploader } from '@/components/hidrocooler/ExternalReceptionUploader';
 import { ChamberTemperatureInput } from '@/components/camaras/ChamberTemperatureInput';
 import { Label } from '@/components/ui/label';
@@ -230,26 +230,31 @@ export default function CamarasPage() {
     const chamberConfig = chambersConfig[chamberId];
   
     // Build the initial occupancy map from ALL stored items
-    const occupiedCoordinates = (allLotsInChambers || [])
+    const occupiedCoordinates = new Map<string, { displayLotId: string; binCount: number }[]>();
+
+    (allLotsInChambers || [])
       .filter(l => l.status === 'Almacenado' && l.chamberId === chamberId && l.coordinate)
-      .reduce((acc, lot) => {
-        if (!acc[lot.coordinate!]) acc[lot.coordinate!] = [];
-        acc[lot.coordinate!].push(lot);
-        return acc;
-    }, {} as Record<string, ChamberLot[]>);
+      .forEach(l => {
+          if (!occupiedCoordinates.has(l.coordinate!)) {
+              occupiedCoordinates.set(l.coordinate!, []);
+          }
+          occupiedCoordinates.get(l.coordinate!)!.push({ displayLotId: l.displayLotId, binCount: l.binCount });
+      });
     
     (otherFruitReceptions || []).forEach(reception => {
         reception.items.forEach(item => {
             if (item.status === 'Almacenado' && item.storageLocation?.chamberId === chamberId && item.storageLocation.coordinate) {
-                if (!occupiedCoordinates[item.storageLocation.coordinate]) {
-                    occupiedCoordinates[item.storageLocation.coordinate] = [];
+                 if (!occupiedCoordinates.has(item.storageLocation.coordinate)) {
+                    occupiedCoordinates.set(item.storageLocation.coordinate, []);
                 }
+                // Mark as a different lot to prevent mixing
+                occupiedCoordinates.get(item.storageLocation.coordinate)!.push({ displayLotId: `other_${reception.id}`, binCount: BINS_PER_COORDINATE });
             }
         });
     });
     
     const allPossibleCoordinates = chamberConfig.columns
-        .flatMap(col => chamberConfig.rows.map(row => `${col}${row}`))
+        .flatMap(col => col.rows.map(row => `${col.name}${row}`))
         .filter(coord => !chamberConfig.blocked?.includes(coord))
         .sort(naturalSort);
 
@@ -260,7 +265,7 @@ export default function CamarasPage() {
     for (const coord of allPossibleCoordinates) {
         if (binsToStore === 0) break;
 
-        const lotsInCoord = occupiedCoordinates[coord];
+        const lotsInCoord = occupiedCoordinates.get(coord);
         if (lotsInCoord && lotsInCoord.length > 0) {
             const isSameLot = lotsInCoord.every(l => l.displayLotId === lotToStore.displayLotId);
             if (isSameLot) {
@@ -283,25 +288,29 @@ export default function CamarasPage() {
                     binsToStore -= binsToAdd;
                     
                     // Live update local map
-                    occupiedCoordinates[coord].push({...lotToStore, binCount: binsToAdd} as ChamberLot);
+                    lotsInCoord.push({displayLotId: lotToStore.displayLotId, binCount: binsToAdd});
                 }
             }
         }
     }
     
-    // --- PASS 2: Fill empty coordinates starting from the user's selection ---
+    // --- PASS 2: Find the first available empty coordinate and store sequentially ---
     if (binsToStore > 0) {
-        const startIndex = allPossibleCoordinates.indexOf(startCoordinate);
-        if (startIndex === -1) {
-            toast({ variant: 'destructive', title: 'Error de Coordenada', description: 'La coordenada de inicio seleccionada ya no está disponible o es inválida.' });
+        // Find the first empty coordinate, ignoring user's startCoordinate for this pass
+        const firstEmptyCoord = allPossibleCoordinates.find(c => !occupiedCoordinates.has(c));
+
+        if (!firstEmptyCoord) {
+            toast({ variant: 'destructive', title: 'Error de espacio', description: `No hay coordenadas vacías en la cámara ${chamberConfig.name}.` });
             return;
         }
 
+        const startIndex = allPossibleCoordinates.indexOf(firstEmptyCoord);
         const coordinatesToSearch = allPossibleCoordinates.slice(startIndex);
+
         for (const coord of coordinatesToSearch) {
             if (binsToStore === 0) break;
 
-            if (!occupiedCoordinates[coord]) { // Check if the coordinate is truly empty
+            if (!occupiedCoordinates.has(coord)) { // Check if the coordinate is truly empty
                 const binsToAdd = Math.min(binsToStore, BINS_PER_COORDINATE);
                 
                 const newLotFractionRef = doc(collection(firestore, 'chamberLots'));
@@ -317,14 +326,14 @@ export default function CamarasPage() {
                 binsToStore -= binsToAdd;
                 
                 // Live update local map
-                occupiedCoordinates[coord] = [{...lotToStore, binCount: binsToAdd} as ChamberLot]; 
+                occupiedCoordinates.set(coord, [{displayLotId: lotToStore.displayLotId, binCount: binsToAdd}]);
             }
         }
     }
 
-
+    // This part of the logic is now less likely to be hit, but kept as a safeguard
     if (binsToStore > 0) {
-        toast({ variant: 'destructive', title: 'Error de espacio', description: `No se encontraron coordenadas suficientes para almacenar todos los bins desde la ubicación ${startCoordinate}. Quedaron ${binsToStore} sin almacenar.` });
+        toast({ variant: 'destructive', title: 'Error de espacio', description: `No se encontraron coordenadas suficientes para almacenar todos los bins. Quedaron ${binsToStore} sin almacenar.` });
         return;
     }
 
@@ -469,7 +478,9 @@ export default function CamarasPage() {
               <CardTitle>Lotes de Productor Pendientes</CardTitle>
               <CardDescription>Lotes que esperan ser asignados a una cámara.</CardDescription>
             </div>
-            <ExternalReceptionUploader />
+            <div className="hidden md:block">
+              <ExternalReceptionUploader />
+            </div>
         </CardHeader>
         <CardContent>
           <div className="rounded-md border">
@@ -505,6 +516,9 @@ export default function CamarasPage() {
                 )}
               </TableBody>
             </Table>
+          </div>
+          <div className="mt-4 md:hidden">
+            <ExternalReceptionUploader />
           </div>
         </CardContent>
       </Card>
@@ -586,7 +600,7 @@ export default function CamarasPage() {
                                 <div className="grid gap-1 min-w-[600px] sm:min-w-[800px]" style={{ gridTemplateColumns: `repeat(${config.columns.length}, minmax(0, 1fr))` }}>
                                 {config.rows.map(row =>
                                     config.columns.map(col => {
-                                    const coord = `${col}${row}`;
+                                    const coord = `${col.name}${row}`;
                                     const isBlocked = config.blocked?.includes(coord);
                                     const itemsInCoord = storedItemsByChamber[chamberId]?.[coord] || [];
                                     const isOccupied = itemsInCoord.length > 0;

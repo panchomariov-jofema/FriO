@@ -215,11 +215,15 @@ export interface ChamberLot {
     storedAt: Timestamp; // When it was put in the chamber
 }
 
+export interface ChamberColumn {
+    name: string;
+    id: string;
+}
 export interface Chamber {
     id: string;
     name: string;
     capacity: number;
-    columns: string[];
+    columns: ChamberColumn[];
     rows: number[];
     blocked?: string[];
 }
@@ -334,5 +338,3 @@ export type StoredItem = {
 
 
 export type MasterData = Exporter | Producer | BinMaterial | OtherClient | PackagingMaster | UserMaster | Profile | Packing;
-
-    
