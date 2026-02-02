@@ -58,7 +58,8 @@ export default function OtherFruitStockReportPage() {
                     productName: item.productName,
                     unit: reception.unit,
                     quantity: item.quantity,
-                    location: `${item.storageLocation!.chamberId} / ${item.storageLocation!.coordinate}`
+                    location: `${item.storageLocation!.chamberId} / ${item.storageLocation!.coordinate}`,
+                    receptionDate: reception.createdAt,
                 }))
         );
     }, [receptions]);
@@ -76,8 +77,9 @@ export default function OtherFruitStockReportPage() {
     }, [stockData]);
 
     const handleExport = () => {
-        const headers = ["Cliente", "Codigo Producto", "Nombre Producto", "Ubicacion", "Cantidad", "Unidad"];
+        const headers = ["Fecha Recepción", "Cliente", "Codigo Producto", "Nombre Producto", "Ubicacion", "Cantidad", "Unidad"];
         const dataToExport = filteredData.map(item => ({
+            "Fecha Recepción": item.receptionDate?.toDate(),
             "Cliente": item.clientName,
             "Codigo Producto": item.productCode,
             "Nombre Producto": item.productName,
@@ -119,6 +121,7 @@ export default function OtherFruitStockReportPage() {
                         <Table>
                             <TableHeader>
                                 <TableRow>
+                                    <TableHead>Fecha Recepción</TableHead>
                                     <TableHead>Cliente</TableHead>
                                     <TableHead>Cód. Producto</TableHead>
                                     <TableHead>Producto</TableHead>
@@ -129,10 +132,11 @@ export default function OtherFruitStockReportPage() {
                             </TableHeader>
                             <TableBody>
                                 {loadingReceptions ? (
-                                    Array.from({ length: 5 }).map((_, i) => <TableRow key={i}><TableCell colSpan={6}><Skeleton className="h-4 w-full" /></TableCell></TableRow>)
+                                    Array.from({ length: 5 }).map((_, i) => <TableRow key={i}><TableCell colSpan={7}><Skeleton className="h-4 w-full" /></TableCell></TableRow>)
                                 ) : filteredData.length > 0 ? (
                                     filteredData.map(item => (
                                         <TableRow key={item.id}>
+                                            <TableCell>{item.receptionDate?.toDate().toLocaleDateString()}</TableCell>
                                             <TableCell>{item.clientName}</TableCell>
                                             <TableCell>{item.productCode}</TableCell>
                                             <TableCell>{item.productName}</TableCell>
@@ -142,7 +146,7 @@ export default function OtherFruitStockReportPage() {
                                         </TableRow>
                                     ))
                                 ) : (
-                                    <TableRow><TableCell colSpan={6} className="h-24 text-center">No hay datos de stock para los filtros seleccionados.</TableCell></TableRow>
+                                    <TableRow><TableCell colSpan={7} className="h-24 text-center">No hay datos de stock para los filtros seleccionados.</TableCell></TableRow>
                                 )}
                             </TableBody>
                         </Table>
