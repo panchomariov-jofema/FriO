@@ -45,27 +45,9 @@ interface EntriesTabProps {
 
 // Rules for automatic calculation
 const calculationRules: Record<string, { binCode: string; related: Record<string, number> }> = {
-    'EXP001': { // SUBSOLE
-        binCode: '10001',
-        related: { 
-            '10002': 24,
-            '10003': 1,
-        }
-    },
-    'EXP002': { // MEYER
-        binCode: '10007',
-        related: { 
-            '10008': 24,
-            '10009': 1,
-        }
-    },
-    'EXP003': { // BLOSSOM
-        binCode: '10011',
-        related: { 
-            '10012': 24,
-            '10013': 1,
-        }
-    }
+    'EXP001': { binCode: '10001', related: { '10002': 24, '10003': 1 } },
+    'EXP002': { binCode: '10007', related: { '10008': 24, '10009': 1 } },
+    'EXP003': { binCode: '10011', related: { '10012': 24, '10013': 1 } }
 };
 
 export function EntriesTab({ exporterId, producerId, isDirectDispatch }: EntriesTabProps) {
@@ -80,40 +62,41 @@ export function EntriesTab({ exporterId, producerId, isDirectDispatch }: Entries
   });
 
   React.useEffect(() => {
-    const subscription = form.watch((value, { name, type }) => {
-      // We only care about changes to item quantities
+    const subscription = form.watch((_value, { name }) => {
+      // 1. Only act on quantity changes within the items array
       if (!name || !name.startsWith('items.') || !name.endsWith('.quantity')) {
         return;
       }
 
+      // 2. Get the rules for the current exporter
       const rules = calculationRules[exporterId];
-      // `value.items` holds the current state of the items array in the form
-      const allItems = value.items; 
-      
-      if (!rules || !allItems || allItems.length === 0) {
-        return;
-      }
+      if (!rules) return;
 
-      // Find the specific item that triggered the change
+      // 3. Get the most up-to-date form values
+      const allItems = form.getValues('items');
+      if (!allItems || allItems.length === 0) return;
+
+      // 4. Identify which item was changed
       const changedIndexMatch = name.match(/items\.(\d+)\.quantity/);
       if (!changedIndexMatch) return;
       
       const changedIndex = parseInt(changedIndexMatch[1], 10);
       const changedItem = allItems[changedIndex];
 
-      // Check if the item that changed is the primary "Bin" for the current rule
+      // 5. Check if the changed item is the PIVOT item
       if (changedItem && changedItem.binMaterialCode === rules.binCode) {
-        const binQuantity = changedItem.quantity;
+        const pivotQty = changedItem.quantity;
         
-        // Ensure quantity is a valid number before calculating
-        if (typeof binQuantity !== 'number' || isNaN(binQuantity)) return;
-        
-        // Now, update the related materials
+        // Ensure pivotQty is a valid number before calculating
+        if (typeof pivotQty !== 'number' || isNaN(pivotQty)) return;
+
+        // 6. Loop through related items and update their quantities
         Object.entries(rules.related).forEach(([relatedCode, multiplier]) => {
           const relatedItemIndex = allItems.findIndex(item => item.binMaterialCode === relatedCode);
+
           if (relatedItemIndex !== -1) {
-            const newVal = binQuantity * multiplier;
-            // Only update if the value is different to avoid infinite loops
+            const newVal = pivotQty * multiplier;
+            // Only update if the value is different to prevent infinite loops
             if (allItems[relatedItemIndex].quantity !== newVal) {
               form.setValue(`items.${relatedItemIndex}.quantity`, newVal, { shouldValidate: true });
             }
@@ -123,7 +106,7 @@ export function EntriesTab({ exporterId, producerId, isDirectDispatch }: Entries
     });
 
     return () => subscription.unsubscribe();
-  }, [form, exporterId]); // Re-subscribe if the form instance or exporterId changes
+  }, [form, exporterId]);
 
   React.useEffect(() => {
     if (materials.length > 0) {
