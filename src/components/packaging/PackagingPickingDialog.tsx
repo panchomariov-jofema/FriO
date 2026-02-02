@@ -14,12 +14,15 @@ import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '../ui/scroll-area';
-import { Download } from 'lucide-react';
+import { FileText } from 'lucide-react';
 import { z } from 'zod';
 import { packagingExitSchema } from '@/lib/schemas';
 import { Input } from '../ui/input';
 import { PackagingMovement, PackagingReception } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
+
 
 type ExitFormValues = z.infer<typeof packagingExitSchema>;
 
@@ -32,31 +35,6 @@ interface PackagingPickingDialogProps {
   clientName: string;
   allReceptions: PackagingReception[];
   loadingReceptions: boolean;
-}
-
-function convertToCSV(data: any[], headers: {key: string, label: string}[]) {
-    const headerRow = headers.map(h => h.label).join(';');
-    const rows = data.map(row => 
-        headers.map(header => {
-            const stringValue = String(row[header.key] ?? '');
-            return `"${stringValue.replace(/"/g, '""')}"`;
-        }).join(';')
-    );
-    return [headerRow, ...rows].join('\n');
-}
-
-function downloadCSV(csvString: string, filename: string) {
-    const blob = new Blob([`\uFEFF${csvString}`], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    if (link.download !== undefined) {
-        const url = URL.createObjectURL(blob);
-        link.setAttribute('href', url);
-        link.setAttribute('download', filename);
-        link.style.visibility = 'hidden';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-    }
 }
 
 // Helper to get a unique key for a location
@@ -253,27 +231,43 @@ export function PackagingPickingDialog({ movement, open, onOpenChange, onConfirm
   const selectAllState = checkedCount === allItemsCount && allItemsCount > 0 ? true : checkedCount === 0 ? false : 'indeterminate';
   const allItemsPicked = allItemsCount > 0 && checkedCount === allItemsCount;
 
-  const handleExportCSV = () => {
-    const dataToExport = flatItems.map(item => ({
-        codigo: item.itemCode,
-        articulo: item.itemName,
-        ubicacion: item.locationString,
-        cantidad: quantities[item.compositeKey] ?? item.palletsToWithdraw,
-    }));
-    
-    const headers = [
-        { key: 'codigo', label: 'Código' },
-        { key: 'articulo', label: 'Artículo' },
-        { key: 'ubicacion', label: 'Ubicación' },
-        { key: 'cantidad', label: 'Pallets a Retirar' },
-    ];
-
-    const csv = convertToCSV(dataToExport, headers);
-    const date = new Date().toISOString().split('T')[0];
-    downloadCSV(csv, `picking_embalaje_${clientName}_${date}.csv`);
-  };
-
   const totalPallets = Object.values(quantities).reduce((sum, qty) => sum + qty, 0);
+
+  const handleGeneratePDF = () => {
+    if (!movement) return;
+
+    const doc = new jsPDF();
+    
+    doc.setFontSize(18);
+    doc.text(`Picking de Salida de Embalaje: ${clientName}`, 14, 22);
+
+    doc.setFontSize(11);
+    doc.setTextColor(100);
+    doc.text(`Confirme la recolección física de cada artículo y ubicación.`, 14, 30);
+
+    const tableData = flatItems.map(item => [
+      item.itemName,
+      item.itemCode,
+      item.locationString,
+      quantities[item.compositeKey] ?? item.palletsToWithdraw,
+    ]);
+    
+    const tableHeaders = [['Artículo', 'Código', 'Ubicación', 'Pallets a Retirar']];
+
+    (doc as any).autoTable({
+      startY: 35,
+      head: tableHeaders,
+      body: tableData,
+      theme: 'grid',
+      headStyles: { fillColor: [22, 163, 74] },
+    });
+
+    const finalY = (doc as any).lastAutoTable.finalY;
+    doc.setFontSize(12);
+    doc.text(`Total a Retirar: ${totalPallets} pallets`, 14, finalY + 10);
+    
+    doc.output('dataurlnewwindow');
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -332,9 +326,9 @@ export function PackagingPickingDialog({ movement, open, onOpenChange, onConfirm
           </ScrollArea>
         </div>
         <DialogFooter className="sm:justify-between pt-4">
-           <Button variant="outline" onClick={handleExportCSV}>
-            <Download className="mr-2 h-4 w-4" />
-            Exportar CSV
+           <Button variant="outline" onClick={handleGeneratePDF}>
+            <FileText className="mr-2 h-4 w-4" />
+            Generar PDF
           </Button>
           <div className="flex gap-2">
             <DialogClose asChild>
