@@ -254,7 +254,7 @@ export default function CamarasPage() {
     });
     
     const allPossibleCoordinates = chamberConfig.columns
-        .flatMap(col => col.rows.map(row => `${col.name}${row}`))
+        .flatMap(col => chamberConfig.rows.map(row => `${col.name}${row}`))
         .filter(coord => !chamberConfig.blocked?.includes(coord))
         .sort(naturalSort);
 
