@@ -46,6 +46,11 @@ const reportList = [
         description: 'Historial de todas las temperaturas registradas en las cámaras.',
         href: '/reportes/registro-temperaturas'
     },
+    {
+        title: "Permanencia Stock (Otros Clientes)",
+        description: "Calcula los días de permanencia del stock de fruta de otros clientes.",
+        href: "/reportes/permanencia-stock-otros-clientes"
+    },
 ];
 
 export default function ReportesPage() {
