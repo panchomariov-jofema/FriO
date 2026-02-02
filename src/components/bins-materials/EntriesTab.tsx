@@ -79,31 +79,51 @@ export function EntriesTab({ exporterId, producerId, isDirectDispatch }: Entries
     defaultValues: { document: '', driverName: '', driverRUT: '', packingId: undefined, items: [] },
   });
 
-  const items = form.watch('items');
-  
   React.useEffect(() => {
-    const rules = calculationRules[exporterId];
-    if (!rules || !items || items.length === 0) return;
+    const subscription = form.watch((value, { name, type }) => {
+      // We only care about changes to item quantities
+      if (!name || !name.startsWith('items.') || !name.endsWith('.quantity')) {
+        return;
+      }
 
-    const binItem = items.find(item => item.binMaterialCode === rules.binCode);
-    if (!binItem) return;
+      const rules = calculationRules[exporterId];
+      // `value.items` holds the current state of the items array in the form
+      const allItems = value.items; 
+      
+      if (!rules || !allItems || allItems.length === 0) {
+        return;
+      }
 
-    const binQuantity = binItem.quantity;
-    
-    if (typeof binQuantity === 'undefined' || binQuantity === null) return;
+      // Find the specific item that triggered the change
+      const changedIndexMatch = name.match(/items\.(\d+)\.quantity/);
+      if (!changedIndexMatch) return;
+      
+      const changedIndex = parseInt(changedIndexMatch[1], 10);
+      const changedItem = allItems[changedIndex];
 
-    Object.entries(rules.related).forEach(([relatedCode, multiplier]) => {
-        const relatedItemIndex = items.findIndex(item => item.binMaterialCode === relatedCode);
-        if (relatedItemIndex !== -1) {
-            const currentVal = items[relatedItemIndex].quantity;
+      // Check if the item that changed is the primary "Bin" for the current rule
+      if (changedItem && changedItem.binMaterialCode === rules.binCode) {
+        const binQuantity = changedItem.quantity;
+        
+        // Ensure quantity is a valid number before calculating
+        if (typeof binQuantity !== 'number' || isNaN(binQuantity)) return;
+        
+        // Now, update the related materials
+        Object.entries(rules.related).forEach(([relatedCode, multiplier]) => {
+          const relatedItemIndex = allItems.findIndex(item => item.binMaterialCode === relatedCode);
+          if (relatedItemIndex !== -1) {
             const newVal = binQuantity * multiplier;
-            if (currentVal !== newVal) {
-                form.setValue(`items.${relatedItemIndex}.quantity`, newVal, { shouldValidate: true });
+            // Only update if the value is different to avoid infinite loops
+            if (allItems[relatedItemIndex].quantity !== newVal) {
+              form.setValue(`items.${relatedItemIndex}.quantity`, newVal, { shouldValidate: true });
             }
-        }
+          }
+        });
+      }
     });
 
-  }, [items, exporterId, form]);
+    return () => subscription.unsubscribe();
+  }, [form, exporterId]); // Re-subscribe if the form instance or exporterId changes
 
   React.useEffect(() => {
     if (materials.length > 0) {

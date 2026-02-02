@@ -93,32 +93,52 @@ export function ExitsTab({ exporterId, producerId }: ExitsTabProps) {
     form.setValue('document', String(nextExitNumber));
   }, [nextExitNumber, form]);
 
-  const items = form.watch('items');
-
   // Effect for automatic quantity calculation
   React.useEffect(() => {
-    const rules = calculationRules[exporterId];
-    if (!rules || !items || items.length === 0) return;
+    const subscription = form.watch((value, { name, type }) => {
+      // We only care about changes to item quantities
+      if (!name || !name.startsWith('items.') || !name.endsWith('.quantity')) {
+        return;
+      }
 
-    const binItem = items.find(item => item.binMaterialCode === rules.binCode);
-    if (!binItem) return;
+      const rules = calculationRules[exporterId];
+      // `value.items` holds the current state of the items array in the form
+      const allItems = value.items;
 
-    const binQuantity = binItem.quantity;
-    
-    if (typeof binQuantity === 'undefined' || binQuantity === null) return;
+      if (!rules || !allItems || allItems.length === 0) {
+        return;
+      }
 
-    Object.entries(rules.related).forEach(([relatedCode, multiplier]) => {
-        const relatedItemIndex = items.findIndex(item => item.binMaterialCode === relatedCode);
-        if (relatedItemIndex !== -1) {
-            const currentVal = items[relatedItemIndex].quantity;
+      // Find the specific item that triggered the change
+      const changedIndexMatch = name.match(/items\.(\d+)\.quantity/);
+      if (!changedIndexMatch) return;
+
+      const changedIndex = parseInt(changedIndexMatch[1], 10);
+      const changedItem = allItems[changedIndex];
+
+      // Check if the item that changed is the primary "Bin" for the current rule
+      if (changedItem && changedItem.binMaterialCode === rules.binCode) {
+        const binQuantity = changedItem.quantity;
+        
+        // Ensure quantity is a valid number before calculating
+        if (typeof binQuantity !== 'number' || isNaN(binQuantity)) return;
+
+        // Now, update the related materials
+        Object.entries(rules.related).forEach(([relatedCode, multiplier]) => {
+          const relatedItemIndex = allItems.findIndex(item => item.binMaterialCode === relatedCode);
+          if (relatedItemIndex !== -1) {
             const newVal = binQuantity * multiplier;
-            if (currentVal !== newVal) {
-                form.setValue(`items.${relatedItemIndex}.quantity`, newVal, { shouldValidate: true });
+            // Only update if the value is different to avoid infinite loops
+            if (allItems[relatedItemIndex].quantity !== newVal) {
+              form.setValue(`items.${relatedItemIndex}.quantity`, newVal, { shouldValidate: true });
             }
-        }
+          }
+        });
+      }
     });
 
-  }, [items, exporterId, form]);
+    return () => subscription.unsubscribe();
+  }, [form, exporterId]);
 
   const getStockForMaterial = React.useCallback((binMaterialId: string) => {
     const stockItem = stockData.find(s => s.exporterId === exporterId && s.binMaterialId === binMaterialId);
