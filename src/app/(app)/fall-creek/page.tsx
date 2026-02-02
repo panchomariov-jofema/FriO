@@ -437,7 +437,7 @@ export default function FallCreekPage() {
                                                 <div className="grid gap-1 min-w-[800px]" style={{ gridTemplateColumns: `repeat(${config.columns.length}, minmax(0, 1fr))` }}>
                                                     {config.rows.map(row =>
                                                         config.columns.map(col => {
-                                                            const coord = `${col}${row}`;
+                                                            const coord = `${col.name}${row}`;
                                                             if (config.blocked?.includes(coord)) {
                                                                 return <div key={coord} className="h-12 w-full rounded border-2 bg-gray-200 dark:bg-gray-700 relative"><div className="absolute inset-0 bg-repeat bg-[length:10px_10px]" style={{backgroundImage: "repeating-linear-gradient(-45deg, #a0aec0, #a0aec0 1px, transparent 1px, transparent 5px)"}} /></div>;
                                                             }
