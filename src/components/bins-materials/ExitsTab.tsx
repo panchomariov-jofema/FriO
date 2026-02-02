@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { useFirestore } from '@/firebase';
 import { collection, query, where, runTransaction, serverTimestamp, getDocs, doc } from 'firebase/firestore';
-import type { BinMaterialStock } from '@/lib/types';
+import type { BinMaterialStock, BinMaterialMovement } from '@/lib/types';
 import { useBinMaterialsByExporter } from '@/hooks/use-bin-materials-by-exporter';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
 import { errorEmitter } from '@/firebase/error-emitter';
@@ -62,13 +62,29 @@ export function ExitsTab({ exporterId, exporterName, producerId }: ExitsTabProps
   const { toast } = useToast();
   const firestore = useFirestore();
   const { materials, loading: loadingMaterials } = useBinMaterialsByExporter(exporterId);
-  
   const { data: stockData, loading: loadingStock } = useFirestoreCollection<BinMaterialStock>('binMaterialStock');
+  const { data: movements, loading: loadingMovements } = useFirestoreCollection<BinMaterialMovement>('binMaterialMovements');
+
 
   const form = useForm<MovementFormValues>({
     resolver: zodResolver(movementSchema),
     defaultValues: { document: '', driverName: '', driverRUT: '', items: [] },
   });
+
+  const nextExitNumber = React.useMemo(() => {
+    if (!movements) return 1;
+    const exitMovements = movements.filter(m => m.type === 'salida' && m.document && !isNaN(parseInt(m.document, 10)));
+    if (exitMovements.length === 0) return 1;
+    const maxNumber = exitMovements.reduce((max, mov) => {
+        const docNum = parseInt(mov.document, 10);
+        return docNum > max ? docNum : max;
+    }, 0);
+    return maxNumber + 1;
+  }, [movements]);
+
+  React.useEffect(() => {
+    form.setValue('document', String(nextExitNumber));
+  }, [nextExitNumber, form]);
 
   const items = form.watch('items');
 
@@ -110,9 +126,9 @@ export function ExitsTab({ exporterId, exporterName, producerId }: ExitsTabProps
   React.useEffect(() => {
     if (materials.length > 0) {
       form.reset({
-        document: form.getValues('document'),
-        driverName: form.getValues('driverName'),
-        driverRUT: form.getValues('driverRUT'),
+        document: String(nextExitNumber),
+        driverName: '',
+        driverRUT: '',
         items: materials.map(m => ({
           binMaterialId: m.id,
           binMaterialCode: m.code,
@@ -121,7 +137,7 @@ export function ExitsTab({ exporterId, exporterName, producerId }: ExitsTabProps
         })),
       });
     }
-  }, [materials, form]);
+  }, [materials, form, nextExitNumber]);
 
   const onSubmit = async (values: MovementFormValues) => {
     if (!firestore) return;
@@ -199,7 +215,7 @@ export function ExitsTab({ exporterId, exporterName, producerId }: ExitsTabProps
         binMaterialName: m.name,
         quantity: 0
       }));
-      form.reset({ document: '', driverName: '', driverRUT: '', items: resetItems });
+      form.reset({ document: String(nextExitNumber + 1), driverName: '', driverRUT: '', items: resetItems });
 
     } catch (error: any) {
       console.error('Error processing exit:', error);
@@ -211,14 +227,14 @@ export function ExitsTab({ exporterId, exporterName, producerId }: ExitsTabProps
     }
   };
   
-  const isLoading = loadingMaterials || loadingStock;
+  const isLoading = loadingMaterials || loadingStock || loadingMovements;
   const formItems = form.getValues('items');
 
   return (
     <Card>
       <CardHeader>
         <CardTitle>Registrar Salida</CardTitle>
-        <CardDescription>Ingrese un documento y las cantidades de los materiales que salen del inventario.</CardDescription>
+        <CardDescription>Ingrese las cantidades de los materiales que salen del inventario.</CardDescription>
       </CardHeader>
       <CardContent>
         <Form {...form}>
@@ -229,8 +245,8 @@ export function ExitsTab({ exporterId, exporterName, producerId }: ExitsTabProps
                 name="document"
                 render={({ field }) => (
                     <FormItem>
-                    <FormLabel>Documento de Salida</FormLabel>
-                    <FormControl><Input {...field} placeholder="Ej: Vale de Consumo 456" autoComplete="off" inputMode="numeric" /></FormControl>
+                    <FormLabel>N° de Salida</FormLabel>
+                    <FormControl><Input {...field} readOnly className="font-bold text-lg bg-muted" /></FormControl>
                     <FormMessage />
                     </FormItem>
                 )}
