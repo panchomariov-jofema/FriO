@@ -17,7 +17,7 @@ import { Badge } from '@/components/ui/badge';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { cn } from '@/lib/utils';
 import { chambersConfig } from '@/lib/chambers-config';
-import { CheckCircle2, CircleDot, Eye, Pencil, Trash2, X } from 'lucide-react';
+import { CheckCircle2, CircleDot, Eye, Pencil, Trash2, X, Move } from 'lucide-react';
 import { Timestamp } from 'firebase/firestore';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
@@ -76,6 +76,12 @@ export default function FallCreekPage() {
     const isEditing = editingMovement !== null;
     const [showOnlyPending, setShowOnlyPending] = React.useState(true);
     
+    // State for dragging the summary card
+    const [isDragging, setIsDragging] = React.useState(false);
+    const [cardPosition, setCardPosition] = React.useState({ x: 0, y: 0 });
+    const dragStartPos = React.useRef({ x: 0, y: 0 });
+    const initialCardPos = React.useRef({ x: 0, y: 0 });
+
 
     const fallCreekClient = React.useMemo(() => {
         if (!allClients) return null;
@@ -153,6 +159,38 @@ export default function FallCreekPage() {
         };
     }, []);
 
+    const handleDragStart = (e: React.MouseEvent<HTMLDivElement>) => {
+        setIsDragging(true);
+        dragStartPos.current = { x: e.clientX, y: e.clientY };
+        initialCardPos.current = { ...cardPosition };
+    };
+
+    React.useEffect(() => {
+        const handleDragMove = (e: MouseEvent) => {
+            if (!isDragging) return;
+            const dx = e.clientX - dragStartPos.current.x;
+            const dy = e.clientY - dragStartPos.current.y;
+            setCardPosition({
+                x: initialCardPos.current.x + dx,
+                y: initialCardPos.current.y + dy,
+            });
+        };
+
+        const handleDragEnd = () => {
+            setIsDragging(false);
+        };
+        
+        if (isDragging) {
+            window.addEventListener('mousemove', handleDragMove);
+            window.addEventListener('mouseup', handleDragEnd);
+        }
+
+        return () => {
+            window.removeEventListener('mousemove', handleDragMove);
+            window.removeEventListener('mouseup', handleDragEnd);
+        };
+    }, [isDragging]);
+
     const handleMouseDown = (chamberId: string, coord: string) => {
         if (!selectionMode) return;
         
@@ -199,6 +237,7 @@ export default function FallCreekPage() {
         setClienteDestino('');
         setRutDestino('');
         setEditingMovement(null);
+        setCardPosition({ x: 0, y: 0 });
     }
     
     const handleToggleSelectionMode = () => {
@@ -206,6 +245,8 @@ export default function FallCreekPage() {
         setSelectionMode(newMode);
         if (!newMode) {
             clearSelectionState();
+        } else {
+            setCardPosition({ x: 0, y: 0 });
         }
     };
     
@@ -305,6 +346,7 @@ export default function FallCreekPage() {
         setDocumentoDespacho(movementToEdit.document || '');
         setClienteDestino(movementToEdit.destinationClientName || '');
         setRutDestino(movementToEdit.destinationClientRUT || '');
+        setCardPosition({ x: 0, y: 0 });
 
         const initialSelectedCoords: Record<string, StoredItem[]> = {};
         if (movementToEdit.locations) {
@@ -562,10 +604,23 @@ export default function FallCreekPage() {
             </div>
 
             {selectionMode && (
-                <div className="fixed bottom-0 left-0 right-0 z-20 px-4 pb-4">
+                <div
+                    className="fixed z-20"
+                    style={{
+                        left: '50%',
+                        bottom: '1rem',
+                        transform: `translateX(-50%) translate(${cardPosition.x}px, ${cardPosition.y}px)`,
+                        width: 'calc(100% - 2rem)',
+                        maxWidth: '64rem',
+                    }}
+                >
                     <Card className="shadow-2xl bg-card/95 backdrop-blur-sm max-w-5xl mx-auto">
-                         <CardHeader>
+                         <CardHeader 
+                            onMouseDown={handleDragStart}
+                            className="cursor-move flex flex-row justify-between items-center"
+                         >
                             <CardTitle>{isEditing ? 'Editar Solicitud de Pre-Despacho' : 'Resumen de Pre-Despacho'}</CardTitle>
+                            <Move className="h-5 w-5 text-muted-foreground" />
                         </CardHeader>
                         <CardContent className="space-y-4">
                             <div className="grid md:grid-cols-2 gap-4">
