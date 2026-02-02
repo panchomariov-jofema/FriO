@@ -39,37 +39,36 @@ type MovementFormValues = z.infer<typeof movementSchema>;
 
 interface EntriesTabProps {
   exporterId: string;
-  exporterName?: string;
   producerId: string;
   isDirectDispatch: boolean;
 }
 
 // Rules for automatic calculation
 const calculationRules: Record<string, { binCode: string; related: Record<string, number> }> = {
-    'SUBSOLE': { 
-        binCode: '10001', // BINS GENERICO
+    'EXP001': { // SUBSOLE
+        binCode: '10001',
         related: { 
-            '10002': 24, // TOTES PLASTICO
-            '10003': 1,  // LAMINA
+            '10002': 24,
+            '10003': 1,
         }
     },
-    'MEYER': {
-        binCode: '10007', // Bins Verde
+    'EXP002': { // MEYER
+        binCode: '10007',
         related: { 
-            '10008': 24, // Totes Verde
-            '10009': 1,  // Esponja
+            '10008': 24,
+            '10009': 1,
         }
     },
-    'BLOSSOM': {
-        binCode: '10011', // Bins
+    'EXP003': { // BLOSSOM
+        binCode: '10011',
         related: { 
-            '10012': 24, // Totes
-            '10013': 1,  // Esponja
+            '10012': 24,
+            '10013': 1,
         }
     }
 };
 
-export function EntriesTab({ exporterId, exporterName, producerId, isDirectDispatch }: EntriesTabProps) {
+export function EntriesTab({ exporterId, producerId, isDirectDispatch }: EntriesTabProps) {
   const { toast } = useToast();
   const firestore = useFirestore();
   const { materials, loading: loadingMaterials } = useBinMaterialsByExporter(exporterId);
@@ -83,8 +82,7 @@ export function EntriesTab({ exporterId, exporterName, producerId, isDirectDispa
   const items = form.watch('items');
   
   React.useEffect(() => {
-    if (!exporterName) return;
-    const rules = calculationRules[exporterName.toUpperCase()];
+    const rules = calculationRules[exporterId];
     if (!rules || !items || items.length === 0) return;
 
     const binItem = items.find(item => item.binMaterialCode === rules.binCode);
@@ -105,7 +103,7 @@ export function EntriesTab({ exporterId, exporterName, producerId, isDirectDispa
         }
     });
 
-  }, [items, exporterName, form]);
+  }, [items, exporterId, form]);
 
   React.useEffect(() => {
     if (materials.length > 0) {

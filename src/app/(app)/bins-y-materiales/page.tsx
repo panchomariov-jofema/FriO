@@ -21,11 +21,6 @@ export default function BinsYMaterialesPage() {
   const { data: exporters, loading: loadingExporters } = useFirestoreCollection<Exporter>('exporters');
   const { data: producers, loading: loadingProducers } = useProducersByExporter(selectedExporterId);
 
-  const selectedExporter = React.useMemo(() => {
-    if (!selectedExporterId) return null;
-    return exporters.find(e => e.exporterId === selectedExporterId);
-  }, [selectedExporterId, exporters]);
-
   return (
     <div className="space-y-4">
       <Card>
@@ -104,7 +99,6 @@ export default function BinsYMaterialesPage() {
              {selectedExporterId && selectedProducerId ? (
                 <EntriesTab 
                   exporterId={selectedExporterId} 
-                  exporterName={selectedExporter?.name}
                   producerId={selectedProducerId} 
                   isDirectDispatch={isDirectDispatch} 
                 />
@@ -120,7 +114,6 @@ export default function BinsYMaterialesPage() {
               {selectedExporterId && selectedProducerId ? (
                 <ExitsTab 
                   exporterId={selectedExporterId}
-                  exporterName={selectedExporter?.name}
                   producerId={selectedProducerId} 
                 />
                ) : (

@@ -37,37 +37,36 @@ type MovementFormValues = z.infer<typeof movementSchema>;
 
 interface ExitsTabProps {
   exporterId: string;
-  exporterName?: string;
   producerId: string;
 }
 
 // Rules for automatic calculation
 const calculationRules: Record<string, { binCode: string; related: Record<string, number> }> = {
-    'SUBSOLE': { 
-        binCode: '10001', // BINS GENERICO
+    'EXP001': { // SUBSOLE
+        binCode: '10001',
         related: { 
-            '10002': 24, // TOTES PLASTICO
-            '10003': 1,  // LAMINA
+            '10002': 24,
+            '10003': 1,
         }
     },
-    'MEYER': {
-        binCode: '10007', // Bins Verde
+    'EXP002': { // MEYER
+        binCode: '10007',
         related: { 
-            '10008': 24, // Totes Verde
-            '10009': 1,  // Esponja
+            '10008': 24,
+            '10009': 1,
         }
     },
-    'BLOSSOM': {
-        binCode: '10011', // Bins
+    'EXP003': { // BLOSSOM
+        binCode: '10011',
         related: { 
-            '10012': 24, // Totes
-            '10013': 1,  // Esponja
+            '10012': 24,
+            '10013': 1,
         }
     }
 };
 
 
-export function ExitsTab({ exporterId, exporterName, producerId }: ExitsTabProps) {
+export function ExitsTab({ exporterId, producerId }: ExitsTabProps) {
   const { toast } = useToast();
   const firestore = useFirestore();
   const { materials, loading: loadingMaterials } = useBinMaterialsByExporter(exporterId);
@@ -98,9 +97,7 @@ export function ExitsTab({ exporterId, exporterName, producerId }: ExitsTabProps
 
   // Effect for automatic quantity calculation
   React.useEffect(() => {
-    if (!exporterName) return;
-    const rules = calculationRules[exporterName.toUpperCase()];
-    // Guard against running when data is not ready
+    const rules = calculationRules[exporterId];
     if (!rules || !items || items.length === 0) return;
 
     const binItem = items.find(item => item.binMaterialCode === rules.binCode);
@@ -108,7 +105,6 @@ export function ExitsTab({ exporterId, exporterName, producerId }: ExitsTabProps
 
     const binQuantity = binItem.quantity;
     
-    // This check prevents the effect from running when the form is resetting
     if (typeof binQuantity === 'undefined' || binQuantity === null) return;
 
     Object.entries(rules.related).forEach(([relatedCode, multiplier]) => {
@@ -117,13 +113,12 @@ export function ExitsTab({ exporterId, exporterName, producerId }: ExitsTabProps
             const currentVal = items[relatedItemIndex].quantity;
             const newVal = binQuantity * multiplier;
             if (currentVal !== newVal) {
-                // Set value and trigger validation
                 form.setValue(`items.${relatedItemIndex}.quantity`, newVal, { shouldValidate: true });
             }
         }
     });
 
-  }, [items, exporterName, form]);
+  }, [items, exporterId, form]);
 
   const getStockForMaterial = React.useCallback((binMaterialId: string) => {
     const stockItem = stockData.find(s => s.exporterId === exporterId && s.binMaterialId === binMaterialId);
