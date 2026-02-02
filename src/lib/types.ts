@@ -33,6 +33,7 @@ export interface BinMaterialMovement {
   driverRUT: string;
   exporterId: string;
   producerId: string;
+  packingId?: string | null;
   items: {
     binMaterialId: string;
     binMaterialCode: string;

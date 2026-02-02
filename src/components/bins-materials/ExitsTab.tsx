@@ -18,6 +18,8 @@ import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { Table, TableBody, TableCell, TableHeader, TableRow, TableHead } from '../ui/table';
 import { Skeleton } from '../ui/skeleton';
+import { usePackingsByExporter } from '@/hooks/use-packings-by-exporter';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 
 const movementItemSchema = z.object({
   binMaterialId: z.string(),
@@ -30,6 +32,7 @@ const movementSchema = z.object({
   document: z.string().min(1, 'El documento es obligatorio.'),
   driverName: z.string().min(1, 'El nombre del conductor es obligatorio.'),
   driverRUT: z.string().min(1, 'El RUT del conductor es obligatorio.'),
+  packingId: z.string().optional(),
   items: z.array(movementItemSchema),
 });
 
@@ -64,11 +67,12 @@ export function ExitsTab({ exporterId, exporterName, producerId }: ExitsTabProps
   const { materials, loading: loadingMaterials } = useBinMaterialsByExporter(exporterId);
   const { data: stockData, loading: loadingStock } = useFirestoreCollection<BinMaterialStock>('binMaterialStock');
   const { data: movements, loading: loadingMovements } = useFirestoreCollection<BinMaterialMovement>('binMaterialMovements');
+  const { data: packings, loading: loadingPackings } = usePackingsByExporter(exporterId);
 
 
   const form = useForm<MovementFormValues>({
     resolver: zodResolver(movementSchema),
-    defaultValues: { document: '', driverName: '', driverRUT: '', items: [] },
+    defaultValues: { document: '', driverName: '', driverRUT: '', packingId: undefined, items: [] },
   });
 
   const nextExitNumber = React.useMemo(() => {
@@ -129,6 +133,7 @@ export function ExitsTab({ exporterId, exporterName, producerId }: ExitsTabProps
         document: String(nextExitNumber),
         driverName: '',
         driverRUT: '',
+        packingId: undefined,
         items: materials.map(m => ({
           binMaterialId: m.id,
           binMaterialCode: m.code,
@@ -173,6 +178,7 @@ export function ExitsTab({ exporterId, exporterName, producerId }: ExitsTabProps
           document: values.document,
           driverName: values.driverName,
           driverRUT: values.driverRUT,
+          packingId: values.packingId || null,
           exporterId,
           producerId,
           items: itemsToProcess,
@@ -215,7 +221,7 @@ export function ExitsTab({ exporterId, exporterName, producerId }: ExitsTabProps
         binMaterialName: m.name,
         quantity: 0
       }));
-      form.reset({ document: String(nextExitNumber + 1), driverName: '', driverRUT: '', items: resetItems });
+      form.reset({ document: String(nextExitNumber + 1), driverName: '', driverRUT: '', packingId: undefined, items: resetItems });
 
     } catch (error: any) {
       console.error('Error processing exit:', error);
@@ -227,7 +233,7 @@ export function ExitsTab({ exporterId, exporterName, producerId }: ExitsTabProps
     }
   };
   
-  const isLoading = loadingMaterials || loadingStock || loadingMovements;
+  const isLoading = loadingMaterials || loadingStock || loadingMovements || loadingPackings;
   const formItems = form.getValues('items');
 
   return (
@@ -239,7 +245,7 @@ export function ExitsTab({ exporterId, exporterName, producerId }: ExitsTabProps
       <CardContent>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
                 <FormField
                 control={form.control}
                 name="document"
@@ -271,6 +277,28 @@ export function ExitsTab({ exporterId, exporterName, producerId }: ExitsTabProps
                     <FormControl><Input {...field} autoComplete="off" inputMode="numeric" /></FormControl>
                     <FormMessage />
                   </FormItem>
+                )}
+              />
+               <FormField
+                control={form.control}
+                name="packingId"
+                render={({ field }) => (
+                    <FormItem>
+                        <FormLabel>Packing</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value} disabled={!exporterId || loadingPackings}>
+                            <FormControl>
+                                <SelectTrigger>
+                                    <SelectValue placeholder={!exporterId ? 'Seleccione exportador' : 'Opcional...'} />
+                                </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                                {packings?.map(p => (
+                                    <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                        <FormMessage />
+                    </FormItem>
                 )}
               />
             </div>
