@@ -261,19 +261,26 @@ export default function FallCreekPage() {
     
         setIsSubmitting(true);
         try {
-            const locationsToPick: OtherFruitMovementLocation[] = selectedItems.map(item => ({
-                receptionId: item.receptionId!,
-                itemIndex: item.itemIndex,
-                quantity: item.quantity,
-                unit: item.unit,
-                productCode: item.displayId,
-                productName: item.varietyOrProduct,
-                clientLotId: item.clientLotId,
-                location: {
-                    chamberId: item.chamberId,
-                    coordinate: item.coordinate
+            const locationsToPick: OtherFruitMovementLocation[] = selectedItems.map(item => {
+                const location: OtherFruitMovementLocation = {
+                    receptionId: item.receptionId!,
+                    itemIndex: item.itemIndex,
+                    quantity: item.quantity,
+                    unit: item.unit,
+                    productCode: item.displayId,
+                    productName: item.varietyOrProduct,
+                    location: {
+                        chamberId: item.chamberId,
+                        coordinate: item.coordinate,
+                    },
+                };
+        
+                if (item.clientLotId) {
+                    location.clientLotId = item.clientLotId;
                 }
-            }));
+        
+                return location;
+            });
     
             const summaryItems = selectedItems.reduce((acc, item) => {
                 const key = item.displayId;
