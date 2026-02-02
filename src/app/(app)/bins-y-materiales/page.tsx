@@ -94,7 +94,7 @@ export default function BinsYMaterialesPage() {
         </CardContent>
       </Card>
       
-      <Tabs defaultValue="entradas" className="w-full">
+      <Tabs defaultValue="salidas" className="w-full">
           <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="entradas" disabled={!selectedExporterId || !selectedProducerId}>Entradas</TabsTrigger>
               <TabsTrigger value="salidas" disabled={!selectedExporterId || !selectedProducerId}>Salidas</TabsTrigger>
