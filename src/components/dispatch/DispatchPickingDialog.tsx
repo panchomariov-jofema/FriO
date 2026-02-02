@@ -15,9 +15,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 import type { Dispatch } from '@/lib/types';
 import { ScrollArea } from '../ui/scroll-area';
-import { Download } from 'lucide-react';
+import { FileText } from 'lucide-react';
 import { naturalSort } from '@/lib/utils';
 import { Input } from '../ui/input';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
+
 
 interface DispatchPickingDialogProps {
   dispatch: Dispatch | null;
@@ -25,31 +28,6 @@ interface DispatchPickingDialogProps {
   onOpenChange: (open: boolean) => void;
   onConfirmDispatch: (dispatch: Dispatch, quantities: Record<string, number>) => void;
   isConfirming: boolean;
-}
-
-function convertToCSV(data: any[], headers: {key: string, label: string}[]) {
-    const headerRow = headers.map(h => h.label).join(';');
-    const rows = data.map(row => 
-        headers.map(header => {
-            const stringValue = String(row[header.key] ?? '');
-            return `"${stringValue.replace(/"/g, '""')}"`;
-        }).join(';')
-    );
-    return [headerRow, ...rows].join('\n');
-}
-
-function downloadCSV(csvString: string, filename: string) {
-    const blob = new Blob([`\uFEFF${csvString}`], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    if (link.download !== undefined) {
-        const url = URL.createObjectURL(blob);
-        link.setAttribute('href', url);
-        link.setAttribute('download', filename);
-        link.style.visibility = 'hidden';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-    }
 }
 
 export function DispatchPickingDialog({ dispatch, open, onOpenChange, onConfirmDispatch, isConfirming }: DispatchPickingDialogProps) {
@@ -111,25 +89,47 @@ export function DispatchPickingDialog({ dispatch, open, onOpenChange, onConfirmD
   const allItemsCount = allItems.length;
   const selectAllState = checkedCount === allItemsCount && allItemsCount > 0 ? true : checkedCount === 0 ? false : 'indeterminate';
 
-  const handleExportCSV = () => {
-    const dataToExport = allItems.map(item => ({
-        lote: item.displayLotId,
-        camara: item.chamberId,
-        coordenada: item.coordinate,
-        bins: quantities[item.chamberLotId] ?? item.binCount,
-    }));
+  const handleGeneratePDF = () => {
+    if (!dispatch) return;
+
+    const doc = new jsPDF();
     
-    const headers = [
-        { key: 'lote', label: 'Lote' },
-        { key: 'camara', label: 'Cámara' },
-        { key: 'coordenada', label: 'Coordenada' },
-        { key: 'bins', label: 'Bins' },
-    ];
+    // Title
+    doc.setFontSize(18);
+    doc.text(`Picking de Despacho: ${dispatch.exporterName}`, 14, 22);
+
+    // Subtitle
+    doc.setFontSize(11);
+    doc.setTextColor(100);
+    doc.text(`Confirme la recolección física de cada ubicación.`, 14, 30);
+
+
+    // Table data
+    const tableData = allItems.map(item => [
+      item.displayLotId,
+      item.chamberId,
+      item.coordinate,
+      quantities[item.chamberLotId] ?? item.binCount,
+    ]);
     
-    const csv = convertToCSV(dataToExport, headers);
-    const date = new Date().toISOString().split('T')[0];
-    downloadCSV(csv, `picking_despacho_${dispatch.exporterName}_${date}.csv`);
-  };
+    const tableHeaders = [['Lote', 'Cámara', 'Coordenada', 'Bins']];
+
+    (doc as any).autoTable({
+      startY: 35,
+      head: tableHeaders,
+      body: tableData,
+      theme: 'grid',
+      headStyles: { fillColor: [22, 163, 74] }, // A green color for header
+    });
+    
+    // Total
+    const finalY = (doc as any).lastAutoTable.finalY;
+    doc.setFontSize(12);
+    doc.text(`Total a Despachar: ${totalPickedBins} bins`, 14, finalY + 10);
+    
+    // Open in new window
+    doc.output('dataurlnewwindow');
+};
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -185,9 +185,9 @@ export function DispatchPickingDialog({ dispatch, open, onOpenChange, onConfirmD
           </Table>
         </div>
         <DialogFooter className="sm:justify-between pt-4">
-           <Button variant="outline" onClick={handleExportCSV}>
-            <Download className="mr-2 h-4 w-4" />
-            Exportar CSV
+           <Button variant="outline" onClick={handleGeneratePDF}>
+            <FileText className="mr-2 h-4 w-4" />
+            Generar PDF
           </Button>
           <div className="flex gap-2">
             <DialogClose asChild>
