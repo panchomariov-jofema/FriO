@@ -8,8 +8,20 @@ import { OtherFruitStorageTab } from '@/components/other-fruit/StorageTab';
 import { OtherFruitExitTab } from '@/components/other-fruit/ExitTab';
 import { StockAndRelocationTab } from '@/components/other-fruit/StockAndRelocationTab';
 import { OtherFruitPickingTab } from '@/components/other-fruit/PickingTab';
+import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
+import type { OtherFruitMovement } from '@/lib/types';
+import { Badge } from '@/components/ui/badge';
 
 export default function OtrosHortofruticolasPage() {
+    const { data: otherFruitMovements } = useFirestoreCollection<OtherFruitMovement>('otherFruitMovements');
+
+    const pendingPickingCount = React.useMemo(() => {
+        if (!otherFruitMovements) return 0;
+        return (otherFruitMovements || []).filter(
+            (mov) => mov.type === 'salida' && mov.status === 'Pendiente de Picking'
+        ).length;
+    }, [otherFruitMovements]);
+
     return (
         <div className="space-y-4">
             <Card>
@@ -24,7 +36,12 @@ export default function OtrosHortofruticolasPage() {
                     <TabsTrigger value="recepcion">Recepción</TabsTrigger>
                     <TabsTrigger value="almacenamiento">Almacenamiento</TabsTrigger>
                     <TabsTrigger value="salidas">Despacho</TabsTrigger>
-                    <TabsTrigger value="picking">Picking</TabsTrigger>
+                    <TabsTrigger value="picking" className="flex items-center gap-2">
+                        Picking
+                        {pendingPickingCount > 0 && (
+                            <Badge className="h-5 w-5 p-0 flex items-center justify-center">{pendingPickingCount}</Badge>
+                        )}
+                    </TabsTrigger>
                     <TabsTrigger value="stock">Stock</TabsTrigger>
                 </TabsList>
                 
@@ -51,5 +68,3 @@ export default function OtrosHortofruticolasPage() {
         </div>
     );
 }
-
-    

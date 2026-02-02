@@ -14,15 +14,24 @@ import { collection, getDocs, writeBatch } from 'firebase/firestore';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
-import type { PackagingReception } from '@/lib/types';
+import type { PackagingReception, PackagingMovement } from '@/lib/types';
 import { ExitTab } from '@/components/packaging/ExitTab';
 import { StockAndRelocationTab } from '@/components/packaging/StockAndRelocationTab';
 import { PendingPickingTab } from '@/components/packaging/PendingPickingTab';
+import { Badge } from '@/components/ui/badge';
 
 export default function EmbalajesPage() {
   const firestore = useFirestore();
   const { toast } = useToast();
   const { data: packagingReceptions } = useFirestoreCollection<PackagingReception>('packagingReceptions');
+  const { data: packagingMovements } = useFirestoreCollection<PackagingMovement>('packagingMovements');
+
+  const pendingPickingCount = React.useMemo(() => {
+    if (!packagingMovements) return 0;
+    return packagingMovements.filter(
+      (mov) => mov.type === 'salida' && mov.status === 'Pendiente de Picking'
+    ).length;
+  }, [packagingMovements]);
 
 
   const handleClearStock = async () => {
@@ -92,7 +101,12 @@ export default function EmbalajesPage() {
               <TabsTrigger value="recepcion">Recepción</TabsTrigger>
               <TabsTrigger value="almacenamiento">Almacenamiento</TabsTrigger>
               <TabsTrigger value="salidas">Despacho</TabsTrigger>
-              <TabsTrigger value="picking">Picking</TabsTrigger>
+              <TabsTrigger value="picking" className="flex items-center gap-2">
+                Picking
+                {pendingPickingCount > 0 && (
+                  <Badge className="h-5 w-5 p-0 flex items-center justify-center">{pendingPickingCount}</Badge>
+                )}
+              </TabsTrigger>
               <TabsTrigger value="stock">Stock</TabsTrigger>
             </TabsList>
           </CardContent>
