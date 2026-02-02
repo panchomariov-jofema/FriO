@@ -93,14 +93,14 @@ export default function DispatchReportPage() {
             totalNetWeight: dispatch.totalNetWeight ? dispatch.totalNetWeight.toFixed(2) : '0.00',
         }));
         const csv = convertToCSV(dataForExport, headers);
-        downloadCSV(csv, 'reporte_packing.csv');
+        downloadCSV(csv, 'reporte_despachos.csv');
     };
     
     return (
         <div className="space-y-6">
             <ReportHeader
-                title="Reporte de Packing"
-                description="Listado de todos los packings creados."
+                title="Reporte de Despachos"
+                description="Listado de todos los despachos creados."
                 onExport={handleExport}
                 isExportDisabled={loading || reportData.length === 0}
             />
