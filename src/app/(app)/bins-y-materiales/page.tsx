@@ -34,7 +34,7 @@ export default function BinsYMaterialesPage() {
           <CardDescription>Seleccione un exportador y productor para gestionar el inventario.</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 items-end">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-2">
               <Label htmlFor="exporter-select">Exportador</Label>
               <Select
@@ -76,7 +76,7 @@ export default function BinsYMaterialesPage() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="flex items-center space-x-2 pb-2">
+            <div className="flex items-center space-x-2 pt-4 md:pt-0 md:self-end md:pb-1">
                 <Checkbox 
                     id="direct-dispatch" 
                     checked={isDirectDispatch}
@@ -100,7 +100,7 @@ export default function BinsYMaterialesPage() {
               <TabsTrigger value="salidas" disabled={!selectedExporterId || !selectedProducerId}>Salidas</TabsTrigger>
               <TabsTrigger value="stock">Stock</TabsTrigger>
           </TabsList>
-          <TabsContent value="entradas">
+          <TabsContent value="entradas" className="mt-4">
              {selectedExporterId && selectedProducerId ? (
                 <EntriesTab 
                   exporterId={selectedExporterId} 
@@ -110,13 +110,13 @@ export default function BinsYMaterialesPage() {
                 />
               ) : (
                 <Card className="mt-4 flex items-center justify-center h-64 border-dashed">
-                    <CardContent className="text-center">
+                    <CardContent className="pt-6 text-center">
                         <p className="text-muted-foreground">Seleccione un exportador y un productor para registrar entradas.</p>
                     </CardContent>
                 </Card>
             )}
           </TabsContent>
-          <TabsContent value="salidas">
+          <TabsContent value="salidas" className="mt-4">
               {selectedExporterId && selectedProducerId ? (
                 <ExitsTab 
                   exporterId={selectedExporterId}
@@ -125,13 +125,13 @@ export default function BinsYMaterialesPage() {
                 />
                ) : (
                 <Card className="mt-4 flex items-center justify-center h-64 border-dashed">
-                    <CardContent className="text-center">
+                    <CardContent className="pt-6 text-center">
                         <p className="text-muted-foreground">Seleccione un exportador y un productor para registrar salidas.</p>
                     </CardContent>
                 </Card>
             )}
           </TabsContent>
-          <TabsContent value="stock">
+          <TabsContent value="stock" className="mt-4">
               <StockTab exporterId={selectedExporterId} />
           </TabsContent>
       </Tabs>

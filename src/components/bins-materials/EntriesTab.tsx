@@ -72,11 +72,9 @@ export function EntriesTab({ exporterId, exporterName, producerId, isDirectDispa
 
   const items = form.watch('items');
   
-  // Effect for automatic quantity calculation
   React.useEffect(() => {
     if (!exporterName) return;
     const rules = calculationRules[exporterName];
-    // Guard against running when data is not ready
     if (!rules || !items || items.length === 0) return;
 
     const binItem = items.find(item => item.binMaterialCode === rules.binCode);
@@ -84,7 +82,6 @@ export function EntriesTab({ exporterId, exporterName, producerId, isDirectDispa
 
     const binQuantity = binItem.quantity;
     
-    // This check prevents the effect from running when the form is resetting
     if (typeof binQuantity === 'undefined' || binQuantity === null) return;
 
     Object.entries(rules.related).forEach(([relatedCode, multiplier]) => {
@@ -93,14 +90,12 @@ export function EntriesTab({ exporterId, exporterName, producerId, isDirectDispa
             const currentVal = items[relatedItemIndex].quantity;
             const newVal = binQuantity * multiplier;
             if (currentVal !== newVal) {
-                // Set value and trigger validation
                 form.setValue(`items.${relatedItemIndex}.quantity`, newVal, { shouldValidate: true });
             }
         }
     });
 
   }, [items, exporterName, form]);
-
 
   React.useEffect(() => {
     if (materials.length > 0) {
@@ -209,6 +204,8 @@ export function EntriesTab({ exporterId, exporterName, producerId, isDirectDispa
     }
   };
 
+  const formItems = form.getValues('items');
+
   return (
     <Card>
       <CardHeader>
@@ -223,7 +220,7 @@ export function EntriesTab({ exporterId, exporterName, producerId, isDirectDispa
       <CardContent>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-            <div className="grid md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <FormField
                 control={form.control}
                 name="document"
@@ -261,12 +258,36 @@ export function EntriesTab({ exporterId, exporterName, producerId, isDirectDispa
 
             <div className="space-y-2">
                 <FormLabel>Materiales</FormLabel>
-                <div className="rounded-md border max-h-96 overflow-y-auto">
+                {/* Mobile View */}
+                <div className="sm:hidden space-y-3">
+                  {loadingMaterials ? (
+                    <Skeleton className="h-20 w-full" />
+                  ) : formItems.map((item, index) => (
+                    <div key={item.binMaterialId} className="border p-4 rounded-lg">
+                      <FormField
+                        control={form.control}
+                        name={`items.${index}.quantity`}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-base">{item.binMaterialName}</FormLabel>
+                            <FormControl>
+                                <Input type="number" {...field} autoComplete="off" min="0" placeholder="Cantidad" className="h-12 text-lg" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  ))}
+                </div>
+
+                {/* Desktop View */}
+                <div className="hidden sm:block rounded-md border">
                     <Table>
                         <TableHeader>
                             <TableRow>
                                 <TableHead>Producto</TableHead>
-                                <TableHead className="w-[150px]">Cantidad</TableHead>
+                                <TableHead className="w-[180px]">Cantidad</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -277,7 +298,7 @@ export function EntriesTab({ exporterId, exporterName, producerId, isDirectDispa
                                         <TableCell><Skeleton className="h-10 w-full" /></TableCell>
                                     </TableRow>
                                 ))
-                            ) : form.getValues('items').map((item, index) => (
+                            ) : formItems.map((item, index) => (
                                 <TableRow key={item.binMaterialId}>
                                     <TableCell className="font-medium">{item.binMaterialName}</TableCell>
                                     <TableCell>

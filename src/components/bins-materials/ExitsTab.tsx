@@ -44,11 +44,8 @@ interface ExitsTabProps {
 // Rules for automatic calculation
 const calculationRules: Record<string, { binCode: string; related: Record<string, number> }> = {
     'Subsole': {
-        binCode: '10001', // BINS GENERICO
-        related: {
-            '10002': 24, // TOTES PLASTICO
-            '10003': 24, // LAMINA
-        }
+        binCode: '10001',
+        related: { '10002': 24, '10003': 24 }
     },
     'Meyer': {
         binCode: '10007',
@@ -215,6 +212,7 @@ export function ExitsTab({ exporterId, exporterName, producerId }: ExitsTabProps
   };
   
   const isLoading = loadingMaterials || loadingStock;
+  const formItems = form.getValues('items');
 
   return (
     <Card>
@@ -225,7 +223,7 @@ export function ExitsTab({ exporterId, exporterName, producerId }: ExitsTabProps
       <CardContent>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-            <div className="grid md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <FormField
                 control={form.control}
                 name="document"
@@ -263,12 +261,39 @@ export function ExitsTab({ exporterId, exporterName, producerId }: ExitsTabProps
 
             <div className="space-y-2">
                 <FormLabel>Materiales</FormLabel>
-                 <div className="rounded-md border max-h-96 overflow-y-auto">
+                {/* Mobile View */}
+                <div className="sm:hidden space-y-3">
+                  {isLoading ? (
+                    <Skeleton className="h-24 w-full" />
+                  ) : formItems.map((item, index) => (
+                    <div key={item.binMaterialId} className="border p-4 rounded-lg">
+                      <FormField
+                        control={form.control}
+                        name={`items.${index}.quantity`}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-base">{item.binMaterialName}</FormLabel>
+                            <FormControl>
+                                <Input type="number" {...field} autoComplete="off" min="0" placeholder="Cantidad a retirar" className="h-12 text-lg" />
+                            </FormControl>
+                             <p className="text-sm text-muted-foreground pt-1">
+                                Stock disponible: {getStockForMaterial(item.binMaterialId)}
+                             </p>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  ))}
+                </div>
+
+                {/* Desktop View */}
+                 <div className="hidden sm:block rounded-md border">
                     <Table>
                         <TableHeader>
                             <TableRow>
                                 <TableHead>Producto</TableHead>
-                                <TableHead className="w-[200px]">Cantidad</TableHead>
+                                <TableHead className="w-[240px]">Cantidad</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -279,7 +304,7 @@ export function ExitsTab({ exporterId, exporterName, producerId }: ExitsTabProps
                                         <TableCell><Skeleton className="h-10 w-full" /></TableCell>
                                     </TableRow>
                                 ))
-                            ) : form.getValues('items').map((item, index) => (
+                            ) : formItems.map((item, index) => (
                                 <TableRow key={item.binMaterialId}>
                                     <TableCell className="font-medium">{item.binMaterialName}</TableCell>
                                     <TableCell>

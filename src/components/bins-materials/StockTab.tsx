@@ -32,15 +32,12 @@ export function StockTab({ exporterId }: StockTabProps) {
     setLoading(true);
     let stockQuery: Query;
     
+    const stockRef = collection(firestore, 'binMaterialStock');
     if (exporterId) {
-        stockQuery = query(
-          collection(firestore, 'binMaterialStock'),
-          where('exporterId', '==', exporterId)
-        );
+        stockQuery = query(stockRef, where('exporterId', '==', exporterId));
     } else {
-        stockQuery = query(collection(firestore, 'binMaterialStock'));
+        stockQuery = query(stockRef);
     }
-
 
     const unsubscribe = onSnapshot(stockQuery, (snapshot) => {
       const stockData: BinMaterialStock[] = [];
@@ -71,11 +68,35 @@ export function StockTab({ exporterId }: StockTabProps) {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="rounded-md border">
+        {/* Mobile View */}
+        <div className="sm:hidden space-y-3">
+          {isLoading ? (
+            Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-24 w-full" />)
+          ) : stock.length > 0 ? (
+            stock.map(item => (
+              <div key={item.id} className="border p-4 rounded-lg flex justify-between items-center">
+                <div>
+                  <p className="font-semibold">{item.binMaterialName}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {exporterId ? `Código: ${item.binMaterialCode}` : exporterMap[item.exporterId] || item.exporterId}
+                  </p>
+                </div>
+                <p className="text-2xl font-bold">{item.quantity}</p>
+              </div>
+            ))
+          ) : (
+             <div className="text-center p-8 border-dashed border rounded-md text-sm text-muted-foreground">
+                No hay stock registrado para esta selección.
+             </div>
+          )}
+        </div>
+
+        {/* Desktop View */}
+        <div className="hidden sm:block rounded-md border">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="hidden sm:table-cell">Código</TableHead>
+                <TableHead>Código</TableHead>
                 <TableHead>Nombre del Material</TableHead>
                 {!exporterId && <TableHead>Exportador</TableHead>}
                 <TableHead className="text-right">Cantidad en Stock</TableHead>
@@ -91,7 +112,7 @@ export function StockTab({ exporterId }: StockTabProps) {
               ) : stock.length > 0 ? (
                 stock.map(item => (
                   <TableRow key={item.id}>
-                    <TableCell className="font-mono hidden sm:table-cell">{item.binMaterialCode}</TableCell>
+                    <TableCell className="font-mono">{item.binMaterialCode}</TableCell>
                     <TableCell className="font-medium">{item.binMaterialName}</TableCell>
                     {!exporterId && <TableCell>{exporterMap[item.exporterId] || item.exporterId}</TableCell>}
                     <TableCell className="text-right font-semibold">{item.quantity}</TableCell>
