@@ -49,11 +49,11 @@ function getSortedCoordinates(chamberConfig: Chamber, strategy: 'secuencial' | '
 
             // Then, for each pair, iterate down the rows to create the "Z" pattern
             for (const row of chamberConfig.rows) {
-                if (!chamberConfig.blocked?.includes(`${col1}${row}`)) {
-                    pairedCoords.push(`${col1}${row}`);
+                if (!chamberConfig.blocked?.includes(`${col1.name}${row}`)) {
+                    pairedCoords.push(`${col1.name}${row}`);
                 }
-                if (col2 && !chamberConfig.blocked?.includes(`${col2}${row}`)) {
-                    pairedCoords.push(`${col2}${row}`);
+                if (col2 && !chamberConfig.blocked?.includes(`${col2.name}${row}`)) {
+                    pairedCoords.push(`${col2.name}${row}`);
                 }
             }
         }
@@ -62,7 +62,7 @@ function getSortedCoordinates(chamberConfig: Chamber, strategy: 'secuencial' | '
     
     // 'secuencial': A1, A2, A3... B1, B2, B3...
     return chamberConfig.columns
-        .flatMap((col: string) => chamberConfig.rows.map((row: number) => `${col}${row}`))
+        .flatMap((col) => chamberConfig.rows.map((row) => `${col.name}${row}`))
         .filter((coord: string) => !chamberConfig.blocked?.includes(coord));
 }
 

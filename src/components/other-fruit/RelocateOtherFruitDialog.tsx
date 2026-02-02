@@ -69,7 +69,7 @@ export function RelocateOtherFruitDialog({
     const chamberConfig = chambersConfig[targetChamberId];
     if (!chamberConfig) return { availableCoordinates: [] };
 
-    const allPossibleCoords = chamberConfig.columns.flatMap(col => chamberConfig.rows.map(row => `${col}${row}`)).sort(naturalSort);
+    const allPossibleCoords = chamberConfig.columns.flatMap(col => chamberConfig.rows.map(row => `${col.name}${row}`)).sort(naturalSort);
     
     const occupiedCoords = new Set<string>();
 

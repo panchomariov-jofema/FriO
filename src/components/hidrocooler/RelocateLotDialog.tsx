@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -67,7 +66,7 @@ export function RelocateLotDialog({
     const chamberConfig = chambersConfig[targetChamberId];
     if (!chamberConfig) return [];
     
-    const allPossibleCoords = chamberConfig.columns.flatMap(col => chamberConfig.rows.map(row => `${col}${row}`));
+    const allPossibleCoords = chamberConfig.columns.flatMap(col => chamberConfig.rows.map(row => `${col.name}${row}`));
     const occupiedCoords = new Set(allLots.filter(l => l.chamberId === targetChamberId).map(l => l.coordinate));
     
     // Add the source coordinate to the list if moving within the same chamber
