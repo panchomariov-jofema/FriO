@@ -43,7 +43,7 @@ interface ExitsTabProps {
 
 // Rules for automatic calculation
 const calculationRules: Record<string, { binCode: string; related: Record<string, number> }> = {
-    'Subsole': {
+    'Subsole': { 
         binCode: '10001', // BINS GENERICO
         related: { 
             '10002': 24, // TOTES PLASTICO
@@ -51,12 +51,18 @@ const calculationRules: Record<string, { binCode: string; related: Record<string
         }
     },
     'Meyer': {
-        binCode: '10007',
-        related: { '10008': 24 }
+        binCode: '10007', // Bins Verde
+        related: { 
+            '10008': 24, // Totes Verde
+            '10009': 1,  // Esponja
+        }
     },
     'Blossom': {
-        binCode: '10011',
-        related: { '10012': 24, '10013': 24 }
+        binCode: '10011', // Bins
+        related: { 
+            '10012': 24, // Totes
+            '10013': 1,  // Esponja
+        }
     }
 };
 
