@@ -12,6 +12,7 @@ import type { ChamberLot, OtherFruitReception, StoredItem } from '@/lib/types';
 import { chambersConfig } from '@/lib/chambers-config';
 import { Alert, AlertDescription } from '../ui/alert';
 import { useToast } from '@/hooks/use-toast';
+import { naturalSort } from '@/lib/utils';
 
 interface RelocateLotDialogProps {
   open: boolean;
@@ -30,18 +31,6 @@ const relocateSchema = z.object({
 });
 
 type RelocateFormValues = z.infer<typeof relocateSchema>;
-
-// Helper for natural sorting
-const naturalSort = (a: string, b: string) => {
-  const re = /(\d+)/;
-  const aNum = parseInt(a.split(re)[1] || '0', 10);
-  const bNum = parseInt(b.split(re)[1] || '0', 10);
-  const aLetter = a.split(re)[0];
-  const bLetter = b.split(re)[0];
-  if (aLetter < bLetter) return -1;
-  if (aLetter > bLetter) return 1;
-  return aNum - bNum;
-};
 
 export function RelocateLotDialog({
   open,
@@ -70,8 +59,11 @@ export function RelocateLotDialog({
     const chamberConfig = chambersConfig[targetChamberId];
     if (!chamberConfig) return { availableCoordinates: [] };
 
-    const allPossibleCoords = chamberConfig.columns.flatMap(col => chamberConfig.rows.map(row => `${col}${row}`)).sort(naturalSort);
-    
+    const allPossibleCoords = chamberConfig.columns
+        .flatMap(col => chamberConfig.rows.map(row => `${col.name}${row}`))
+        .filter(coord => !chamberConfig.blocked?.includes(coord))
+        .sort(naturalSort);
+
     const occupiedCoords = new Set<string>();
 
     allChamberLots.forEach(lot => {
@@ -96,7 +88,7 @@ export function RelocateLotDialog({
       occupiedCoords.delete(sourceCoordinate);
     }
     
-    const available = allPossibleCoords.filter(coord => !occupiedCoords.has(coord) && !chamberConfig.blocked?.includes(coord));
+    const available = allPossibleCoords.filter(coord => !occupiedCoords.has(coord));
 
     return { 
         availableCoordinates: available,
@@ -215,5 +207,3 @@ export function RelocateLotDialog({
     </Dialog>
   );
 }
-
-    

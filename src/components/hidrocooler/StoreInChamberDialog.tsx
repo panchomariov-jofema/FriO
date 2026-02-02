@@ -76,7 +76,7 @@ export function StoreInChamberDialog({ lot, open, onOpenChange, onStore, allCham
     });
 
     const allPossibleCoords = chamberConfig.columns
-      .flatMap(col => chamberConfig.rows.map(row => `${col}${row}`))
+      .flatMap(col => chamberConfig.rows.map(row => `${col.name}${row}`))
       .filter(coord => !chamberConfig.blocked?.includes(coord))
       .sort(naturalSort);
 
