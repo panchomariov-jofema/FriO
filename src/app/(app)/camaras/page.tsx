@@ -24,6 +24,9 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Trash2 } from 'lucide-react';
 import { ExternalReceptionUploader } from '@/components/hidrocooler/ExternalReceptionUploader';
 import { ChamberTemperatureInput } from '@/components/camaras/ChamberTemperatureInput';
+import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
+
 
 // --- Color Palette Logic (Moved outside component to persist state) ---
 
@@ -67,6 +70,7 @@ export default function CamarasPage() {
   const [latestTemperatures, setLatestTemperatures] = React.useState<Record<string, ChamberTemperature | null>>({});
   const firestore = useFirestore();
   const { toast } = useToast();
+  const [showChamberStatus, setShowChamberStatus] = React.useState(true);
 
   const loading = loadingChamberLots || loadingOtherFruit || loadingExporters;
   
@@ -506,143 +510,160 @@ export default function CamarasPage() {
       </Card>
 
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <div>
-            <CardTitle>Estado de Cámaras</CardTitle>
-            <CardDescription>Ocupación y distribución de los lotes en las cámaras de frío.</CardDescription>
+        <CardContent className="p-4 flex items-center justify-between">
+          <div className="space-y-1">
+            <h3 className="font-semibold">Visualizar Estado de Cámaras</h3>
+            <p className="text-sm text-muted-foreground">Muestra u oculta la sección de ocupación de cámaras.</p>
           </div>
-          <div className="text-right">
-              <p className="text-sm text-muted-foreground">Peso Neto Total en Cámaras</p>
-              <div className="text-2xl font-bold">
-                  {loading ? <Skeleton className="h-8 w-32" /> : `${totalNetWeightInStock.toLocaleString('es-CL', {maximumFractionDigits: 0})} kg`}
-              </div>
-          </div>
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-                <Button variant="destructive" size="icon">
-                    <Trash2 className="h-4 w-4" />
-                    <span className="sr-only">Limpiar Stock</span>
-                </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-                <AlertDialogHeader>
-                    <AlertDialogTitle>¿Está seguro de limpiar todo el stock?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                        Esta acción no se puede deshacer. Se eliminarán permanentemente TODAS las lotes
-                        almacenados en las cámaras. Esta herramienta es solo para fines de desarrollo y pruebas.
-                    </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleClearStock} className="bg-destructive hover:bg-destructive/90">
-                        Sí, Limpiar Stock
-                    </AlertDialogAction>
-                </AlertDialogFooter>
-            </AlertDialogContent>
-        </AlertDialog>
-
-        </CardHeader>
-        <CardContent>
-          <Accordion type="single" collapsible className="w-full">
-            {Object.entries(chambersConfig).map(([chamberId, config]) => (
-                <AccordionItem value={chamberId} key={chamberId}>
-                    <AccordionTrigger>
-                        <div className="flex w-full items-center justify-between pr-4">
-                            <div className="flex items-center gap-4">
-                                <span className="text-lg font-semibold">{config.name}</span>
-                                <ChamberTemperatureInput chamberId={chamberId} />
-                            </div>
-                            <div className="text-right">
-                                <p className={cn("font-mono font-semibold", (chamberOccupancy[chamberId]?.percentage ?? 0) > 50 ? 'text-destructive' : 'text-foreground')}>
-                                    {chamberOccupancy[chamberId]?.occupied ?? 0} / {chamberOccupancy[chamberId]?.total ?? 0} Bins Equiv.
-                                    ({(chamberOccupancy[chamberId]?.percentage ?? 0).toFixed(1)}%)
-                                </p>
-                                <Progress value={chamberOccupancy[chamberId]?.percentage ?? 0} className="w-48 h-2 mt-1" />
-                            </div>
-                        </div>
-                    </AccordionTrigger>
-                    <AccordionContent>
-                        <div className="p-4 bg-muted/50 rounded-lg border overflow-x-auto">
-                            <div className="grid gap-1 min-w-[800px]" style={{ gridTemplateColumns: `repeat(${config.columns.length}, minmax(0, 1fr))` }}>
-                              {config.rows.map(row =>
-                                config.columns.map(col => {
-                                  const coord = `${col}${row}`;
-                                  const isBlocked = config.blocked?.includes(coord);
-                                  const itemsInCoord = storedItemsByChamber[chamberId]?.[coord] || [];
-                                  const isOccupied = itemsInCoord.length > 0;
-                                  
-                                  const totalBins = itemsInCoord.filter(i => i.unit === 'Bins').reduce((s, i) => s + i.quantity, 0);
-                                  const totalPallets = itemsInCoord.filter(i => i.unit === 'Pallets').reduce((s, i) => s + i.quantity, 0);
-                                  const totalNetWeight = itemsInCoord.reduce((sum, i) => sum + (i.quantity * (i.netWeightPerBin || 0)), 0);
-                                  const clientLotIds = Array.from(new Set(itemsInCoord.map(i => i.clientLotId).filter(Boolean)));
-                                  
-                                  const occupancyPercentage = isOccupied ? (totalBins + totalPallets * 2) / 6 * 100 : 0; // Approx. 1 pallet = 2 bins
-                                  const firstItem = isOccupied ? itemsInCoord[0] : null;
-
-                                  if (isBlocked) {
-                                    return (
-                                      <div key={coord} className="h-12 w-full rounded border-2 bg-gray-200 dark:bg-gray-700 relative">
-                                        <div className="absolute inset-0 bg-repeat bg-[length:10px_10px]" style={{backgroundImage: "repeating-linear-gradient(-45deg, #a0aec0, #a0aec0 1px, transparent 1px, transparent 5px)"}} />
-                                      </div>
-                                    )
-                                  }
-                                  
-                                  const lotColor = firstItem ? getColorForLot(`${firstItem.type}-${firstItem.lotIdForColor}`) : 'transparent';
-                                  const cellStyle = { 
-                                      '--lot-color': lotColor,
-                                      '--lot-color-border': lotColor.replace(')', ', 0.5)'),
-                                      '--lot-color-bg': lotColor.replace(')', ', 0.2)'),
-                                      '--lot-color-progress': lotColor.replace(')', ', 0.3)'),
-                                  } as React.CSSProperties;
-
-
-                                  return (
-                                    <Popover key={coord}>
-                                      <PopoverTrigger asChild>
-                                        <div 
-                                          className={cn("h-12 w-full rounded border-2 flex items-center justify-center text-xs font-mono relative overflow-hidden cursor-pointer",
-                                            isOccupied ? 'border-[var(--lot-color-border)] bg-[var(--lot-color-bg)]' : 'bg-background border-dashed'
-                                          )}
-                                          style={cellStyle}
-                                        >
-                                          <div className="absolute bottom-0 left-0 top-0 bg-[var(--lot-color-progress)]" style={{ right: `${100 - occupancyPercentage}%` }} />
-                                          <span className="relative z-10 font-semibold">{coord}</span>
-                                        </div>
-                                      </PopoverTrigger>
-                                      {isOccupied && firstItem && (
-                                        <PopoverContent className="p-4 w-64" side="bottom" align="center">
-                                          <div className="space-y-2">
-                                            <p className="font-bold">
-                                              {firstItem.type === 'producerLot' ? `Lote: ${firstItem.displayId}` : `Producto: ${firstItem.displayId}`}
-                                            </p>
-                                            {clientLotIds.length > 0 && (
-                                              <p>Lote Cliente: <span className="font-mono">{clientLotIds.join(', ')}</span></p>
-                                            )}
-                                            <p>
-                                              {firstItem.type === 'producerLot' ? `Productor: ${firstItem.ownerName}` : `Cliente: ${firstItem.ownerName}`}
-                                            </p>
-                                            <p>Variedad/Producto: {firstItem.varietyOrProduct}</p>
-                                            <div className="grid grid-cols-2 gap-x-4">
-                                                <p>Bins: {totalBins}</p>
-                                                <p>Pallets: {totalPallets}</p>
-                                                {totalNetWeight > 0 && <p className="col-span-2">Peso Neto: {totalNetWeight.toFixed(1)} kg</p>}
-                                            </div>
-                                            <Button size="sm" className="w-full mt-2" onClick={() => handleRelocateClick(chamberId, coord)}>Reubicar</Button>
-                                          </div>
-                                        </PopoverContent>
-                                      )}
-                                    </Popover>
-                                  );
-                                })
-                              )}
-                            </div>
-                        </div>
-                    </AccordionContent>
-                </AccordionItem>
-            ))}
-          </Accordion>
+          <Switch
+            id="show-chamber-status"
+            checked={showChamberStatus}
+            onCheckedChange={setShowChamberStatus}
+          />
         </CardContent>
       </Card>
+
+      {showChamberStatus && (
+        <Card>
+            <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <div>
+                    <CardTitle>Estado de Cámaras</CardTitle>
+                    <CardDescription>Ocupación y distribución de los lotes en las cámaras de frío.</CardDescription>
+                </div>
+                <div className="flex w-full sm:w-auto items-center justify-between sm:justify-end gap-4">
+                    <div className="text-right">
+                        <p className="text-sm text-muted-foreground">Peso Neto Total</p>
+                        <div className="text-xl sm:text-2xl font-bold">
+                            {loading ? <Skeleton className="h-8 w-32" /> : `${totalNetWeightInStock.toLocaleString('es-CL', {maximumFractionDigits: 0})} kg`}
+                        </div>
+                    </div>
+                    <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                            <Button variant="destructive" size="icon" className="shrink-0">
+                                <Trash2 className="h-4 w-4" />
+                                <span className="sr-only">Limpiar Stock</span>
+                            </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                            <AlertDialogHeader>
+                                <AlertDialogTitle>¿Está seguro de limpiar todo el stock?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                    Esta acción no se puede deshacer. Se eliminarán permanentemente TODAS las lotes
+                                    almacenados en las cámaras. Esta herramienta es solo para fines de desarrollo y pruebas.
+                                </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                <AlertDialogAction onClick={handleClearStock} className="bg-destructive hover:bg-destructive/90">
+                                    Sí, Limpiar Stock
+                                </AlertDialogAction>
+                            </AlertDialogFooter>
+                        </AlertDialogContent>
+                    </AlertDialog>
+                </div>
+            </CardHeader>
+            <CardContent>
+            <Accordion type="single" collapsible className="w-full">
+                {Object.entries(chambersConfig).map(([chamberId, config]) => (
+                    <AccordionItem value={chamberId} key={chamberId}>
+                        <AccordionTrigger>
+                            <div className="flex flex-col sm:flex-row w-full items-start sm:items-center justify-between gap-2 sm:gap-4 pr-4 text-left">
+                                <div className="flex items-center gap-2 sm:gap-4">
+                                    <span className="text-md sm:text-lg font-semibold">{config.name}</span>
+                                    <ChamberTemperatureInput chamberId={chamberId} />
+                                </div>
+                                <div className="text-left sm:text-right w-full sm:w-auto">
+                                    <p className={cn("font-mono font-semibold text-sm", (chamberOccupancy[chamberId]?.percentage ?? 0) > 50 ? 'text-destructive' : 'text-foreground')}>
+                                        {chamberOccupancy[chamberId]?.occupied ?? 0} / {chamberOccupancy[chamberId]?.total ?? 0} Bins Equiv.
+                                        ({(chamberOccupancy[chamberId]?.percentage ?? 0).toFixed(1)}%)
+                                    </p>
+                                    <Progress value={chamberOccupancy[chamberId]?.percentage ?? 0} className="w-full sm:w-48 h-2 mt-1" />
+                                </div>
+                            </div>
+                        </AccordionTrigger>
+                        <AccordionContent>
+                            <div className="p-2 sm:p-4 bg-muted/50 rounded-lg border overflow-x-auto">
+                                <div className="grid gap-1 min-w-[600px] sm:min-w-[800px]" style={{ gridTemplateColumns: `repeat(${config.columns.length}, minmax(0, 1fr))` }}>
+                                {config.rows.map(row =>
+                                    config.columns.map(col => {
+                                    const coord = `${col}${row}`;
+                                    const isBlocked = config.blocked?.includes(coord);
+                                    const itemsInCoord = storedItemsByChamber[chamberId]?.[coord] || [];
+                                    const isOccupied = itemsInCoord.length > 0;
+                                    
+                                    const totalBins = itemsInCoord.filter(i => i.unit === 'Bins').reduce((s, i) => s + i.quantity, 0);
+                                    const totalPallets = itemsInCoord.filter(i => i.unit === 'Pallets').reduce((s, i) => s + i.quantity, 0);
+                                    const totalNetWeight = itemsInCoord.reduce((sum, i) => sum + (i.quantity * (i.netWeightPerBin || 0)), 0);
+                                    const clientLotIds = Array.from(new Set(itemsInCoord.map(i => i.clientLotId).filter(Boolean)));
+                                    
+                                    const occupancyPercentage = isOccupied ? (totalBins + totalPallets * 2) / 6 * 100 : 0; // Approx. 1 pallet = 2 bins
+                                    const firstItem = isOccupied ? itemsInCoord[0] : null;
+
+                                    if (isBlocked) {
+                                        return (
+                                        <div key={coord} className="h-10 sm:h-12 w-full rounded border-2 bg-gray-200 dark:bg-gray-700 relative">
+                                            <div className="absolute inset-0 bg-repeat bg-[length:10px_10px]" style={{backgroundImage: "repeating-linear-gradient(-45deg, #a0aec0, #a0aec0 1px, transparent 1px, transparent 5px)"}} />
+                                        </div>
+                                        )
+                                    }
+                                    
+                                    const lotColor = firstItem ? getColorForLot(`${firstItem.type}-${firstItem.lotIdForColor}`) : 'transparent';
+                                    const cellStyle = { 
+                                        '--lot-color': lotColor,
+                                        '--lot-color-border': lotColor.replace(')', ', 0.5)'),
+                                        '--lot-color-bg': lotColor.replace(')', ', 0.2)'),
+                                        '--lot-color-progress': lotColor.replace(')', ', 0.3)'),
+                                    } as React.CSSProperties;
+
+
+                                    return (
+                                        <Popover key={coord}>
+                                        <PopoverTrigger asChild>
+                                            <div 
+                                            className={cn("h-10 sm:h-12 w-full rounded border-2 flex items-center justify-center text-xs font-mono relative overflow-hidden cursor-pointer",
+                                                isOccupied ? 'border-[var(--lot-color-border)] bg-[var(--lot-color-bg)]' : 'bg-background border-dashed'
+                                            )}
+                                            style={cellStyle}
+                                            >
+                                            <div className="absolute bottom-0 left-0 top-0 bg-[var(--lot-color-progress)]" style={{ right: `${100 - occupancyPercentage}%` }} />
+                                            <span className="relative z-10 font-semibold">{coord}</span>
+                                            </div>
+                                        </PopoverTrigger>
+                                        {isOccupied && firstItem && (
+                                            <PopoverContent className="p-4 w-60 sm:w-64" side="bottom" align="center">
+                                            <div className="space-y-2">
+                                                <p className="font-bold">
+                                                {firstItem.type === 'producerLot' ? `Lote: ${firstItem.displayId}` : `Producto: ${firstItem.displayId}`}
+                                                </p>
+                                                {clientLotIds.length > 0 && (
+                                                <p>Lote Cliente: <span className="font-mono">{clientLotIds.join(', ')}</span></p>
+                                                )}
+                                                <p>
+                                                {firstItem.type === 'producerLot' ? `Productor: ${firstItem.ownerName}` : `Cliente: ${firstItem.ownerName}`}
+                                                </p>
+                                                <p>Variedad/Producto: {firstItem.varietyOrProduct}</p>
+                                                <div className="grid grid-cols-2 gap-x-4">
+                                                    <p>Bins: {totalBins}</p>
+                                                    <p>Pallets: {totalPallets}</p>
+                                                    {totalNetWeight > 0 && <p className="col-span-2">Peso Neto: {totalNetWeight.toFixed(1)} kg</p>}
+                                                </div>
+                                                <Button size="sm" className="w-full mt-2" onClick={() => handleRelocateClick(chamberId, coord)}>Reubicar</Button>
+                                              </div>
+                                            </PopoverContent>
+                                        )}
+                                        </Popover>
+                                    );
+                                    })
+                                )}
+                                </div>
+                            </div>
+                        </AccordionContent>
+                    </AccordionItem>
+                ))}
+            </Accordion>
+            </CardContent>
+        </Card>
+      )}
 
       {lotToStore && (
         <StoreInChamberDialog
