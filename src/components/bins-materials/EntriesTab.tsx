@@ -50,7 +50,7 @@ const calculationRules: Record<string, { binCode: string; related: Record<string
         binCode: '10001', // BINS GENERICO
         related: { 
             '10002': 24, // TOTES PLASTICO
-            '10003': 24, // LAMINA
+            '10003': 1, // LAMINA
         }
     },
     'Meyer': {
