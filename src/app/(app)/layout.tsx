@@ -64,7 +64,7 @@ const navStructure: any[] = [
         icon: Users, // New Icon
         items: [
             { type: 'item', href: '/embalajes', label: 'Embalajes', icon: Package },
-            { type: 'item', href: '/otros-hortofruticolas', label: 'Otros Hortofrutícolas', icon: Grape },
+            { type: 'item', href: '/otros-hortofruticolas', label: 'Socios Comerciales', icon: Grape },
             { type: 'item', href: '/fall-creek', label: 'Fall Creek', icon: Sprout },
         ]
     },

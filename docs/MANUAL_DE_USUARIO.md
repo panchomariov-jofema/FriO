@@ -98,12 +98,12 @@ Gestiona la salida de fruta para los clientes.
     - **Generar PDF**: Para despachos "Completados", permite descargar un PDF con el detalle del despacho.
     - **Deshacer**: Cancela una solicitud "Pendiente de Picking" sin afectar el stock.
 
-### 4.7. Embalajes y Otros Hortofrutícolas
+### 4.7. Embalajes y Socios Comerciales
 
 Estos módulos funcionan de manera similar para gestionar la recepción, almacenamiento y despacho de pallets de embalaje y fruta de otros clientes.
 
 - **Recepción**: Registra la entrada.
-- **Almacenamiento / Pendientes**: Muestra lo que está pendiente de ubicar y permite asignarle una bodega/pasillo (Embalajes) o cámara/coordenada (Otros Hortofrutícolas).
+- **Almacenamiento / Pendientes**: Muestra lo que está pendiente de ubicar y permite asignarle una bodega/pasillo (Embalajes) o cámara/coordenada (Socios Comerciales).
 - **Despacho/Salidas**: Crea una solicitud de salida.
 - **Picking**: Confirma la salida física de los materiales/fruta, rebajando el stock. La pestaña de "Picking" mostrará un indicador numérico con la cantidad de tareas pendientes. Desde aquí puede **generar un PDF** para la recolección física.
 - **Stock**: Permite ver el inventario actual y reubicarlo.
@@ -113,7 +113,7 @@ Este módulo ofrece una interfaz visual para el despacho de productos de Fall Cr
 - **Vista de Cámaras**: Muestra una grilla con la ocupación de las cámaras, permitiendo seleccionar coordenadas específicas para el despacho.
 - **Selección Múltiple**: Puede hacer clic y arrastrar para seleccionar varias coordenadas a la vez.
 - **Resumen de Pre-Despacho**: Una ventana emergente muestra el resumen de los productos seleccionados. Esta ventana **es movible**, permitiéndole arrastrarla para despejar la vista y seleccionar más lotes.
-- **Generación de Solicitud**: Una vez completada la selección y los datos del despacho, se crea una solicitud que aparecerá en la pestaña de "Picking" del módulo de "Otros Hortofrutícolas".
+- **Generación de Solicitud**: Una vez completada la selección y los datos del despacho, se crea una solicitud que aparecerá en la pestaña de "Picking" del módulo de "Socios Comerciales".
 
 
 ### 4.8. Reportes

@@ -48,7 +48,7 @@ interface MasterDataShellProps<T extends MasterData> {
 }
 
 const defaultProfiles = [
-  { profileId: 'MAESTRO', name: 'Maestro', modulesAccess: ['Dashboard', 'Bins y Materiales', 'Recepción', 'Hidrocooler', 'Cámaras', 'Despachos', 'Reportes', 'Embalajes', 'Otros Hortofrutícolas', 'Datos Maestros'] },
+  { profileId: 'MAESTRO', name: 'Maestro', modulesAccess: ['Dashboard', 'Bins y Materiales', 'Recepción', 'Hidrocooler', 'Cámaras', 'Despachos', 'Reportes', 'Embalajes', 'Socios Comerciales', 'Datos Maestros'] },
   { profileId: 'EJECUTIVO', name: 'Ejecutivo', modulesAccess: ['Dashboard', 'Reportes'] },
   { profileId: 'EXP_SUBSOLE', name: 'Exportador Subsole', modulesAccess: [{ name: 'Dashboard', fixedExporterId: 'SUBSOLE' }] },
   { profileId: 'EXP_MEYER', name: 'Exportador Meyer', modulesAccess: [{ name: 'Dashboard', fixedExporterId: 'MEYER' }] },
@@ -56,7 +56,7 @@ const defaultProfiles = [
   { profileId: 'SUP_PATIO', name: 'Supervisor Patio', modulesAccess: ['Recepción', 'Hidrocooler', 'Cámaras'] },
   { profileId: 'SUP_SUBSOLE', name: 'Supervisor Subsole', modulesAccess: ['Recepción', 'Despachos'] },
   { profileId: 'SUP_HIDRO', name: 'Supervisor Hidrocooler', modulesAccess: ['Hidrocooler'] },
-  { profileId: 'GRUERO', name: 'Gruero', modulesAccess: ['Cámaras', { name: 'Embalajes', allowedTabs: ['almacenamiento'] }, { name: 'Otros Hortofrutícolas', allowedTabs: ['almacenamiento'] }] },
+  { profileId: 'GRUERO', name: 'Gruero', modulesAccess: ['Cámaras', { name: 'Embalajes', allowedTabs: ['almacenamiento'] }, { name: 'Socios Comerciales', allowedTabs: ['almacenamiento'] }] },
 ];
 
 

@@ -144,7 +144,7 @@ export type ModulePermission =
   | string 
   | { name: 'Dashboard', fixedExporterId: string }
   | { name: 'Embalajes', allowedTabs: string[] }
-  | { name: 'Otros Hortofrutícolas', allowedTabs: string[] };
+  | { name: 'Socios Comerciales', allowedTabs: string[] };
 
 export interface Profile {
   id: string;

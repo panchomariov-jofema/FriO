@@ -185,8 +185,8 @@ export function OtherFruitReceptionTab({ clientId: fixedClientId }: { clientId?:
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Recepción de Fruta</CardTitle>
-        <CardDescription>Registre la entrada de fruta de clientes hortofrutícolas.</CardDescription>
+        <CardTitle>Recepción de Productos</CardTitle>
+        <CardDescription>Registre la entrada de productos de socios comerciales.</CardDescription>
       </CardHeader>
       <CardContent>
         <Form {...form}>
@@ -198,11 +198,11 @@ export function OtherFruitReceptionTab({ clientId: fixedClientId }: { clientId?:
                   name="clientId"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Cliente de Fruta</FormLabel>
+                      <FormLabel>Socio Comercial</FormLabel>
                       <Select onValueChange={handleClientChange} value={field.value} disabled={loadingClients}>
                         <FormControl>
                           <SelectTrigger>
-                            <SelectValue placeholder="Seleccione un cliente..." />
+                            <SelectValue placeholder="Seleccione un socio..." />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>

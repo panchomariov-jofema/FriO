@@ -26,8 +26,8 @@ export default function OtrosHortofruticolasPage() {
         <div className="space-y-4">
             <Card>
                 <CardHeader>
-                    <CardTitle>Gestión de Otros Hortofrutícolas</CardTitle>
-                    <CardDescription>Recepción, almacenamiento y despacho de fruta de otros clientes.</CardDescription>
+                    <CardTitle>Gestión de Socios Comerciales</CardTitle>
+                    <CardDescription>Recepción, almacenamiento y despacho de productos de socios comerciales.</CardDescription>
                 </CardHeader>
             </Card>
 
