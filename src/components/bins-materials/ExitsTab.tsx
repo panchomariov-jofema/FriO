@@ -77,42 +77,34 @@ export function ExitsTab({ exporterId, producerId }: ExitsTabProps) {
 
   // Effect for automatic quantity calculation
   React.useEffect(() => {
-    const subscription = form.watch((_value, { name }) => {
-      // 1. Only act on quantity changes within the items array
+    const subscription = form.watch((value, { name }) => {
       if (!name || !name.startsWith('items.') || !name.endsWith('.quantity')) {
         return;
       }
 
-      // 2. Get the rules for the current exporter
       const rules = calculationRules[exporterId];
       if (!rules) return;
 
-      // 3. Get the most up-to-date form values
-      const allItems = form.getValues('items');
+      const allItems = value.items;
       if (!allItems || allItems.length === 0) return;
 
-      // 4. Identify which item was changed
       const changedIndexMatch = name.match(/items\.(\d+)\.quantity/);
       if (!changedIndexMatch) return;
       
       const changedIndex = parseInt(changedIndexMatch[1], 10);
       const changedItem = allItems[changedIndex];
 
-      // 5. Check if the changed item is the PIVOT item
       if (changedItem && changedItem.binMaterialCode === rules.binCode) {
         const pivotQty = changedItem.quantity;
         
-        // Ensure pivotQty is a valid number before calculating
         if (typeof pivotQty !== 'number' || isNaN(pivotQty)) return;
 
-        // 6. Loop through related items and update their quantities
         Object.entries(rules.related).forEach(([relatedCode, multiplier]) => {
           const relatedItemIndex = allItems.findIndex(item => item.binMaterialCode === relatedCode);
 
           if (relatedItemIndex !== -1) {
             const newVal = pivotQty * multiplier;
-            // Only update if the value is different to prevent infinite loops
-            if (allItems[relatedItemIndex].quantity !== newVal) {
+            if (value.items[relatedItemIndex].quantity !== newVal) {
               form.setValue(`items.${relatedItemIndex}.quantity`, newVal, { shouldValidate: true });
             }
           }
