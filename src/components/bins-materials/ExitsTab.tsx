@@ -43,21 +43,21 @@ interface ExitsTabProps {
 
 // Rules for automatic calculation
 const calculationRules: Record<string, { binCode: string; related: Record<string, number> }> = {
-    'Subsole': { 
+    'SUBSOLE': { 
         binCode: '10001', // BINS GENERICO
         related: { 
             '10002': 24, // TOTES PLASTICO
             '10003': 1,  // LAMINA
         }
     },
-    'Meyer': {
+    'MEYER': {
         binCode: '10007', // Bins Verde
         related: { 
             '10008': 24, // Totes Verde
             '10009': 1,  // Esponja
         }
     },
-    'Blossom': {
+    'BLOSSOM': {
         binCode: '10011', // Bins
         related: { 
             '10012': 24, // Totes
@@ -99,7 +99,7 @@ export function ExitsTab({ exporterId, exporterName, producerId }: ExitsTabProps
   // Effect for automatic quantity calculation
   React.useEffect(() => {
     if (!exporterName) return;
-    const rules = calculationRules[exporterName];
+    const rules = calculationRules[exporterName.toUpperCase()];
     // Guard against running when data is not ready
     if (!rules || !items || items.length === 0) return;
 
