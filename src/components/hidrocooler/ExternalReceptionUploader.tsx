@@ -138,7 +138,7 @@ export function ExternalReceptionUploader() {
 
   return (
     <>
-      <Button variant="outline" onClick={() => setIsOpen(true)}>
+      <Button variant="outline" onClick={() => setIsOpen(true)} className="hidden md:inline-flex">
         <Upload className="mr-2 h-4 w-4" />
         Carga Externa
       </Button>
