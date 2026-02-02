@@ -70,7 +70,7 @@ export default function CamarasPage() {
   const [latestTemperatures, setLatestTemperatures] = React.useState<Record<string, ChamberTemperature | null>>({});
   const firestore = useFirestore();
   const { toast } = useToast();
-  const [showChamberStatus, setShowChamberStatus] = React.useState(true);
+  const [showChamberStatus, setShowChamberStatus] = React.useState(false);
 
   const loading = loadingChamberLots || loadingOtherFruit || loadingExporters;
   
@@ -685,7 +685,7 @@ export default function CamarasPage() {
             open={isStoreDialogOpen}
             onOpenChange={setStoreDialogOpen}
             onStore={handleStoreInChamber}
-            allChamberLots={allLotsInChambers}
+            allChamberLots={allLotsInChambers.filter(l => l.status === 'Almacenado')}
             allOtherFruitReceptions={otherFruitReceptions || []}
         />
       )}
@@ -698,7 +698,7 @@ export default function CamarasPage() {
             sourceChamberId={coordToRelocate.chamberId}
             sourceCoordinate={coordToRelocate.coordinate}
             lotsInCoordinate={lotsInCoordToRelocate}
-            allChamberLots={allLotsInChambers}
+            allChamberLots={allLotsInChambers.filter(l => l.status === 'Almacenado')}
             allOtherFruitReceptions={otherFruitReceptions || []}
         />
       )}
