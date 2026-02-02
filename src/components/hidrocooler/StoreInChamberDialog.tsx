@@ -53,7 +53,7 @@ export function StoreInChamberDialog({ lot, open, onOpenChange, onStore, allCham
 
     // Populate occupancy map from producer lots
     allChamberLots.forEach(l => {
-      if (l.chamberId === selectedChamberId && l.coordinate) {
+      if (l.status === 'Almacenado' && l.chamberId === selectedChamberId && l.coordinate) {
         if (!occupancyMap.has(l.coordinate)) {
           occupancyMap.set(l.coordinate, { lots: [] });
         }
@@ -64,7 +64,7 @@ export function StoreInChamberDialog({ lot, open, onOpenChange, onStore, allCham
     // Populate occupancy map from other fruit receptions
     allOtherFruitReceptions.forEach(r => {
       r.items.forEach(item => {
-        if (item.storageLocation?.chamberId === selectedChamberId && item.storageLocation.coordinate) {
+        if (item.status === 'Almacenado' && item.storageLocation?.chamberId === selectedChamberId && item.storageLocation.coordinate) {
             const lotId = `other_${r.id}_${item.productCode}`;
             if (!occupancyMap.has(item.storageLocation.coordinate)) {
                 occupancyMap.set(item.storageLocation.coordinate, { lots: [] });
