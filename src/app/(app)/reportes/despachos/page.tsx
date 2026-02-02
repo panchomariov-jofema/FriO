@@ -16,7 +16,7 @@ function convertToCSV(data: any[], headers: string[]) {
             let value = row[header];
              if (value instanceof Date) {
                 value = value.toLocaleString();
-            } else if (typeof value === 'object' && value !== null && value?.toDate) {
+            } else if (typeof value === 'object' && value !== null && value?.toDate) { // Firebase Timestamp
                 value = value.toDate().toLocaleString();
             } else if (Array.isArray(value)) {
                 value = value.join(', ');
@@ -93,13 +93,13 @@ export default function DispatchReportPage() {
             totalNetWeight: dispatch.totalNetWeight ? dispatch.totalNetWeight.toFixed(2) : '0.00',
         }));
         const csv = convertToCSV(dataForExport, headers);
-        downloadCSV(csv, 'reporte_despachos.csv');
+        downloadCSV(csv, 'reporte_despachos_a_packing.csv');
     };
     
     return (
         <div className="space-y-6">
             <ReportHeader
-                title="Reporte de Despachos"
+                title="Reporte de Despachos a Packing"
                 description="Listado de todos los despachos creados."
                 onExport={handleExport}
                 isExportDisabled={loading || reportData.length === 0}

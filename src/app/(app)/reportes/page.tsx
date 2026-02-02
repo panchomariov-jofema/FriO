@@ -37,7 +37,7 @@ const reportList = [
         href: '/reportes/kardex-fruta-otros-clientes'
     },
     { 
-        title: 'Reporte de Despachos', 
+        title: 'Reporte de Despachos a Packing', 
         description: 'Listado de todos los despachos de fruta creados.',
         href: '/reportes/despachos'
     },
