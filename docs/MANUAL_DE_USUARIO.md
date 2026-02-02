@@ -129,7 +129,7 @@ Ofrece una lista de reportes tabulares de solo lectura con opción de exportar a
     - Registro de Recepción de Fruta
     - Stock por Ubicación (Otros Clientes)
     - Kardex de Movimientos de Fruta (Otros Clientes)
-    - Reporte de Despachos
+    - Reporte de Packing
     - Registro de Temperaturas
     - **Permanencia Stock (Otros Clientes)**: Calcula los días que el stock de fruta ha permanecido en el frigorífico, ideal para facturación.
 
