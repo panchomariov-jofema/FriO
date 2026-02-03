@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Button } from '@/components/ui/button';
 import type { ChamberLot, OtherFruitReception } from '@/lib/types';
 import { chambersConfig } from '@/lib/chambers-config';
-import { naturalSort } from '@/lib/utils';
+import { getSortedCoordinates } from '@/lib/utils';
 
 interface StoreInChamberDialogProps {
   lot: ChamberLot | null;
@@ -19,6 +19,7 @@ interface StoreInChamberDialogProps {
   onStore: (data: { chamberId: string, coordinate: string }) => void;
   allChamberLots: ChamberLot[];
   allOtherFruitReceptions: OtherFruitReception[];
+  storageStrategy: 'secuencial' | 'fifo';
 }
 
 const storeSchema = z.object({
@@ -28,7 +29,7 @@ const storeSchema = z.object({
 
 type StoreFormValues = z.infer<typeof storeSchema>;
 
-export function StoreInChamberDialog({ lot, open, onOpenChange, onStore, allChamberLots, allOtherFruitReceptions }: StoreInChamberDialogProps) {
+export function StoreInChamberDialog({ lot, open, onOpenChange, onStore, allChamberLots, allOtherFruitReceptions, storageStrategy }: StoreInChamberDialogProps) {
   const form = useForm<StoreFormValues>({
     resolver: zodResolver(storeSchema),
     defaultValues: {
@@ -75,10 +76,7 @@ export function StoreInChamberDialog({ lot, open, onOpenChange, onStore, allCham
       });
     });
 
-    const allPossibleCoords = chamberConfig.columns
-      .flatMap(col => chamberConfig.rows.map(row => `${col.name}${row}`))
-      .filter(coord => !chamberConfig.blocked?.includes(coord))
-      .sort(naturalSort);
+    const allPossibleCoords = getSortedCoordinates(chamberConfig, storageStrategy);
 
     // 1. Find a partially filled coordinate with the SAME lot
     const partialSameLotCoords = allPossibleCoords.filter(coord => {
@@ -92,7 +90,7 @@ export function StoreInChamberDialog({ lot, open, onOpenChange, onStore, allCham
 
     let currentSuggestion: string | null = null;
     if (partialSameLotCoords.length > 0) {
-      currentSuggestion = partialSameLotCoords[0]; // Already sorted by naturalSort
+      currentSuggestion = partialSameLotCoords[0];
     } else {
       // 2. Find the first completely empty coordinate
       const firstEmpty = allPossibleCoords.find(coord => !occupancyMap.has(coord));
@@ -105,7 +103,7 @@ export function StoreInChamberDialog({ lot, open, onOpenChange, onStore, allCham
 
     return { availableCoordinatesForNewLots: emptyCoords, suggestion: currentSuggestion };
 
-  }, [selectedChamberId, lot, allChamberLots, allOtherFruitReceptions]);
+  }, [selectedChamberId, lot, allChamberLots, allOtherFruitReceptions, storageStrategy]);
 
 
   // Effect to suggest a coordinate when a chamber is selected

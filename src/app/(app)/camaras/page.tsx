@@ -17,7 +17,7 @@ import { FirestorePermissionError } from '@/firebase/errors';
 import { chambersConfig } from '@/lib/chambers-config';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { cn, naturalSort } from '@/lib/utils';
+import { cn, getSortedCoordinates } from '@/lib/utils';
 import { Progress } from '@/components/ui/progress';
 import { RelocateLotDialog } from '@/components/camaras/RelocateLotDialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
@@ -71,6 +71,7 @@ export default function CamarasPage() {
   const firestore = useFirestore();
   const { toast } = useToast();
   const [showChamberStatus, setShowChamberStatus] = React.useState(false);
+  const [storageStrategy, setStorageStrategy] = React.useState<'secuencial' | 'fifo'>('secuencial');
 
   const loading = loadingChamberLots || loadingOtherFruit || loadingExporters;
   
@@ -229,7 +230,6 @@ export default function CamarasPage() {
     const BINS_PER_COORDINATE = 6;
     const chamberConfig = chambersConfig[chamberId];
   
-    // Build the initial occupancy map from ALL stored items
     const occupiedCoordinates = new Map<string, { displayLotId: string; binCount: number }[]>();
 
     (allLotsInChambers || [])
@@ -247,16 +247,12 @@ export default function CamarasPage() {
                  if (!occupiedCoordinates.has(item.storageLocation.coordinate)) {
                     occupiedCoordinates.set(item.storageLocation.coordinate, []);
                 }
-                // Mark as a different lot to prevent mixing
                 occupiedCoordinates.get(item.storageLocation.coordinate)!.push({ displayLotId: `other_${reception.id}`, binCount: BINS_PER_COORDINATE });
             }
         });
     });
     
-    const allPossibleCoordinates = chamberConfig.columns
-        .flatMap(col => chamberConfig.rows.map(row => `${col.name}${row}`))
-        .filter(coord => !chamberConfig.blocked?.includes(coord))
-        .sort(naturalSort);
+    const allPossibleCoordinates = getSortedCoordinates(chamberConfig, storageStrategy);
 
     let binsToStore = lotToStore.binCount;
     const batch = writeBatch(firestore);
@@ -287,24 +283,20 @@ export default function CamarasPage() {
                     });
                     binsToStore -= binsToAdd;
                     
-                    // Live update local map
                     lotsInCoord.push({displayLotId: lotToStore.displayLotId, binCount: binsToAdd});
                 }
             }
         }
     }
     
-    // --- PASS 2: Find the first available empty coordinate and store sequentially ---
+    // --- PASS 2: Store sequentially starting from the user's selected coordinate ---
     if (binsToStore > 0) {
-        // Find the first empty coordinate, ignoring user's startCoordinate for this pass
-        const firstEmptyCoord = allPossibleCoordinates.find(c => !occupiedCoordinates.has(c));
-
-        if (!firstEmptyCoord) {
-            toast({ variant: 'destructive', title: 'Error de espacio', description: `No hay coordenadas vacías en la cámara ${chamberConfig.name}.` });
+        if (!allPossibleCoordinates.includes(startCoordinate) || occupiedCoordinates.has(startCoordinate)) {
+            toast({ variant: 'destructive', title: 'Error de ubicación', description: `La coordenada de inicio (${startCoordinate}) no es válida o ya está ocupada.` });
             return;
         }
 
-        const startIndex = allPossibleCoordinates.indexOf(firstEmptyCoord);
+        const startIndex = allPossibleCoordinates.indexOf(startCoordinate);
         const coordinatesToSearch = allPossibleCoordinates.slice(startIndex);
 
         for (const coord of coordinatesToSearch) {
@@ -325,19 +317,16 @@ export default function CamarasPage() {
                 });
                 binsToStore -= binsToAdd;
                 
-                // Live update local map
                 occupiedCoordinates.set(coord, [{displayLotId: lotToStore.displayLotId, binCount: binsToAdd}]);
             }
         }
     }
 
-    // This part of the logic is now less likely to be hit, but kept as a safeguard
     if (binsToStore > 0) {
-        toast({ variant: 'destructive', title: 'Error de espacio', description: `No se encontraron coordenadas suficientes para almacenar todos los bins. Quedaron ${binsToStore} sin almacenar.` });
+        toast({ variant: 'destructive', title: 'Error de espacio', description: `No se encontraron coordenadas suficientes. Quedaron ${binsToStore} sin almacenar.` });
         return;
     }
 
-    // Mark the original pending lot as processed by deleting it
     const originalLotRef = doc(firestore, 'chamberLots', lotToStore.id);
     batch.delete(originalLotRef);
 
@@ -523,19 +512,34 @@ export default function CamarasPage() {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardContent className="p-4 flex items-center justify-between">
-          <div className="space-y-1">
-            <h3 className="font-semibold">Visualizar Estado de Cámaras</h3>
-            <p className="text-sm text-muted-foreground">Muestra u oculta la sección de ocupación de cámaras.</p>
-          </div>
-          <Switch
-            id="show-chamber-status"
-            checked={showChamberStatus}
-            onCheckedChange={setShowChamberStatus}
-          />
-        </CardContent>
-      </Card>
+      <div className="grid md:grid-cols-2 gap-4">
+        <Card>
+          <CardContent className="p-4 flex items-center justify-between">
+            <div className="space-y-1">
+              <h3 className="font-semibold">Visualizar Estado de Cámaras</h3>
+              <p className="text-sm text-muted-foreground">Muestra u oculta la sección de ocupación de cámaras.</p>
+            </div>
+            <Switch
+              id="show-chamber-status"
+              checked={showChamberStatus}
+              onCheckedChange={setShowChamberStatus}
+            />
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4 flex items-center justify-between">
+            <div className="space-y-1">
+              <h3 className="font-semibold">Layout de Almacenamiento FIFO</h3>
+              <p className="text-sm text-muted-foreground">Activar para almacenamiento tipo "serpiente" (A↓, B↑, C↓...).</p>
+            </div>
+            <Switch
+              id="storage-strategy"
+              checked={storageStrategy === 'fifo'}
+              onCheckedChange={(checked) => setStorageStrategy(checked ? 'fifo' : 'secuencial')}
+            />
+          </CardContent>
+        </Card>
+      </div>
 
       {showChamberStatus && (
         <Card>
@@ -687,6 +691,7 @@ export default function CamarasPage() {
             onStore={handleStoreInChamber}
             allChamberLots={allLotsInChambers.filter(l => l.status === 'Almacenado')}
             allOtherFruitReceptions={otherFruitReceptions || []}
+            storageStrategy={storageStrategy}
         />
       )}
 
