@@ -15,7 +15,7 @@ import { useToast } from '@/hooks/use-toast';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { chambersConfig } from '@/lib/chambers-config';
-import { getSortedCoordinates } from '@/lib/utils';
+import { getSortedCoordinates, getPairedCoordinates } from '@/lib/utils';
 import { useChamberStrategy } from '@/contexts/ChamberStrategyContext';
 
 interface PendingItem extends OtherFruitReceptionItem {
@@ -63,7 +63,7 @@ export function OtherFruitStorageTab({ clientId: fixedClientId }: { clientId?: s
     setDialogOpen(true);
   };
 
-  const handleStoreConfirm = async (data: { chamberId: string; coordinate: string; totalQuantity: number; quantityPerLocation: number; strategy: 'secuencial' | 'fifo' }) => {
+  const handleStoreConfirm = async (data: { chamberId: string; coordinate: string; totalQuantity: number; quantityPerLocation: number; strategy: 'secuencial' | 'pareado' }) => {
     if (!selectedItem || !firestore) return;
 
     const { chamberId, coordinate: startCoordinate, totalQuantity, quantityPerLocation, strategy } = data;
@@ -80,7 +80,9 @@ export function OtherFruitStorageTab({ clientId: fixedClientId }: { clientId?: s
       return;
     }
 
-    const allPossibleCoords = getSortedCoordinates(chamberConfig, strategy);
+    const getCoordinatesFunc = strategy === 'pareado' ? getPairedCoordinates : getSortedCoordinates;
+    const allPossibleCoords = getCoordinatesFunc(chamberConfig);
+
 
     const occupiedCoords = new Set<string>();
     (allChamberLots || []).forEach(lot => {

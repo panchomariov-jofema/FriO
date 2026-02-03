@@ -13,7 +13,8 @@ import { Button } from '@/components/ui/button';
 import { OtherFruitReception, ChamberLot, OtherFruitReceptionItem, Chamber } from '@/lib/types';
 import { chambersConfig } from '@/lib/chambers-config';
 import { useToast } from '@/hooks/use-toast';
-import { getSortedCoordinates } from '@/lib/utils';
+import { getSortedCoordinates, getPairedCoordinates } from '@/lib/utils';
+import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
 
 interface PendingItem extends OtherFruitReceptionItem {
     receptionId: string;
@@ -27,7 +28,7 @@ interface StoreOtherFruitDialogProps {
   item: PendingItem | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onConfirm: (data: { chamberId: string; coordinate: string; totalQuantity: number; quantityPerLocation: number; strategy: 'secuencial' | 'fifo' }) => void;
+  onConfirm: (data: { chamberId: string; coordinate: string; totalQuantity: number; quantityPerLocation: number; strategy: 'secuencial' | 'pareado' }) => void;
   allReceptions: OtherFruitReception[];
   allChamberLots: ChamberLot[];
   chamberStrategies: Record<string, 'secuencial' | 'fifo'>;
@@ -41,6 +42,7 @@ const storeSchema = z.object({
   coordinate: z.string({ required_error: 'Debe seleccionar una coordenada de inicio.' }),
   totalQuantity: z.coerce.number().positive('La cantidad total debe ser mayor a 0.'),
   quantityPerLocation: z.coerce.number().positive('La cantidad por ubicación debe ser mayor a 0.'),
+  strategy: z.enum(['secuencial', 'pareado']).default('secuencial'),
 });
 
 type StoreFormValues = z.infer<typeof storeSchema>;
@@ -53,6 +55,7 @@ export function StoreOtherFruitDialog({ item, open, onOpenChange, onConfirm, all
   const { toast } = useToast();
 
   const selectedChamberId = form.watch('chamberId');
+  const selectedStrategy = form.watch('strategy');
   
   const capacityPerCoord = useMemo(() => {
     if (!item) return PALLETS_PER_COORDINATE;
@@ -83,24 +86,26 @@ export function StoreOtherFruitDialog({ item, open, onOpenChange, onConfirm, all
         });
     });
     
-    const storageStrategy = chamberStrategies[selectedChamberId] || 'secuencial';
-    const allPossibleCoords = getSortedCoordinates(chamberConfig, storageStrategy);
+    const sortFunction = selectedStrategy === 'pareado' ? getPairedCoordinates : getSortedCoordinates;
+    const allPossibleCoords = sortFunction(chamberConfig);
     
     const availableCoords = allPossibleCoords.filter(coord => !occupiedCoords.has(coord));
     const currentSuggestion = availableCoords.length > 0 ? availableCoords[0] : null;
     
     return { availableCoordinates: availableCoords, suggestion: currentSuggestion };
 
-  }, [selectedChamberId, item, allReceptions, allChamberLots, chamberStrategies]);
+  }, [selectedChamberId, item, allReceptions, allChamberLots, selectedStrategy]);
 
   useEffect(() => {
     if (open && item) {
        const defaultQtyPerLocation = item.unit === 'Pallets' ? 1 : capacityPerCoord;
+       const isFallCreek = item.clientName.toUpperCase() === 'FALL CREEK';
       form.reset({
         totalQuantity: item.quantity,
         quantityPerLocation: defaultQtyPerLocation,
         chamberId: undefined,
         coordinate: undefined,
+        strategy: isFallCreek ? 'pareado' : 'secuencial',
        });
     }
   }, [item, open, form, capacityPerCoord]);
@@ -123,13 +128,14 @@ export function StoreOtherFruitDialog({ item, open, onOpenChange, onConfirm, all
         toast({ variant: 'destructive', title: 'Cantidad Inválida', description: `No puede almacenar más de lo pendiente (${item.quantity}).`});
         return;
     }
-    const strategy = chamberStrategies[values.chamberId] || 'secuencial';
-    onConfirm({ ...values, strategy });
+    onConfirm(values);
   };
   
   if (!item) {
     return null;
   }
+
+  const isFallCreekClient = item.clientName.toUpperCase() === 'FALL CREEK';
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -142,6 +148,38 @@ export function StoreOtherFruitDialog({ item, open, onOpenChange, onConfirm, all
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 py-4">
+            {isFallCreekClient && (
+                 <FormField
+                    control={form.control}
+                    name="strategy"
+                    render={({ field }) => (
+                        <FormItem className="space-y-3">
+                            <FormLabel>Estrategia de Almacenamiento</FormLabel>
+                            <FormControl>
+                                <RadioGroup
+                                    onValueChange={field.onChange}
+                                    value={field.value}
+                                    className="flex flex-row space-x-4"
+                                >
+                                    <FormItem className="flex items-center space-x-2 space-y-0">
+                                        <FormControl>
+                                            <RadioGroupItem value="secuencial" />
+                                        </FormControl>
+                                        <FormLabel className="font-normal">Secuencial</FormLabel>
+                                    </FormItem>
+                                    <FormItem className="flex items-center space-x-2 space-y-0">
+                                        <FormControl>
+                                            <RadioGroupItem value="pareado" />
+                                        </FormControl>
+                                        <FormLabel className="font-normal">Pareado</FormLabel>
+                                    </FormItem>
+                                </RadioGroup>
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    )}
+                />
+            )}
              <div className="grid grid-cols-2 gap-4">
                 <FormField control={form.control} name="chamberId" render={({ field }) => (
                     <FormItem>

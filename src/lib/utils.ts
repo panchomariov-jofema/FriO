@@ -20,11 +20,41 @@ export const naturalSort = (a: string, b: string) => {
   return aNum - bNum;
 };
 
-export const getSortedCoordinates = (chamberConfig: Chamber, strategy: 'secuencial' | 'fifo'): string[] => {
-  // Per the user's request, the "serpent" (FIFO) layout now follows a simple
-  // sequential order (A1...A12, then B1...B12).
+// Sequential / "Snake" (FIFO) layout.
+export const getSortedCoordinates = (chamberConfig: Chamber): string[] => {
+  // Returns A1, A2... B1, B2...
   return chamberConfig.columns
     .flatMap(col => chamberConfig.rows.map(row => `${col.name}${row}`))
     .filter(coord => !chamberConfig.blocked?.includes(coord))
     .sort(naturalSort);
+};
+
+// New Paired / Z-pattern layout for Fall Creek
+export const getPairedCoordinates = (chamberConfig: Chamber): string[] => {
+    const coords: string[] = [];
+    const columns = chamberConfig.columns.map(c => c.name);
+    const rows = chamberConfig.rows;
+
+    // Process columns in pairs (A,B), (C,D), etc.
+    for (let i = 0; i < columns.length; i += 2) {
+        const col1Name = columns[i];
+        const col2Name = i + 1 < columns.length ? columns[i + 1] : null;
+
+        rows.forEach(row => {
+            // Add from first column in the pair
+            const coord1 = `${col1Name}${row}`;
+            if (!chamberConfig.blocked?.includes(coord1)) {
+                coords.push(coord1);
+            }
+            
+            // If there's a second column in the pair, add from it
+            if (col2Name) {
+                const coord2 = `${col2Name}${row}`;
+                if (!chamberConfig.blocked?.includes(coord2)) {
+                    coords.push(coord2);
+                }
+            }
+        });
+    }
+    return coords;
 };
