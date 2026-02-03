@@ -9,11 +9,12 @@ import { OtherFruitExitTab } from '@/components/other-fruit/ExitTab';
 import { StockAndRelocationTab } from '@/components/other-fruit/StockAndRelocationTab';
 import { OtherFruitPickingTab } from '@/components/other-fruit/PickingTab';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
-import type { OtherFruitMovement } from '@/lib/types';
+import type { OtherFruitMovement, OtherFruitReception } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
 
 export default function OtrosHortofruticolasPage() {
     const { data: otherFruitMovements } = useFirestoreCollection<OtherFruitMovement>('otherFruitMovements');
+    const { data: otherFruitReceptions } = useFirestoreCollection<OtherFruitReception>('otherFruitReceptions');
 
     const pendingPickingCount = React.useMemo(() => {
         if (!otherFruitMovements) return 0;
@@ -21,6 +22,14 @@ export default function OtrosHortofruticolasPage() {
             (mov) => mov.type === 'salida' && mov.status === 'Pendiente de Picking'
         ).length;
     }, [otherFruitMovements]);
+    
+    const pendingStorageCount = React.useMemo(() => {
+        if (!otherFruitReceptions) return 0;
+        return (otherFruitReceptions || [])
+            .flatMap(reception => reception.items)
+            .filter(item => item.status === 'Pendiente de almacenar')
+            .length;
+    }, [otherFruitReceptions]);
 
     return (
         <div className="space-y-4">
@@ -34,7 +43,12 @@ export default function OtrosHortofruticolasPage() {
             <Tabs defaultValue="recepcion" className="w-full">
                 <TabsList className="grid w-full grid-cols-5">
                     <TabsTrigger value="recepcion">Recepción</TabsTrigger>
-                    <TabsTrigger value="almacenamiento">Almacenamiento</TabsTrigger>
+                    <TabsTrigger value="almacenamiento" className="flex items-center gap-2">
+                        Almacenamiento
+                        {pendingStorageCount > 0 && (
+                            <Badge className="h-5 w-5 p-0 flex items-center justify-center">{pendingStorageCount}</Badge>
+                        )}
+                    </TabsTrigger>
                     <TabsTrigger value="salidas">Despacho</TabsTrigger>
                     <TabsTrigger value="picking" className="flex items-center gap-2">
                         Picking
