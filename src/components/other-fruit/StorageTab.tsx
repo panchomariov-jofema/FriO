@@ -65,7 +65,7 @@ export function OtherFruitStorageTab({ clientId: fixedClientId }: { clientId?: s
 
   const handleStoreConfirm = async (data: { chamberId: string; coordinate: string; totalQuantity: number; quantityPerLocation: number; strategy: 'secuencial' | 'fifo' }) => {
     if (!selectedItem || !firestore) return;
-    
+
     const { chamberId, coordinate: startCoordinate, totalQuantity, quantityPerLocation, strategy } = data;
 
     const chamberConfig = chambersConfig[chamberId];
@@ -76,100 +76,106 @@ export function OtherFruitStorageTab({ clientId: fixedClientId }: { clientId?: s
     const capacityPerCoord = selectedItem.unit === 'Bins' ? BINS_PER_COORDINATE : PALLETS_PER_COORDINATE;
 
     if (quantityPerLocation > capacityPerCoord) {
-        toast({ title: 'Error', description: `La cantidad por ubicación excede el máximo de ${capacityPerCoord}.`, variant: 'destructive'});
-        return;
+      toast({ title: 'Error', description: `La cantidad por ubicación excede el máximo de ${capacityPerCoord}.`, variant: 'destructive' });
+      return;
     }
 
     const allPossibleCoords = getSortedCoordinates(chamberConfig, strategy);
 
     const occupiedCoords = new Set<string>();
     (allChamberLots || []).forEach(lot => {
-        if (lot.chamberId === chamberId && lot.coordinate) occupiedCoords.add(lot.coordinate);
+      if (lot.chamberId === chamberId && lot.coordinate) occupiedCoords.add(lot.coordinate);
     });
     (allReceptions || []).forEach(reception => {
-        reception.items.forEach(item => {
-            if(item.status === 'Almacenado' && item.storageLocation?.chamberId === chamberId && item.storageLocation.coordinate) {
-                 occupiedCoords.add(item.storageLocation.coordinate);
-            }
-        });
+      reception.items.forEach(item => {
+        if (item.status === 'Almacenado' && item.storageLocation?.chamberId === chamberId && item.storageLocation.coordinate) {
+          occupiedCoords.add(item.storageLocation.coordinate);
+        }
+      });
     });
 
-    const availableCoordinates = allPossibleCoords.filter(coord => !occupiedCoords.has(coord));
-    const startIndex = availableCoordinates.indexOf(startCoordinate);
-    if (startIndex === -1) {
-        toast({ title: 'Error', description: 'La coordenada de inicio ya no está disponible.', variant: 'destructive'});
+    if (occupiedCoords.has(startCoordinate)) {
+        toast({ title: 'Error', description: 'La coordenada de inicio ya está ocupada.', variant: 'destructive'});
         return;
     }
 
+    const startIndex = allPossibleCoords.indexOf(startCoordinate);
+    if (startIndex === -1) {
+        toast({ title: 'Error', description: 'La coordenada de inicio no es válida para esta cámara.', variant: 'destructive'});
+        return;
+    }
+    
+    const coordinatesToSearch = allPossibleCoords.slice(startIndex);
     let remainingQuantityToStore = totalQuantity;
     const coordsToUse: string[] = [];
     const batch = writeBatch(firestore);
-    
+
     const receptionDocRef = doc(firestore, 'otherFruitReceptions', selectedItem.receptionId);
     const originalReception = allReceptions.find(r => r.id === selectedItem.receptionId);
     if (!originalReception) return;
 
     const updatedItems = JSON.parse(JSON.stringify(originalReception.items));
     const originalItem = updatedItems[selectedItem.itemIndex];
-    
+
     if (totalQuantity > originalItem.quantity) {
-        toast({ title: 'Error', description: 'La cantidad a almacenar excede la pendiente.', variant: 'destructive'});
-        return;
+      toast({ title: 'Error', description: 'La cantidad a almacenar excede la pendiente.', variant: 'destructive' });
+      return;
     }
 
     originalItem.quantity -= totalQuantity;
 
-    for (let i = startIndex; i < availableCoordinates.length; i++) {
-        const coord = availableCoordinates[i];
+    for (const coord of coordinatesToSearch) {
         if (remainingQuantityToStore <= 0) break;
-        coordsToUse.push(coord);
+        
+        if (!occupiedCoords.has(coord)) {
+            coordsToUse.push(coord);
+            const quantityForThisCoord = Math.min(remainingQuantityToStore, quantityPerLocation);
 
-        const quantityForThisCoord = Math.min(remainingQuantityToStore, quantityPerLocation);
-
-        const newItem: OtherFruitReceptionItem = {
-            ...originalItem,
-            quantity: quantityForThisCoord,
-            status: 'Almacenado',
-            storageLocation: { chamberId, coordinate: coord },
-            storedAt: new Date(),
-        };
-        updatedItems.push(newItem);
-
-        remainingQuantityToStore -= quantityForThisCoord;
+            const newItem: OtherFruitReceptionItem = {
+                ...originalItem,
+                quantity: quantityForThisCoord,
+                status: 'Almacenado',
+                storageLocation: { chamberId, coordinate: coord },
+                storedAt: new Date(),
+            };
+            updatedItems.push(newItem);
+    
+            remainingQuantityToStore -= quantityForThisCoord;
+        }
     }
-
+    
     if (remainingQuantityToStore > 0) {
-        toast({ title: 'Espacio Insuficiente', description: `No se encontraron suficientes coordenadas libres para almacenar todo. Quedaron ${remainingQuantityToStore} sin almacenar.`, variant: 'destructive', duration: 7000});
-        return;
+      toast({ title: 'Espacio Insuficiente', description: `No se encontraron suficientes coordenadas libres para almacenar todo. Quedaron ${remainingQuantityToStore} sin almacenar.`, variant: 'destructive', duration: 7000 });
+      return;
     }
 
     if (originalItem.quantity <= 0) {
-        updatedItems.splice(selectedItem.itemIndex, 1);
+      updatedItems.splice(selectedItem.itemIndex, 1);
     }
-    
+
     const allItemsStoredOrEmpty = updatedItems.every((item: OtherFruitReceptionItem) => item.status === 'Almacenado' || item.quantity <= 0);
     const newStatus = allItemsStoredOrEmpty ? 'Almacenado' : 'Parcialmente Almacenado';
 
     const updateData = {
-        items: updatedItems,
-        status: newStatus,
-        updatedAt: serverTimestamp(),
+      items: updatedItems,
+      status: newStatus,
+      updatedAt: serverTimestamp(),
     };
-    
+
     batch.update(receptionDocRef, updateData);
 
     try {
-        await batch.commit();
-        toast({ title: 'Éxito', description: `${totalQuantity} ${selectedItem.unit} almacenados en ${coordsToUse.length} ubicaciones.` });
-        setDialogOpen(false);
+      await batch.commit();
+      toast({ title: 'Éxito', description: `${totalQuantity} ${selectedItem.unit} almacenados en ${coordsToUse.length} ubicaciones.` });
+      setDialogOpen(false);
     } catch (error) {
-        console.error("Error storing fruit item:", error);
-        toast({ variant: 'destructive', title: 'Error', description: 'No se pudo actualizar la ubicación.' });
-        errorEmitter.emit('permission-error', new FirestorePermissionError({
-            path: receptionDocRef.path,
-            operation: 'update',
-            requestResourceData: updateData,
-        }));
+      console.error("Error storing fruit item:", error);
+      toast({ variant: 'destructive', title: 'Error', description: 'No se pudo actualizar la ubicación.' });
+      errorEmitter.emit('permission-error', new FirestorePermissionError({
+        path: receptionDocRef.path,
+        operation: 'update',
+        requestResourceData: updateData,
+      }));
     }
   };
 
