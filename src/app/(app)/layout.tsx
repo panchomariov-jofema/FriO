@@ -42,6 +42,7 @@ import type { UserMaster, Profile, ModulePermission } from '@/lib/types';
 import { signOut } from 'firebase/auth';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { cn } from '@/lib/utils';
+import { ChamberStrategyProvider } from '@/contexts/ChamberStrategyContext';
 
 // Define the structure with types and potential nesting
 const navStructure: any[] = [
@@ -269,7 +270,9 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <SidebarProvider defaultOpen={true}>
-      <AppLayoutContent>{children}</AppLayoutContent>
+      <ChamberStrategyProvider>
+        <AppLayoutContent>{children}</AppLayoutContent>
+      </ChamberStrategyProvider>
     </SidebarProvider>
   )
 }

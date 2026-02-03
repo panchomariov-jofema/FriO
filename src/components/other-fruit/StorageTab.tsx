@@ -15,6 +15,8 @@ import { useToast } from '@/hooks/use-toast';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { chambersConfig } from '@/lib/chambers-config';
+import { getSortedCoordinates } from '@/lib/utils';
+import { useChamberStrategy } from '@/contexts/ChamberStrategyContext';
 
 interface PendingItem extends OtherFruitReceptionItem {
     receptionId: string;
@@ -22,35 +24,6 @@ interface PendingItem extends OtherFruitReceptionItem {
     document: string;
     itemIndex: number;
     unit: 'Bins' | 'Pallets';
-}
-
-function getSortedCoordinates(chamberConfig: Chamber, strategy: 'secuencial' | 'pareado'): string[] {
-    if (strategy === 'pareado') {
-        const pairedCoords: string[] = [];
-        const cols = [...chamberConfig.columns];
-        
-        // Iterate through column pairs first (e.g., A/B, then C/D)
-        for (let i = 0; i < cols.length; i += 2) {
-            const col1 = cols[i];
-            const col2 = i + 1 < cols.length ? cols[i + 1] : null;
-
-            // Then, for each pair, iterate down the rows to create the "Z" pattern
-            for (const row of chamberConfig.rows) {
-                if (!chamberConfig.blocked?.includes(`${col1.name}${row}`)) {
-                    pairedCoords.push(`${col1.name}${row}`);
-                }
-                if (col2 && !chamberConfig.blocked?.includes(`${col2.name}${row}`)) {
-                    pairedCoords.push(`${col2.name}${row}`);
-                }
-            }
-        }
-        return pairedCoords;
-    }
-    
-    // 'secuencial': A1, A2, A3... B1, B2, B3...
-    return chamberConfig.columns
-        .flatMap((col) => chamberConfig.rows.map((row) => `${col.name}${row}`))
-        .filter((coord: string) => !chamberConfig.blocked?.includes(coord));
 }
 
 
@@ -61,6 +34,7 @@ export function OtherFruitStorageTab({ clientId: fixedClientId }: { clientId?: s
   const [isDialogOpen, setDialogOpen] = React.useState(false);
   const firestore = useFirestore();
   const { toast } = useToast();
+  const { chamberStrategies } = useChamberStrategy();
   
   const loading = loadingReceptions || loadingChamberLots;
 
@@ -89,7 +63,7 @@ export function OtherFruitStorageTab({ clientId: fixedClientId }: { clientId?: s
     setDialogOpen(true);
   };
 
-  const handleStoreConfirm = async (data: { chamberId: string; coordinate: string; totalQuantity: number; quantityPerLocation: number; strategy: 'secuencial' | 'pareado' }) => {
+  const handleStoreConfirm = async (data: { chamberId: string; coordinate: string; totalQuantity: number; quantityPerLocation: number; strategy: 'secuencial' | 'fifo' }) => {
     if (!selectedItem || !firestore) return;
     
     const { chamberId, coordinate: startCoordinate, totalQuantity, quantityPerLocation, strategy } = data;
@@ -252,6 +226,7 @@ export function OtherFruitStorageTab({ clientId: fixedClientId }: { clientId?: s
         onConfirm={handleStoreConfirm}
         allReceptions={allReceptions || []}
         allChamberLots={allChamberLots || []}
+        chamberStrategies={chamberStrategies}
       />
     </>
   );

@@ -13,8 +13,7 @@ import { Button } from '@/components/ui/button';
 import { OtherFruitReception, ChamberLot, OtherFruitReceptionItem, Chamber } from '@/lib/types';
 import { chambersConfig } from '@/lib/chambers-config';
 import { useToast } from '@/hooks/use-toast';
-import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
-import { Label } from '../ui/label';
+import { getSortedCoordinates } from '@/lib/utils';
 
 interface PendingItem extends OtherFruitReceptionItem {
     receptionId: string;
@@ -28,67 +27,32 @@ interface StoreOtherFruitDialogProps {
   item: PendingItem | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onConfirm: (data: { chamberId: string; coordinate: string; totalQuantity: number; quantityPerLocation: number; strategy: 'secuencial' | 'pareado' }) => void;
+  onConfirm: (data: { chamberId: string; coordinate: string; totalQuantity: number; quantityPerLocation: number; strategy: 'secuencial' | 'fifo' }) => void;
   allReceptions: OtherFruitReception[];
   allChamberLots: ChamberLot[];
+  chamberStrategies: Record<string, 'secuencial' | 'fifo'>;
 }
 
 const BINS_PER_COORDINATE = 9;
 const PALLETS_PER_COORDINATE = 3; 
-
-// Helper function to get sorted coordinates based on strategy
-function getSortedCoordinates(chamberConfig: Chamber, strategy: 'secuencial' | 'pareado'): string[] {
-    if (strategy === 'pareado') {
-        const pairedCoords: string[] = [];
-        const cols = [...chamberConfig.columns];
-        
-        // Iterate through column pairs first (e.g., A/B, then C/D)
-        for (let i = 0; i < cols.length; i += 2) {
-            const col1 = cols[i];
-            const col2 = i + 1 < cols.length ? cols[i + 1] : null;
-
-            // Then, for each pair, iterate down the rows to create the "Z" pattern
-            for (const row of chamberConfig.rows) {
-                if (!chamberConfig.blocked?.includes(`${col1.name}${row}`)) {
-                    pairedCoords.push(`${col1.name}${row}`);
-                }
-                if (col2 && !chamberConfig.blocked?.includes(`${col2.name}${row}`)) {
-                    pairedCoords.push(`${col2.name}${row}`);
-                }
-            }
-        }
-        return pairedCoords;
-    }
-    
-    // 'secuencial': A1, A2, A3... B1, B2, B3...
-    return chamberConfig.columns
-        .flatMap((col) => chamberConfig.rows.map((row) => `${col.name}${row}`))
-        .filter((coord: string) => !chamberConfig.blocked?.includes(coord));
-}
-
 
 const storeSchema = z.object({
   chamberId: z.string({ required_error: 'Debe seleccionar una cámara.' }),
   coordinate: z.string({ required_error: 'Debe seleccionar una coordenada de inicio.' }),
   totalQuantity: z.coerce.number().positive('La cantidad total debe ser mayor a 0.'),
   quantityPerLocation: z.coerce.number().positive('La cantidad por ubicación debe ser mayor a 0.'),
-  strategy: z.enum(['secuencial', 'pareado']).default('secuencial'),
 });
 
 type StoreFormValues = z.infer<typeof storeSchema>;
 
 
-export function StoreOtherFruitDialog({ item, open, onOpenChange, onConfirm, allReceptions, allChamberLots }: StoreOtherFruitDialogProps) {
+export function StoreOtherFruitDialog({ item, open, onOpenChange, onConfirm, allReceptions, allChamberLots, chamberStrategies }: StoreOtherFruitDialogProps) {
   const form = useForm<StoreFormValues>({
     resolver: zodResolver(storeSchema),
-    defaultValues: {
-      strategy: 'secuencial',
-    }
   });
   const { toast } = useToast();
 
   const selectedChamberId = form.watch('chamberId');
-  const storageStrategy = form.watch('strategy');
   
   const capacityPerCoord = useMemo(() => {
     if (!item) return PALLETS_PER_COORDINATE;
@@ -117,6 +81,7 @@ export function StoreOtherFruitDialog({ item, open, onOpenChange, onConfirm, all
         });
     });
     
+    const storageStrategy = chamberStrategies[selectedChamberId] || 'secuencial';
     const allPossibleCoords = getSortedCoordinates(chamberConfig, storageStrategy);
     
     const availableCoords = allPossibleCoords.filter(coord => !occupiedCoords.has(coord));
@@ -124,7 +89,7 @@ export function StoreOtherFruitDialog({ item, open, onOpenChange, onConfirm, all
     
     return { availableCoordinates: availableCoords, suggestion: currentSuggestion };
 
-  }, [selectedChamberId, item, allReceptions, allChamberLots, storageStrategy]);
+  }, [selectedChamberId, item, allReceptions, allChamberLots, chamberStrategies]);
 
   useEffect(() => {
     if (open && item) {
@@ -134,7 +99,6 @@ export function StoreOtherFruitDialog({ item, open, onOpenChange, onConfirm, all
         quantityPerLocation: defaultQtyPerLocation,
         chamberId: undefined,
         coordinate: undefined,
-        strategy: 'secuencial',
        });
     }
   }, [item, open, form, capacityPerCoord]);
@@ -157,7 +121,8 @@ export function StoreOtherFruitDialog({ item, open, onOpenChange, onConfirm, all
         toast({ variant: 'destructive', title: 'Cantidad Inválida', description: `No puede almacenar más de lo pendiente (${item.quantity}).`});
         return;
     }
-    onConfirm(values);
+    const strategy = chamberStrategies[values.chamberId] || 'secuencial';
+    onConfirm({ ...values, strategy });
   };
   
   if (!item) {
@@ -175,36 +140,6 @@ export function StoreOtherFruitDialog({ item, open, onOpenChange, onConfirm, all
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 py-4">
-            <FormField
-              control={form.control}
-              name="strategy"
-              render={({ field }) => (
-                <FormItem className="space-y-3">
-                  <FormLabel>Estrategia de Almacenamiento</FormLabel>
-                  <FormControl>
-                    <RadioGroup
-                      onValueChange={field.onChange}
-                      defaultValue={field.value}
-                      className="flex space-x-4"
-                    >
-                      <FormItem className="flex items-center space-x-2 space-y-0">
-                        <FormControl>
-                          <RadioGroupItem value="secuencial" />
-                        </FormControl>
-                        <FormLabel className="font-normal">Secuencial (A1, A2, A3...)</FormLabel>
-                      </FormItem>
-                      <FormItem className="flex items-center space-x-2 space-y-0">
-                        <FormControl>
-                          <RadioGroupItem value="pareado" />
-                        </FormControl>
-                        <FormLabel className="font-normal">Pareado (A1, B1, A2, B2...)</FormLabel>
-                      </FormItem>
-                    </RadioGroup>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
              <div className="grid grid-cols-2 gap-4">
                 <FormField control={form.control} name="chamberId" render={({ field }) => (
                     <FormItem>

@@ -26,6 +26,7 @@ import { ExternalReceptionUploader } from '@/components/hidrocooler/ExternalRece
 import { ChamberTemperatureInput } from '@/components/camaras/ChamberTemperatureInput';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { useChamberStrategy } from '@/contexts/ChamberStrategyContext';
 
 
 // --- Color Palette Logic (Moved outside component to persist state) ---
@@ -71,12 +72,7 @@ export default function CamarasPage() {
   const firestore = useFirestore();
   const { toast } = useToast();
   const [showChamberStatus, setShowChamberStatus] = React.useState(false);
-  const [chamberStrategies, setChamberStrategies] = React.useState<Record<string, 'secuencial' | 'fifo'>>(
-    Object.keys(chambersConfig).reduce((acc, chamberId) => {
-        acc[chamberId] = 'secuencial';
-        return acc;
-    }, {} as Record<string, 'secuencial' | 'fifo'>)
-  );
+  const { chamberStrategies, setChamberStrategies } = useChamberStrategy();
 
   const loading = loadingChamberLots || loadingOtherFruit || loadingExporters;
   
@@ -627,7 +623,6 @@ export default function CamarasPage() {
                                           coord = `${col.name}${row}`;
                                       }
 
-                                      const isBlocked = config.blocked?.includes(coord);
                                       const itemsInCoord = storedItemsByChamber[chamberId]?.[coord] || [];
                                       const isOccupied = itemsInCoord.length > 0;
                                     
@@ -639,23 +634,6 @@ export default function CamarasPage() {
                                       const occupancyPercentage = isOccupied ? (totalBins + totalPallets * 2) / 6 * 100 : 0; // Approx. 1 pallet = 2 bins
                                       const firstItem = isOccupied ? itemsInCoord[0] : null;
 
-                                      if (isBlocked) {
-                                          return (
-                                          <div key={`${col.name}${row}`} className="h-10 sm:h-12 w-full rounded border-2 bg-gray-200 dark:bg-gray-700 relative">
-                                              <div className="absolute inset-0 bg-repeat bg-[length:10px_10px]" style={{backgroundImage: "repeating-linear-gradient(-45deg, #a0aec0, #a0aec0 1px, transparent 1px, transparent 5px)"}} />
-                                          </div>
-                                          )
-                                      }
-                                    
-                                      const lotColor = firstItem ? getColorForLot(`${firstItem.type}-${firstItem.lotIdForColor}`) : 'transparent';
-                                      const cellStyle = { 
-                                          '--lot-color': lotColor,
-                                          '--lot-color-border': lotColor.replace(')', ', 0.5)'),
-                                          '--lot-color-bg': lotColor.replace(')', ', 0.2)'),
-                                          '--lot-color-progress': lotColor.replace(')', ', 0.3)'),
-                                      } as React.CSSProperties;
-
-
                                       return (
                                           <Popover key={coord}>
                                           <PopoverTrigger asChild>
@@ -663,7 +641,12 @@ export default function CamarasPage() {
                                               className={cn("h-10 sm:h-12 w-full rounded border-2 flex items-center justify-center text-xs font-mono relative overflow-hidden cursor-pointer",
                                                   isOccupied ? 'border-[var(--lot-color-border)] bg-[var(--lot-color-bg)]' : 'bg-background border-dashed'
                                               )}
-                                              style={cellStyle}
+                                              style={{
+                                                '--lot-color': firstItem ? getColorForLot(`${firstItem.type}-${firstItem.lotIdForColor}`) : 'transparent',
+                                                '--lot-color-border': firstItem ? getColorForLot(`${firstItem.type}-${firstItem.lotIdForColor}`).replace(')', ', 0.5)') : 'transparent',
+                                                '--lot-color-bg': firstItem ? getColorForLot(`${firstItem.type}-${firstItem.lotIdForColor}`).replace(')', ', 0.2)') : 'transparent',
+                                                '--lot-color-progress': firstItem ? getColorForLot(`${firstItem.type}-${firstItem.lotIdForColor}`).replace(')', ', 0.3)') : 'transparent',
+                                              } as React.CSSProperties}
                                               >
                                               <div className="absolute bottom-0 left-0 top-0 bg-[var(--lot-color-progress)]" style={{ right: `${100 - occupancyPercentage}%` }} />
                                               <span className="relative z-10 font-semibold">{coord}</span>
