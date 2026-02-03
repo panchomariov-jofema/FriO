@@ -610,13 +610,21 @@ export default function CamarasPage() {
                                     config.columns.map((col, colIndex) => {
                                       const strategy = chamberStrategies[chamberId] || 'secuencial';
                                       const isEvenColumn = colIndex % 2 !== 0;
+                                      
                                       let coord;
-                                
+                                      const unblockedRowCount = 12; // Assuming rows 1-12 are usable
+                                      
                                       if (strategy === 'fifo' && isEvenColumn) {
-                                        const reversedRowValue = config.rows[config.rows.length - 1 - rowIndex];
-                                        coord = `${col.name}${reversedRowValue}`;
+                                          if (rowIndex < unblockedRowCount) {
+                                              // This is an unblocked visual row. Map it to the reversed logical unblocked row.
+                                              const logicalRowValue = unblockedRowCount - rowIndex; // rowIndex 0 -> 12, rowIndex 1 -> 11, ..., rowIndex 11 -> 1
+                                              coord = `${col.name}${logicalRowValue}`;
+                                          } else {
+                                              // This is a blocked visual row. Map it to the corresponding logical blocked row.
+                                              coord = `${col.name}${row}`;
+                                          }
                                       } else {
-                                        coord = `${col.name}${row}`;
+                                          coord = `${col.name}${row}`;
                                       }
 
                                       const isBlocked = config.blocked?.includes(coord);
