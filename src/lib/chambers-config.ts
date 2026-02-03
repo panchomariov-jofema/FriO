@@ -16,7 +16,7 @@ const columns4to6 = [
     { name: 'M', id: 'M' }, { name: 'N', id: 'N' }, { name: 'O', id: 'O' }
 ];
 
-const rows = Array.from({ length: 13 }, (_, i) => i + 1);
+const rows = Array.from({ length: 14 }, (_, i) => i + 1);
 
 const blockedCoordsC1C3 = [
     ...Array.from({ length: 5 }, (_, i) => `E${i + 9}`), // E9-E13
