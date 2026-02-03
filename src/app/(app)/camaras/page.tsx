@@ -606,75 +606,85 @@ export default function CamarasPage() {
                             </div>
                             <div className="p-2 sm:p-4 bg-muted/50 rounded-b-lg border border-t-0 overflow-x-auto">
                                 <div className="grid gap-1 min-w-[600px] sm:min-w-[800px]" style={{ gridTemplateColumns: `repeat(${config.columns.length}, minmax(0, 1fr))` }}>
-                                {config.rows.map(row =>
-                                    config.columns.map(col => {
-                                    const coord = `${col.name}${row}`;
-                                    const isBlocked = config.blocked?.includes(coord);
-                                    const itemsInCoord = storedItemsByChamber[chamberId]?.[coord] || [];
-                                    const isOccupied = itemsInCoord.length > 0;
-                                    
-                                    const totalBins = itemsInCoord.filter(i => i.unit === 'Bins').reduce((s, i) => s + i.quantity, 0);
-                                    const totalPallets = itemsInCoord.filter(i => i.unit === 'Pallets').reduce((s, i) => s + i.quantity, 0);
-                                    const totalNetWeight = itemsInCoord.reduce((sum, i) => sum + (i.quantity * (i.netWeightPerBin || 0)), 0);
-                                    const clientLotIds = Array.from(new Set(itemsInCoord.map(i => i.clientLotId).filter(Boolean)));
-                                    
-                                    const occupancyPercentage = isOccupied ? (totalBins + totalPallets * 2) / 6 * 100 : 0; // Approx. 1 pallet = 2 bins
-                                    const firstItem = isOccupied ? itemsInCoord[0] : null;
+                                {config.rows.map((row, rowIndex) =>
+                                    config.columns.map((col, colIndex) => {
+                                      const strategy = chamberStrategies[chamberId] || 'secuencial';
+                                      const isEvenColumn = colIndex % 2 !== 0;
+                                      let coord;
+                                
+                                      if (strategy === 'fifo' && isEvenColumn) {
+                                        const reversedRowValue = config.rows[config.rows.length - 1 - rowIndex];
+                                        coord = `${col.name}${reversedRowValue}`;
+                                      } else {
+                                        coord = `${col.name}${row}`;
+                                      }
 
-                                    if (isBlocked) {
-                                        return (
-                                        <div key={coord} className="h-10 sm:h-12 w-full rounded border-2 bg-gray-200 dark:bg-gray-700 relative">
-                                            <div className="absolute inset-0 bg-repeat bg-[length:10px_10px]" style={{backgroundImage: "repeating-linear-gradient(-45deg, #a0aec0, #a0aec0 1px, transparent 1px, transparent 5px)"}} />
-                                        </div>
-                                        )
-                                    }
+                                      const isBlocked = config.blocked?.includes(coord);
+                                      const itemsInCoord = storedItemsByChamber[chamberId]?.[coord] || [];
+                                      const isOccupied = itemsInCoord.length > 0;
                                     
-                                    const lotColor = firstItem ? getColorForLot(`${firstItem.type}-${firstItem.lotIdForColor}`) : 'transparent';
-                                    const cellStyle = { 
-                                        '--lot-color': lotColor,
-                                        '--lot-color-border': lotColor.replace(')', ', 0.5)'),
-                                        '--lot-color-bg': lotColor.replace(')', ', 0.2)'),
-                                        '--lot-color-progress': lotColor.replace(')', ', 0.3)'),
-                                    } as React.CSSProperties;
+                                      const totalBins = itemsInCoord.filter(i => i.unit === 'Bins').reduce((s, i) => s + i.quantity, 0);
+                                      const totalPallets = itemsInCoord.filter(i => i.unit === 'Pallets').reduce((s, i) => s + i.quantity, 0);
+                                      const totalNetWeight = itemsInCoord.reduce((sum, i) => sum + (i.quantity * (i.netWeightPerBin || 0)), 0);
+                                      const clientLotIds = Array.from(new Set(itemsInCoord.map(i => i.clientLotId).filter(Boolean)));
+                                    
+                                      const occupancyPercentage = isOccupied ? (totalBins + totalPallets * 2) / 6 * 100 : 0; // Approx. 1 pallet = 2 bins
+                                      const firstItem = isOccupied ? itemsInCoord[0] : null;
+
+                                      if (isBlocked) {
+                                          return (
+                                          <div key={`${col.name}${row}`} className="h-10 sm:h-12 w-full rounded border-2 bg-gray-200 dark:bg-gray-700 relative">
+                                              <div className="absolute inset-0 bg-repeat bg-[length:10px_10px]" style={{backgroundImage: "repeating-linear-gradient(-45deg, #a0aec0, #a0aec0 1px, transparent 1px, transparent 5px)"}} />
+                                          </div>
+                                          )
+                                      }
+                                    
+                                      const lotColor = firstItem ? getColorForLot(`${firstItem.type}-${firstItem.lotIdForColor}`) : 'transparent';
+                                      const cellStyle = { 
+                                          '--lot-color': lotColor,
+                                          '--lot-color-border': lotColor.replace(')', ', 0.5)'),
+                                          '--lot-color-bg': lotColor.replace(')', ', 0.2)'),
+                                          '--lot-color-progress': lotColor.replace(')', ', 0.3)'),
+                                      } as React.CSSProperties;
 
 
-                                    return (
-                                        <Popover key={coord}>
-                                        <PopoverTrigger asChild>
-                                            <div 
-                                            className={cn("h-10 sm:h-12 w-full rounded border-2 flex items-center justify-center text-xs font-mono relative overflow-hidden cursor-pointer",
-                                                isOccupied ? 'border-[var(--lot-color-border)] bg-[var(--lot-color-bg)]' : 'bg-background border-dashed'
-                                            )}
-                                            style={cellStyle}
-                                            >
-                                            <div className="absolute bottom-0 left-0 top-0 bg-[var(--lot-color-progress)]" style={{ right: `${100 - occupancyPercentage}%` }} />
-                                            <span className="relative z-10 font-semibold">{coord}</span>
-                                            </div>
-                                        </PopoverTrigger>
-                                        {isOccupied && firstItem && (
-                                            <PopoverContent className="p-4 w-60 sm:w-64" side="bottom" align="center">
-                                            <div className="space-y-2">
-                                                <p className="font-bold">
-                                                {firstItem.type === 'producerLot' ? `Lote: ${firstItem.displayId}` : `Producto: ${firstItem.displayId}`}
-                                                </p>
-                                                {clientLotIds.length > 0 && (
-                                                <p>Lote Cliente: <span className="font-mono">{clientLotIds.join(', ')}</span></p>
-                                                )}
-                                                <p>
-                                                {firstItem.type === 'producerLot' ? `Productor: ${firstItem.ownerName}` : `Cliente: ${firstItem.ownerName}`}
-                                                </p>
-                                                <p>Variedad/Producto: {firstItem.varietyOrProduct}</p>
-                                                <div className="grid grid-cols-2 gap-x-4">
-                                                    <p>Bins: {totalBins}</p>
-                                                    <p>Pallets: {totalPallets}</p>
-                                                    {totalNetWeight > 0 && <p className="col-span-2">Peso Neto: {totalNetWeight.toFixed(1)} kg</p>}
-                                                </div>
-                                                <Button size="sm" className="w-full mt-2" onClick={() => handleRelocateClick(chamberId, coord)}>Reubicar</Button>
+                                      return (
+                                          <Popover key={coord}>
+                                          <PopoverTrigger asChild>
+                                              <div 
+                                              className={cn("h-10 sm:h-12 w-full rounded border-2 flex items-center justify-center text-xs font-mono relative overflow-hidden cursor-pointer",
+                                                  isOccupied ? 'border-[var(--lot-color-border)] bg-[var(--lot-color-bg)]' : 'bg-background border-dashed'
+                                              )}
+                                              style={cellStyle}
+                                              >
+                                              <div className="absolute bottom-0 left-0 top-0 bg-[var(--lot-color-progress)]" style={{ right: `${100 - occupancyPercentage}%` }} />
+                                              <span className="relative z-10 font-semibold">{coord}</span>
                                               </div>
-                                            </PopoverContent>
-                                        )}
-                                        </Popover>
-                                    );
+                                          </PopoverTrigger>
+                                          {isOccupied && firstItem && (
+                                              <PopoverContent className="p-4 w-60 sm:w-64" side="bottom" align="center">
+                                              <div className="space-y-2">
+                                                  <p className="font-bold">
+                                                  {firstItem.type === 'producerLot' ? `Lote: ${firstItem.displayId}` : `Producto: ${firstItem.displayId}`}
+                                                  </p>
+                                                  {clientLotIds.length > 0 && (
+                                                  <p>Lote Cliente: <span className="font-mono">{clientLotIds.join(', ')}</span></p>
+                                                  )}
+                                                  <p>
+                                                  {firstItem.type === 'producerLot' ? `Productor: ${firstItem.ownerName}` : `Cliente: ${firstItem.ownerName}`}
+                                                  </p>
+                                                  <p>Variedad/Producto: {firstItem.varietyOrProduct}</p>
+                                                  <div className="grid grid-cols-2 gap-x-4">
+                                                      <p>Bins: {totalBins}</p>
+                                                      <p>Pallets: {totalPallets}</p>
+                                                      {totalNetWeight > 0 && <p className="col-span-2">Peso Neto: {totalNetWeight.toFixed(1)} kg</p>}
+                                                  </div>
+                                                  <Button size="sm" className="w-full mt-2" onClick={() => handleRelocateClick(chamberId, coord)}>Reubicar</Button>
+                                                </div>
+                                              </PopoverContent>
+                                          )}
+                                          </Popover>
+                                      );
                                     })
                                 )}
                                 </div>
