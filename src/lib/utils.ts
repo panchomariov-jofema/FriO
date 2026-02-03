@@ -21,24 +21,8 @@ export const naturalSort = (a: string, b: string) => {
 };
 
 export const getSortedCoordinates = (chamberConfig: Chamber, strategy: 'secuencial' | 'fifo'): string[] => {
-  if (strategy === 'fifo') {
-    const fifoCoords: string[] = [];
-    const reversedRows = [...chamberConfig.rows].reverse();
-    chamberConfig.columns.forEach((col, index) => {
-      // Odd columns (A, C, E...) go down, Even columns (B, D, F...) go up
-      const isEvenColumn = index % 2 !== 0; 
-      const rowsToIterate = isEvenColumn ? reversedRows : chamberConfig.rows;
-      for (const row of rowsToIterate) {
-        const coord = `${col.name}${row}`;
-        if (!chamberConfig.blocked?.includes(coord)) {
-          fifoCoords.push(coord);
-        }
-      }
-    });
-    return fifoCoords;
-  }
-
-  // Default 'secuencial' strategy
+  // Per the user's request, the "serpent" (FIFO) layout now follows a simple
+  // sequential order (A1...A12, then B1...B12).
   return chamberConfig.columns
     .flatMap(col => chamberConfig.rows.map(row => `${col.name}${row}`))
     .filter(coord => !chamberConfig.blocked?.includes(coord))
