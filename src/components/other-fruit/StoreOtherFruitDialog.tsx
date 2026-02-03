@@ -74,13 +74,13 @@ export function StoreOtherFruitDialog({ item, open, onOpenChange, onConfirm, all
 
     const occupiedCoords = new Set<string>();
     (allChamberLots || []).forEach(lot => {
-        if (lot.status === 'Almacenado' && lot.chamberId === selectedChamberId && lot.coordinate) {
+        if (lot.status === 'Almacenado' && lot.chamberId === selectedChamberId && lot.coordinate && lot.binCount > 0) {
           occupiedCoords.add(lot.coordinate);
         }
     });
     (allReceptions || []).forEach(reception => {
         reception.items.forEach(storedItem => {
-            if (storedItem.status === 'Almacenado' && storedItem.storageLocation?.chamberId === selectedChamberId && storedItem.storageLocation.coordinate) {
+            if (storedItem.status === 'Almacenado' && storedItem.storageLocation?.chamberId === selectedChamberId && storedItem.storageLocation.coordinate && storedItem.quantity > 0) {
                 occupiedCoords.add(storedItem.storageLocation.coordinate);
             }
         });
