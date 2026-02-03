@@ -347,7 +347,7 @@ export default function CamarasPage() {
     }
   };
 
-  const handleRelocate = async ({ targetChamberId, targetCoordinate }: { targetChamberId: string, targetCoordinate: string}) => {
+  const handleRelocate = async ({ targetChamberId, targetCoordinate }: { targetChamberId: string; targetCoordinate: string}) => {
     if (!coordToRelocate || !firestore) return;
 
     const { chamberId: sourceChamberId, coordinate: sourceCoordinate } = coordToRelocate;
@@ -604,26 +604,27 @@ export default function CamarasPage() {
                                 <div className="grid gap-1 min-w-[600px] sm:min-w-[800px]" style={{ gridTemplateColumns: `repeat(${config.columns.length}, minmax(0, 1fr))` }}>
                                 {config.rows.map((row, rowIndex) =>
                                     config.columns.map((col, colIndex) => {
+                                      const visualCoord = `${col.name}${row}`;
+                                      
+                                      if (config.blocked?.includes(visualCoord)) {
+                                          return <div key={visualCoord} className="h-10 sm:h-12 w-full rounded border-2 bg-gray-200 dark:bg-gray-700 relative"><div className="absolute inset-0 bg-repeat bg-[length:10px_10px]" style={{backgroundImage: "repeating-linear-gradient(-45deg, hsl(var(--muted-foreground)/0.3), hsl(var(--muted-foreground)/0.3) 1px, transparent 1px, transparent 5px)"}} /></div>;
+                                      }
+                                      
+                                      let dataCoord = visualCoord;
                                       const strategy = chamberStrategies[chamberId] || 'secuencial';
                                       const isEvenColumn = colIndex % 2 !== 0;
                                       
-                                      let coord;
-                                      const unblockedRowCount = 12; // Assuming rows 1-12 are usable
-                                      
                                       if (strategy === 'fifo' && isEvenColumn) {
-                                          if (rowIndex < unblockedRowCount) {
-                                              // This is an unblocked visual row. Map it to the reversed logical unblocked row.
-                                              const logicalRowValue = unblockedRowCount - rowIndex; // rowIndex 0 -> 12, rowIndex 1 -> 11, ..., rowIndex 11 -> 1
-                                              coord = `${col.name}${logicalRowValue}`;
-                                          } else {
-                                              // This is a blocked visual row. Map it to the corresponding logical blocked row.
-                                              coord = `${col.name}${row}`;
+                                          const unblockedRows = config.rows.filter(r => !config.blocked?.includes(`${col.name}${r}`));
+                                          const reversedUnblockedRows = [...unblockedRows].reverse();
+                                          const unblockedIndex = unblockedRows.indexOf(row);
+                                          
+                                          if (unblockedIndex !== -1) {
+                                              dataCoord = `${col.name}${reversedUnblockedRows[unblockedIndex]}`;
                                           }
-                                      } else {
-                                          coord = `${col.name}${row}`;
                                       }
 
-                                      const itemsInCoord = storedItemsByChamber[chamberId]?.[coord] || [];
+                                      const itemsInCoord = storedItemsByChamber[chamberId]?.[dataCoord] || [];
                                       const isOccupied = itemsInCoord.length > 0;
                                     
                                       const totalBins = itemsInCoord.filter(i => i.unit === 'Bins').reduce((s, i) => s + i.quantity, 0);
@@ -635,7 +636,7 @@ export default function CamarasPage() {
                                       const firstItem = isOccupied ? itemsInCoord[0] : null;
 
                                       return (
-                                          <Popover key={coord}>
+                                          <Popover key={visualCoord}>
                                           <PopoverTrigger asChild>
                                               <div 
                                               className={cn("h-10 sm:h-12 w-full rounded border-2 flex items-center justify-center text-xs font-mono relative overflow-hidden cursor-pointer",
@@ -649,7 +650,7 @@ export default function CamarasPage() {
                                               } as React.CSSProperties}
                                               >
                                               <div className="absolute bottom-0 left-0 top-0 bg-[var(--lot-color-progress)]" style={{ right: `${100 - occupancyPercentage}%` }} />
-                                              <span className="relative z-10 font-semibold">{coord}</span>
+                                              <span className="relative z-10 font-semibold">{dataCoord}</span>
                                               </div>
                                           </PopoverTrigger>
                                           {isOccupied && firstItem && (
@@ -670,7 +671,7 @@ export default function CamarasPage() {
                                                       <p>Pallets: {totalPallets}</p>
                                                       {totalNetWeight > 0 && <p className="col-span-2">Peso Neto: {totalNetWeight.toFixed(1)} kg</p>}
                                                   </div>
-                                                  <Button size="sm" className="w-full mt-2" onClick={() => handleRelocateClick(chamberId, coord)}>Reubicar</Button>
+                                                  <Button size="sm" className="w-full mt-2" onClick={() => handleRelocateClick(chamberId, dataCoord)}>Reubicar</Button>
                                                 </div>
                                               </PopoverContent>
                                           )}
