@@ -18,6 +18,11 @@ const columns4to6 = [
 
 const rows = Array.from({ length: 14 }, (_, i) => i + 1);
 
+const blockedRows = [13, 14];
+const blocked1to3 = columns1to3.flatMap(col => blockedRows.map(row => `${col.name}${row}`));
+const blocked4to6 = columns4to6.flatMap(col => blockedRows.map(row => `${col.name}${row}`));
+
+
 export const chambersConfig: ChambersConfig = {
     'CAMARA-1': {
         id: 'CAMARA-1',
@@ -25,6 +30,7 @@ export const chambersConfig: ChambersConfig = {
         capacity: 800,
         columns: columns1to3,
         rows,
+        blocked: blocked1to3,
     },
     'CAMARA-2': {
         id: 'CAMARA-2',
@@ -32,6 +38,7 @@ export const chambersConfig: ChambersConfig = {
         capacity: 800,
         columns: columns1to3,
         rows,
+        blocked: blocked1to3,
     },
     'CAMARA-3': {
         id: 'CAMARA-3',
@@ -39,6 +46,7 @@ export const chambersConfig: ChambersConfig = {
         capacity: 800,
         columns: columns1to3,
         rows,
+        blocked: blocked1to3,
     },
     'CAMARA-4': {
         id: 'CAMARA-4',
@@ -46,6 +54,7 @@ export const chambersConfig: ChambersConfig = {
         capacity: 1500,
         columns: columns4to6,
         rows,
+        blocked: blocked4to6,
     },
     'CAMARA-5': {
         id: 'CAMARA-5',
@@ -53,6 +62,7 @@ export const chambersConfig: ChambersConfig = {
         capacity: 1500,
         columns: columns4to6,
         rows,
+        blocked: blocked4to6,
     },
     'CAMARA-6': {
         id: 'CAMARA-6',
@@ -60,6 +70,7 @@ export const chambersConfig: ChambersConfig = {
         capacity: 1500,
         columns: columns4to6,
         rows,
+        blocked: blocked4to6,
     },
 };
 
