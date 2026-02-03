@@ -175,30 +175,21 @@ export default function CamarasPage() {
 
     const calculatedChamberOccupancy = Object.keys(chambersConfig).reduce((acc, chamberId) => {
         const chamberConfig = chambersConfig[chamberId];
-        const totalCapacity = chamberConfig.capacity;
-
-        const binsInChamber = allChamberLots
-            .filter(lot => lot.status === 'Almacenado' && lot.chamberId === chamberId && lot.binCount > 0)
-            .reduce((sum, lot) => sum + lot.binCount, 0);
-
-        const otherFruitInChamber = allOtherFruitReceptions
-            .flatMap(r => r.items.map(item => ({ ...item, unit: r.unit, chamberId: item.storageLocation?.chamberId })))
-            .filter(item => item.status === 'Almacenado' && item.chamberId === chamberId && item.quantity > 0);
-
-        const otherBins = otherFruitInChamber
-            .filter(item => item.unit === 'Bins')
-            .reduce((sum, item) => sum + item.quantity, 0);
-
-        const otherPallets = otherFruitInChamber
-            .filter(item => item.unit === 'Pallets')
-            .reduce((sum, item) => sum + item.quantity, 0);
+        const itemsInThisChamber = allStoredItems.filter(item => item.chamberId === chamberId);
         
-        const occupiedEquivalentBins = binsInChamber + otherBins + (otherPallets * 2);
+        const occupiedEquivalentBins = itemsInThisChamber.reduce((sum, item) => {
+            if (item.unit === 'Bins') {
+                return sum + item.quantity;
+            } else if (item.unit === 'Pallets') {
+                return sum + (item.quantity * 2); // 1 pallet = 2 bins
+            }
+            return sum;
+        }, 0);
 
         acc[chamberId] = {
             occupied: occupiedEquivalentBins,
-            total: totalCapacity,
-            percentage: totalCapacity > 0 ? (occupiedEquivalentBins / totalCapacity) * 100 : 0,
+            total: chamberConfig.capacity,
+            percentage: chamberConfig.capacity > 0 ? (occupiedEquivalentBins / chamberConfig.capacity) * 100 : 0,
         };
         return acc;
     }, {} as Record<string, {occupied: number; total: number; percentage: number}>);
