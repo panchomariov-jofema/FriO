@@ -88,8 +88,8 @@ export default function FallCreekPage() {
         return allClients.find(c => c.name.toUpperCase() === FALL_CREEK_CLIENT_NAME) || null;
     }, [allClients]);
 
-    const { storedItemsByChamber, chamberOccupancy, chambersWithFallCreekStock } = React.useMemo(() => {
-        if (!fallCreekClient) return { storedItemsByChamber: {}, chamberOccupancy: {}, chambersWithFallCreekStock: [] };
+    const { storedItemsByChamber, chamberOccupancy, chambersWithFallCreekStock, reservedCoords } = React.useMemo(() => {
+        if (!fallCreekClient) return { storedItemsByChamber: {}, chamberOccupancy: {}, chambersWithFallCreekStock: [], reservedCoords: new Set<string>() };
 
         const fallCreekStoredItems: StoredItem[] = (allReceptions || [])
             .filter(r => r.clientId === fallCreekClient.clientId)
@@ -140,13 +140,26 @@ export default function FallCreekPage() {
             Object.values(calculatedStoredItemsByChamber[chamberId] || {}).some(items => items.length > 0)
         );
 
+        const calculatedReservedCoords = new Set<string>();
+        if (allMovements) {
+            allMovements
+                .filter(mov => mov.status === 'Pendiente de Picking' && mov.id !== editingMovement?.id)
+                .forEach(mov => {
+                    mov.locations?.forEach(loc => {
+                        const key = `${loc.location.chamberId}_${loc.location.coordinate}`;
+                        calculatedReservedCoords.add(key);
+                    });
+                });
+        }
+
         return {
             storedItemsByChamber: calculatedStoredItemsByChamber,
             chamberOccupancy: calculatedChamberOccupancy,
-            chambersWithFallCreekStock: calculatedChambersWithStock
+            chambersWithFallCreekStock: calculatedChambersWithStock,
+            reservedCoords: calculatedReservedCoords
         };
 
-    }, [fallCreekClient, allReceptions]);
+    }, [fallCreekClient, allReceptions, allMovements, editingMovement]);
 
     React.useEffect(() => {
         const handleGlobalMouseUp = () => {
@@ -493,7 +506,9 @@ export default function FallCreekPage() {
                                                             
                                                             const itemsInCoord = storedItemsByChamber[chamberId]?.[coord] || [];
                                                             const isOccupied = itemsInCoord.length > 0;
-                                                            const isSelected = !!selectedCoords[`${chamberId}_${coord}`];
+                                                            const key = `${chamberId}_${coord}`;
+                                                            const isSelected = !!selectedCoords[key];
+                                                            const isReserved = reservedCoords.has(key);
                                                             
                                                             const lotColor = isOccupied ? getColorForLot(itemsInCoord[0].lotIdForColor) : 'transparent';
                                                             const cellStyle = { 
@@ -503,19 +518,31 @@ export default function FallCreekPage() {
 
                                                             return (
                                                                 <div key={coord}
-                                                                    onMouseDown={() => handleMouseDown(chamberId, coord)}
-                                                                    onMouseEnter={() => handleMouseEnter(chamberId, coord)}
+                                                                    onMouseDown={() => {
+                                                                        if (isReserved || !isOccupied) return;
+                                                                        handleMouseDown(chamberId, coord);
+                                                                    }}
+                                                                    onMouseEnter={() => {
+                                                                        if (isReserved || !isOccupied) return;
+                                                                        handleMouseEnter(chamberId, coord);
+                                                                    }}
                                                                     className={cn(
                                                                         "h-12 w-full rounded border-2 flex items-center justify-center text-xs font-mono relative overflow-hidden",
                                                                         isOccupied && "bg-[var(--lot-color-bg)]",
                                                                         !isOccupied && "bg-background border-dashed",
-                                                                        selectionMode && isOccupied && "cursor-pointer hover:border-primary",
+                                                                        selectionMode && isOccupied && !isReserved && "cursor-pointer hover:border-primary",
+                                                                        isReserved && "cursor-not-allowed",
                                                                         isSelected && "ring-2 ring-primary ring-offset-2"
                                                                     )}
                                                                     style={cellStyle}
                                                                 >
-                                                                    <span className="relative z-10 font-semibold">{coord}</span>
+                                                                    <span className={cn("relative z-10 font-semibold", isReserved && "opacity-50")}>{coord}</span>
                                                                     {isSelected && <div className="absolute inset-0 bg-primary/30 flex items-center justify-center"><CheckCircle2 className="h-6 w-6 text-primary" /></div>}
+                                                                    {isReserved && (
+                                                                        <div className="absolute inset-0 bg-destructive/10">
+                                                                           <div className="absolute inset-0 bg-repeat bg-[length:10px_10px]" style={{backgroundImage: "repeating-linear-gradient(-45deg, hsl(var(--destructive)/0.3), hsl(var(--destructive)/0.3) 1px, transparent 1px, transparent 5px)"}} />
+                                                                        </div>
+                                                                    )}
                                                                 </div>
                                                             );
                                                         })
@@ -712,3 +739,5 @@ export default function FallCreekPage() {
         </div>
     );
 }
+
+    
