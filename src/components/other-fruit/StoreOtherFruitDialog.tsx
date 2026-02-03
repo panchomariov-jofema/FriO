@@ -71,7 +71,9 @@ export function StoreOtherFruitDialog({ item, open, onOpenChange, onConfirm, all
 
     const occupiedCoords = new Set<string>();
     (allChamberLots || []).forEach(lot => {
-        if (lot.chamberId === selectedChamberId && lot.coordinate) occupiedCoords.add(lot.coordinate);
+        if (lot.status === 'Almacenado' && lot.chamberId === selectedChamberId && lot.coordinate) {
+          occupiedCoords.add(lot.coordinate);
+        }
     });
     (allReceptions || []).forEach(reception => {
         reception.items.forEach(storedItem => {
