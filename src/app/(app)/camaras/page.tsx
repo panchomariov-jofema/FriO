@@ -71,7 +71,12 @@ export default function CamarasPage() {
   const firestore = useFirestore();
   const { toast } = useToast();
   const [showChamberStatus, setShowChamberStatus] = React.useState(false);
-  const [storageStrategy, setStorageStrategy] = React.useState<'secuencial' | 'fifo'>('secuencial');
+  const [chamberStrategies, setChamberStrategies] = React.useState<Record<string, 'secuencial' | 'fifo'>>(
+    Object.keys(chambersConfig).reduce((acc, chamberId) => {
+        acc[chamberId] = 'secuencial';
+        return acc;
+    }, {} as Record<string, 'secuencial' | 'fifo'>)
+  );
 
   const loading = loadingChamberLots || loadingOtherFruit || loadingExporters;
   
@@ -229,6 +234,7 @@ export default function CamarasPage() {
   
     const BINS_PER_COORDINATE = 6;
     const chamberConfig = chambersConfig[chamberId];
+    const strategy = chamberStrategies[chamberId] || 'secuencial';
   
     const occupiedCoordinates = new Map<string, { displayLotId: string; binCount: number }[]>();
 
@@ -252,7 +258,7 @@ export default function CamarasPage() {
         });
     });
     
-    const allPossibleCoordinates = getSortedCoordinates(chamberConfig, storageStrategy);
+    const allPossibleCoordinates = getSortedCoordinates(chamberConfig, strategy);
 
     let binsToStore = lotToStore.binCount;
     const batch = writeBatch(firestore);
@@ -512,34 +518,19 @@ export default function CamarasPage() {
         </CardContent>
       </Card>
 
-      <div className="grid md:grid-cols-2 gap-4">
-        <Card>
-          <CardContent className="p-4 flex items-center justify-between">
-            <div className="space-y-1">
-              <h3 className="font-semibold">Visualizar Estado de Cámaras</h3>
-              <p className="text-sm text-muted-foreground">Muestra u oculta la sección de ocupación de cámaras.</p>
-            </div>
-            <Switch
-              id="show-chamber-status"
-              checked={showChamberStatus}
-              onCheckedChange={setShowChamberStatus}
-            />
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4 flex items-center justify-between">
-            <div className="space-y-1">
-              <h3 className="font-semibold">Layout de Almacenamiento FIFO</h3>
-              <p className="text-sm text-muted-foreground">Activar para almacenamiento tipo "serpiente" (A↓, B↑, C↓...).</p>
-            </div>
-            <Switch
-              id="storage-strategy"
-              checked={storageStrategy === 'fifo'}
-              onCheckedChange={(checked) => setStorageStrategy(checked ? 'fifo' : 'secuencial')}
-            />
-          </CardContent>
-        </Card>
-      </div>
+      <Card>
+        <CardContent className="p-4 flex items-center justify-between">
+          <div className="space-y-1">
+            <h3 className="font-semibold">Visualizar Estado de Cámaras</h3>
+            <p className="text-sm text-muted-foreground">Muestra u oculta la sección de ocupación de cámaras.</p>
+          </div>
+          <Switch
+            id="show-chamber-status"
+            checked={showChamberStatus}
+            onCheckedChange={setShowChamberStatus}
+          />
+        </CardContent>
+      </Card>
 
       {showChamberStatus && (
         <Card>
@@ -600,7 +591,20 @@ export default function CamarasPage() {
                             </div>
                         </AccordionTrigger>
                         <AccordionContent>
-                            <div className="p-2 sm:p-4 bg-muted/50 rounded-lg border overflow-x-auto">
+                            <div className="flex items-center space-x-2 px-4 pb-4 border-b">
+                                <Switch
+                                    id={`fifo-switch-${chamberId}`}
+                                    checked={chamberStrategies[chamberId] === 'fifo'}
+                                    onCheckedChange={(checked) => {
+                                        setChamberStrategies(prev => ({
+                                            ...prev,
+                                            [chamberId]: checked ? 'fifo' : 'secuencial'
+                                        }));
+                                    }}
+                                />
+                                <Label htmlFor={`fifo-switch-${chamberId}`}>Activar Layout FIFO (Serpiente)</Label>
+                            </div>
+                            <div className="p-2 sm:p-4 bg-muted/50 rounded-b-lg border border-t-0 overflow-x-auto">
                                 <div className="grid gap-1 min-w-[600px] sm:min-w-[800px]" style={{ gridTemplateColumns: `repeat(${config.columns.length}, minmax(0, 1fr))` }}>
                                 {config.rows.map(row =>
                                     config.columns.map(col => {
@@ -691,7 +695,7 @@ export default function CamarasPage() {
             onStore={handleStoreInChamber}
             allChamberLots={allLotsInChambers.filter(l => l.status === 'Almacenado')}
             allOtherFruitReceptions={otherFruitReceptions || []}
-            storageStrategy={storageStrategy}
+            chamberStrategies={chamberStrategies}
         />
       )}
 

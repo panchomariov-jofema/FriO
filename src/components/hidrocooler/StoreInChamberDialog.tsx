@@ -19,7 +19,7 @@ interface StoreInChamberDialogProps {
   onStore: (data: { chamberId: string, coordinate: string }) => void;
   allChamberLots: ChamberLot[];
   allOtherFruitReceptions: OtherFruitReception[];
-  storageStrategy: 'secuencial' | 'fifo';
+  chamberStrategies: Record<string, 'secuencial' | 'fifo'>;
 }
 
 const storeSchema = z.object({
@@ -29,7 +29,7 @@ const storeSchema = z.object({
 
 type StoreFormValues = z.infer<typeof storeSchema>;
 
-export function StoreInChamberDialog({ lot, open, onOpenChange, onStore, allChamberLots, allOtherFruitReceptions, storageStrategy }: StoreInChamberDialogProps) {
+export function StoreInChamberDialog({ lot, open, onOpenChange, onStore, allChamberLots, allOtherFruitReceptions, chamberStrategies }: StoreInChamberDialogProps) {
   const form = useForm<StoreFormValues>({
     resolver: zodResolver(storeSchema),
     defaultValues: {
@@ -76,7 +76,8 @@ export function StoreInChamberDialog({ lot, open, onOpenChange, onStore, allCham
       });
     });
 
-    const allPossibleCoords = getSortedCoordinates(chamberConfig, storageStrategy);
+    const strategy = chamberStrategies[selectedChamberId] || 'secuencial';
+    const allPossibleCoords = getSortedCoordinates(chamberConfig, strategy);
 
     // 1. Find a partially filled coordinate with the SAME lot
     const partialSameLotCoords = allPossibleCoords.filter(coord => {
@@ -103,7 +104,7 @@ export function StoreInChamberDialog({ lot, open, onOpenChange, onStore, allCham
 
     return { availableCoordinatesForNewLots: emptyCoords, suggestion: currentSuggestion };
 
-  }, [selectedChamberId, lot, allChamberLots, allOtherFruitReceptions, storageStrategy]);
+  }, [selectedChamberId, lot, allChamberLots, allOtherFruitReceptions, chamberStrategies]);
 
 
   // Effect to suggest a coordinate when a chamber is selected
