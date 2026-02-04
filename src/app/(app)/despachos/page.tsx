@@ -29,7 +29,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
-import type { ChamberLot, Dispatch, Exporter, Producer, ReceptionLot } from '@/lib/types';
+import type { ChamberLot, Dispatch, Exporter, Producer, ReceptionLot, OtherFruitReception } from '@/lib/types';
 import { useFirestore, useCollection, useMemoFirebase, useUser } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { collection, query, where, writeBatch, serverTimestamp, doc, orderBy } from 'firebase/firestore';
@@ -110,6 +110,8 @@ function DespachosPageContent() {
   const { data: chamberLots, loading: loadingChamberLots } = useFirestoreCollection<ChamberLot>('chamberLots');
   const { data: receptionLots, loading: loadingReceptionLots } = useFirestoreCollection<ReceptionLot>('receptionLots');
   const { data: producers, loading: loadingProducers } = useFirestoreCollection<Producer>('producers');
+  const { data: otherFruitReceptions, loading: loadingOtherFruit } = useFirestoreCollection<OtherFruitReception>('otherFruitReceptions');
+
   const { user } = useUser();
   const firestore = useFirestore();
   const { toast } = useToast();
@@ -158,26 +160,50 @@ function DespachosPageContent() {
   const { binsPerChamber, binsPerExporter, binsPerProducer } = React.useMemo(() => {
     const storedLots = (chamberLots || []).filter(lot => lot.status === 'Almacenado');
 
+    const storedOtherFruit = (otherFruitReceptions || [])
+        .flatMap(r => r.items.map(item => ({ ...item, reception: r })))
+        .filter(({ item }) => item.status === 'Almacenado' && item.quantity > 0 && item.storageLocation?.chamberId);
+
+
+    // Bins per Chamber
     const perChamber = storedLots.reduce((acc, lot) => {
       const chamberName = chambersConfig[lot.chamberId!]?.name || lot.chamberId!;
       acc[chamberName] = (acc[chamberName] || 0) + lot.binCount;
       return acc;
     }, {} as Record<string, number>);
 
-    const perExporter = storedLots.reduce((acc, lot) => {
-      const id = lot.exporterId || 'undefined';
-      acc[id] = (acc[id] || 0) + lot.binCount;
-      return acc;
-    }, {} as Record<string, number>);
+    storedOtherFruit.forEach(({ item, reception }) => {
+        if(item.storageLocation?.chamberId) {
+            const chamberName = chambersConfig[item.storageLocation.chamberId]?.name || item.storageLocation.chamberId;
+            const equivalentBins = reception.unit === 'Pallets' ? item.quantity * 2 : item.quantity;
+            perChamber[chamberName] = (perChamber[chamberName] || 0) + equivalentBins;
+        }
+    });
 
+    // Bins per Exporter/Client
+    const perExporter: Record<string, number> = storedLots.reduce((acc, lot) => {
+        const id = lot.exporterId;
+        acc[id] = (acc[id] || 0) + lot.binCount;
+        return acc;
+    }, {} as Record<string, number>);
+    
+    storedOtherFruit.forEach(({ item, reception }) => {
+        const clientName = reception.clientName;
+        const equivalentBins = reception.unit === 'Pallets' ? item.quantity * 2 : item.quantity;
+        perExporter[clientName] = (perExporter[clientName] || 0) + equivalentBins;
+    });
+
+    // Bins per Producer
     const perProducer = storedLots.reduce((acc, lot) => {
       const producerName = lot.producerShortName;
-      acc[producerName] = (acc[producerName] || 0) + lot.binCount;
+      if (producerName) {
+          acc[producerName] = (acc[producerName] || 0) + lot.binCount;
+      }
       return acc;
     }, {} as Record<string, number>);
 
     return { binsPerChamber: perChamber, binsPerExporter: perExporter, binsPerProducer: perProducer };
-  }, [chamberLots]);
+  }, [chamberLots, otherFruitReceptions]);
 
   const onSubmit = async (values: DispatchFormValues) => {
     if (!firestore || !exporters || !chamberLots) return;
@@ -414,7 +440,7 @@ function DespachosPageContent() {
         <Card>
           <CardHeader><CardTitle>Stock por Cámara</CardTitle></CardHeader>
           <CardContent>
-            {loadingChamberLots ? <Skeleton className="h-20" /> : (
+            {loadingChamberLots || loadingOtherFruit ? <Skeleton className="h-20" /> : (
               <ul className="space-y-1 text-sm">
                 {Object.entries(binsPerChamber).map(([chamber, count]) => (
                   <li key={chamber} className="flex justify-between"><span>{chamber}:</span><span className="font-semibold">{count} bins</span></li>
@@ -426,10 +452,10 @@ function DespachosPageContent() {
         <Card>
           <CardHeader><CardTitle>Stock por Exportador</CardTitle></CardHeader>
           <CardContent>
-            {loadingChamberLots || loadingExporters ? <Skeleton className="h-20" /> : (
+            {loadingChamberLots || loadingExporters || loadingOtherFruit ? <Skeleton className="h-20" /> : (
               <ul className="space-y-1 text-sm">
-                {Object.entries(binsPerExporter).map(([exporterId, count]) => (
-                  <li key={exporterId} className="flex justify-between"><span>{getExporterName(exporterId)}:</span><span className="font-semibold">{count} bins</span></li>
+                {Object.entries(binsPerExporter).map(([exporterKey, count]) => (
+                  <li key={exporterKey} className="flex justify-between"><span>{getExporterName(exporterKey)}:</span><span className="font-semibold">{count} bins</span></li>
                 ))}
               </ul>
             )}
