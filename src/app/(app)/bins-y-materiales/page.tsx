@@ -17,9 +17,17 @@ export default function BinsYMaterialesPage() {
   const [selectedExporterId, setSelectedExporterId] = React.useState<string | null>(null);
   const [selectedProducerId, setSelectedProducerId] = React.useState<string | null>(null);
   const [isDirectDispatch, setIsDirectDispatch] = React.useState(false);
+  const [activeTab, setActiveTab] = React.useState('salidas');
 
   const { data: exporters, loading: loadingExporters } = useFirestoreCollection<Exporter>('exporters');
   const { data: producers, loading: loadingProducers } = useProducersByExporter(selectedExporterId);
+
+  const handleDirectDispatchChange = (checked: boolean) => {
+    setIsDirectDispatch(checked);
+    if (checked) {
+      setActiveTab('entradas');
+    }
+  };
 
   return (
     <div className="space-y-4">
@@ -75,7 +83,7 @@ export default function BinsYMaterialesPage() {
                 <Checkbox 
                     id="direct-dispatch" 
                     checked={isDirectDispatch}
-                    onCheckedChange={(checked) => setIsDirectDispatch(!!checked)}
+                    onCheckedChange={(checked) => handleDirectDispatchChange(!!checked)}
                     disabled={!selectedExporterId || !selectedProducerId}
                 />
                 <Label
@@ -89,10 +97,10 @@ export default function BinsYMaterialesPage() {
         </CardContent>
       </Card>
       
-      <Tabs defaultValue="salidas" className="w-full">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="entradas" disabled={!selectedExporterId || !selectedProducerId}>Entradas</TabsTrigger>
-              <TabsTrigger value="salidas" disabled={!selectedExporterId || !selectedProducerId}>Salidas</TabsTrigger>
+              <TabsTrigger value="salidas" disabled={!selectedExporterId || !selectedProducerId || isDirectDispatch}>Salidas</TabsTrigger>
               <TabsTrigger value="stock">Stock</TabsTrigger>
           </TabsList>
           <TabsContent value="entradas" className="mt-4">
