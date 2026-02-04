@@ -30,7 +30,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
 import type { ChamberLot, Dispatch, Exporter, Producer, ReceptionLot } from '@/lib/types';
-import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
+import { useFirestore, useCollection, useMemoFirebase, useUser } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { collection, query, where, getDocs, writeBatch, serverTimestamp, doc, addDoc, getDoc, deleteDoc, orderBy } from 'firebase/firestore';
 import { FirestorePermissionError } from '@/firebase/errors';
@@ -57,6 +57,7 @@ import { Download } from 'lucide-react';
 import { DispatchPickingDialog } from '@/components/dispatch/DispatchPickingDialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
+import { LoadingScreen } from '@/components/LoadingScreen';
 
 const dispatchSchema = z.object({
   exporterId: z.string().min(1, 'Debe seleccionar un cliente.'),
@@ -101,7 +102,7 @@ function downloadCSV(csvString: string, filename: string) {
 }
 
 
-export default function DespachosPage() {
+function DespachosPageContent() {
   const { data: exporters, loading: loadingExporters } = useFirestoreCollection<Exporter>('exporters');
   const { data: chamberLots, loading: loadingChamberLots } = useFirestoreCollection<ChamberLot>('chamberLots');
   const { data: receptionLots, loading: loadingReceptionLots } = useFirestoreCollection<ReceptionLot>('receptionLots');
@@ -759,4 +760,12 @@ const handleUndoDispatch = async (dispatchToUndo: Dispatch) => {
   );
 }
 
-    
+export default function DespachosPage() {
+  const { user, isUserLoading } = useUser();
+
+  if (isUserLoading || !user) {
+    return <LoadingScreen />;
+  }
+
+  return <DespachosPageContent />;
+}

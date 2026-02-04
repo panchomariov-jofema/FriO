@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ProcessLotDialog } from '@/components/hidrocooler/ProcessLotDialog';
 import { collection, doc, runTransaction, serverTimestamp, addDoc, updateDoc, query, where, orderBy } from 'firebase/firestore';
-import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
+import { useFirestore, useCollection, useMemoFirebase, useUser } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
@@ -18,8 +18,10 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { EditProcessingLotDialog } from '@/components/hidrocooler/EditProcessingLotDialog';
 import { Pencil } from 'lucide-react';
+import { LoadingScreen } from '@/components/LoadingScreen';
 
-export default function HidrocoolerPage() {
+
+function HidrocoolerPageContent() {
   const firestore = useFirestore();
   // Need to get reception lot to get variety
   const { data: receptionLots } = useFirestoreCollection<ReceptionLot>('receptionLots');
@@ -378,4 +380,13 @@ export default function HidrocoolerPage() {
   );
 }
 
-    
+
+export default function HidrocoolerPage() {
+  const { user, isUserLoading } = useUser();
+
+  if (isUserLoading || !user) {
+    return <LoadingScreen />;
+  }
+
+  return <HidrocoolerPageContent />;
+}
