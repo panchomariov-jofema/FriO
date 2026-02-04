@@ -53,6 +53,17 @@ export default function RecepcionPage() {
     }
   }, [binCount, form]);
 
+  // Set default exporter to SUBSOLE
+  React.useEffect(() => {
+    if (!loadingExporters && exporters.length > 0 && !selectedExporter) {
+      const subsoleExporter = exporters.find(e => e.name.toUpperCase() === 'SUBSOLE');
+      if (subsoleExporter) {
+        setSelectedExporter(subsoleExporter.exporterId);
+        form.setValue('exporterId', subsoleExporter.exporterId);
+      }
+    }
+  }, [exporters, loadingExporters, selectedExporter, form]);
+
   const onSubmit = (values: LotFormValues) => {
     const selectedProducerId = form.getValues('producerId');
     if (!selectedExporter || !selectedProducerId) {
