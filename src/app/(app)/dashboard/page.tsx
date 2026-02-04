@@ -362,10 +362,15 @@ export default function DashboardPage() {
     }, [exporters, otherClients]);
     
     React.useEffect(() => {
-        if (user && users.length > 0 && profiles.length > 0 && !userProfile) {
-            const currentUserMaster = users.find(u => u.userName.toLowerCase() === user.email?.split('@')[0].toLowerCase());
+        const emailLocalPart = user?.email ? user.email.split('@')[0].toLowerCase() : null;
+        if (emailLocalPart && users.length > 0 && profiles.length > 0 && !userProfile) {
+            const currentUserMaster = users.find(
+                (u) => u.userName.toLowerCase() === emailLocalPart
+            );
             if (currentUserMaster) {
-                const profile = profiles.find(p => p.profileId === currentUserMaster.profileId);
+                const profile = profiles.find(
+                (p) => p.profileId === currentUserMaster.profileId
+                );
                 setUserProfile(profile || null);
             }
         }

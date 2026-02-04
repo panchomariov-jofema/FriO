@@ -2,9 +2,46 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    // WARNING: This is temporarily open for debugging.
+
+    // Tabla de usuarios maestro
+    match /usersMaster/{userId} {
+      allow read, write: if request.auth != null
+                         && request.auth.uid == userId;
+    }
+
+    // Despachos
+    match /dispatches/{dispatchId} {
+      allow read: if canReadDispatches();
+      allow write: if canWriteDispatches();
+    }
+
+    // Resto de colecciones:
+    // solo el perfil MAESTRO puede leer/escribir
     match /{document=**} {
-      allow read, write: if true;
+      allow read, write: if isMaestro();
+    }
+
+    // Funciones auxiliares
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function getUserMaster() {
+      return get(/databases/$(database)/documents/usersMaster/$(request.auth.uid));
+    }
+
+    function isMaestro() {
+      return isSignedIn()
+             && exists(/databases/$(database)/documents/usersMaster/$(request.auth.uid))
+             && getUserMaster().data.profileId == 'MAESTRO';
+    }
+
+    function canReadDispatches() {
+      return isMaestro();
+    }
+
+    function canWriteDispatches() {
+      return isMaestro();
     }
   }
 }
