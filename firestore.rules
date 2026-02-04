@@ -28,7 +28,7 @@
  * ## Forced Redeployment Timestamp
  * A timestamp is included to force the Firebase CLI to recognize changes and redeploy the rules,
  * bypassing any potential caching issues that might prevent updates from applying.
- * Force redeploy: 1722448939.914282
+ * Force redeploy: 1722460015.123456
  */
 rules_version = '2';
 
@@ -66,15 +66,7 @@ service cloud.firestore {
     // ------------------------------------------------------------------------
 
      /**
-     * @description Collection for dispatch records.
-     * @allow Authenticated users can read and write freely.
-     */
-    match /dispatches/{docId} {
-      allow read, write: if isSignedIn();
-    }
-
-     /**
-     * @description Collections for all other operational data.
+     * @description Collections for all operational data.
      * @allow Authenticated users can read and write freely.
      */
     match /{collection}/{docId} where collection in [
@@ -82,7 +74,7 @@ service cloud.firestore {
       'receptionLots', 'hidrocoolerLots', 'processingLots',
       'chamberLots', 'packagingReceptions',
       'otherFruitReceptions', 'otherFruitMovements', 'packagingMovements',
-      'chamberTemperatures'
+      'chamberTemperatures', 'dispatches'
     ] {
       allow read, write: if isSignedIn();
     }
