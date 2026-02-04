@@ -11,7 +11,7 @@ import {
   CardTitle,
   CardDescription,
 } from '@/components/ui/card';
-import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
+import { useCollection, useMemoFirebase, useUser, useFirestore } from '@/firebase';
 import type { ChamberLot, Dispatch, Exporter, ProcessingLot, ReceptionLot, BinMaterialStock, OtherFruitReception, Profile, UserMaster, HidrocoolerLot, OtherClient, ChamberTemperature, OtherFruitMovement } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis, Cell, Legend, LabelList } from 'recharts';
@@ -22,7 +22,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Boxes, PackageCheck, Truck, Warehouse, Archive, ChevronsLeft, Waves, Download } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
-import { useFirestore, useUser } from '@/firebase';
 import { Button } from "@/components/ui/button"
 import { Calendar } from "@/components/ui/calendar"
 import {
@@ -31,8 +30,9 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover"
 import { cn } from "@/lib/utils"
-import { collection, onSnapshot, query } from 'firebase/firestore';
+import { collection, onSnapshot, query, where } from 'firebase/firestore';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
 
 
 const CHART_COLORS = [
@@ -267,8 +267,6 @@ function FallCreekExecutiveView({ dashboardData, clientName }: { dashboardData: 
 export default function DashboardPage() {
     const { user } = useUser();
     const firestore = useFirestore();
-    const { data: users, loading: loadingUsers } = useFirestoreCollection<UserMaster>('usersMaster');
-    const { data: profiles, loading: loadingProfiles } = useFirestoreCollection<Profile>('profiles');
 
     const [selectedClient, setSelectedClient] = React.useState<{ value: string; label: string; id: string; type: 'exporter' | 'otherclient'; name: string } | null>(null);
     const [fixedExporterId, setFixedExporterId] = React.useState<string | null>(null);
@@ -279,17 +277,45 @@ export default function DashboardPage() {
     });
     const [latestTemperatures, setLatestTemperatures] = React.useState<Record<string, ChamberTemperature | null>>({});
 
-    const { data: chamberLots, loading: loadingChamber } = useFirestoreCollection<ChamberLot>('chamberLots');
-    const { data: otherFruitReceptions, loading: loadingOtherFruit } = useFirestoreCollection<OtherFruitReception>('otherFruitReceptions');
-    const { data: otherFruitMovements, loading: loadingOtherFruitMovements } = useFirestoreCollection<OtherFruitMovement>('otherFruitMovements');
-    const { data: processingLots, loading: loadingProcessing } = useFirestoreCollection<ProcessingLot>('processingLots');
-    const { data: dispatches, loading: loadingDispatches } = useFirestoreCollection<Dispatch>('dispatches');
-    const { data: receptionLots, loading: loadingReception } = useFirestoreCollection<ReceptionLot>('receptionLots');
+    const { data: users, loading: loadingUsers } = useFirestoreCollection<UserMaster>('usersMaster');
+    const { data: profiles, loading: loadingProfiles } = useFirestoreCollection<Profile>('profiles');
     const { data: exporters, loading: loadingExporters } = useFirestoreCollection<Exporter>('exporters');
     const { data: otherClients, loading: loadingOtherClients } = useFirestoreCollection<OtherClient>('otherClients');
     const { data: binMaterialStock, loading: loadingBinStock } = useFirestoreCollection<BinMaterialStock>('binMaterialStock');
-    const { data: hidrocoolerLots, loading: loadingHidroLots } = useFirestoreCollection<HidrocoolerLot>('hidrocoolerLots');
+    
+    // Optimized Queries
+    const baseQueryDeps = [firestore, dateRange];
 
+    const createDateFilteredQuery = (collectionName: string, dateField: string) => {
+        return useMemoFirebase(() => {
+            if (!firestore) return null;
+            const collRef = collection(firestore, collectionName);
+            if (!dateRange?.from) return query(collRef);
+            const toDate = dateRange.to ? addDays(dateRange.to, 1) : addDays(new Date(), 1);
+            return query(collRef, where(dateField, '>=', dateRange.from), where(dateField, '<', toDate));
+        }, baseQueryDeps);
+    };
+
+    const chamberLotsQuery = useMemoFirebase(() => {
+        if (!firestore) return null;
+        // Chamber lots use storedAt for date filtering, but also need all stored lots for occupancy
+        const collRef = collection(firestore, 'chamberLots');
+        if (!dateRange?.from) return query(collRef);
+        const toDate = dateRange.to ? addDays(dateRange.to, 1) : addDays(new Date(), 1);
+        // This is a compromise: we filter by `storedAt` for some calcs, but still need all stored lots for total occupancy.
+        // A better approach might be a separate query for occupancy, but for now we fetch a wider range.
+        return query(collRef);
+    }, [firestore]);
+
+
+    const { data: chamberLots, loading: loadingChamber } = useCollection<ChamberLot>(chamberLotsQuery);
+    const { data: otherFruitReceptions, loading: loadingOtherFruit } = useCollection<OtherFruitReception>(createDateFilteredQuery('otherFruitReceptions', 'createdAt'));
+    const { data: otherFruitMovements, loading: loadingOtherFruitMovements } = useCollection<OtherFruitMovement>(createDateFilteredQuery('otherFruitMovements', 'createdAt'));
+    const { data: processingLots, loading: loadingProcessing } = useCollection<ProcessingLot>(createDateFilteredQuery('processingLots', 'createdAt'));
+    const { data: dispatches, loading: loadingDispatches } = useCollection<Dispatch>(createDateFilteredQuery('dispatches', 'createdAt'));
+    const { data: receptionLots, loading: loadingReception } = useCollection<ReceptionLot>(createDateFilteredQuery('receptionLots', 'createdAt'));
+    const { data: hidrocoolerLots, loading: loadingHidroLots } = useCollection<HidrocoolerLot>(createDateFilteredQuery('hidrocoolerLots', 'receptionDate'));
+    
     React.useEffect(() => {
         if (!firestore) return;
         const q = query(collection(firestore, 'chamberTemperatures'));
@@ -349,7 +375,7 @@ export default function DashboardPage() {
         if (userProfile) {
             const dashboardPermission = userProfile.modulesAccess.find(p => typeof p === 'object' && p.name === 'Dashboard');
             if (dashboardPermission && typeof dashboardPermission === 'object' && 'fixedExporterId' in dashboardPermission) {
-                const exporter = exporters.find(e => e.name === (dashboardPermission as any).fixedExporterId);
+                const exporter = (exporters || []).find(e => e.name === (dashboardPermission as any).fixedExporterId);
                 if (exporter) {
                     setFixedExporterId(exporter.exporterId);
                     setSelectedClient({
@@ -505,7 +531,6 @@ export default function DashboardPage() {
 
         (receptionLots || []).forEach(lot => {
             if (isOtherClientSelected) return;
-            if (!isDateInRange(lot.createdAt?.toDate())) return;
             if (isExporterSelected && lot.exporterId !== selectedClient.id) return;
 
             const weight = lot.netWeightPerBin && lot.netWeightPerBin > 0 
@@ -559,7 +584,7 @@ export default function DashboardPage() {
             return null;
         }
         
-        const clientReceptions = otherFruitReceptions.filter(r => r.clientId === selectedClient.id);
+        const clientReceptions = (otherFruitReceptions || []).filter(r => r.clientId === selectedClient.id);
 
         const summaryItems = clientReceptions.flatMap(reception => 
             reception.items
@@ -931,7 +956,7 @@ export default function DashboardPage() {
                             <TableBody>
                                 {loading ? (
                                     Array.from({ length: 5 }).map((_, i) => <TableRow key={i}><TableCell colSpan={6}><Skeleton className="h-4 w-full" /></TableCell></TableRow>)
-                                ) : latestReceptions.length > 0 ? (
+                                ) : (latestReceptions || []).length > 0 ? (
                                     latestReceptions.map(lot => (
                                         <TableRow key={lot.id}>
                                             <TableCell>{lot.createdAt?.toDate().toLocaleString()}</TableCell>
@@ -958,3 +983,5 @@ export default function DashboardPage() {
         </div>
     );
 }
+
+    

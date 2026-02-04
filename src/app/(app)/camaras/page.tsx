@@ -9,8 +9,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { StoreInChamberDialog } from '@/components/hidrocooler/StoreInChamberDialog';
-import { collection, doc, writeBatch, getDocs, updateDoc, getDoc, serverTimestamp, query, orderBy, limit, onSnapshot } from 'firebase/firestore';
-import { useFirestore } from '@/firebase';
+import { collection, doc, writeBatch, getDocs, updateDoc, getDoc, serverTimestamp, query, orderBy, limit, onSnapshot, where } from 'firebase/firestore';
+import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
@@ -61,20 +61,33 @@ const getColorForLot = (lotId: string) => {
 
 
 export default function CamarasPage() {
-  const { data: chamberLots, loading: loadingChamberLots } = useFirestoreCollection<ChamberLot>('chamberLots');
-  const { data: otherFruitReceptions, loading: loadingOtherFruit } = useFirestoreCollection<OtherFruitReception>('otherFruitReceptions');
+  const firestore = useFirestore();
   const { data: exporters, loading: loadingExporters } = useFirestoreCollection<Exporter>('exporters');
+  const { data: otherFruitReceptions, loading: loadingOtherFruit } = useFirestoreCollection<OtherFruitReception>('otherFruitReceptions');
+
+  const pendingLotsQuery = useMemoFirebase(() => {
+    if (!firestore) return null;
+    return query(collection(firestore, 'chamberLots'), where('status', '==', 'Pendiente por Almacenar'));
+  }, [firestore]);
+  const { data: pendingLots, loading: loadingPendingLots } = useCollection<ChamberLot>(pendingLotsQuery);
+
+  const storedLotsQuery = useMemoFirebase(() => {
+    if (!firestore) return null;
+    return query(collection(firestore, 'chamberLots'), where('status', '==', 'Almacenado'));
+  }, [firestore]);
+  const { data: storedLots, loading: loadingStoredLots } = useCollection<ChamberLot>(storedLotsQuery);
+
+
   const [lotToStore, setLotToStore] = React.useState<ChamberLot | null>(null);
   const [coordToRelocate, setCoordToRelocate] = React.useState<{ chamberId: string, coordinate: string } | null>(null);
   const [isStoreDialogOpen, setStoreDialogOpen] = React.useState(false);
   const [isRelocateDialogOpen, setRelocateDialogOpen] = React.useState(false);
   const [latestTemperatures, setLatestTemperatures] = React.useState<Record<string, ChamberTemperature | null>>({});
-  const firestore = useFirestore();
   const { toast } = useToast();
   const [showChamberStatus, setShowChamberStatus] = React.useState(false);
   const { chamberStrategies, setChamberStrategies } = useChamberStrategy();
 
-  const loading = loadingChamberLots || loadingOtherFruit || loadingExporters;
+  const loading = loadingPendingLots || loadingStoredLots || loadingOtherFruit || loadingExporters;
   
   React.useEffect(() => {
     if (!firestore) return;
@@ -101,8 +114,8 @@ export default function CamarasPage() {
   }, [firestore]);
 
 
-  const { pendingLots, storedItemsByChamber, chamberOccupancy, totalNetWeightInStock, exporterMap, allLotsInChambers } = React.useMemo(() => {
-    const allChamberLots = chamberLots || [];
+  const { sortedPendingLots, storedItemsByChamber, chamberOccupancy, totalNetWeightInStock, exporterMap, allLotsInChambers } = React.useMemo(() => {
+    const allStoredLots = storedLots || [];
     const allOtherFruitReceptions = otherFruitReceptions || [];
 
     const calculatedExporterMap = (exporters || []).reduce((acc, exp) => {
@@ -110,13 +123,12 @@ export default function CamarasPage() {
       return acc;
     }, {} as Record<string, string>);
 
-    const calculatedPendingLots = allChamberLots
-      .filter((lot) => lot.status === 'Pendiente por Almacenar')
+    const calculatedPendingLots = (pendingLots || [])
       .sort((a, b) => b.receptionDate && a.receptionDate ? a.receptionDate.toMillis() - b.receptionDate.toMillis() : 0);
       
     const allStoredItems: StoredItem[] = [
-      ...allChamberLots
-        .filter(lot => lot.status === 'Almacenado' && lot.chamberId && lot.coordinate && lot.binCount > 0)
+      ...allStoredLots
+        .filter(lot => lot.chamberId && lot.coordinate && lot.binCount > 0)
         .map(lot => ({
             id: lot.id,
             type: 'producerLot' as const,
@@ -196,14 +208,14 @@ export default function CamarasPage() {
 
 
     return { 
-        pendingLots: calculatedPendingLots, 
+        sortedPendingLots: calculatedPendingLots, 
         storedItemsByChamber: calculatedStoredItemsByChamber, 
         chamberOccupancy: calculatedChamberOccupancy,
         totalNetWeightInStock: calculatedTotalNetWeight,
         exporterMap: calculatedExporterMap,
-        allLotsInChambers: allChamberLots,
+        allLotsInChambers: allStoredLots,
     };
-  }, [chamberLots, otherFruitReceptions, exporters]);
+  }, [pendingLots, storedLots, otherFruitReceptions, exporters]);
 
 
   const handleStoreClick = (lot: ChamberLot) => {
@@ -226,7 +238,7 @@ export default function CamarasPage() {
     const occupiedCoordinates = new Map<string, { displayLotId: string; binCount: number }[]>();
 
     (allLotsInChambers || [])
-      .filter(l => l.status === 'Almacenado' && l.chamberId === chamberId && l.coordinate)
+      .filter(l => l.chamberId === chamberId && l.coordinate)
       .forEach(l => {
           if (!occupiedCoordinates.has(l.coordinate!)) {
               occupiedCoordinates.set(l.coordinate!, []);
@@ -344,11 +356,10 @@ export default function CamarasPage() {
     const { chamberId: sourceChamberId, coordinate: sourceCoordinate } = coordToRelocate;
 
     // Find all lot documents that are in the source coordinate
-    const lotsToMove = (chamberLots || []).filter(
+    const lotsToMove = (storedLots || []).filter(
       (lot) =>
         lot.chamberId === sourceChamberId &&
-        lot.coordinate === sourceCoordinate &&
-        lot.status === 'Almacenado'
+        lot.coordinate === sourceCoordinate
     );
      // Find all other fruit items that are in the source coordinate
     const fruitItemsToMove = (otherFruitReceptions || []).flatMap(reception =>
@@ -414,7 +425,7 @@ export default function CamarasPage() {
   
   const handleClearStock = async () => {
     if (!firestore) return;
-    const hasChamberLots = chamberLots && chamberLots.length > 0;
+    const hasChamberLots = storedLots && storedLots.length > 0;
     const hasOtherFruit = otherFruitReceptions && otherFruitReceptions.length > 0;
     
     if (!hasChamberLots && !hasOtherFruit) {
@@ -480,8 +491,8 @@ export default function CamarasPage() {
               <TableBody>
                 {loading ? (
                   Array.from({ length: 3 }).map((_, i) => <TableRow key={i}><TableCell colSpan={6}><Skeleton className="h-4 w-full" /></TableCell></TableRow>)
-                ) : pendingLots.length > 0 ? (
-                  pendingLots.map((lot) => (
+                ) : (sortedPendingLots || []).length > 0 ? (
+                  sortedPendingLots.map((lot) => (
                     <TableRow key={lot.id}>
                       <TableCell className="hidden sm:table-cell">{lot.receptionDate?.toDate().toLocaleString('es-CL', { year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute:'2-digit' })}</TableCell>
                       <TableCell className="font-medium">{lot.displayLotId}</TableCell>
@@ -707,3 +718,5 @@ export default function CamarasPage() {
     </div>
   );
 }
+
+    

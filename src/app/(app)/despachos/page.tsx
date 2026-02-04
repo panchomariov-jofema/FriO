@@ -30,9 +30,9 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
 import type { ChamberLot, Dispatch, Exporter, Producer, ReceptionLot } from '@/lib/types';
-import { useFirestore } from '@/firebase';
+import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
-import { collection, query, where, getDocs, writeBatch, serverTimestamp, doc, addDoc, getDoc, deleteDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, writeBatch, serverTimestamp, doc, addDoc, getDoc, deleteDoc, orderBy } from 'firebase/firestore';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -103,7 +103,6 @@ function downloadCSV(csvString: string, filename: string) {
 
 export default function DespachosPage() {
   const { data: exporters, loading: loadingExporters } = useFirestoreCollection<Exporter>('exporters');
-  const { data: dispatches, loading: loadingDispatches } = useFirestoreCollection<Dispatch>('dispatches');
   const { data: chamberLots, loading: loadingChamberLots } = useFirestoreCollection<ChamberLot>('chamberLots');
   const { data: receptionLots, loading: loadingReceptionLots } = useFirestoreCollection<ReceptionLot>('receptionLots');
   const { data: producers, loading: loadingProducers } = useFirestoreCollection<Producer>('producers');
@@ -113,6 +112,17 @@ export default function DespachosPage() {
   const [isUndoing, setIsUndoing] = React.useState(false);
   const [pickingDispatch, setPickingDispatch] = React.useState<Dispatch | null>(null);
   const [showOnlyPending, setShowOnlyPending] = React.useState(true);
+  
+  const dispatchesQuery = useMemoFirebase(() => {
+    if (!firestore) return null;
+    const collRef = collection(firestore, 'dispatches');
+    if (showOnlyPending) {
+        return query(collRef, where('status', '==', 'Pendiente de Picking'), orderBy('createdAt', 'desc'));
+    }
+    return query(collRef, orderBy('createdAt', 'desc'));
+  }, [firestore, showOnlyPending]);
+  const { data: filteredDispatches, loading: loadingDispatches } = useCollection<Dispatch>(dispatchesQuery);
+
 
   const form = useForm<DispatchFormValues>({
     resolver: zodResolver(dispatchSchema),
@@ -437,22 +447,7 @@ const handleUndoDispatch = async (dispatchToUndo: Dispatch) => {
 
 
   const summaryIsLoading = loadingChamberLots || loadingExporters || loadingProducers;
-  const sortedDispatches = React.useMemo(() => {
-    if (!dispatches) return [];
-    return [...dispatches].sort((a, b) => {
-      if (!a.createdAt || !b.createdAt) return 0;
-      return b.createdAt.toMillis() - a.createdAt.toMillis();
-    });
-  }, [dispatches]);
-
-  const filteredDispatches = React.useMemo(() => {
-    if (showOnlyPending) {
-        return sortedDispatches.filter(d => d.status === 'Pendiente de Picking');
-    }
-    return sortedDispatches;
-  }, [sortedDispatches, showOnlyPending]);
-
-
+  
   return (
     <div className="space-y-6">
       <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -691,8 +686,8 @@ const handleUndoDispatch = async (dispatchToUndo: Dispatch) => {
                     <TableBody>
                         {loadingDispatches ? (
                              Array.from({ length: 3 }).map((_, i) => <TableRow key={i}><TableCell colSpan={6}><Skeleton className="h-4 w-full" /></TableCell></TableRow>)
-                        ) : filteredDispatches.length > 0 ? (
-                            filteredDispatches.map(dispatch => (
+                        ) : (filteredDispatches || []).length > 0 ? (
+                            filteredDispatches?.map(dispatch => (
                                 <TableRow key={dispatch.id}>
                                     <TableCell className="font-medium">{dispatch.exporterName}</TableCell>
                                     <TableCell>{dispatch.createdAt?.toDate().toLocaleDateString()}</TableCell>
@@ -763,3 +758,5 @@ const handleUndoDispatch = async (dispatchToUndo: Dispatch) => {
     </div>
   );
 }
+
+    
