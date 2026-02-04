@@ -118,11 +118,21 @@ function DespachosPageContent() {
     if (!firestore) return null;
     const collRef = collection(firestore, 'dispatches');
     if (showOnlyPending) {
-        return query(collRef, where('status', '==', 'Pendiente de Picking'), orderBy('createdAt', 'desc'));
+        return query(collRef, where('status', '==', 'Pendiente de Picking'));
     }
     return query(collRef, orderBy('createdAt', 'desc'));
   }, [firestore, showOnlyPending]);
-  const { data: filteredDispatches, loading: loadingDispatches } = useCollection<Dispatch>(dispatchesQuery);
+  const { data: dispatches, loading: loadingDispatches } = useCollection<Dispatch>(dispatchesQuery);
+
+  const filteredDispatches = React.useMemo(() => {
+    if (!dispatches) return [];
+    if (showOnlyPending) {
+        // when showing only pending, we need to sort client-side.
+        return [...dispatches].sort((a,b) => (b.createdAt?.toMillis() ?? 0) - (a.createdAt?.toMillis() ?? 0));
+    }
+    // when showing all, it's already sorted by the query.
+    return dispatches;
+  }, [dispatches, showOnlyPending]);
 
 
   const form = useForm<DispatchFormValues>({
@@ -688,7 +698,7 @@ const handleUndoDispatch = async (dispatchToUndo: Dispatch) => {
                         {loadingDispatches ? (
                              Array.from({ length: 3 }).map((_, i) => <TableRow key={i}><TableCell colSpan={6}><Skeleton className="h-4 w-full" /></TableCell></TableRow>)
                         ) : (filteredDispatches || []).length > 0 ? (
-                            filteredDispatches?.map(dispatch => (
+                            filteredDispatches.map(dispatch => (
                                 <TableRow key={dispatch.id}>
                                     <TableCell className="font-medium">{dispatch.exporterName}</TableCell>
                                     <TableCell>{dispatch.createdAt?.toDate().toLocaleDateString()}</TableCell>
