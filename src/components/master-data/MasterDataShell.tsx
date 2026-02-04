@@ -35,6 +35,45 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 
+// Helper functions for CSV export
+function convertToCSV(data: any[], headers: string[]) {
+    const headerRow = headers.join(';');
+    const rows = data.map(row =>
+        headers.map(header => {
+            let value = row[header];
+            if (value === undefined || value === null) {
+                return '""';
+            }
+            if (value instanceof Date) {
+                value = value.toLocaleString('es-CL');
+            } else if (typeof value === 'object' && value.toDate instanceof Function) { // Firebase Timestamp
+                value = value.toDate().toLocaleString('es-CL');
+            } else if (Array.isArray(value) || typeof value === 'object') {
+                value = JSON.stringify(value);
+            }
+            
+            const stringValue = String(value);
+            return `"${stringValue.replace(/"/g, '""')}"`;
+        }).join(';')
+    );
+    return [headerRow, ...rows].join('\n');
+}
+
+function downloadCSV(csvString: string, filename: string) {
+    const blob = new Blob([`\uFEFF${csvString}`], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement("a");
+    if (link.download !== undefined) {
+        const url = URL.createObjectURL(blob);
+        link.setAttribute("href", url);
+        link.setAttribute("download", filename);
+        link.style.visibility = "hidden";
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+}
+
+
 interface MasterDataShellProps<T extends MasterData> {
   title: string;
   collectionName: string;
@@ -114,7 +153,7 @@ export function MasterDataShell<T extends MasterData>({
         try {
           dataToSave.modulesAccess = JSON.parse(dataToSave.modulesAccess);
         } catch (e) {
-          dataToSave.modulesAccess = val.split(',').map((s: string) => s.trim());
+          dataToSave.modulesAccess = values.modulesAccess.split(',').map((s: string) => s.trim());
         }
       }
       
@@ -291,6 +330,21 @@ export function MasterDataShell<T extends MasterData>({
     document.body.removeChild(link);
   };
   
+  const handleExport = () => {
+    if (!data || data.length === 0) {
+        toast({
+            variant: 'destructive',
+            title: 'Sin datos',
+            description: 'No hay datos para exportar.',
+        });
+        return;
+    }
+    const headers = csvHeaders as string[];
+    const csv = convertToCSV(data, headers);
+    const date = new Date().toISOString().split('T')[0];
+    downloadCSV(csv, `export_${collectionName}_${date}.csv`);
+  };
+
   const handleSeedProfiles = async () => {
     if (!firestore || collectionName !== 'profiles') return;
 
@@ -358,6 +412,10 @@ export function MasterDataShell<T extends MasterData>({
             <Button variant="outline" onClick={handleDownloadTemplate}>
                 <Download className="mr-2 h-4 w-4" />
                 Descargar Plantilla
+            </Button>
+            <Button variant="outline" onClick={handleExport} disabled={loading || !data || data.length === 0}>
+                <Download className="mr-2 h-4 w-4" />
+                Exportar CSV
             </Button>
             <input
                 type="file"
