@@ -127,10 +127,26 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
             item.type === 'item' ? [item.label] : [item.label, ...item.items.map((sub: any) => sub.label)]
         ));
     } else {
-        const emailUsername = user.email ? user.email.split('@')[0].toLowerCase() : null;
-        const currentUserMaster = emailUsername ? users.find(u => u.userName.toLowerCase() === emailUsername) : null;
-        const userProfile = currentUserMaster ? profiles.find(p => p.profileId === currentUserMaster.profileId) : null;
+        const emailUsername = user?.email
+          ? user.email.split('@')[0].toLowerCase()
+          : null;
 
+        let currentUserMaster: UserMaster | null = null;
+        let userProfile: Profile | null = null;
+
+        if (emailUsername && users.length > 0 && profiles.length > 0) {
+          currentUserMaster = users.find(
+            (u) => typeof u.userName === 'string'
+              && u.userName.toLowerCase() === emailUsername
+          ) ?? null;
+
+          if (currentUserMaster) {
+            userProfile = profiles.find(
+              (p) => p.profileId === currentUserMaster!.profileId
+            ) ?? null;
+          }
+        }
+        
         if (userProfile) {
              accessibleModuleNames = new Set(userProfile.modulesAccess.map((permission: ModulePermission) => 
                 typeof permission === 'string' ? permission : permission.name
