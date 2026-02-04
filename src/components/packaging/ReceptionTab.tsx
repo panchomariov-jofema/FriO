@@ -220,7 +220,7 @@ export function ReceptionTab() {
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Cant. Pallets</FormLabel>
-                          <FormControl><Input type="number" {...field} autoComplete="off" min="1" inputMode="numeric" /></FormControl>
+                          <FormControl><Input type="number" {...field} value={field.value ?? ''} autoComplete="off" min="1" inputMode="numeric" /></FormControl>
                           <FormMessage />
                         </FormItem>
                       )}

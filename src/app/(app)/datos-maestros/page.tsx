@@ -201,7 +201,7 @@ const HidrocoolerForm = ({ form }: { form: any }) => (
         <FormItem><FormLabel>Nombre</FormLabel><FormControl><Input {...field} autoComplete="off" /></FormControl><FormMessage /></FormItem>
       )} />
       <FormField control={form.control} name="binCount" render={({ field }) => (
-        <FormItem><FormLabel>Cantidad de Bins</FormLabel><FormControl><Input type="number" {...field} autoComplete="off" /></FormControl><FormMessage /></FormItem>
+        <FormItem><FormLabel>Cantidad de Bins</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''} autoComplete="off" /></FormControl><FormMessage /></FormItem>
       )} />
     </>
 );

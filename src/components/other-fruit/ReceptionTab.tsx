@@ -384,7 +384,7 @@ export function OtherFruitReceptionTab({ clientId: fixedClientId }: { clientId?:
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Cantidad ({selectedClient?.unit || 'Unidades'})</FormLabel>
-                          <FormControl><Input type="number" {...field} autoComplete="off" min="1" inputMode="numeric" /></FormControl>
+                          <FormControl><Input type="number" {...field} value={field.value ?? ''} autoComplete="off" min="1" inputMode="numeric" /></FormControl>
                           <FormMessage />
                         </FormItem>
                       )}

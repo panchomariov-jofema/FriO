@@ -298,7 +298,7 @@ export function EntriesTab({ exporterId, producerId, isDirectDispatch }: Entries
                           <FormItem>
                             <FormLabel className="text-base">{item.binMaterialName}</FormLabel>
                             <FormControl>
-                                <Input type="number" {...field} autoComplete="off" min="0" placeholder="Cantidad" className="h-12 text-lg" />
+                                <Input type="number" {...field} value={field.value ?? ''} autoComplete="off" min="0" placeholder="Cantidad" className="h-12 text-lg" />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -335,7 +335,7 @@ export function EntriesTab({ exporterId, producerId, isDirectDispatch }: Entries
                                             render={({ field }) => (
                                                 <FormItem>
                                                     <FormControl>
-                                                        <Input type="number" {...field} autoComplete="off" min="0" />
+                                                        <Input type="number" {...field} value={field.value ?? ''} autoComplete="off" min="0" />
                                                     </FormControl>
                                                     <FormMessage />
                                                 </FormItem>

@@ -288,7 +288,7 @@ export function ExitsTab({ exporterId, producerId }: ExitsTabProps) {
                           <FormItem>
                             <FormLabel className="text-base">{item.binMaterialName}</FormLabel>
                             <FormControl>
-                                <Input type="number" {...field} autoComplete="off" min="0" placeholder="Cantidad a retirar" className="h-12 text-lg" />
+                                <Input type="number" {...field} value={field.value ?? ''} autoComplete="off" min="0" placeholder="Cantidad a retirar" className="h-12 text-lg" />
                             </FormControl>
                              <p className="text-sm text-muted-foreground pt-1">
                                 Stock disponible: {getStockForMaterial(item.binMaterialId)}
@@ -328,7 +328,7 @@ export function ExitsTab({ exporterId, producerId }: ExitsTabProps) {
                                             render={({ field }) => (
                                                 <FormItem>
                                                     <FormControl>
-                                                        <Input type="number" {...field} autoComplete="off" min="0" />
+                                                        <Input type="number" {...field} value={field.value ?? ''} autoComplete="off" min="0" />
                                                     </FormControl>
                                                      <p className="text-xs text-muted-foreground pt-1">
                                                         Stock: {getStockForMaterial(item.binMaterialId)}

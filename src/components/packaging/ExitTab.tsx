@@ -218,7 +218,7 @@ export function ExitTab() {
                                 <FormItem>
                                     <FormLabel>Cantidad de Pallets</FormLabel>
                                     <FormControl>
-                                        <Input type="number" {...itemField} autoComplete="off" min="1" />
+                                        <Input type="number" {...itemField} value={itemField.value ?? ''} autoComplete="off" min="1" />
                                     </FormControl>
                                     <p className="text-xs text-muted-foreground pt-1">
                                         Stock: {stockByCode.get(form.getValues(`items.${index}.packagingMasterCode`)) || 0}

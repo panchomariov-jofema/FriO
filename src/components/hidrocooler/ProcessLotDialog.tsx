@@ -121,7 +121,7 @@ export function ProcessLotDialog({ lot, open, onOpenChange, onProcess }: Process
                 <FormItem>
                   <FormLabel>Cantidad de Bins a Procesar</FormLabel>
                   <FormControl>
-                    <Input type="number" {...field} autoComplete="off" inputMode="numeric" />
+                    <Input type="number" {...field} value={field.value ?? ''} autoComplete="off" inputMode="numeric" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

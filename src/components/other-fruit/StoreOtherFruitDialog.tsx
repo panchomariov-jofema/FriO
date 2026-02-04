@@ -222,7 +222,7 @@ export function StoreOtherFruitDialog({ item, open, onOpenChange, onConfirm, all
                     <FormItem>
                     <FormLabel>Cantidad Total a Almacenar</FormLabel>
                     <FormControl>
-                        <Input type="number" {...field} autoComplete="off" inputMode="numeric" />
+                        <Input type="number" {...field} value={field.value ?? ''} autoComplete="off" inputMode="numeric" />
                     </FormControl>
                     <p className="text-xs text-muted-foreground pt-1">
                         Pendiente: {item.quantity} {item.unit}.
@@ -238,7 +238,7 @@ export function StoreOtherFruitDialog({ item, open, onOpenChange, onConfirm, all
                     <FormItem>
                     <FormLabel>Cantidad por Ubicación</FormLabel>
                     <FormControl>
-                        <Input type="number" {...field} autoComplete="off" inputMode="numeric" />
+                        <Input type="number" {...field} value={field.value ?? ''} autoComplete="off" inputMode="numeric" />
                     </FormControl>
                      <p className="text-xs text-muted-foreground pt-1">
                         Máx: {capacityPerCoord}

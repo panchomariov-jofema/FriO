@@ -632,7 +632,7 @@ const handleUndoDispatch = async (dispatchToUndo: Dispatch) => {
                             <FormItem className="lg:col-span-1">
                                 <FormLabel>Cantidad Máxima de Bins</FormLabel>
                                 <FormControl>
-                                <Input type="number" {...field} autoComplete="off" inputMode="numeric" />
+                                <Input type="number" {...field} value={field.value ?? ''} autoComplete="off" inputMode="numeric" />
                                 </FormControl>
                                 <FormMessage />
                             </FormItem>

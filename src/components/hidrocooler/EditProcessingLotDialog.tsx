@@ -90,7 +90,7 @@ export function EditProcessingLotDialog({
                 <FormItem>
                   <FormLabel>Nueva Cantidad de Bins</FormLabel>
                   <FormControl>
-                    <Input type="number" {...field} autoComplete="off" inputMode="numeric" />
+                    <Input type="number" {...field} value={field.value ?? ''} autoComplete="off" inputMode="numeric" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
