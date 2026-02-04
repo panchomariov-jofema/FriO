@@ -9,7 +9,9 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import type { HidrocoolerLot } from '@/lib/types';
+import type { Hidrocooler, HidrocoolerLot } from '@/lib/types';
+import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
+import { Skeleton } from '../ui/skeleton';
 
 interface ProcessLotDialogProps {
   lot: HidrocoolerLot | null;
@@ -26,6 +28,8 @@ const processSchema = z.object({
 type ProcessFormValues = z.infer<typeof processSchema>;
 
 export function ProcessLotDialog({ lot, open, onOpenChange, onProcess }: ProcessLotDialogProps) {
+  const { data: hidrocoolers, loading: loadingHidrocoolers } = useFirestoreCollection<Hidrocooler>('hidrocoolers');
+  
   const form = useForm<ProcessFormValues>({
     resolver: zodResolver(processSchema),
     defaultValues: {
@@ -53,7 +57,7 @@ export function ProcessLotDialog({ lot, open, onOpenChange, onProcess }: Process
       if(selectedHidrocooler) {
           form.setValue('binCount', finalBinCount);
       } else {
-         form.reset({ hidrocooler: undefined, binCount: lot.binCount, netWeightPerBin: lot.netWeightPerBin });
+         form.reset({ hidrocooler: undefined, binCount: lot.binCount });
       }
 
     }
@@ -62,7 +66,7 @@ export function ProcessLotDialog({ lot, open, onOpenChange, onProcess }: Process
   React.useEffect(() => {
     // Reset form when dialog opens
     if (open && lot) {
-      form.reset({ hidrocooler: undefined, binCount: lot.binCount, netWeightPerBin: lot.netWeightPerBin });
+      form.reset({ hidrocooler: undefined, binCount: lot.binCount });
     }
   }, [open, lot, form]);
 
@@ -96,15 +100,22 @@ export function ProcessLotDialog({ lot, open, onOpenChange, onProcess }: Process
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Hidrocooler</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
+                  <Select onValueChange={field.onChange} value={field.value} disabled={loadingHidrocoolers}>
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="Seleccione un hidrocooler" />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="HIDROCOOLER 1">HIDROCOOLER 1</SelectItem>
-                      <SelectItem value="HIDROCOOLER 2">HIDROCOOLER 2</SelectItem>
+                      {loadingHidrocoolers ? (
+                        <div className="p-2">
+                          <Skeleton className="h-6 w-full" />
+                        </div>
+                      ) : (
+                        hidrocoolers.map(h => (
+                            <SelectItem key={h.id} value={h.name}>{h.name}</SelectItem>
+                        ))
+                      )}
                     </SelectContent>
                   </Select>
                   <FormMessage />

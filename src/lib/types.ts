@@ -186,6 +186,11 @@ export interface HidrocoolerLot {
   receptionDate: Timestamp; // Changed from createdAt
 }
 
+export interface Hidrocooler {
+  id: string;
+  name: string;
+}
+
 export interface ProcessingLot {
   id: string;
   originalLotId: string;
@@ -338,4 +343,4 @@ export type StoredItem = {
 }
 
 
-export type MasterData = Exporter | Producer | BinMaterial | OtherClient | PackagingMaster | UserMaster | Profile | Packing;
+export type MasterData = Exporter | Producer | BinMaterial | OtherClient | PackagingMaster | UserMaster | Profile | Packing | Hidrocooler;

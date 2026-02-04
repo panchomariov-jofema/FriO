@@ -13,6 +13,7 @@ import type {
   Packing,
   UserMaster,
   Profile,
+  Hidrocooler,
 } from '@/lib/types';
 import {
   exporterSchema,
@@ -23,6 +24,7 @@ import {
   packingSchema,
   userMasterSchema,
   profileSchema,
+  hidrocoolerSchema,
 } from '@/lib/schemas';
 import { FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
@@ -193,6 +195,14 @@ const ProfileForm = ({ form }: { form: any }) => (
     </>
 );
 
+const HidrocoolerForm = ({ form }: { form: any }) => (
+    <>
+      <FormField control={form.control} name="name" render={({ field }) => (
+        <FormItem><FormLabel>Nombre</FormLabel><FormControl><Input {...field} autoComplete="off" /></FormControl><FormMessage /></FormItem>
+      )} />
+    </>
+);
+
 export default function DatosMaestrosPage() {
   const { data: exporters, loading: loadingExporters } = useFirestoreCollection<Exporter>('exporters');
   const { data: otherClients, loading: loadingOtherClients } = useFirestoreCollection<OtherClient>('otherClients');
@@ -207,6 +217,7 @@ export default function DatosMaestrosPage() {
     { value: 'packing', label: 'Packing' },
     { value: 'usersMaster', label: 'Usuarios' },
     { value: 'profiles', label: 'Perfiles' },
+    { value: 'hidrocoolers', label: 'Hidro-coolers' },
   ];
 
   return (
@@ -217,7 +228,7 @@ export default function DatosMaestrosPage() {
       </CardHeader>
       <CardContent>
         <Tabs defaultValue="exporters" className="w-full">
-          <TabsList className="grid w-full grid-cols-3 sm:grid-cols-4 lg:grid-cols-8">
+          <TabsList className="grid w-full grid-cols-3 sm:grid-cols-5">
             {tabs.map((tab) => (
               <TabsTrigger key={tab.value} value={tab.value}>{tab.label}</TabsTrigger>
             ))}
@@ -324,6 +335,19 @@ export default function DatosMaestrosPage() {
               docNameField="name"
               csvHeaders={['profileId', 'name', 'modulesAccess']}
               csvTemplateFileName="plantilla_perfiles.csv"
+              formProps={{}}
+            />
+          </TabsContent>
+          <TabsContent value="hidrocoolers" className="mt-4">
+            <MasterDataShell
+              title="Hidrocoolers"
+              collectionName="hidrocoolers"
+              schema={hidrocoolerSchema}
+              columns={[{key: 'name', header: 'Nombre'}]}
+              RenderFormComponent={HidrocoolerForm}
+              docNameField="name"
+              csvHeaders={['name']}
+              csvTemplateFileName="plantilla_hidrocoolers.csv"
               formProps={{}}
             />
           </TabsContent>

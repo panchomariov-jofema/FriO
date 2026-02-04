@@ -179,3 +179,7 @@ export const otherFruitExitSchema = z.object({
     document: z.string().optional(),
     items: z.array(otherFruitExitItemSchema).min(1),
 });
+
+export const hidrocoolerSchema = z.object({
+  name: z.string().min(1, 'El nombre es obligatorio'),
+});

@@ -680,6 +680,21 @@
         "createdAt"
       ]
     },
+    "Hidrocooler": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Hidrocooler",
+      "type": "object",
+      "description": "Represents a hidrocooler unit.",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Name of the hidrocooler (e.g., HIDROCOOLER 1)."
+        }
+      },
+      "required": [
+        "name"
+      ]
+    },
     "ProcessingLot": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "ProcessingLot",
@@ -1088,6 +1103,22 @@
             {
               "name": "hidrocoolerLotId",
               "description": "The unique identifier for the hidrocooler lot."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/hidrocoolers/{hidrocoolerId}",
+        "definition": {
+          "entityName": "Hidrocooler",
+          "schema": {
+            "$ref": "#/backend/entities/Hidrocooler"
+          },
+          "description": "Stores hidrocooler unit configurations. A generated ID will be used.",
+          "params": [
+            {
+              "name": "hidrocoolerId",
+              "description": "The unique identifier for the hidrocooler."
             }
           ]
         }
