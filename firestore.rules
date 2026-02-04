@@ -1,47 +1,11 @@
 rules_version = '2';
-
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // Tabla de usuarios maestro
-    match /usersMaster/{userId} {
-      allow read, write: if request.auth != null
-                         && request.auth.uid == userId;
-    }
-
-    // Despachos
-    match /dispatches/{dispatchId} {
-      allow read: if canReadDispatches();
-      allow write: if canWriteDispatches();
-    }
-
-    // Resto de colecciones:
-    // solo el perfil MAESTRO puede leer/escribir
+    // Force redeployment: 2024-07-29-1500
+    // This is a permissive rule for development. It allows any signed-in user
+    // to read and write to any document in the database.
     match /{document=**} {
-      allow read, write: if isMaestro();
-    }
-
-    // Funciones auxiliares
-    function isSignedIn() {
-      return request.auth != null;
-    }
-
-    function getUserMaster() {
-      return get(/databases/$(database)/documents/usersMaster/$(request.auth.uid));
-    }
-
-    function isMaestro() {
-      return isSignedIn()
-             && exists(/databases/$(database)/documents/usersMaster/$(request.auth.uid))
-             && getUserMaster().data.profileId == 'MAESTRO';
-    }
-
-    function canReadDispatches() {
-      return isMaestro();
-    }
-
-    function canWriteDispatches() {
-      return isMaestro();
+      allow read, write: if request.auth != null;
     }
   }
 }
