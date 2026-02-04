@@ -164,7 +164,12 @@ export function PackagingPickingDialog({ movement, open, onOpenChange, onConfirm
         newCount = 0;
     }
     if (newCount > originalCount) {
-        newCount = originalCount; // Cannot exceed originally allocated amount
+        newCount = originalCount;
+        toast({
+            title: 'Cantidad excede lo solicitado',
+            description: `No puede recoger más de ${originalCount} pallets para esta ubicación.`,
+            variant: 'destructive',
+        });
     }
     setQuantities(prev => ({ ...prev, [compositeKey]: newCount }));
   };

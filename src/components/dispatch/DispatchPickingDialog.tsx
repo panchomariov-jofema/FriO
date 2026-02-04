@@ -20,6 +20,7 @@ import { naturalSort } from '@/lib/utils';
 import { Input } from '../ui/input';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
+import { useToast } from '@/hooks/use-toast';
 
 
 interface DispatchPickingDialogProps {
@@ -33,6 +34,7 @@ interface DispatchPickingDialogProps {
 export function DispatchPickingDialog({ dispatch, open, onOpenChange, onConfirmDispatch, isConfirming }: DispatchPickingDialogProps) {
   const [pickedItems, setPickedItems] = React.useState<Record<string, boolean>>({});
   const [quantities, setQuantities] = React.useState<Record<string, number>>({});
+  const { toast } = useToast();
 
   React.useEffect(() => {
     if (dispatch) {
@@ -54,6 +56,11 @@ export function DispatchPickingDialog({ dispatch, open, onOpenChange, onConfirmD
     }
     if (newCount > originalCount) {
       newCount = originalCount;
+      toast({
+        title: 'Cantidad excede lo solicitado',
+        description: `No puede recoger más de ${originalCount} bins para esta ubicación.`,
+        variant: 'destructive',
+      });
     }
     setQuantities(prev => ({ ...prev, [chamberLotId]: newCount }));
   };

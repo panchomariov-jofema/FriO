@@ -68,6 +68,11 @@ export function OtherFruitPickingDialog({ movement, open, onOpenChange, onConfir
     }
     if (newCount > originalCount) {
         newCount = originalCount;
+        toast({
+            title: 'Cantidad excede lo solicitado',
+            description: `No puede recoger más de ${originalCount} unidades para esta ubicación.`,
+            variant: 'destructive',
+        });
     }
     setQuantities(prev => ({ ...prev, [compositeKey]: newCount }));
   };
