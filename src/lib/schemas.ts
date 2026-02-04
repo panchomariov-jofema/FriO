@@ -182,4 +182,5 @@ export const otherFruitExitSchema = z.object({
 
 export const hidrocoolerSchema = z.object({
   name: z.string().min(1, 'El nombre es obligatorio'),
+  binCount: z.coerce.number().positive("La cantidad de bins debe ser un número positivo."),
 });

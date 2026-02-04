@@ -200,6 +200,9 @@ const HidrocoolerForm = ({ form }: { form: any }) => (
       <FormField control={form.control} name="name" render={({ field }) => (
         <FormItem><FormLabel>Nombre</FormLabel><FormControl><Input {...field} autoComplete="off" /></FormControl><FormMessage /></FormItem>
       )} />
+      <FormField control={form.control} name="binCount" render={({ field }) => (
+        <FormItem><FormLabel>Cantidad de Bins</FormLabel><FormControl><Input type="number" {...field} autoComplete="off" /></FormControl><FormMessage /></FormItem>
+      )} />
     </>
 );
 
@@ -343,10 +346,10 @@ export default function DatosMaestrosPage() {
               title="Hidrocoolers"
               collectionName="hidrocoolers"
               schema={hidrocoolerSchema}
-              columns={[{key: 'name', header: 'Nombre'}]}
+              columns={[{key: 'name', header: 'Nombre'}, {key: 'binCount', header: 'Cantidad Bins'}]}
               RenderFormComponent={HidrocoolerForm}
               docNameField="name"
-              csvHeaders={['name']}
+              csvHeaders={['name', 'binCount']}
               csvTemplateFileName="plantilla_hidrocoolers.csv"
               formProps={{}}
             />

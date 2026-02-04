@@ -189,6 +189,7 @@ export interface HidrocoolerLot {
 export interface Hidrocooler {
   id: string;
   name: string;
+  binCount: number;
 }
 
 export interface ProcessingLot {

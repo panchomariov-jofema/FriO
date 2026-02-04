@@ -17,11 +17,11 @@ interface ProcessLotDialogProps {
   lot: HidrocoolerLot | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onProcess: (data: { hidrocooler: string; binCount: number }) => void;
+  onProcess: (data: { hidrocooler: Hidrocooler; binCount: number }) => void;
 }
 
 const processSchema = z.object({
-  hidrocooler: z.string({ required_error: 'Debe seleccionar un hidrocooler.' }),
+  hidrocoolerId: z.string({ required_error: 'Debe seleccionar un hidrocooler.' }),
   binCount: z.coerce.number().positive('La cantidad de bins debe ser mayor a 0.'),
 });
 
@@ -33,42 +33,31 @@ export function ProcessLotDialog({ lot, open, onOpenChange, onProcess }: Process
   const form = useForm<ProcessFormValues>({
     resolver: zodResolver(processSchema),
     defaultValues: {
-      hidrocooler: undefined,
-      binCount: lot?.binCount,
+      hidrocoolerId: undefined,
+      binCount: undefined,
     },
   });
 
-  const selectedHidrocooler = form.watch('hidrocooler');
+  const selectedHidrocoolerId = form.watch('hidrocoolerId');
 
-  React.useEffect(() => {
-    if (lot) {
-      // Set default bin count based on selected hidrocooler
-      let defaultBinCount = lot.binCount;
-      if (selectedHidrocooler === 'HIDROCOOLER 1') {
-        defaultBinCount = 10;
-      } else if (selectedHidrocooler === 'HIDROCOOLER 2') {
-        defaultBinCount = 8;
-      }
-      
-      // Ensure default does not exceed available
-      const finalBinCount = Math.min(defaultBinCount, lot.binCount);
-
-      // Only update if the hidrocooler has been selected, to avoid overwriting initial state
-      if(selectedHidrocooler) {
-          form.setValue('binCount', finalBinCount);
-      } else {
-         form.reset({ hidrocooler: undefined, binCount: lot.binCount });
-      }
-
-    }
-  }, [selectedHidrocooler, lot, form]);
-  
   React.useEffect(() => {
     // Reset form when dialog opens
     if (open && lot) {
-      form.reset({ hidrocooler: undefined, binCount: lot.binCount });
+      form.reset({ hidrocoolerId: undefined, binCount: lot.binCount });
     }
   }, [open, lot, form]);
+  
+  React.useEffect(() => {
+    if (lot && selectedHidrocoolerId) {
+      const selectedHidrocooler = hidrocoolers.find(h => h.id === selectedHidrocoolerId);
+      
+      if (selectedHidrocooler) {
+        const defaultBinCount = selectedHidrocooler.binCount;
+        const finalBinCount = Math.min(defaultBinCount, lot.binCount);
+        form.setValue('binCount', finalBinCount);
+      }
+    }
+  }, [selectedHidrocoolerId, lot, form, hidrocoolers]);
 
 
   const onSubmit = (values: ProcessFormValues) => {
@@ -77,7 +66,10 @@ export function ProcessLotDialog({ lot, open, onOpenChange, onProcess }: Process
       form.setError('binCount', { message: `La cantidad no puede ser mayor a ${lot.binCount}.`});
       return;
     }
-    onProcess(values);
+    const selectedHidrocooler = hidrocoolers.find(h => h.id === values.hidrocoolerId);
+    if (!selectedHidrocooler) return;
+
+    onProcess({ hidrocooler: selectedHidrocooler, binCount: values.binCount });
     onOpenChange(false);
   };
 
@@ -96,7 +88,7 @@ export function ProcessLotDialog({ lot, open, onOpenChange, onProcess }: Process
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-4">
             <FormField
               control={form.control}
-              name="hidrocooler"
+              name="hidrocoolerId"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Hidrocooler</FormLabel>
@@ -113,7 +105,7 @@ export function ProcessLotDialog({ lot, open, onOpenChange, onProcess }: Process
                         </div>
                       ) : (
                         hidrocoolers.map(h => (
-                            <SelectItem key={h.id} value={h.name}>{h.name}</SelectItem>
+                            <SelectItem key={h.id} value={h.id}>{h.name}</SelectItem>
                         ))
                       )}
                     </SelectContent>

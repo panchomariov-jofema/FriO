@@ -689,10 +689,15 @@
         "name": {
           "type": "string",
           "description": "Name of the hidrocooler (e.g., HIDROCOOLER 1)."
+        },
+        "binCount": {
+          "type": "number",
+          "description": "The default number of bins to process."
         }
       },
       "required": [
-        "name"
+        "name",
+        "binCount"
       ]
     },
     "ProcessingLot": {

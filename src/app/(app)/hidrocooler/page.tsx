@@ -4,7 +4,7 @@ import * as React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
-import type { HidrocoolerLot, ProcessingLot, ReceptionLot } from '@/lib/types';
+import type { HidrocoolerLot, ProcessingLot, ReceptionLot, Hidrocooler } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -65,7 +65,7 @@ function HidrocoolerPageContent() {
     setEditDialogOpen(true);
   };
 
-  const handleStartProcessing = async ({ hidrocooler, binCount }: { hidrocooler: string, binCount: number }) => {
+  const handleStartProcessing = async ({ hidrocooler, binCount }: { hidrocooler: Hidrocooler, binCount: number }) => {
     if (!lotToProcess || !firestore) return;
 
     const originalLotRef = doc(firestore, 'hidrocoolerLots', lotToProcess.id);
@@ -97,7 +97,7 @@ function HidrocoolerPageContent() {
                 displayLotId: lotToProcess.displayLotId,
                 producerShortName: lotToProcess.producerShortName,
                 binCount: binCount,
-                hidrocooler,
+                hidrocooler: hidrocooler.name,
                 netWeightPerBin: currentLotData.netWeightPerBin || 0, // Propagate net weight
                 status: 'En Proceso' as const,
                 createdAt: serverTimestamp(),
@@ -109,7 +109,7 @@ function HidrocoolerPageContent() {
             transaction.set(newProcessingLotRef, newProcessingLot);
         });
         
-        toast({ title: "Éxito", description: `${binCount} bins del lote ${lotToProcess.displayLotId} enviados a ${hidrocooler}.` });
+        toast({ title: "Éxito", description: `${binCount} bins del lote ${lotToProcess.displayLotId} enviados a ${hidrocooler.name}.` });
 
     } catch (e: any) {
         console.error("Error al procesar el lote: ", e);
@@ -120,7 +120,7 @@ function HidrocoolerPageContent() {
             new FirestorePermissionError({
               path: errPath,
               operation: 'write',
-              requestResourceData: { originalLotId: lotToProcess.id, hidrocooler },
+              requestResourceData: { originalLotId: lotToProcess.id, hidrocooler: hidrocooler.name },
             })
         );
     }
