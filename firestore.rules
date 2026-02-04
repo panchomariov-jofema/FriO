@@ -1,38 +1,13 @@
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    function isSignedIn() {
-      return request.auth != null;
+    // Default rule: allow read/write access to authenticated users.
+    // This is a permissive rule for development.
+    // For production, you should implement more granular security rules.
+    // Force redeploy: 2024-08-01 15:00:00 UTC
+    match /{document=**} {
+      allow read, write: if request.auth != null;
     }
-
-    // --- Master Data ---
-    match /exporters/{docId} { allow read, write: if isSignedIn(); }
-    match /producers/{docId} { allow read, write: if isSignedIn(); }
-    match /binMaterials/{docId} { allow read, write: if isSignedIn(); }
-    match /otherClients/{docId} { allow read, write: if isSignedIn(); }
-    match /packagingMaster/{docId} { allow read, write: if isSignedIn(); }
-    match /packings/{docId} { allow read, write: if isSignedIn(); }
-    match /usersMaster/{docId} { allow read, write: if isSignedIn(); }
-    match /profiles/{docId} { allow read, write: if isSignedIn(); }
-
-    // --- Operational Data ---
-    match /receptionLots/{docId} { allow read, write: if isSignedIn(); }
-    match /hidrocoolerLots/{docId} { allow read, write: if isSignedIn(); }
-    match /processingLots/{docId} { allow read, write: if isSignedIn(); }
-    match /chamberLots/{docId} { allow read, write: if isSignedIn(); }
-    match /dispatches/{docId} { allow read, write: if isSignedIn(); }
-    match /chamberTemperatures/{docId} { allow read, write: if isSignedIn(); }
-
-    // --- Bin/Material Movements & Stock ---
-    match /binMaterialMovements/{docId} { allow read, write: if isSignedIn(); }
-    match /binMaterialStock/{docId} { allow read, write: if isSignedIn(); }
-
-    // --- Other Clients Data (Packaging & Fruit) ---
-    match /packagingReceptions/{docId} { allow read, write: if isSignedIn(); }
-    match /otherFruitReceptions/{docId} { allow read, write: if isSignedIn(); }
-    match /packagingMovements/{docId} { allow read, write: if isSignedIn(); }
-    match /otherFruitMovements/{docId} { allow read, write: if isSignedIn(); }
-
   }
 }

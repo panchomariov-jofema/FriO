@@ -9,8 +9,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ProcessLotDialog } from '@/components/hidrocooler/ProcessLotDialog';
-import { collection, doc, runTransaction, serverTimestamp, addDoc, updateDoc, query, where, orderBy } from 'firebase/firestore';
-import { useFirestore, useCollection, useMemoFirebase, useUser } from '@/firebase';
+import { collection, doc, runTransaction, serverTimestamp, addDoc, updateDoc } from 'firebase/firestore';
+import { useFirestore, useUser } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
@@ -23,38 +23,37 @@ import { LoadingScreen } from '@/components/LoadingScreen';
 
 function HidrocoolerPageContent() {
   const firestore = useFirestore();
-  // Need to get reception lot to get variety
   const { data: receptionLots } = useFirestoreCollection<ReceptionLot>('receptionLots');
-  const [showOnlyOpen, setShowOnlyOpen] = React.useState(true);
-
-  const pendingLotsQuery = useMemoFirebase(() => {
-    if (!firestore) return null;
-    return query(
-        collection(firestore, 'hidrocoolerLots'), 
-        where('status', '==', 'Pendiente de Pre-Hidro'),
-        orderBy('receptionDate', 'asc')
-    );
-  }, [firestore]);
-  const { data: sortedPendingLots, loading: loadingPending } = useCollection<HidrocoolerLot>(pendingLotsQuery);
+  const { data: pendingLots, loading: loadingPending } = useFirestoreCollection<HidrocoolerLot>('hidrocoolerLots');
+  const { data: processingLots, loading: loadingProcessing } = useFirestoreCollection<ProcessingLot>('processingLots');
   
-  const processingLotsQuery = useMemoFirebase(() => {
-    if (!firestore) return null;
-    const baseQuery = collection(firestore, 'processingLots');
-    if (showOnlyOpen) {
-        return query(baseQuery, where('status', '==', 'En Proceso'), orderBy('createdAt', 'desc'));
-    }
-    return query(baseQuery, orderBy('createdAt', 'desc'));
-  }, [firestore, showOnlyOpen]);
-  const { data: filteredProcessingLots, loading: loadingProcessing } = useCollection<ProcessingLot>(processingLotsQuery);
-
-
   const [lotToProcess, setLotToProcess] = React.useState<HidrocoolerLot | null>(null);
   const [lotToEdit, setLotToEdit] = React.useState<ProcessingLot | null>(null);
   const [isProcessDialogOpen, setProcessDialogOpen] = React.useState(false);
   const [isEditDialogOpen, setEditDialogOpen] = React.useState(false);
+  const [showOnlyOpen, setShowOnlyOpen] = React.useState(true);
 
 
   const { toast } = useToast();
+  
+  const sortedPendingLots = React.useMemo(() => {
+    if (!pendingLots) return [];
+    return pendingLots.filter(l => l.status === 'Pendiente de Pre-Hidro').sort((a, b) => {
+        if (!b.receptionDate) return -1;
+        if (!a.receptionDate) return 1;
+        return a.receptionDate.toMillis() - b.receptionDate.toMillis();
+    });
+  }, [pendingLots]);
+
+  const filteredProcessingLots = React.useMemo(() => {
+    if (!processingLots) return [];
+    const sorted = [...processingLots].sort((a,b) => (b.createdAt?.toMillis() ?? 0) - (a.createdAt?.toMillis() ?? 0));
+    if (showOnlyOpen) {
+      return sorted.filter(lot => lot.status === 'En Proceso');
+    }
+    return sorted;
+  }, [processingLots, showOnlyOpen]);
+
   
   const handleProcessClick = (lot: HidrocoolerLot) => {
     setLotToProcess(lot);
@@ -273,8 +272,8 @@ function HidrocoolerPageContent() {
                   Array.from({ length: 3 }).map((_, i) => (
                     <TableRow key={i}><TableCell colSpan={6}><Skeleton className="h-4 w-full" /></TableCell></TableRow>
                   ))
-                ) : (sortedPendingLots || []).length > 0 ? (
-                  sortedPendingLots?.map((lot) => (
+                ) : sortedPendingLots.length > 0 ? (
+                  sortedPendingLots.map((lot) => (
                     <TableRow key={lot.id}>
                       <TableCell className="text-sm">{lot.receptionDate?.toDate().toLocaleString('es-CL', { year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute:'2-digit' })}</TableCell>
                       <TableCell className="font-medium">{lot.displayLotId}</TableCell>
@@ -326,8 +325,8 @@ function HidrocoolerPageContent() {
                   Array.from({ length: 3 }).map((_, i) => (
                     <TableRow key={i}><TableCell colSpan={6}><Skeleton className="h-4 w-full" /></TableCell></TableRow>
                   ))
-                ) : (filteredProcessingLots || []).length > 0 ? (
-                  filteredProcessingLots?.map((lot) => (
+                ) : filteredProcessingLots.length > 0 ? (
+                  filteredProcessingLots.map((lot) => (
                     <TableRow key={lot.id}>
                       <TableCell className="font-medium">{lot.displayLotId}</TableCell>
                       <TableCell>{lot.hidrocooler}</TableCell>
@@ -373,7 +372,7 @@ function HidrocoolerPageContent() {
           open={isEditDialogOpen}
           onOpenChange={setEditDialogOpen}
           onConfirm={handleUpdateProcessingBinCount}
-          pendingLots={sortedPendingLots}
+          pendingLots={pendingLots}
         />
       )}
     </div>
