@@ -162,7 +162,7 @@ function DespachosPageContent() {
 
     const storedOtherFruit = (otherFruitReceptions || [])
         .flatMap(r => r.items.map(item => ({ ...item, reception: r })))
-        .filter(({ item }) => item.status === 'Almacenado' && item.quantity > 0 && item.storageLocation?.chamberId);
+        .filter((item) => item.status === 'Almacenado' && item.quantity > 0 && item.storageLocation?.chamberId);
 
 
     // Bins per Chamber
@@ -172,10 +172,10 @@ function DespachosPageContent() {
       return acc;
     }, {} as Record<string, number>);
 
-    storedOtherFruit.forEach(({ item, reception }) => {
+    storedOtherFruit.forEach((item) => {
         if(item.storageLocation?.chamberId) {
             const chamberName = chambersConfig[item.storageLocation.chamberId]?.name || item.storageLocation.chamberId;
-            const equivalentBins = reception.unit === 'Pallets' ? item.quantity * 2 : item.quantity;
+            const equivalentBins = item.reception.unit === 'Pallets' ? item.quantity * 2 : item.quantity;
             perChamber[chamberName] = (perChamber[chamberName] || 0) + equivalentBins;
         }
     });
@@ -187,9 +187,9 @@ function DespachosPageContent() {
         return acc;
     }, {} as Record<string, number>);
     
-    storedOtherFruit.forEach(({ item, reception }) => {
-        const clientName = reception.clientName;
-        const equivalentBins = reception.unit === 'Pallets' ? item.quantity * 2 : item.quantity;
+    storedOtherFruit.forEach((item) => {
+        const clientName = item.reception.clientName;
+        const equivalentBins = item.reception.unit === 'Pallets' ? item.quantity * 2 : item.quantity;
         perExporter[clientName] = (perExporter[clientName] || 0) + equivalentBins;
     });
 
