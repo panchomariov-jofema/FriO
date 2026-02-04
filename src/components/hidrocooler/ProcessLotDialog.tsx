@@ -41,18 +41,20 @@ export function ProcessLotDialog({ lot, open, onOpenChange, onProcess }: Process
   const selectedHidrocoolerId = form.watch('hidrocoolerId');
 
   React.useEffect(() => {
-    // Reset form when dialog opens
+    // Reset form when dialog opens, leaving binCount empty initially
     if (open && lot) {
-      form.reset({ hidrocoolerId: undefined, binCount: lot.binCount });
+      form.reset({ hidrocoolerId: undefined, binCount: undefined });
     }
   }, [open, lot, form]);
   
   React.useEffect(() => {
+    // When a hidrocooler is selected, set the binCount intelligently
     if (lot && selectedHidrocoolerId) {
       const selectedHidrocooler = hidrocoolers.find(h => h.id === selectedHidrocoolerId);
       
       if (selectedHidrocooler) {
         const defaultBinCount = selectedHidrocooler.binCount;
+        // The suggested amount is the smaller of the two: hidrocooler capacity or available lot bins
         const finalBinCount = Math.min(defaultBinCount, lot.binCount);
         form.setValue('binCount', finalBinCount);
       }
