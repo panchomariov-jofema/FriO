@@ -66,92 +66,16 @@ service cloud.firestore {
     // ------------------------------------------------------------------------
 
      /**
-     * @description Collections for bin and material stock and movements.
-     * @paths /binMaterialMovements/{docId}, /binMaterialStock/{docId}
+     * @description Collections for all operational data, including stock, lots, movements, and dispatches.
      * @allow Authenticated users can read and write freely.
      */
-    match /{collection}/{docId} where collection in ['binMaterialMovements', 'binMaterialStock'] {
-      allow read, write: if isSignedIn();
-    }
-
-    /**
-     * @description Collection for fruit reception lots.
-     * @path /receptionLots/{lotId}
-     * @allow Any authenticated user can create, read, and update lots.
-     */
-    match /receptionLots/{lotId} {
-      allow read, write: if isSignedIn();
-    }
-
-    /**
-     * @description Collection for lots that are pending to enter the hidrocooler process.
-     * @path /hidrocoolerLots/{lotId}
-     * @allow Any authenticated user can create, read, and update lots.
-     */
-    match /hidrocoolerLots/{lotId} {
-      allow read, write: if isSignedIn();
-    }
-    
-    /**
-     * @description Collection for lot fractions currently being processed in a hidrocooler.
-     * @path /processingLots/{lotId}
-     * @allow Any authenticated user can create, read, and update lots.
-     */
-    match /processingLots/{lotId} {
-        allow read, write: if isSignedIn();
-    }
-
-    /**
-     * @description Collection for lots stored in cooling chambers.
-     * @path /chamberLots/{lotId}
-     * @allow Any authenticated user can create, read, and update lots.
-     */
-    match /chamberLots/{lotId} {
-      allow read, write: if isSignedIn();
-    }
-
-    /**
-     * @description Collection for dispatch records.
-     * @path /dispatches/{dispatchId}
-     * @allow Any authenticated user can create, read, and update dispatches.
-     */
-    match /dispatches/{dispatchId} {
-      allow read, write: if isSignedIn();
-    }
-    
-    /**
-     * @description Collection for packaging reception records.
-     * @path /packagingReceptions/{receptionId}
-     * @allow Any authenticated user can create, read, and update records.
-     */
-    match /packagingReceptions/{receptionId} {
-        allow read, write: if isSignedIn();
-    }
-
-    /**
-     * @description Collection for fruit reception from other clients.
-     * @path /otherFruitReceptions/{receptionId}
-     * @allow Any authenticated user can create, read, and update records.
-     */
-    match /otherFruitReceptions/{receptionId} {
-        allow read, write: if isSignedIn();
-    }
-    
-    /**
-     * @description Collection for fruit movements from other clients.
-     * @path /otherFruitMovements/{movementId}
-     * @allow Any authenticated user can create, read, and update records.
-     */
-    match /otherFruitMovements/{movementId} {
-        allow read, write: if isSignedIn();
-    }
-
-    /**
-     * @description Collection for packaging movement records.
-     * @path /packagingMovements/{movementId}
-     * @allow Any authenticated user can create, read, and update records.
-     */
-    match /packagingMovements/{movementId} {
+    match /{collection}/{docId} where collection in [
+      'binMaterialMovements', 'binMaterialStock',
+      'receptionLots', 'hidrocoolerLots', 'processingLots',
+      'chamberLots', 'dispatches', 'packagingReceptions',
+      'otherFruitReceptions', 'otherFruitMovements', 'packagingMovements',
+      'chamberTemperatures'
+    ] {
       allow read, write: if isSignedIn();
     }
   }
