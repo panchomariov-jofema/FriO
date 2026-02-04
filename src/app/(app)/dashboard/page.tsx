@@ -364,15 +364,18 @@ export default function DashboardPage() {
     React.useEffect(() => {
         const emailLocalPart = user?.email ? user.email.split('@')[0].toLowerCase() : null;
         if (emailLocalPart && users.length > 0 && profiles.length > 0 && !userProfile) {
-            const currentUserMaster = users.find(
-                (u) => u.userName.toLowerCase() === emailLocalPart
-            );
-            if (currentUserMaster) {
-                const profile = profiles.find(
-                (p) => p.profileId === currentUserMaster.profileId
-                );
-                setUserProfile(profile || null);
-            }
+          const currentUserMaster = users.find(
+            (u) =>
+              typeof u.userName === 'string' &&
+              u.userName.toLowerCase() === emailLocalPart
+          ) ?? null;
+        
+          if (currentUserMaster) {
+            const profile = profiles.find(
+              (p) => p.profileId === currentUserMaster.profileId
+            ) ?? null;
+            setUserProfile(profile || null);
+          }
         }
     }, [user, users, profiles, userProfile]);
 
@@ -988,5 +991,3 @@ export default function DashboardPage() {
         </div>
     );
 }
-
-    
