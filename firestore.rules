@@ -7,37 +7,29 @@
  * (read, write, delete) on ANY collection. This is intentionally open to facilitate
  * rapid development and testing without permission-related interruptions.
  *
- * ## Data Structure
- * The data is organized into several top-level collections, each representing a distinct
- * entity (e.g., /exporters, /producers, /receptionLots). This flat hierarchy simplifies
- * the security rules significantly.
+ * ## Data Structure & Rule
+ * To ensure permissions are applied consistently and avoid deployment caching issues,
+ * a single, global rule is used.
  *
  * ## Key Security Decision
- * - **Authenticated Access Only**: All operations are gated by a single function, `isSignedIn()`,
- *   which simply checks if a user is authenticated with Firebase Auth (`request.auth != null`).
- *   Anonymous users have no access.
- * - **Full Permissions for Authenticated Users**: If a user is signed in, they are granted
- *   full read and write permissions across all specified collections.
+ * - **Authenticated Access Only**: A global wildcard match (`/{document=**}`) applies
+ *   the `isSignedIn()` function to every document in the database.
+ * - **`isSignedIn()`**: This function simply checks if a user is authenticated with
+ *   Firebase Auth (`request.auth != null`). Anonymous users have no access.
  *
  * ## WARNING: Production Insecurity
- * This ruleset is NOT secure for a production environment. Allowing any authenticated user
- * to write to any collection poses a significant security risk. Before going to production,
+ * This ruleset is NOT secure for a production environment. Before going to production,
  * these rules MUST be replaced with a more granular, role-based access control system.
- * For example, only users with an 'admin' role should be able to write to master data collections.
  *
  * ## Forced Redeployment Timestamp
  * A timestamp is included to force the Firebase CLI to recognize changes and redeploy the rules,
  * bypassing any potential caching issues that might prevent updates from applying.
- * Force redeploy: 1722460015.123456
+ * Force redeploy: 1722460020.987654
  */
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // ------------------------------------------------------------------------
-    // Helper Functions
-    // ------------------------------------------------------------------------
 
     /**
      * isSignedIn()
@@ -48,34 +40,11 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    // ------------------------------------------------------------------------
-    // Master Data Collections
-    // ------------------------------------------------------------------------
-
     /**
-     * @description Master data collections. Open access for any signed-in user during development.
-     * @paths /exporters/{docId}, /producers/{docId}, /binMaterials/{docId}, /otherClients/{docId}, /packagingMaster/{docId}, /usersMaster/{docId}, /profiles/{docId}, /packings/{docId}
-     * @allow Authenticated users can read and write freely.
+     * @description Global rule for all collections.
+     * @allow Authenticated users can read and write freely across the entire database.
      */
-    match /{collection}/{docId} where collection in ['exporters', 'producers', 'binMaterials', 'otherClients', 'packagingMaster', 'usersMaster', 'profiles', 'packings'] {
-      allow read, write: if isSignedIn();
-    }
-
-    // ------------------------------------------------------------------------
-    // Operational Data Collections
-    // ------------------------------------------------------------------------
-
-     /**
-     * @description Collections for all operational data.
-     * @allow Authenticated users can read and write freely.
-     */
-    match /{collection}/{docId} where collection in [
-      'binMaterialMovements', 'binMaterialStock',
-      'receptionLots', 'hidrocoolerLots', 'processingLots',
-      'chamberLots', 'packagingReceptions',
-      'otherFruitReceptions', 'otherFruitMovements', 'packagingMovements',
-      'chamberTemperatures', 'dispatches'
-    ] {
+    match /{document=**} {
       allow read, write: if isSignedIn();
     }
   }
