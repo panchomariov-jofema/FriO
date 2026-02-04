@@ -32,7 +32,7 @@ import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
 import type { ChamberLot, Dispatch, Exporter, Producer, ReceptionLot } from '@/lib/types';
 import { useFirestore, useCollection, useMemoFirebase, useUser } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
-import { collection, query, where, getDocs, writeBatch, serverTimestamp, doc, addDoc, getDoc, deleteDoc, orderBy } from 'firebase/firestore';
+import { collection, query, where, writeBatch, serverTimestamp, doc, orderBy } from 'firebase/firestore';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -59,6 +59,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { LoadingScreen } from '@/components/LoadingScreen';
 
+
 const dispatchSchema = z.object({
   exporterId: z.string().min(1, 'Debe seleccionar un cliente.'),
   packingId: z.string().optional(),
@@ -67,9 +68,10 @@ const dispatchSchema = z.object({
     .positive('La cantidad de bins debe ser mayor a 0.'),
 });
 
+
 type DispatchFormValues = z.infer<typeof dispatchSchema>;
 
-// Helper to convert array of objects to CSV
+
 function convertToCSV(data: any[], headers: string[]) {
     const headerRow = headers.join(';');
     const rows = data.map(row => 
@@ -77,7 +79,7 @@ function convertToCSV(data: any[], headers: string[]) {
             let value = row[header];
             if (value instanceof Date) {
                 value = value.toLocaleString();
-            } else if (typeof value === 'object' && value !== null && value?.toDate) { // Firebase Timestamp
+            } else if (typeof value === 'object' && value !== null && value?.toDate) {
                 value = value.toDate().toLocaleString();
             }
             const stringValue = String(value ?? '');
@@ -86,6 +88,7 @@ function convertToCSV(data: any[], headers: string[]) {
     );
     return [headerRow, ...rows].join('\n');
 }
+
 
 function downloadCSV(csvString: string, filename: string) {
     const blob = new Blob([`\uFEFF${csvString}`], { type: 'text/csv;charset=utf-8;' });
@@ -107,6 +110,7 @@ function DespachosPageContent() {
   const { data: chamberLots, loading: loadingChamberLots } = useFirestoreCollection<ChamberLot>('chamberLots');
   const { data: receptionLots, loading: loadingReceptionLots } = useFirestoreCollection<ReceptionLot>('receptionLots');
   const { data: producers, loading: loadingProducers } = useFirestoreCollection<Producer>('producers');
+  const { user } = useUser();
   const firestore = useFirestore();
   const { toast } = useToast();
   const [isConfirming, setIsConfirming] = React.useState(false);
@@ -115,24 +119,23 @@ function DespachosPageContent() {
   const [showOnlyPending, setShowOnlyPending] = React.useState(true);
   
   const dispatchesQuery = useMemoFirebase(() => {
-    if (!firestore) return null;
+    if (!firestore || !user) return null;
     const collRef = collection(firestore, 'dispatches');
+    // The query without orderBy is more stable and avoids needing composite indexes
+    // Sorting will be done on the client side.
     if (showOnlyPending) {
-        return query(collRef, where('status', '==', 'Pendiente de Picking'));
+      return query(collRef, where('status', '==', 'Pendiente de Picking'));
     }
-    return query(collRef, orderBy('createdAt', 'desc'));
-  }, [firestore, showOnlyPending]);
+    return query(collRef);
+  }, [firestore, showOnlyPending, user]);
+  
   const { data: dispatches, loading: loadingDispatches } = useCollection<Dispatch>(dispatchesQuery);
 
   const filteredDispatches = React.useMemo(() => {
     if (!dispatches) return [];
-    if (showOnlyPending) {
-        // when showing only pending, we need to sort client-side.
-        return [...dispatches].sort((a,b) => (b.createdAt?.toMillis() ?? 0) - (a.createdAt?.toMillis() ?? 0));
-    }
-    // when showing all, it's already sorted by the query.
-    return dispatches;
-  }, [dispatches, showOnlyPending]);
+    // Always sort by date on the client side
+    return [...dispatches].sort((a,b) => (b.createdAt?.toMillis() ?? 0) - (a.createdAt?.toMillis() ?? 0));
+  }, [dispatches]);
 
 
   const form = useForm<DispatchFormValues>({
@@ -194,7 +197,6 @@ function DespachosPageContent() {
             return;
         }
 
-        // 1. Group all chamber lot fractions by their original displayLotId
         const groupedLots = availableLots.reduce((acc, lot) => {
             if (!acc[lot.displayLotId]) {
                 acc[lot.displayLotId] = {
@@ -208,14 +210,12 @@ function DespachosPageContent() {
             return acc;
         }, {} as Record<string, { totalBins: number, receptionDate: any, fractions: ChamberLot[] }>);
 
-        // 2. Sort the grouped lots by receptionDate (FIFO), handling possible nulls
         const sortedGroupedLots = Object.values(groupedLots).sort((a, b) => {
             if (!a.receptionDate) return 1;
             if (!b.receptionDate) return -1;
             return a.receptionDate.toMillis() - b.receptionDate.toMillis();
         });
 
-        // 3. Select whole lots without exceeding maxBins
         const binsToDispatch: ChamberLot[] = [];
         let accumulatedBins = 0;
         
@@ -231,7 +231,6 @@ function DespachosPageContent() {
             return;
         }
   
-        // 4. Create dispatch document and reserve stock
         let totalNetWeight = 0;
 
         const dispatchBinsPayload = binsToDispatch.map(lot => {
@@ -260,13 +259,11 @@ function DespachosPageContent() {
   
         const batch = writeBatch(firestore);
 
-        // Mark lots as 'Despachado' to reserve them
         binsToDispatch.forEach(lot => {
             const lotRef = doc(firestore, 'chamberLots', lot.id);
             batch.update(lotRef, { status: 'Despachado' });
         });
 
-        // Create the dispatch document
         const dispatchRef = doc(collection(firestore, 'dispatches'));
         batch.set(dispatchRef, dispatchData);
 
@@ -299,7 +296,6 @@ function DespachosPageContent() {
         const batch = writeBatch(firestore);
         const chamberLotsCollectionRef = collection(firestore, 'chamberLots');
 
-        // Recalculate final values based on picked quantities
         const finalBins: Dispatch['bins'] = [];
         let finalTotalBins = 0;
         let finalTotalNetWeight = 0;
@@ -309,11 +305,9 @@ function DespachosPageContent() {
             const originalCount = originalBin.binCount;
             const remainder = originalCount - pickedCount;
 
-            // The original dispatched lot is always removed from its 'Despachado' state.
             const lotRef = doc(firestore, 'chamberLots', originalBin.chamberLotId);
             batch.delete(lotRef);
 
-            // If there's a remainder, create a new lot with 'Almacenado' status.
             if (remainder > 0) {
                 const originalLotData = chamberLots.find(l => l.id === originalBin.chamberLotId);
                 if (originalLotData) {
@@ -322,13 +316,12 @@ function DespachosPageContent() {
                         binCount: remainder,
                         status: 'Almacenado' as const,
                     };
-                    delete (newLotData as any).id; // Make sure firestore generates a new ID
+                    delete (newLotData as any).id;
                     const newLotRef = doc(chamberLotsCollectionRef);
                     batch.set(newLotRef, newLotData);
                 }
             }
 
-            // Update the list of bins in the final dispatch document if any were picked.
             if (pickedCount > 0) {
                 const lotData = chamberLots.find(l => l.id === originalBin.chamberLotId);
                 finalTotalBins += pickedCount;
@@ -339,7 +332,6 @@ function DespachosPageContent() {
             }
         }
         
-        // Update the dispatch document with the final corrected data and 'Completado' status.
         const dispatchRef = doc(firestore, 'dispatches', dispatchToConfirm.id);
         batch.update(dispatchRef, {
             status: 'Completado',
@@ -351,421 +343,245 @@ function DespachosPageContent() {
         await batch.commit();
 
         toast({
-            title: 'Despacho Confirmado',
-            description: `El stock ha sido rebajado y las ubicaciones están libres.`,
+            title: 'Éxito',
+            description: `Despacho para ${dispatchToConfirm.exporterName} completado.`,
         });
+        setPickingDispatch(null);
 
-    } catch (error: any) {
-        console.error("Error confirming dispatch:", error);
-        toast({ variant: 'destructive', title: 'Error', description: 'Ocurrió un error al confirmar el despacho.' });
-        errorEmitter.emit(
-            'permission-error',
-            new FirestorePermissionError({
-                path: 'dispatches or chamberLots',
-                operation: 'write',
-            })
-        );
+    } catch (e: any) {
+        console.error('Error confirming dispatch:', e);
+        toast({
+            variant: 'destructive',
+            title: 'Error',
+            description: 'Ocurrió un error al confirmar el despacho.',
+        });
+        errorEmitter.emit('permission-error', new FirestorePermissionError({
+            path: `dispatches/${dispatchToConfirm.id}`,
+            operation: 'update',
+        }));
     } finally {
         setIsConfirming(false);
-        setPickingDispatch(null);
     }
-};
+  };
 
-
-const handleUndoDispatch = async (dispatchToUndo: Dispatch) => {
+  const handleUndoDispatch = async (dispatchToUndo: Dispatch) => {
     if (!firestore) return;
     setIsUndoing(true);
 
     try {
-        const batch = writeBatch(firestore);
+      const batch = writeBatch(firestore);
 
-        // 1. Set chamberLots status back to 'Almacenado'
-        dispatchToUndo.bins.forEach(bin => {
-            const lotRef = doc(firestore, 'chamberLots', bin.chamberLotId);
-            batch.update(lotRef, { status: 'Almacenado' });
-        });
-        
-        // 2. Delete the dispatch document
-        const dispatchRef = doc(firestore, 'dispatches', dispatchToUndo.id);
-        batch.delete(dispatchRef);
+      // Revert status of chamber lots
+      dispatchToUndo.bins.forEach(bin => {
+        const lotRef = doc(firestore, 'chamberLots', bin.chamberLotId);
+        batch.update(lotRef, { status: 'Almacenado' });
+      });
+      
+      // Delete the dispatch document
+      const dispatchRef = doc(firestore, 'dispatches', dispatchToUndo.id);
+      batch.delete(dispatchRef);
 
-        await batch.commit();
-
-        toast({
-            title: 'Solicitud Deshecha',
-            description: `La solicitud de despacho para ${dispatchToUndo.exporterName} ha sido cancelada.`,
-        });
+      await batch.commit();
+      
+      toast({
+        title: 'Solicitud Deshecha',
+        description: `Se ha cancelado la solicitud para ${dispatchToUndo.exporterName}.`,
+      });
 
     } catch (error: any) {
-        console.error("Error undoing dispatch request:", error);
-        toast({ variant: 'destructive', title: 'Error', description: 'Ocurrió un error al deshacer la solicitud.' });
-        errorEmitter.emit(
-            'permission-error',
-            new FirestorePermissionError({
-                path: `dispatches/${dispatchToUndo.id}`,
-                operation: 'delete',
-            })
-        );
+      console.error("Error undoing dispatch:", error);
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Ocurrió un error al deshacer la solicitud.',
+      });
+       errorEmitter.emit(
+        'permission-error',
+        new FirestorePermissionError({
+          path: `dispatches/${dispatchToUndo.id}`,
+          operation: 'delete',
+        })
+      );
     } finally {
-        setIsUndoing(false);
+      setIsUndoing(false);
     }
-};
+  };
 
-  const handleExportDispatch = (dispatch: Dispatch) => {
-    if (!receptionLots || !producers) {
-        toast({ variant: 'destructive', title: 'Error', description: 'Los datos de recepción o productores aún no están cargados.' });
-        return;
-    }
-    
-    // Group bins by displayLotId
-    const groupedBins = dispatch.bins.reduce((acc, bin) => {
-        if (!acc[bin.displayLotId]) {
-            acc[bin.displayLotId] = {
-                totalBins: 0,
-                displayLotId: bin.displayLotId,
-            };
-        }
-        acc[bin.displayLotId].totalBins += bin.binCount;
-        return acc;
-    }, {} as Record<string, { totalBins: number, displayLotId: string }>);
-
-
-    const dataToExport = Object.values(groupedBins).map(groupedBin => {
-        const originalReception = receptionLots.find(lot => lot.displayLotId === groupedBin.displayLotId);
-        const producer = producers.find(p => p.producerId === originalReception?.producerId);
-
-        const netWeight = (originalReception?.netWeightPerBin && originalReception.binCount > 0)
-            ? originalReception.netWeightPerBin * groupedBin.totalBins
-            : null;
-
-        return {
-            'Cantidad de Bins': groupedBin.totalBins,
-            'Cantidad de Totes': originalReception?.toteCount ?? '',
-            'Productor': originalReception?.producerId ?? '',
-            'Nombre Productor': producer?.name ?? '',
-            'Variedad': originalReception?.variety ?? '',
-            'Kilos Netos': netWeight?.toFixed(2) ?? '',
-            'Fecha de Recepción': originalReception?.createdAt?.toDate().toLocaleDateString() ?? '',
-            'N° Documento de recepcion': originalReception?.document ?? '',
-        };
-    });
-
-    const headers = ['Cantidad de Bins', 'Cantidad de Totes', 'Productor', 'Nombre Productor', 'Variedad', 'Kilos Netos', 'Fecha de Recepción', 'N° Documento de recepcion'];
-    const csv = convertToCSV(dataToExport, headers);
-    const date = dispatch.createdAt.toDate().toISOString().split('T')[0];
-    downloadCSV(csv, `despacho_${dispatch.exporterName}_${date}.csv`);
-};
-
-
-  const summaryIsLoading = loadingChamberLots || loadingExporters || loadingProducers;
-  
   return (
     <div className="space-y-6">
-      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+      {/* Summary Cards */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         <Card>
-          <CardHeader>
-            <CardTitle>Resumen: Bins por Cámara</CardTitle>
-            <CardDescription>Total de bins en estado "Almacenado" por cada cámara.</CardDescription>
-          </CardHeader>
+          <CardHeader><CardTitle>Stock por Cámara</CardTitle></CardHeader>
           <CardContent>
-            <div className="rounded-md border max-h-48 overflow-y-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Cámara</TableHead>
-                    <TableHead className="text-right">Total Bins</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {summaryIsLoading ? (
-                    <TableRow><TableCell colSpan={2}><Skeleton className="h-4 w-full my-1" /></TableCell></TableRow>
-                  ) : Object.keys(binsPerChamber).length > 0 ? (
-                    Object.entries(binsPerChamber).map(([chamberName, count]) => (
-                      <TableRow key={chamberName}>
-                        <TableCell className="font-medium">{chamberName}</TableCell>
-                        <TableCell className="text-right">{count}</TableCell>
-                      </TableRow>
-                    ))
-                  ) : (
-                    <TableRow><TableCell colSpan={2} className="h-24 text-center">No hay bins almacenados.</TableCell></TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </div>
+            {loadingChamberLots ? <Skeleton className="h-20" /> : (
+              <ul className="space-y-1 text-sm">
+                {Object.entries(binsPerChamber).map(([chamber, count]) => (
+                  <li key={chamber} className="flex justify-between"><span>{chamber}:</span><span className="font-semibold">{count} bins</span></li>
+                ))}
+              </ul>
+            )}
           </CardContent>
         </Card>
         <Card>
-          <CardHeader>
-            <CardTitle>Resumen: Bins por Exportador</CardTitle>
-            <CardDescription>Total de bins en estado "Almacenado" por cada cliente.</CardDescription>
-          </CardHeader>
+          <CardHeader><CardTitle>Stock por Exportador</CardTitle></CardHeader>
           <CardContent>
-            <div className="rounded-md border max-h-48 overflow-y-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Exportador</TableHead>
-                      <TableHead className="text-right">Total Bins</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {summaryIsLoading ? (
-                       <TableRow><TableCell colSpan={2}><Skeleton className="h-4 w-full my-1" /></TableCell></TableRow>
-                    ) : Object.keys(binsPerExporter).length > 0 ? (
-                      Object.entries(binsPerExporter).map(([exporterId, count]) => (
-                        <TableRow key={exporterId}>
-                          <TableCell className="font-medium">{getExporterName(exporterId)}</TableCell>
-                          <TableCell className="text-right">{count}</TableCell>
-                        </TableRow>
-                      ))
-                    ) : (
-                      <TableRow><TableCell colSpan={2} className="h-24 text-center">No hay bins almacenados.</TableCell></TableRow>
-                    )}
-                  </TableBody>
-                </Table>
-            </div>
+            {loadingChamberLots || loadingExporters ? <Skeleton className="h-20" /> : (
+              <ul className="space-y-1 text-sm">
+                {Object.entries(binsPerExporter).map(([exporterId, count]) => (
+                  <li key={exporterId} className="flex justify-between"><span>{getExporterName(exporterId)}:</span><span className="font-semibold">{count} bins</span></li>
+                ))}
+              </ul>
+            )}
           </CardContent>
         </Card>
          <Card>
-          <CardHeader>
-            <CardTitle>Resumen: Bins por Productor</CardTitle>
-            <CardDescription>Total de bins en estado "Almacenado" por cada productor.</CardDescription>
-          </CardHeader>
+          <CardHeader><CardTitle>Stock por Productor</CardTitle></CardHeader>
           <CardContent>
-            <div className="rounded-md border max-h-48 overflow-y-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Productor</TableHead>
-                      <TableHead className="text-right">Total Bins</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {summaryIsLoading ? (
-                       <TableRow><TableCell colSpan={2}><Skeleton className="h-4 w-full my-1" /></TableCell></TableRow>
-                    ) : Object.keys(binsPerProducer).length > 0 ? (
-                      Object.entries(binsPerProducer).map(([producerName, count]) => (
-                        <TableRow key={producerName}>
-                          <TableCell className="font-medium">{producerName}</TableCell>
-                          <TableCell className="text-right">{count}</TableCell>
-                        </TableRow>
-                      ))
-                    ) : (
-                      <TableRow><TableCell colSpan={2} className="h-24 text-center">No hay bins almacenados.</TableCell></TableRow>
-                    )}
-                  </TableBody>
-                </Table>
-            </div>
+            {loadingChamberLots || loadingProducers ? <Skeleton className="h-20" /> : (
+              <ul className="space-y-1 text-sm max-h-48 overflow-y-auto">
+                {Object.entries(binsPerProducer).map(([producerName, count]) => (
+                  <li key={producerName} className="flex justify-between"><span>{producerName}:</span><span className="font-semibold">{count} bins</span></li>
+                ))}
+              </ul>
+            )}
           </CardContent>
         </Card>
       </div>
-
-    <Tabs defaultValue="automatico" className="w-full">
+      
+      <Tabs defaultValue="automatico" className="w-full">
         <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="automatico">Despacho Automático</TabsTrigger>
+            <TabsTrigger value="automatico">Despacho Automático (FIFO)</TabsTrigger>
             <TabsTrigger value="manual">Despacho Manual</TabsTrigger>
         </TabsList>
         <TabsContent value="automatico">
             <Card>
                 <CardHeader>
-                <CardTitle>Crear Solicitud de Despacho Automático</CardTitle>
-                <CardDescription>
-                    Seleccione un cliente y la cantidad de bins. El sistema reservará los lotes más antiguos (FIFO) sin dividirlos para un posterior picking.
-                </CardDescription>
+                    <CardTitle>Crear Solicitud de Despacho Automático (FIFO)</CardTitle>
+                    <CardDescription>
+                    Seleccione un cliente y la cantidad máxima de bins. El sistema seleccionará los lotes más antiguos (FIFO) sin dividirlos.
+                    </CardDescription>
                 </CardHeader>
                 <CardContent>
-                <Form {...form}>
-                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                    <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
-                        <FormField
-                            control={form.control}
-                            name="exporterId"
-                            render={({ field }) => (
-                            <FormItem className="lg:col-span-1">
-                                <FormLabel>Cliente (Exportador)</FormLabel>
-                                <Select
-                                onValueChange={(value) => {
-                                    field.onChange(value);
-                                    form.setValue('packingId', undefined); // Reset packing when exporter changes
-                                }}
-                                value={field.value}
-                                disabled={loadingExporters}>
-                                <FormControl>
-                                    <SelectTrigger>
-                                    <SelectValue placeholder="Seleccione un cliente..." />
-                                    </SelectTrigger>
-                                </FormControl>
-                                <SelectContent>
-                                    {exporters?.map(e => (
-                                    <SelectItem key={e.id} value={e.exporterId}>
-                                        {e.name}
-                                    </SelectItem>
-                                    ))}
-                                </SelectContent>
-                                </Select>
-                                <FormMessage />
-                            </FormItem>
-                            )}
-                        />
-                        <FormField
-                            control={form.control}
-                            name="packingId"
-                            render={({ field }) => (
-                            <FormItem className="lg:col-span-1">
-                                <FormLabel>Packing</FormLabel>
-                                <Select
-                                onValueChange={field.onChange}
-                                value={field.value}
-                                disabled={!selectedExporterId || loadingPackings}
-                                >
-                                <FormControl>
-                                    <SelectTrigger>
-                                    <SelectValue placeholder={!selectedExporterId ? 'Seleccione exportador' : 'Seleccione un packing...'} />
-                                    </SelectTrigger>
-                                </FormControl>
-                                <SelectContent>
-                                    {packings?.map(p => (
-                                    <SelectItem key={p.id} value={p.id}>
-                                        {p.name}
-                                    </SelectItem>
-                                    ))}
-                                </SelectContent>
-                                </Select>
-                                <FormMessage />
-                            </FormItem>
-                            )}
-                        />
-                        <FormField
-                            control={form.control}
-                            name="maxBins"
-                            render={({ field }) => (
-                            <FormItem className="lg:col-span-1">
-                                <FormLabel>Cantidad Máxima de Bins</FormLabel>
-                                <FormControl>
-                                <Input type="number" {...field} value={field.value ?? ''} autoComplete="off" inputMode="numeric" />
-                                </FormControl>
-                                <FormMessage />
-                            </FormItem>
-                            )}
-                        />
-                        <Button type="submit" disabled={form.formState.isSubmitting} className="lg:col-span-1">
-                            {form.formState.isSubmitting ? 'Procesando...' : 'Crear Solicitud'}
-                        </Button>
-                    </div>
+                    <Form {...form}>
+                    <form onSubmit={form.handleSubmit(onSubmit)} className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 items-end">
+                        <FormField control={form.control} name="exporterId" render={({ field }) => (
+                            <FormItem><FormLabel>Cliente Exportador</FormLabel><Select onValueChange={field.onChange} value={field.value} disabled={loadingExporters}>
+                                <FormControl><SelectTrigger><SelectValue placeholder="Seleccione un cliente" /></SelectTrigger></FormControl>
+                                <SelectContent>{exporters?.map(e => <SelectItem key={e.id} value={e.exporterId}>{e.name}</SelectItem>)}</SelectContent>
+                            </Select><FormMessage /></FormItem>
+                        )} />
+                        <FormField control={form.control} name="packingId" render={({ field }) => (
+                            <FormItem><FormLabel>Packing de Destino (Opcional)</FormLabel><Select onValueChange={field.onChange} value={field.value} disabled={!selectedExporterId || loadingPackings}>
+                                <FormControl><SelectTrigger><SelectValue placeholder={!selectedExporterId ? 'Seleccione exportador' : 'Seleccione...'} /></SelectTrigger></FormControl>
+                                <SelectContent>{packings?.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}</SelectContent>
+                            </Select><FormMessage /></FormItem>
+                        )} />
+                        <FormField control={form.control} name="maxBins" render={({ field }) => (
+                            <FormItem><FormLabel>Cantidad Máx. de Bins</FormLabel><FormControl><Input type="number" {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem>
+                        )} />
+                        <div className="lg:col-span-3 flex justify-end">
+                            <Button type="submit" disabled={form.formState.isSubmitting}>Crear Solicitud FIFO</Button>
+                        </div>
                     </form>
-                </Form>
+                    </Form>
                 </CardContent>
             </Card>
         </TabsContent>
         <TabsContent value="manual">
-            <ManualDispatchTab 
-              exporters={exporters || []}
-              loadingExporters={loadingExporters}
-              chamberLots={chamberLots || []}
-              loadingChamberLots={loadingChamberLots}
+            <ManualDispatchTab
+                exporters={exporters}
+                loadingExporters={loadingExporters}
+                chamberLots={chamberLots}
+                loadingChamberLots={loadingChamberLots}
             />
         </TabsContent>
-    </Tabs>
+      </Tabs>
 
-      
+
       <Card>
         <CardHeader>
           <div className="flex justify-between items-center">
             <div>
               <CardTitle>Solicitudes de Despacho</CardTitle>
-              <CardDescription>Lista de despachos pendientes de picking y completados.</CardDescription>
+              <CardDescription>Lista de solicitudes creadas.</CardDescription>
             </div>
             <div className="flex items-center space-x-2">
-              <Checkbox id="show-pending" checked={showOnlyPending} onCheckedChange={(checked) => setShowOnlyPending(!!checked)} />
-              <Label htmlFor="show-pending" className="whitespace-nowrap">Solo Solicitudes Pendientes</Label>
+                <Checkbox id="show-pending" checked={showOnlyPending} onCheckedChange={(checked) => setShowOnlyPending(!!checked)} />
+                <Label htmlFor="show-pending">Mostrar solo pendientes</Label>
             </div>
           </div>
         </CardHeader>
         <CardContent>
-            <div className="rounded-md border">
-                <Table>
-                    <TableHeader>
-                        <TableRow>
-                            <TableHead>Cliente</TableHead>
-                            <TableHead>Fecha</TableHead>
-                            <TableHead>Total Bins</TableHead>
-                            <TableHead className="hidden md:table-cell">Peso Neto</TableHead>
-                            <TableHead>Estado</TableHead>
-                            <TableHead className="text-right">Acciones</TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {loadingDispatches ? (
-                             Array.from({ length: 3 }).map((_, i) => <TableRow key={i}><TableCell colSpan={6}><Skeleton className="h-4 w-full" /></TableCell></TableRow>)
-                        ) : (filteredDispatches || []).length > 0 ? (
-                            filteredDispatches.map(dispatch => (
-                                <TableRow key={dispatch.id}>
-                                    <TableCell className="font-medium">{dispatch.exporterName}</TableCell>
-                                    <TableCell>{dispatch.createdAt?.toDate().toLocaleDateString()}</TableCell>
-                                    <TableCell>{dispatch.totalBins}</TableCell>
-                                    <TableCell className="hidden md:table-cell">{dispatch.totalNetWeight ? `${dispatch.totalNetWeight.toFixed(2)} kg` : '-'}</TableCell>
-                                    <TableCell><Badge variant={dispatch.status === 'Completado' ? 'default' : 'secondary'}>{dispatch.status}</Badge></TableCell>
-                                    <TableCell className="text-right space-x-2">
-                                        {dispatch.status === 'Pendiente de Picking' && (
-                                            <>
-                                            <Button variant="outline" size="sm" onClick={() => setPickingDispatch(dispatch)}>
-                                                Hacer Picking
-                                            </Button>
-                                            <AlertDialog>
-                                                <AlertDialogTrigger asChild>
-                                                    <Button variant="destructive" size="sm" disabled={isConfirming || isUndoing}>Deshacer</Button>
-                                                </AlertDialogTrigger>
-                                                <AlertDialogContent>
-                                                    <AlertDialogHeader>
-                                                        <AlertDialogTitle>¿Deshacer la solicitud?</AlertDialogTitle>
-                                                        <AlertDialogDescription>
-                                                           Esta acción cancelará la solicitud de despacho y devolverá los bins al stock.
-                                                        </AlertDialogDescription>
-                                                    </AlertDialogHeader>
-                                                    <AlertDialogFooter>
-                                                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                                        <AlertDialogAction onClick={() => handleUndoDispatch(dispatch)} className="bg-destructive hover:bg-destructive/90">
-                                                            Sí, Deshacer
-                                                        </AlertDialogAction>
-                                                    </AlertDialogFooter>
-                                                </AlertDialogContent>
-                                            </AlertDialog>
-                                            </>
-                                        )}
-                                        {dispatch.status === 'Completado' && (
-                                            <Button 
-                                                variant="outline" 
-                                                size="sm"
-                                                onClick={() => handleExportDispatch(dispatch)}
-                                                disabled={loadingReceptionLots || loadingProducers}
-                                            >
-                                                <Download className="mr-2 h-4 w-4" />
-                                                Exportar
-                                            </Button>
-                                        )}
-                                    </TableCell>
-                                </TableRow>
-                            ))
+          <div className="rounded-md border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Fecha Creación</TableHead>
+                  <TableHead>Cliente</TableHead>
+                  <TableHead>N° Bins</TableHead>
+                  <TableHead>Peso Neto</TableHead>
+                  <TableHead>Estado</TableHead>
+                  <TableHead className="text-right">Acciones</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {loadingDispatches ? (
+                  Array.from({ length: 3 }).map((_, i) => <TableRow key={i}><TableCell colSpan={6}><Skeleton className="h-4 w-full" /></TableCell></TableRow>)
+                ) : filteredDispatches.length > 0 ? (
+                  filteredDispatches.map((dispatch) => (
+                    <TableRow key={dispatch.id}>
+                      <TableCell>{dispatch.createdAt?.toDate().toLocaleString()}</TableCell>
+                      <TableCell>{dispatch.exporterName}</TableCell>
+                      <TableCell>{dispatch.totalBins}</TableCell>
+                      <TableCell>{dispatch.totalNetWeight ? `${dispatch.totalNetWeight.toFixed(2)} kg` : '-'}</TableCell>
+                      <TableCell><Badge variant={dispatch.status === 'Completado' ? 'default' : 'secondary'}>{dispatch.status}</Badge></TableCell>
+                      <TableCell className="text-right">
+                        {dispatch.status === 'Pendiente de Picking' ? (
+                          <div className="flex justify-end gap-2">
+                            <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                    <Button variant="outline" size="sm">Deshacer</Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                        <AlertDialogTitle>¿Está seguro de deshacer esta solicitud?</AlertDialogTitle>
+                                        <AlertDialogDescription>Esta acción devolverá los lotes al stock disponible y eliminará la solicitud de despacho. No se puede revertir.</AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                        <AlertDialogAction onClick={() => handleUndoDispatch(dispatch)} disabled={isUndoing}>
+                                            {isUndoing ? 'Deshaciendo...' : 'Sí, Deshacer'}
+                                        </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                </AlertDialogContent>
+                            </AlertDialog>
+                            <Button size="sm" onClick={() => setPickingDispatch(dispatch)}>Hacer Picking</Button>
+                          </div>
                         ) : (
-                            <TableRow>
-                                <TableCell colSpan={6} className="h-24 text-center">
-                                    {showOnlyPending ? "No hay despachos pendientes." : "No hay despachos creados."}
-                                </TableCell>
-                            </TableRow>
+                          <Button variant="outline" size="sm" onClick={() => setPickingDispatch(dispatch)}>Ver PDF</Button>
                         )}
-                    </TableBody>
-                </Table>
-            </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow><TableCell colSpan={6} className="h-24 text-center">No hay solicitudes de despacho.</TableCell></TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
         </CardContent>
       </Card>
       
-      <DispatchPickingDialog
-        dispatch={pickingDispatch}
-        open={!!pickingDispatch}
-        onOpenChange={(open) => !open && setPickingDispatch(null)}
-        onConfirmDispatch={handleConfirmDispatch}
-        isConfirming={isConfirming}
-      />
+      {pickingDispatch && (
+        <DispatchPickingDialog 
+            dispatch={pickingDispatch}
+            open={!!pickingDispatch}
+            onOpenChange={(open) => !open && setPickingDispatch(null)}
+            onConfirmDispatch={handleConfirmDispatch}
+            isConfirming={isConfirming}
+        />
+      )}
     </div>
   );
 }
