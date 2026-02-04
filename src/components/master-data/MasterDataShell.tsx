@@ -276,6 +276,11 @@ export function MasterDataShell<T extends MasterData>({
                 rowData[header] = values[index];
             });
 
+            // Normalize data before validation
+            if (rowData.type && typeof rowData.type === 'string') {
+              rowData.type = rowData.type.toLowerCase();
+            }
+
             try {
                 const validatedData = schema.parse(rowData);
                 const collRef = collection(firestore, collectionName);
