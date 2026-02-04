@@ -1,51 +1,12 @@
-/**
- * # Firestore Security Rules for FrigoManager
- *
- * ## Core Philosophy
- * This ruleset establishes a secure-but-permissive model for the development phase.
- * The primary security posture is that ANY authenticated user can perform ANY operation
- * (read, write, delete) on ANY collection. This is intentionally open to facilitate
- * rapid development and testing without permission-related interruptions.
- *
- * ## Data Structure & Rule
- * To ensure permissions are applied consistently and avoid deployment caching issues,
- * a single, global rule is used.
- *
- * ## Key Security Decision
- * - **Authenticated Access Only**: A global wildcard match (`/{document=**}`) applies
- *   the `isSignedIn()` function to every document in the database.
- * - **`isSignedIn()`**: This function simply checks if a user is authenticated with
- *   Firebase Auth (`request.auth != null`). Anonymous users have no access.
- *
- * ## WARNING: Production Insecurity
- * This ruleset is NOT secure for a production environment. Before going to production,
- * these rules MUST be replaced with a more granular, role-based access control system.
- *
- * ## Forced Redeployment Timestamp
- * A timestamp is included to force the Firebase CLI to recognize changes and redeploy the rules,
- * bypassing any potential caching issues that might prevent updates from applying.
- * Force redeploy: 1722460020.987654
- */
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    /**
-     * isSignedIn()
-     * Checks if the user is authenticated via Firebase Auth.
-     * @returns {boolean} True if a user is signed in, false otherwise.
-     */
-    function isSignedIn() {
-      return request.auth != null;
-    }
-
-    /**
-     * @description Global rule for all collections.
-     * @allow Authenticated users can read and write freely across the entire database.
-     */
+    // Grant read/write access to all documents to any authenticated user.
+    // This is a simplified rule for development.
+    // WARNING: This is not secure for production.
     match /{document=**} {
-      allow read, write: if isSignedIn();
+      allow read, write: if request.auth != null;
     }
   }
 }
