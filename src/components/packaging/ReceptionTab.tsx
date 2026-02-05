@@ -12,13 +12,14 @@ import { Button } from '@/components/ui/button';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
 import type { OtherClient, PackagingMaster, PackagingReceptionItem } from '@/lib/types';
 import { packagingReceptionSchema } from '@/lib/schemas';
-import { PlusCircle, Trash2 } from 'lucide-react';
+import { PlusCircle, Trash2, ScanLine } from 'lucide-react';
 import { useFirestore } from '@/firebase';
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { Label } from '@/components/ui/label';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '../ui/alert-dialog';
 
 type ReceptionFormValues = z.infer<typeof packagingReceptionSchema>;
 
@@ -34,6 +35,8 @@ export function ReceptionTab() {
   const { data: allPackagingMasters, loading: loadingMasters } = useFirestoreCollection<PackagingMaster>('packagingMaster');
   const firestore = useFirestore();
   const { toast } = useToast();
+  const [scanningIndex, setScanningIndex] = React.useState<number | null>(null);
+  const [scannedValue, setScannedValue] = React.useState('');
 
   const form = useForm<ReceptionFormValues>({
     resolver: zodResolver(packagingReceptionSchema),
@@ -119,6 +122,15 @@ export function ReceptionTab() {
     }
   };
 
+  const handleScanConfirm = () => {
+    if (scanningIndex !== null) {
+        form.setValue(`items.${scanningIndex}.packagingMasterCode`, scannedValue);
+        handleCodeBlur(scanningIndex); // Trigger blur logic to find product
+        setScanningIndex(null);
+        setScannedValue('');
+    }
+  };
+
 
   const handleClientChange = (value: string) => {
     form.setValue('clientId', value);
@@ -193,18 +205,51 @@ export function ReceptionTab() {
                       render={({ field: itemField }) => (
                         <FormItem>
                           <FormLabel>Cod. Artículo</FormLabel>
-                           <FormControl>
-                               <Input 
-                                {...itemField} 
-                                onBlur={() => handleCodeBlur(index)} 
-                                autoComplete="off" 
-                                disabled={!selectedClientId || loadingMasters}
-                                placeholder={!selectedClientId ? "Seleccione cliente" : "Ingrese código..."}
-                                inputMode="numeric" 
-                                pattern="[0-9]*"
-                               />
-                           </FormControl>
-                          <FormMessage />
+                          <div className="flex items-center gap-2">
+                             <FormControl>
+                                 <Input 
+                                  {...itemField} 
+                                  onBlur={() => handleCodeBlur(index)} 
+                                  autoComplete="off" 
+                                  disabled={!selectedClientId || loadingMasters}
+                                  placeholder={!selectedClientId ? "Seleccione cliente" : "Ingrese código..."}
+                                  inputMode="numeric" 
+                                  pattern="[0-9]*"
+                                 />
+                             </FormControl>
+                              <AlertDialog open={scanningIndex === index} onOpenChange={(isOpen) => { if (!isOpen) setScanningIndex(null); }}>
+                                <AlertDialogTrigger asChild>
+                                  <Button type="button" variant="outline" size="icon" className="shrink-0" onClick={() => setScanningIndex(index)}>
+                                      <ScanLine className="h-4 w-4" />
+                                      <span className="sr-only">Escanear código</span>
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>Simulación de Escáner</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      En la aplicación final, esto abriría la cámara para escanear un código de barras. Por ahora, puede ingresar el valor manualmente.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <Input 
+                                      value={scannedValue} 
+                                      onChange={(e) => setScannedValue(e.target.value)} 
+                                      placeholder="Ingrese el valor del código de barras..."
+                                      onKeyDown={(e) => {
+                                          if (e.key === 'Enter') {
+                                              e.preventDefault();
+                                              handleScanConfirm();
+                                          }
+                                      }}
+                                  />
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel onClick={() => setScannedValue('')}>Cancelar</AlertDialogCancel>
+                                    <AlertDialogAction onClick={handleScanConfirm}>Aceptar</AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                           </div>
+                           <FormMessage />
                         </FormItem>
                       )}
                     />
