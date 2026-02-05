@@ -20,7 +20,6 @@ import {
   Cherry,
   Users,
   ChevronRight,
-  Image,
 } from 'lucide-react';
 import {
   Sidebar,

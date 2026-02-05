@@ -11,7 +11,9 @@ export const CustomAppleIcon = React.forwardRef<SVGSVGElement, React.SVGProps<SV
         {...props}
     >
         <g transform="scale(1.2) translate(-2, -2)">
-            <path d="M16 4 C 17 1, 20 1, 20 3" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+            {/* The tilde/virgulilla path */}
+            <path d="M15,4 C16,2 18,2 19,4" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+            {/* The apple body path */}
             <path d="M19.5,10.5C19.5,5.5,16,5,15,5.5C13.5,6,12,8,12,8C12,8,10.5,6,9,5.5C8,5,4.5,5.5,4.5,10.5C4.5,16.5,8,22,12,22C16,22,19.5,16.5,19.5,10.5Z" />
         </g>
     </svg>
