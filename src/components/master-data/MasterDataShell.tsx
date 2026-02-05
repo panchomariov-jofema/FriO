@@ -268,6 +268,18 @@ export function MasterDataShell<T extends MasterData>({
         const errors: string[] = [];
         let successCount = 0;
 
+        const keyFields: Record<string, string> = {
+          exporters: 'exporterId',
+          producers: 'producerId',
+          binMaterials: 'code',
+          otherClients: 'clientId',
+          packagingMaster: 'code',
+          usersMaster: 'userName',
+          profiles: 'profileId',
+          packings: 'name',
+        };
+        const keyField = keyFields[collectionName];
+
         for (let i = 1; i < lines.length; i++) {
             const values = lines[i].split(',').map(v => v.trim().replace(/"/g, ''));
             const rowData: { [key: string]: any } = {};
@@ -276,38 +288,43 @@ export function MasterDataShell<T extends MasterData>({
                 rowData[header] = values[index];
             });
 
-            // Normalize data before validation
             if (rowData.type && typeof rowData.type === 'string') {
               rowData.type = rowData.type.toLowerCase();
             }
 
             try {
                 const validatedData = schema.parse(rowData);
-                const collRef = collection(firestore, collectionName);
-                addDoc(collRef, validatedData).catch(error => {
-                  errors.push(`Línea ${i + 1}: Error al guardar - ${error.message}`);
-                   errorEmitter.emit(
-                      'permission-error',
-                      new FirestorePermissionError({
-                        path: collRef.path,
-                        operation: 'create',
-                        requestResourceData: validatedData,
-                      })
-                    );
-                });
+
+                let existingDocRef: any = null;
+                if (keyField && validatedData[keyField]) {
+                    const q = query(collection(firestore, collectionName), where(keyField, "==", validatedData[keyField]));
+                    const querySnapshot = await getDocs(q);
+                    if (!querySnapshot.empty) {
+                        existingDocRef = querySnapshot.docs[0].ref;
+                    }
+                }
+        
+                if (existingDocRef) {
+                    await updateDoc(existingDocRef, validatedData);
+                } else {
+                    const collRef = collection(firestore, collectionName);
+                    await addDoc(collRef, validatedData);
+                }
                 successCount++;
+
             } catch (error) {
                 if (error instanceof z.ZodError) {
                     errors.push(`Línea ${i + 1}: ${error.errors.map(e => e.message).join(', ')}`);
                 } else {
-                    errors.push(`Línea ${i + 1}: Error desconocido al guardar.`);
+                    console.error("Error processing import line:", error);
+                    errors.push(`Línea ${i + 1}: Error al guardar en base de datos.`);
                 }
             }
         }
         
         toast({
             title: 'Importación Completada',
-            description: `${successCount} registros procesados. ${errors.length} errores.`,
+            description: `${successCount} registros procesados. ${errors.length > 0 ? `${errors.length} errores.` : ''}`,
         });
 
         if (errors.length > 0) {
