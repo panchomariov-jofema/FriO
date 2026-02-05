@@ -74,7 +74,6 @@ const navStructure: any[] = [
     },
     { type: 'item', href: '/reportes', label: 'Reportes', icon: PieChart },
     { type: 'item', href: '/datos-maestros', label: 'Datos Maestros', icon: Database },
-    { type: 'item', href: '/logo', label: 'Logo', icon: Image },
 ];
 
 function AppLayoutContent({ children }: { children: React.ReactNode }) {
