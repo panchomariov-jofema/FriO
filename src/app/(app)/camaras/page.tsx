@@ -32,18 +32,18 @@ import { useChamberStrategy } from '@/contexts/ChamberStrategyContext';
 // --- Color Palette Logic (Moved outside component to persist state) ---
 
 const lotColorPalette = [
-  'hsl(221, 83%, 53%)', // Blue
-  'hsl(0, 72%, 51%)',   // Red
-  'hsl(48, 96%, 53%)',  // Yellow
-  'hsl(262, 83%, 60%)', // Violet
-  'hsl(170, 75%, 41%)', // Cyan
-  'hsl(350, 75%, 55%)', // Pink
-  'hsl(25, 85%, 50%)',  // Orange
-  'hsl(120, 50%, 50%)', // Green
-  'hsl(310, 80%, 50%)', // Magenta
-  'hsl(195, 100%, 45%)',// Sky Blue
-  'hsl(60, 100%, 45%)', // Lemon
-  'hsl(290, 60%, 50%)', // Purple
+  'hsl(210, 80%, 55%)',  // Vivid Blue
+  'hsl(0, 90%, 60%)',    // Bright Red
+  'hsl(145, 70%, 45%)',  // Strong Green
+  'hsl(50, 100%, 50%)',  // Bright Yellow
+  'hsl(280, 70%, 60%)',  // Deep Purple
+  'hsl(30, 100%, 55%)',  // Bold Orange
+  'hsl(180, 70%, 45%)',  // Sharp Cyan
+  'hsl(330, 85%, 60%)',  // Hot Pink
+  'hsl(160, 100%, 35%)', // Teal
+  'hsl(30, 40%, 40%)',   // Brown
+  'hsl(80, 60%, 50%)',   // Lime Green
+  'hsl(240, 60%, 60%)',  // Indigo
 ];
 
 // Map to store assigned colors for each lot ID
