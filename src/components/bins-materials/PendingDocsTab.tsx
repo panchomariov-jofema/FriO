@@ -73,7 +73,7 @@ export function PendingDocsTab() {
                             <Badge variant="destructive">{doc.estado}</Badge>
                         </TableCell>
                         <TableCell className="text-right">
-                           <Button variant="outline" size="sm" onClick={() => handleCopyJson(doc)}>Copiar JSON</Button>
+                           <Button variant="outline" size="sm" onClick={() => handleCopyJson(doc)}>Capturar Datos</Button>
                         </TableCell>
                     </TableRow>
                 ))
