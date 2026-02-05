@@ -50,19 +50,37 @@ const ProducerForm = ({ form, exporters }: { form: any; exporters: Exporter[] })
   return (
     <>
       <FormField control={form.control} name="producerId" render={({ field }) => (
-        <FormItem><FormLabel>ID Productor</FormLabel><FormControl><Input {...field} autoComplete="off" /></FormControl><FormMessage /></FormItem>
+        <FormItem><FormLabel>ID Productor</FormLabel><FormControl><Input {...field} value={field.value ?? ''} autoComplete="off" /></FormControl><FormMessage /></FormItem>
       )} />
       <FormField control={form.control} name="shortName" render={({ field }) => (
-        <FormItem><FormLabel>Nombre Corto</FormLabel><FormControl><Input {...field} autoComplete="off" /></FormControl><FormMessage /></FormItem>
+        <FormItem><FormLabel>Nombre Corto</FormLabel><FormControl><Input {...field} value={field.value ?? ''} autoComplete="off" /></FormControl><FormMessage /></FormItem>
       )} />
       <FormField control={form.control} name="name" render={({ field }) => (
-        <FormItem><FormLabel>Nombre</FormLabel><FormControl><Input {...field} autoComplete="off" /></FormControl><FormMessage /></FormItem>
+        <FormItem><FormLabel>Nombre</FormLabel><FormControl><Input {...field} value={field.value ?? ''} autoComplete="off" /></FormControl><FormMessage /></FormItem>
       )} />
       <FormField control={form.control} name="exporterId" render={({ field }) => (
-        <FormItem><FormLabel>Exportador</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
+        <FormItem><FormLabel>Exportador</FormLabel><Select onValueChange={field.onChange} value={field.value}>
           <FormControl><SelectTrigger><SelectValue placeholder="Seleccione un exportador" /></SelectTrigger></FormControl>
           <SelectContent>{exporters?.map(e => <SelectItem key={e.id} value={e.exporterId}>{e.name}</SelectItem>)}</SelectContent>
         </Select><FormMessage /></FormItem>
+      )} />
+       <FormField control={form.control} name="rut" render={({ field }) => (
+        <FormItem><FormLabel>RUT</FormLabel><FormControl><Input {...field} value={field.value ?? ''} autoComplete="off" /></FormControl><FormMessage /></FormItem>
+      )} />
+       <FormField control={form.control} name="razon_social" render={({ field }) => (
+        <FormItem><FormLabel>Razón Social</FormLabel><FormControl><Input {...field} value={field.value ?? ''} autoComplete="off" /></FormControl><FormMessage /></FormItem>
+      )} />
+      <FormField control={form.control} name="giro" render={({ field }) => (
+        <FormItem><FormLabel>Giro</FormLabel><FormControl><Input {...field} value={field.value ?? ''} autoComplete="off" /></FormControl><FormMessage /></FormItem>
+      )} />
+      <FormField control={form.control} name="direccion" render={({ field }) => (
+        <FormItem><FormLabel>Dirección</FormLabel><FormControl><Input {...field} value={field.value ?? ''} autoComplete="off" /></FormControl><FormMessage /></FormItem>
+      )} />
+      <FormField control={form.control} name="comuna" render={({ field }) => (
+        <FormItem><FormLabel>Comuna</FormLabel><FormControl><Input {...field} value={field.value ?? ''} autoComplete="off" /></FormControl><FormMessage /></FormItem>
+      )} />
+      <FormField control={form.control} name="ciudad" render={({ field }) => (
+        <FormItem><FormLabel>Ciudad</FormLabel><FormControl><Input {...field} value={field.value ?? ''} autoComplete="off" /></FormControl><FormMessage /></FormItem>
       )} />
     </>
   )
@@ -255,10 +273,20 @@ export default function DatosMaestrosPage() {
               title="Productores"
               collectionName="producers"
               schema={producerSchema}
-              columns={[{key: 'producerId', header: 'ID'}, {key: 'shortName', header: 'Nombre Corto'}, {key: 'name', header: 'Nombre'}, {key: 'exporterId', header: 'ID Exportador'}]}
+              columns={[
+                {key: 'producerId', header: 'ID'}, 
+                {key: 'shortName', header: 'Nombre Corto'}, 
+                {key: 'name', header: 'Nombre'}, 
+                {key: 'exporterId', header: 'ID Exportador'},
+                {key: 'rut', header: 'RUT'},
+                {key: 'giro', header: 'Giro'},
+                {key: 'direccion', header: 'Dirección'},
+                {key: 'comuna', header: 'Comuna'},
+                {key: 'ciudad', header: 'Ciudad'}
+              ]}
               RenderFormComponent={ProducerForm}
               docNameField="name"
-              csvHeaders={['producerId', 'shortName', 'name', 'exporterId']}
+              csvHeaders={['producerId', 'shortName', 'name', 'exporterId', 'rut', 'razon_social', 'giro', 'direccion', 'comuna', 'ciudad']}
               csvTemplateFileName="plantilla_productores.csv"
               formProps={{ exporters: loadingExporters ? [] : exporters }}
             />
