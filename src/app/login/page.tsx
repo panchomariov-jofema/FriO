@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -48,7 +49,7 @@ const CustomAppleIcon = ({ className }: { className?: string }) => (
       className={className}
     >
       <path d="M12 20.94c1.5 0 2.75 1.06 4 1.06 3 0 6-8 6-12.22A4.91 4.91 0 0 0 17 5c-2.22 0-4 1.44-5 2-1-.56-2.78-2-5-2a4.9 4.9 0 0 0-5 4.78C2 14 5 22 8 22c1.25 0 2.5-1.06 4-1.06Z" />
-      <path d="M9 4 Q 10.5 2 12 4 T 15 4" />
+      <path d="M9 2 Q 10.5 0 12 2 T 15 2" />
     </svg>
   );
 
