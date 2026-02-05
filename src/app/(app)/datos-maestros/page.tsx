@@ -231,7 +231,7 @@ export default function DatosMaestrosPage() {
       </CardHeader>
       <CardContent>
         <Tabs defaultValue="exporters" className="w-full">
-          <TabsList className="grid w-full grid-cols-3 sm:grid-cols-5">
+          <TabsList className="h-auto flex-wrap justify-start">
             {tabs.map((tab) => (
               <TabsTrigger key={tab.value} value={tab.value}>{tab.label}</TabsTrigger>
             ))}
