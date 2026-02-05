@@ -44,14 +44,14 @@ export default function PermanenceReportPage() {
     const reportData = React.useMemo(() => {
         if (loading) return [];
         
-        const receptionMap = new Map(receptions.map(r => [r.id, r]));
+        const receptionMap = new Map((receptions || []).map(r => [r.id, r]));
         const data: any[] = [];
         
-        movements.forEach(movement => {
+        (movements || []).forEach(movement => {
             if (movement.type === 'salida' && movement.status === 'Completado' && movement.locations) {
                 movement.locations.forEach((loc, index) => {
                     const reception = receptionMap.get(loc.receptionId);
-                    if (reception) {
+                    if (reception && reception.createdAt && movement.createdAt) {
                         const fechaRecepcion = reception.createdAt.toDate();
                         const fechaSalida = movement.createdAt.toDate();
                         const diasPermanencia = differenceInDays(fechaSalida, fechaRecepcion);

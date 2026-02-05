@@ -103,7 +103,7 @@ export default function OtherFruitKardexReportPage() {
             });
         }
 
-        return allMovements.sort((a, b) => b.date.toMillis() - a.date.toMillis());
+        return allMovements.sort((a, b) => (b.date?.toMillis() ?? 0) - (a.date?.toMillis() ?? 0));
     }, [receptions, movements]);
 
     const [clientFilter, setClientFilter] = React.useState('all');
@@ -124,7 +124,7 @@ export default function OtherFruitKardexReportPage() {
 
     const handleExport = () => {
         const dataToExport = filteredData.map(item => ({
-            "Fecha": item.date.toDate(),
+            "Fecha": item.date?.toDate(),
             "Tipo": item.type,
             "Cliente": item.clientName,
             "Documento": item.document,
@@ -189,7 +189,7 @@ export default function OtherFruitKardexReportPage() {
                                 ) : filteredData.length > 0 ? (
                                     filteredData.map((item) => (
                                     <TableRow key={item.key}>
-                                        <TableCell>{item.date.toDate().toLocaleString()}</TableCell>
+                                        <TableCell>{item.date?.toDate().toLocaleString() ?? 'N/A'}</TableCell>
                                         <TableCell>
                                             <Badge variant={item.type === 'entrada' ? 'default' : 'secondary'}>
                                                 {item.type.charAt(0).toUpperCase() + item.type.slice(1)}

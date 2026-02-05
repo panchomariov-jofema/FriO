@@ -28,7 +28,7 @@ export function OtherFruitPickingTab() {
   const pendingMovements = React.useMemo(() => {
     return (allMovements || [])
       .filter(m => m.type === 'salida' && m.status === 'Pendiente de Picking')
-      .sort((a, b) => b.createdAt.toMillis() - a.createdAt.toMillis());
+      .sort((a, b) => (b.createdAt?.toMillis() ?? 0) - (a.createdAt?.toMillis() ?? 0));
   }, [allMovements]);
   
   const handleStartPicking = (movement: OtherFruitMovement) => {
@@ -127,7 +127,7 @@ export function OtherFruitPickingTab() {
                 ) : pendingMovements.length > 0 ? (
                   pendingMovements.map((mov) => (
                     <TableRow key={mov.id}>
-                      <TableCell>{mov.createdAt.toDate().toLocaleString()}</TableCell>
+                      <TableCell>{mov.createdAt?.toDate().toLocaleString() ?? 'N/A'}</TableCell>
                       <TableCell>{mov.clientName}</TableCell>
                       <TableCell className="hidden sm:table-cell">{mov.document}</TableCell>
                       <TableCell>{mov.items.reduce((sum, item) => sum + item.quantity, 0)} {mov.unit}</TableCell>
@@ -160,5 +160,3 @@ export function OtherFruitPickingTab() {
     </>
   );
 }
-
-    
