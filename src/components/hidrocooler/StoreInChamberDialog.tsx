@@ -78,30 +78,12 @@ export function StoreInChamberDialog({ lot, open, onOpenChange, onStore, allCham
 
     const strategy = chamberStrategies[selectedChamberId] || 'secuencial';
     const allPossibleCoords = getSortedCoordinates(chamberConfig, strategy);
-
-    // 1. Find a partially filled coordinate with the SAME lot
-    const partialSameLotCoords = allPossibleCoords.filter(coord => {
-      const occupiedBy = occupancyMap.get(coord);
-      if (!occupiedBy || occupiedBy.lots.length === 0) return false;
-      const isSameLot = occupiedBy.lots.every(l => l.displayLotId === lot.displayLotId);
-      if (!isSameLot) return false;
-      const totalBins = occupiedBy.lots.reduce((sum, l) => sum + l.binCount, 0);
-      return totalBins < 6; // Standard capacity per coordinate for producer lots
-    });
-
-    let currentSuggestion: string | null = null;
-    if (partialSameLotCoords.length > 0) {
-      currentSuggestion = partialSameLotCoords[0];
-    } else {
-      // 2. Find the first completely empty coordinate
-      const firstEmpty = allPossibleCoords.find(coord => !occupancyMap.has(coord));
-      if (firstEmpty) {
-        currentSuggestion = firstEmpty;
-      }
-    }
-
+    
+    // Suggestion logic should only suggest empty coordinates.
+    // The actual storage logic will handle filling partial coordinates first.
     const emptyCoords = allPossibleCoords.filter(coord => !occupancyMap.has(coord));
-
+    const currentSuggestion = emptyCoords.length > 0 ? emptyCoords[0] : null;
+    
     return { availableCoordinatesForNewLots: emptyCoords, suggestion: currentSuggestion };
 
   }, [selectedChamberId, lot, allChamberLots, allOtherFruitReceptions, chamberStrategies]);
