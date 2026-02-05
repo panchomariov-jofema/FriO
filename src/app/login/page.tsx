@@ -34,24 +34,7 @@ import { useToast } from '@/hooks/use-toast';
 import { FirebaseError } from 'firebase/app';
 import { LoadingScreen } from '@/components/LoadingScreen';
 import { Separator } from '@/components/ui/separator';
-
-const CustomAppleIcon = ({ className }: { className?: string }) => (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={className}
-    >
-      <path d="M12 20.94c1.5 0 2.75 1.06 4 1.06 3 0 6-8 6-12.22A4.91 4.91 0 0 0 17 5c-2.22 0-4 1.44-5 2-1-.56-2.78-2-5-2a4.9 4.9 0 0 0-5 4.78C2 14 5 22 8 22c1.25 0 2.5-1.06 4-1.06Z" />
-      <path d="M9 2 Q 10.5 0 12 2 T 15 2" />
-    </svg>
-  );
+import { FrioLogo } from '@/components/ui/FrioLogo';
 
 const loginSchema = z.object({
   email: z.string().email('Email inválido.'),
@@ -151,10 +134,7 @@ export default function LoginPage() {
       <Card className="w-full max-w-md bg-card/95 backdrop-blur-sm border-border/20">
         <CardHeader className="text-center">
           <div className="flex justify-center items-center mb-4">
-            <div className="flex items-baseline gap-1">
-                <span className="font-bold text-5xl text-primary">Fri</span>
-                <CustomAppleIcon className="w-10 h-10 text-primary translate-y-1" />
-            </div>
+            <FrioLogo className="w-32 h-auto text-primary" />
           </div>
           <CardTitle className="text-2xl">
             {isSignUp ? 'Crear una cuenta' : 'Iniciar Sesión'}
