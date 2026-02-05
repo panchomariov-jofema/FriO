@@ -58,6 +58,7 @@ import { DispatchPickingDialog } from '@/components/dispatch/DispatchPickingDial
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { LoadingScreen } from '@/components/LoadingScreen';
+import { Switch } from '@/components/ui/switch';
 
 
 const dispatchSchema = z.object({
@@ -119,6 +120,7 @@ function DespachosPageContent() {
   const [isUndoing, setIsUndoing] = React.useState(false);
   const [pickingDispatch, setPickingDispatch] = React.useState<Dispatch | null>(null);
   const [showOnlyPending, setShowOnlyPending] = React.useState(true);
+  const [showCherryOnly, setShowCherryOnly] = React.useState(false);
   
   const dispatchesQuery = useMemoFirebase(() => {
     if (!firestore || !user) return null;
@@ -160,7 +162,7 @@ function DespachosPageContent() {
   const { binsPerChamber, binsPerExporter, binsPerProducer } = React.useMemo(() => {
     const storedLots = (chamberLots || []).filter(lot => lot.status === 'Almacenado');
 
-    const storedOtherFruit = (otherFruitReceptions || [])
+    const storedOtherFruit = showCherryOnly ? [] : (otherFruitReceptions || [])
         .flatMap(r => r.items.map(item => ({ ...item, reception: r })))
         .filter((item) => item.status === 'Almacenado' && item.quantity > 0 && item.storageLocation?.chamberId);
 
@@ -203,7 +205,7 @@ function DespachosPageContent() {
     }, {} as Record<string, number>);
 
     return { binsPerChamber: perChamber, binsPerExporter: perExporter, binsPerProducer: perProducer };
-  }, [chamberLots, otherFruitReceptions]);
+  }, [chamberLots, otherFruitReceptions, showCherryOnly]);
 
   const onSubmit = async (values: DispatchFormValues) => {
     if (!firestore || !exporters || !chamberLots) return;
@@ -436,43 +438,49 @@ function DespachosPageContent() {
   return (
     <div className="space-y-6">
       {/* Summary Cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        <Card>
-          <CardHeader><CardTitle>Stock por Cámara</CardTitle></CardHeader>
-          <CardContent>
-            {loadingChamberLots || loadingOtherFruit ? <Skeleton className="h-20" /> : (
-              <ul className="space-y-1 text-sm">
-                {Object.entries(binsPerChamber).map(([chamber, count]) => (
-                  <li key={chamber} className="flex justify-between"><span>{chamber}:</span><span className="font-semibold">{count} bins</span></li>
-                ))}
-              </ul>
-            )}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader><CardTitle>Stock por Exportador</CardTitle></CardHeader>
-          <CardContent>
-            {loadingChamberLots || loadingExporters || loadingOtherFruit ? <Skeleton className="h-20" /> : (
-              <ul className="space-y-1 text-sm">
-                {Object.entries(binsPerExporter).map(([exporterKey, count]) => (
-                  <li key={exporterKey} className="flex justify-between"><span>{getExporterName(exporterKey)}:</span><span className="font-semibold">{count} bins</span></li>
-                ))}
-              </ul>
-            )}
-          </CardContent>
-        </Card>
-         <Card>
-          <CardHeader><CardTitle>Stock por Productor</CardTitle></CardHeader>
-          <CardContent>
-            {loadingChamberLots || loadingProducers ? <Skeleton className="h-20" /> : (
-              <ul className="space-y-1 text-sm max-h-48 overflow-y-auto">
-                {Object.entries(binsPerProducer).map(([producerName, count]) => (
-                  <li key={producerName} className="flex justify-between"><span>{producerName}:</span><span className="font-semibold">{count} bins</span></li>
-                ))}
-              </ul>
-            )}
-          </CardContent>
-        </Card>
+      <div className="relative">
+        <div className="absolute top-0 right-0 flex items-center space-x-2 z-10">
+          <Switch id="cherry-filter" checked={showCherryOnly} onCheckedChange={setShowCherryOnly} />
+          <Label htmlFor="cherry-filter">Solo Cereza</Label>
+        </div>
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <Card>
+            <CardHeader><CardTitle>Stock por Cámara</CardTitle></CardHeader>
+            <CardContent>
+              {loadingChamberLots || loadingOtherFruit ? <Skeleton className="h-20" /> : (
+                <ul className="space-y-1 text-sm">
+                  {Object.entries(binsPerChamber).map(([chamber, count]) => (
+                    <li key={chamber} className="flex justify-between"><span>{chamber}:</span><span className="font-semibold">{count} bins</span></li>
+                  ))}
+                </ul>
+              )}
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader><CardTitle>Stock por Exportador</CardTitle></CardHeader>
+            <CardContent>
+              {loadingChamberLots || loadingExporters || loadingOtherFruit ? <Skeleton className="h-20" /> : (
+                <ul className="space-y-1 text-sm">
+                  {Object.entries(binsPerExporter).map(([exporterKey, count]) => (
+                    <li key={exporterKey} className="flex justify-between"><span>{getExporterName(exporterKey)}:</span><span className="font-semibold">{count} bins</span></li>
+                  ))}
+                </ul>
+              )}
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader><CardTitle>Stock por Productor</CardTitle></CardHeader>
+            <CardContent>
+              {loadingChamberLots || loadingProducers ? <Skeleton className="h-20" /> : (
+                <ul className="space-y-1 text-sm max-h-48 overflow-y-auto">
+                  {Object.entries(binsPerProducer).map(([producerName, count]) => (
+                    <li key={producerName} className="flex justify-between"><span>{producerName}:</span><span className="font-semibold">{count} bins</span></li>
+                  ))}
+                </ul>
+              )}
+            </CardContent>
+          </Card>
+        </div>
       </div>
       
       <Tabs defaultValue="automatico" className="w-full">
@@ -499,7 +507,7 @@ function DespachosPageContent() {
                         )} />
                         <FormField control={form.control} name="packingId" render={({ field }) => (
                             <FormItem><FormLabel>Packing de Destino (Opcional)</FormLabel><Select onValueChange={field.onChange} value={field.value} disabled={!selectedExporterId || loadingPackings}>
-                                <FormControl><SelectTrigger><SelectValue placeholder={!selectedExporterId ? 'Seleccione exportador' : 'Seleccione...'} /></SelectTrigger></FormControl>
+                                <FormControl><SelectTrigger><SelectValue placeholder={!selectedExporterId ? 'Seleccione exportador' : 'Opcional...'} /></SelectTrigger></FormControl>
                                 <SelectContent>{packings?.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}</SelectContent>
                             </Select><FormMessage /></FormItem>
                         )} />
