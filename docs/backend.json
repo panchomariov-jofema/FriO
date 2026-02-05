@@ -46,6 +46,30 @@
         "exporterId": {
           "type": "string",
           "description": "Reference to Exporter. (Relationship: Exporter 1:N Producer)"
+        },
+        "rut": {
+          "type": "string",
+          "description": "RUT of the producer."
+        },
+        "razon_social": {
+          "type": "string",
+          "description": "Legal name of the producer."
+        },
+        "giro": {
+          "type": "string",
+          "description": "Business activity of the producer."
+        },
+        "direccion": {
+          "type": "string",
+          "description": "Address of the producer."
+        },
+        "comuna": {
+          "type": "string",
+          "description": "Comuna (municipality) of the producer."
+        },
+        "ciudad": {
+          "type": "string",
+          "description": "City of the producer."
         }
       },
       "required": [
@@ -914,6 +938,52 @@
         "createdAt",
         "bins"
       ]
+    },
+    "PendingDocument": {
+      "title": "Pending Document",
+      "description": "Represents a pending DTE document to be generated from a material exit.",
+      "type": "object",
+      "properties": {
+        "receptor": {
+          "type": "object",
+          "properties": {
+            "rut": { "type": "string" },
+            "razon_social": { "type": "string" },
+            "giro": { "type": "string" },
+            "direccion": { "type": "string" },
+            "comuna": { "type": "string" },
+            "ciudad": { "type": "string" }
+          },
+          "required": ["rut", "razon_social", "giro", "direccion", "comuna", "ciudad"]
+        },
+        "documento": {
+          "type": "object",
+          "properties": {
+            "referencia_exportador": { "type": "string" },
+            "patente_vehiculo": { "type": "string" },
+            "observaciones": { "type": "string" }
+          },
+          "required": ["referencia_exportador", "patente_vehiculo"]
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "item": { "type": "number" },
+              "codigo": { "type": "string" },
+              "descripcion": { "type": "string" },
+              "unidad_medida": { "type": "string" },
+              "cantidad": { "type": "number" }
+            },
+            "required": ["item", "codigo", "descripcion", "unidad_medida", "cantidad"]
+          }
+        },
+        "fecha_salida": { "type": "string", "format": "date-time" },
+        "estado": { "type": "string", "enum": ["PENDIENTE", "GENERADO"] },
+        "sourceMovementId": { "type": "string", "description": "The ID of the original BinMaterialMovement document." }
+      },
+      "required": ["receptor", "documento", "items", "fecha_salida", "estado", "sourceMovementId"]
     }
   },
   "auth": {
@@ -1252,6 +1322,22 @@
             {
               "name": "movementId",
               "description": "The unique identifier for the fruit movement record."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/documentosPendientes/{documentoId}",
+        "definition": {
+          "entityName": "PendingDocument",
+          "schema": {
+            "$ref": "#/backend/entities/PendingDocument"
+          },
+          "description": "Stores pending DTE documents generated from material exits.",
+          "params": [
+            {
+              "name": "documentoId",
+              "description": "The unique identifier for the pending document."
             }
           ]
         }

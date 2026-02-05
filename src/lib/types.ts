@@ -15,6 +15,12 @@ export interface Producer {
   shortName: string;
   name: string;
   exporterId: string;
+  rut?: string;
+  razon_social?: string;
+  giro?: string;
+  direccion?: string;
+  comuna?: string;
+  ciudad?: string;
 }
 
 export interface BinMaterial {
@@ -324,6 +330,34 @@ export interface OtherFruitMovement {
   status?: 'Pendiente de Picking' | 'Completado';
   locations?: OtherFruitMovementLocation[];
 }
+
+export interface PendingDocument {
+  id: string;
+  receptor: {
+    rut: string;
+    razon_social: string;
+    giro: string;
+    direccion: string;
+    comuna: string;
+    ciudad: string;
+  };
+  documento: {
+    referencia_exportador: string;
+    patente_vehiculo: string;
+    observaciones: string;
+  };
+  items: {
+    item: number;
+    codigo: string;
+    descripcion: string;
+    unidad_medida: string;
+    cantidad: number;
+  }[];
+  fecha_salida: Timestamp;
+  estado: 'PENDIENTE' | 'GENERADO';
+  sourceMovementId: string;
+}
+
 
 // Unified type for any stored item in a chamber
 export type StoredItem = {

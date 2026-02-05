@@ -10,14 +10,15 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { useFirestore } from '@/firebase';
-import { collection, query, where, runTransaction, serverTimestamp, getDocs, doc } from 'firebase/firestore';
-import type { BinMaterialStock, BinMaterialMovement } from '@/lib/types';
+import { collection, query, where, runTransaction, serverTimestamp, getDocs, doc, getDoc } from 'firebase/firestore';
+import type { BinMaterialStock, BinMaterialMovement, Producer } from '@/lib/types';
 import { useBinMaterialsByExporter } from '@/hooks/use-bin-materials-by-exporter';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { Table, TableBody, TableCell, TableHeader, TableRow, TableHead } from '../ui/table';
 import { Skeleton } from '../ui/skeleton';
+import { Textarea } from '../ui/textarea';
 
 const movementItemSchema = z.object({
   binMaterialId: z.string(),
@@ -30,6 +31,8 @@ const movementSchema = z.object({
   document: z.string().min(1, 'El documento es obligatorio.'),
   driverName: z.string().min(1, 'El nombre del conductor es obligatorio.'),
   driverRUT: z.string().min(1, 'El RUT del conductor es obligatorio.'),
+  patente_vehiculo: z.string().min(1, 'La patente es obligatoria.'),
+  observaciones: z.string().optional(),
   items: z.array(movementItemSchema),
 });
 
@@ -58,7 +61,7 @@ export function ExitsTab({ exporterId, exporterName, producerId }: ExitsTabProps
 
   const form = useForm<MovementFormValues>({
     resolver: zodResolver(movementSchema),
-    defaultValues: { document: '', driverName: '', driverRUT: '', items: [] },
+    defaultValues: { document: '', driverName: '', driverRUT: '', patente_vehiculo: '', observaciones: '', items: [] },
   });
 
   const getMultiplierLabel = (itemCode: string): string => {
@@ -140,6 +143,8 @@ export function ExitsTab({ exporterId, exporterName, producerId }: ExitsTabProps
         document: String(nextExitNumber),
         driverName: '',
         driverRUT: '',
+        patente_vehiculo: '',
+        observaciones: '',
         items: materials.map(m => ({
           binMaterialId: m.id,
           binMaterialCode: m.code,
@@ -175,6 +180,14 @@ export function ExitsTab({ exporterId, exporterName, producerId }: ExitsTabProps
             return;
         }
     }
+    
+    const producerRef = doc(firestore, 'producers', producerId);
+    const producerSnap = await getDoc(producerRef);
+    if (!producerSnap.exists()) {
+        toast({ variant: 'destructive', title: 'Error', description: 'No se encontraron los datos del productor.' });
+        return;
+    }
+    const producerData = producerSnap.data() as Producer;
 
     try {
       await runTransaction(firestore, async (transaction) => {
@@ -191,6 +204,35 @@ export function ExitsTab({ exporterId, exporterName, producerId }: ExitsTabProps
         };
         transaction.set(movementRef, movementData);
         
+        // Create pending document
+        const pendingDocRef = doc(collection(firestore, 'documentosPendientes'));
+        const pendingDocData = {
+            receptor: {
+                rut: producerData.rut || 'N/A',
+                razon_social: producerData.razon_social || producerData.name,
+                giro: producerData.giro || 'N/A',
+                direccion: producerData.direccion || 'N/A',
+                comuna: producerData.comuna || 'N/A',
+                ciudad: producerData.ciudad || 'N/A',
+            },
+            documento: {
+                referencia_exportador: exporterName || 'N/A',
+                patente_vehiculo: values.patente_vehiculo,
+                observaciones: values.observaciones || '',
+            },
+            items: itemsToProcess.map((item, index) => ({
+                item: index + 1,
+                codigo: item.binMaterialCode,
+                descripcion: item.binMaterialName,
+                unidad_medida: 'unidades',
+                cantidad: item.quantity,
+            })),
+            fecha_salida: serverTimestamp(),
+            estado: 'PENDIENTE',
+            sourceMovementId: movementRef.id,
+        };
+        transaction.set(pendingDocRef, pendingDocData);
+
         for (const item of itemsToProcess) {
           const stockQuery = query(
             collection(firestore, 'binMaterialStock'),
@@ -219,20 +261,20 @@ export function ExitsTab({ exporterId, exporterName, producerId }: ExitsTabProps
         }
       });
 
-      toast({ title: 'Éxito', description: 'Salida registrada y stock actualizado.' });
+      toast({ title: 'Éxito', description: 'Salida registrada y documento pendiente creado.' });
       const resetItems = materials.map(m => ({
         binMaterialId: m.id,
         binMaterialCode: m.code,
         binMaterialName: m.name,
         quantity: 0
       }));
-      form.reset({ document: String(nextExitNumber + 1), driverName: '', driverRUT: '', items: resetItems });
+      form.reset({ document: String(nextExitNumber + 1), driverName: '', driverRUT: '', patente_vehiculo: '', observaciones: '', items: resetItems });
 
     } catch (error: any) {
       console.error('Error processing exit:', error);
       toast({ variant: 'destructive', title: 'Error', description: error.message || 'No se pudo procesar la salida.' });
        errorEmitter.emit('permission-error', new FirestorePermissionError({
-          path: 'binMaterialMovements or binMaterialStock',
+          path: 'binMaterialMovements or binMaterialStock or documentosPendientes',
           operation: 'write'
       }));
     }
@@ -250,7 +292,7 @@ export function ExitsTab({ exporterId, exporterName, producerId }: ExitsTabProps
       <CardContent>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 <FormField
                 control={form.control}
                 name="document"
@@ -280,6 +322,28 @@ export function ExitsTab({ exporterId, exporterName, producerId }: ExitsTabProps
                   <FormItem>
                     <FormLabel>Rut Conductor</FormLabel>
                     <FormControl><Input {...field} autoComplete="off" inputMode="numeric" /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+               <FormField
+                control={form.control}
+                name="patente_vehiculo"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Patente Vehículo</FormLabel>
+                    <FormControl><Input {...field} autoComplete="off" /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+               <FormField
+                control={form.control}
+                name="observaciones"
+                render={({ field }) => (
+                  <FormItem className="lg:col-span-2">
+                    <FormLabel>Observaciones</FormLabel>
+                    <FormControl><Textarea {...field} /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
