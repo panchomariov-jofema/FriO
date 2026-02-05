@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { useFirestore } from '@/firebase';
-import { collection, query, where, runTransaction, serverTimestamp, getDocs, doc, getDoc } from 'firebase/firestore';
+import { collection, query, where, runTransaction, serverTimestamp, getDocs, doc } from 'firebase/firestore';
 import type { BinMaterialStock, BinMaterialMovement, Producer } from '@/lib/types';
 import { useBinMaterialsByExporter } from '@/hooks/use-bin-materials-by-exporter';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
@@ -181,13 +181,14 @@ export function ExitsTab({ exporterId, exporterName, producerId }: ExitsTabProps
         }
     }
     
-    const producerRef = doc(firestore, 'producers', producerId);
-    const producerSnap = await getDoc(producerRef);
-    if (!producerSnap.exists()) {
+    const producerQuery = query(collection(firestore, 'producers'), where('producerId', '==', producerId));
+    const producerQuerySnap = await getDocs(producerQuery);
+
+    if (producerQuerySnap.empty) {
         toast({ variant: 'destructive', title: 'Error', description: 'No se encontraron los datos del productor.' });
         return;
     }
-    const producerData = producerSnap.data() as Producer;
+    const producerData = producerQuerySnap.docs[0].data() as Producer;
 
     try {
       await runTransaction(firestore, async (transaction) => {
@@ -209,7 +210,7 @@ export function ExitsTab({ exporterId, exporterName, producerId }: ExitsTabProps
         const pendingDocData = {
             receptor: {
                 rut: producerData.rut || 'N/A',
-                razon_social: producerData.razon_social || producerData.name,
+                razon_social: producerData.name,
                 giro: producerData.giro || 'N/A',
                 direccion: producerData.direccion || 'N/A',
                 comuna: producerData.comuna || 'N/A',
