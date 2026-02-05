@@ -86,6 +86,7 @@ export default function CamarasPage() {
   const { toast } = useToast();
   const [showChamberStatus, setShowChamberStatus] = React.useState(false);
   const { chamberStrategies, setChamberStrategies } = useChamberStrategy();
+  const [strategyChangeToConfirm, setStrategyChangeToConfirm] = React.useState<{ chamberId: string; strategy: 'secuencial' | 'fifo' } | null>(null);
 
   const loading = loadingPendingLots || loadingStoredLots || loadingOtherFruit || loadingExporters;
   
@@ -258,6 +259,7 @@ export default function CamarasPage() {
     });
     
     const allPossibleCoordinates = getSortedCoordinates(chamberConfig, strategy);
+    const allEmptyCoordinates = allPossibleCoordinates.filter(coord => !occupiedCoordinates.has(coord));
 
     let binsToStore = lotToStore.binCount;
     const batch = writeBatch(firestore);
@@ -296,34 +298,30 @@ export default function CamarasPage() {
     
     // --- PASS 2: Store sequentially starting from the user's selected coordinate ---
     if (binsToStore > 0) {
-        if (!allPossibleCoordinates.includes(startCoordinate) || occupiedCoordinates.has(startCoordinate)) {
+        if (!allEmptyCoordinates.includes(startCoordinate)) {
             toast({ variant: 'destructive', title: 'Error de ubicación', description: `La coordenada de inicio (${startCoordinate}) no es válida o ya está ocupada.` });
             return;
         }
 
-        const startIndex = allPossibleCoordinates.indexOf(startCoordinate);
-        const coordinatesToSearch = allPossibleCoordinates.slice(startIndex);
+        const startIndex = allEmptyCoordinates.indexOf(startCoordinate);
+        const coordinatesToSearch = allEmptyCoordinates.slice(startIndex);
 
         for (const coord of coordinatesToSearch) {
             if (binsToStore === 0) break;
-
-            if (!occupiedCoordinates.has(coord)) { // Check if the coordinate is truly empty
-                const binsToAdd = Math.min(binsToStore, BINS_PER_COORDINATE);
-                
-                const newLotFractionRef = doc(collection(firestore, 'chamberLots'));
-                batch.set(newLotFractionRef, {
-                    ...lotToStore,
-                    id: newLotFractionRef.id,
-                    binCount: binsToAdd,
-                    chamberId: chamberId,
-                    coordinate: coord,
-                    status: 'Almacenado',
-                    storedAt: serverTimestamp()
-                });
-                binsToStore -= binsToAdd;
-                
-                occupiedCoordinates.set(coord, [{displayLotId: lotToStore.displayLotId, binCount: binsToAdd}]);
-            }
+            
+            const binsToAdd = Math.min(binsToStore, BINS_PER_COORDINATE);
+            
+            const newLotFractionRef = doc(collection(firestore, 'chamberLots'));
+            batch.set(newLotFractionRef, {
+                ...lotToStore,
+                id: newLotFractionRef.id,
+                binCount: binsToAdd,
+                chamberId: chamberId,
+                coordinate: coord,
+                status: 'Almacenado',
+                storedAt: serverTimestamp()
+            });
+            binsToStore -= binsToAdd;
         }
     }
 
@@ -460,6 +458,28 @@ export default function CamarasPage() {
     }
   };
 
+  const handleStrategyChange = (chamberId: string, checked: boolean) => {
+    const newStrategy = checked ? 'fifo' : 'secuencial';
+    if (!checked) {
+        setStrategyChangeToConfirm({ chamberId, strategy: newStrategy });
+    } else {
+        setChamberStrategies(prev => ({
+            ...prev,
+            [chamberId]: newStrategy,
+        }));
+    }
+  };
+
+  const confirmStrategyChange = () => {
+      if (strategyChangeToConfirm) {
+          setChamberStrategies(prev => ({
+              ...prev,
+              [strategyChangeToConfirm.chamberId]: strategyChangeToConfirm.strategy,
+          }));
+          setStrategyChangeToConfirm(null);
+      }
+  };
+
   const lotsInCoordToRelocate = coordToRelocate ? storedItemsByChamber[coordToRelocate.chamberId]?.[coordToRelocate.coordinate] || [] : [];
 
 
@@ -593,12 +613,7 @@ export default function CamarasPage() {
                                 <Switch
                                     id={`fifo-switch-${chamberId}`}
                                     checked={chamberStrategies[chamberId] === 'fifo'}
-                                    onCheckedChange={(checked) => {
-                                        setChamberStrategies(prev => ({
-                                            ...prev,
-                                            [chamberId]: checked ? 'fifo' : 'secuencial'
-                                        }));
-                                    }}
+                                    onCheckedChange={(checked) => handleStrategyChange(chamberId, checked)}
                                 />
                                 <Label htmlFor={`fifo-switch-${chamberId}`}>Activar Layout FIFO (Serpiente)</Label>
                             </div>
@@ -715,8 +730,23 @@ export default function CamarasPage() {
             allOtherFruitReceptions={otherFruitReceptions || []}
         />
       )}
+      <AlertDialog open={!!strategyChangeToConfirm} onOpenChange={() => setStrategyChangeToConfirm(null)}>
+        <AlertDialogContent>
+            <AlertDialogHeader>
+                <AlertDialogTitle>¿Desactivar Layout FIFO?</AlertDialogTitle>
+                <AlertDialogDescription>
+                    Esta acción cambiará el criterio visual para futuros almacenamientos en esta cámara.
+                    El almacenamiento existente no se verá afectado. ¿Desea continuar?
+                </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+                <AlertDialogCancel onClick={() => setStrategyChangeToConfirm(null)}>Cancelar</AlertDialogCancel>
+                <AlertDialogAction onClick={confirmStrategyChange}>
+                    Sí, Desactivar
+                </AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+    </AlertDialog>
     </div>
   );
 }
-
-    

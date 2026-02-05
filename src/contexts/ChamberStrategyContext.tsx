@@ -13,13 +13,37 @@ interface ChamberStrategyContextType {
 
 const ChamberStrategyContext = React.createContext<ChamberStrategyContextType | undefined>(undefined);
 
+const LOCAL_STORAGE_KEY = 'chamber_layout_strategies';
+
 export function ChamberStrategyProvider({ children }: { children: React.ReactNode }) {
-  const [chamberStrategies, setChamberStrategies] = React.useState<ChamberStrategies>(() =>
-    Object.keys(chambersConfig).reduce((acc, chamberId) => {
+  const [chamberStrategies, setChamberStrategies] = React.useState<ChamberStrategies>(() => {
+    // Default initial state. Actual state will be loaded from localStorage client-side.
+    return Object.keys(chambersConfig).reduce((acc, chamberId) => {
       acc[chamberId] = 'secuencial';
       return acc;
-    }, {} as ChamberStrategies)
-  );
+    }, {} as ChamberStrategies);
+  });
+
+  // On initial client-side mount, load the saved strategies from localStorage.
+  React.useEffect(() => {
+    try {
+      const savedStrategies = localStorage.getItem(LOCAL_STORAGE_KEY);
+      if (savedStrategies) {
+        setChamberStrategies(JSON.parse(savedStrategies));
+      }
+    } catch (error) {
+      console.warn("Could not load chamber strategies from localStorage", error);
+    }
+  }, []);
+
+  // Whenever the strategies change, save them back to localStorage.
+  React.useEffect(() => {
+    try {
+      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(chamberStrategies));
+    } catch (error) {
+      console.warn("Could not save chamber strategies to localStorage", error);
+    }
+  }, [chamberStrategies]);
 
   return (
     <ChamberStrategyContext.Provider value={{ chamberStrategies, setChamberStrategies }}>
