@@ -42,9 +42,9 @@ interface ExitsTabProps {
 
 // Rules for automatic calculation
 const calculationRules: Record<string, { binCode: string; related: Record<string, number> }> = {
-    'EXP001': { binCode: '10001', related: { '10002': 24, '10003': 1 } },
-    'EXP002': { binCode: '10007', related: { '10008': 24, '10009': 1 } },
-    'EXP003': { binCode: '10011', related: { '10012': 24, '10013': 1 } }
+    'SUBSOLE': { binCode: '10001', related: { '10002': 24, '10003': 1 } },
+    'MEYER': { binCode: '10007', related: { '10008': 24, '10009': 1 } },
+    'BLOSSOM': { binCode: '10011', related: { '10012': 24, '10013': 1 } }
 };
 
 
