@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -18,6 +17,7 @@ import { useFirestore } from '@/firebase';
 import { writeBatch, doc, collection, serverTimestamp, addDoc } from 'firebase/firestore';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
+import { Input } from '../ui/input';
 
 const varieties: Variety[] = ['SANTINA', 'LAPINS', 'REGINA', 'KORDIA', 'SKEENA', 'SWEETHEART', 'SYLVIA', 'SUNBURST'];
 
@@ -40,6 +40,7 @@ export function ManualDispatchTab({ exporters, loadingExporters, chamberLots, lo
     });
 
     const [selectedLots, setSelectedLots] = React.useState<Record<string, ChamberLot>>({});
+    const [quantities, setQuantities] = React.useState<Record<string, number>>({});
     const [isSubmitting, setIsSubmitting] = React.useState(false);
     const { toast } = useToast();
     const firestore = useFirestore();
@@ -73,19 +74,48 @@ export function ManualDispatchTab({ exporters, loadingExporters, chamberLots, lo
             }
             return newSelection;
         });
+
+        // Also manage the quantities for editing
+        setQuantities(prev => {
+            const newQuantities = { ...prev };
+            if (isSelected) {
+                newQuantities[lot.id] = lot.binCount; // Initialize with full amount
+            } else {
+                delete newQuantities[lot.id];
+            }
+            return newQuantities;
+        });
+    };
+    
+    const handleQuantityChange = (lotId: string, max: number, value: string) => {
+        const numValue = parseInt(value, 10);
+
+        if (value === '' || (numValue >= 0 && !isNaN(numValue))) {
+             if (numValue > max) {
+                toast({
+                    title: "Cantidad inválida",
+                    description: `La cantidad no puede superar los ${max} bins disponibles.`,
+                    variant: "destructive",
+                });
+                setQuantities(prev => ({ ...prev, [lotId]: max }));
+            } else {
+                setQuantities(prev => ({ ...prev, [lotId]: numValue || 0 }));
+            }
+        }
     };
     
     const handleCreateDispatch = async () => {
-        if (Object.keys(selectedLots).length === 0) {
+        const lotsToDispatch = Object.values(selectedLots);
+        if (lotsToDispatch.length === 0) {
             toast({ variant: 'destructive', title: 'Error', description: 'Debe seleccionar al menos un lote.' });
             return;
         }
 
         const { packingId } = form.getValues();
-        const firstLot = Object.values(selectedLots)[0];
+        const firstLot = lotsToDispatch[0];
         const mainExporterId = firstLot.exporterId;
 
-        if (!Object.values(selectedLots).every(lot => lot.exporterId === mainExporterId)) {
+        if (!lotsToDispatch.every(lot => lot.exporterId === mainExporterId)) {
             toast({ variant: 'destructive', title: 'Error de consistencia', description: 'Todos los lotes seleccionados deben pertenecer al mismo exportador.' });
             return;
         }
@@ -101,27 +131,35 @@ export function ManualDispatchTab({ exporters, loadingExporters, chamberLots, lo
 
         try {
             const batch = writeBatch(firestore);
-            const binsToDispatch = [];
+            
             let totalBins = 0;
             let totalNetWeight = 0;
 
-            for (const lot of Object.values(selectedLots)) {
-                binsToDispatch.push({
+            for (const lot of lotsToDispatch) {
+                const quantity = quantities[lot.id];
+                if (quantity > 0) {
+                     totalBins += quantity;
+                    if (lot.netWeightPerBin) {
+                        totalNetWeight += quantity * lot.netWeightPerBin;
+                    }
+                }
+            }
+
+            if (totalBins <= 0) {
+                toast({ variant: 'destructive', title: 'Error', description: 'La cantidad total a despachar debe ser mayor a 0.' });
+                setIsSubmitting(false);
+                return;
+            }
+
+            const binsToDispatch = lotsToDispatch
+                .filter(lot => quantities[lot.id] > 0)
+                .map(lot => ({
                     chamberLotId: lot.id,
                     displayLotId: lot.displayLotId,
                     chamberId: lot.chamberId!,
                     coordinate: lot.coordinate!,
-                    binCount: lot.binCount,
-                });
-                totalBins += lot.binCount;
-                if (lot.netWeightPerBin && lot.netWeightPerBin > 0) {
-                    totalNetWeight += lot.binCount * lot.netWeightPerBin;
-                }
-                
-                // Reserve the lot by updating its status
-                const lotRef = doc(firestore, 'chamberLots', lot.id);
-                batch.update(lotRef, { status: 'Despachado' });
-            }
+                    binCount: quantities[lot.id], // Use the edited quantity
+                }));
 
             const dispatchData = {
                 exporterId: selectedExporter.exporterId,
@@ -133,6 +171,14 @@ export function ManualDispatchTab({ exporters, loadingExporters, chamberLots, lo
                 createdAt: serverTimestamp(),
                 bins: binsToDispatch,
             };
+            
+            // Reserve the entire original lot. The picking dialog will handle splitting the remainder.
+            for (const lot of lotsToDispatch) {
+                if (quantities[lot.id] > 0) {
+                    const lotRef = doc(firestore, 'chamberLots', lot.id);
+                    batch.update(lotRef, { status: 'Despachado' });
+                }
+            }
 
             const dispatchRef = doc(collection(firestore, 'dispatches'));
             batch.set(dispatchRef, dispatchData);
@@ -141,6 +187,7 @@ export function ManualDispatchTab({ exporters, loadingExporters, chamberLots, lo
             
             toast({ title: 'Éxito', description: `Solicitud de despacho creada con ${totalBins} bins.` });
             setSelectedLots({});
+            setQuantities({});
             form.reset();
 
         } catch (error: any) {
@@ -154,10 +201,10 @@ export function ManualDispatchTab({ exporters, loadingExporters, chamberLots, lo
     
     const { totalSelectedBins, totalSelectedNetWeight } = React.useMemo(() => {
         const lots = Object.values(selectedLots);
-        const bins = lots.reduce((sum, lot) => sum + lot.binCount, 0);
-        const weight = lots.reduce((sum, lot) => sum + (lot.binCount * (lot.netWeightPerBin || 0)), 0);
+        const bins = lots.reduce((sum, lot) => sum + (quantities[lot.id] || 0), 0);
+        const weight = lots.reduce((sum, lot) => sum + ((quantities[lot.id] || 0) * (lot.netWeightPerBin || 0)), 0);
         return { totalSelectedBins: bins, totalSelectedNetWeight: weight };
-    }, [selectedLots]);
+    }, [selectedLots, quantities]);
 
 
     return (
@@ -215,7 +262,7 @@ export function ManualDispatchTab({ exporters, loadingExporters, chamberLots, lo
                                 <TableHead>Lote</TableHead>
                                 <TableHead>Cámara</TableHead>
                                 <TableHead>Coord.</TableHead>
-                                <TableHead>Bins</TableHead>
+                                <TableHead className="w-24">Bins</TableHead>
                                 <TableHead className="hidden md:table-cell">Peso Neto/Bin</TableHead>
                                 <TableHead className="hidden md:table-cell">Productor</TableHead>
                                 <TableHead className="hidden md:table-cell">Variedad</TableHead>
@@ -236,7 +283,17 @@ export function ManualDispatchTab({ exporters, loadingExporters, chamberLots, lo
                                         <TableCell>{lot.displayLotId}</TableCell>
                                         <TableCell>{lot.chamberId}</TableCell>
                                         <TableCell>{lot.coordinate}</TableCell>
-                                        <TableCell>{lot.binCount}</TableCell>
+                                        <TableCell>
+                                            <Input
+                                                type="number"
+                                                className="h-8 w-20"
+                                                value={quantities[lot.id] ?? lot.binCount}
+                                                onChange={(e) => handleQuantityChange(lot.id, lot.binCount, e.target.value)}
+                                                disabled={!selectedLots[lot.id]}
+                                                min={0}
+                                                max={lot.binCount}
+                                            />
+                                        </TableCell>
                                         <TableCell className="hidden md:table-cell">{lot.netWeightPerBin ? `${lot.netWeightPerBin.toFixed(2)} kg` : '-'}</TableCell>
                                         <TableCell className="hidden md:table-cell">{lot.producerShortName}</TableCell>
                                         <TableCell className="hidden md:table-cell">{lot.variety}</TableCell>
@@ -261,5 +318,3 @@ export function ManualDispatchTab({ exporters, loadingExporters, chamberLots, lo
         </Card>
     );
 }
-
-    
