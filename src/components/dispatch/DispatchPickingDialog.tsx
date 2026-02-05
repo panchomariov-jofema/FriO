@@ -15,7 +15,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 import type { Dispatch } from '@/lib/types';
 import { ScrollArea } from '../ui/scroll-area';
-import { FileText } from 'lucide-react';
+import { FileText, Building } from 'lucide-react';
 import { naturalSort } from '@/lib/utils';
 import { Input } from '../ui/input';
 import jsPDF from 'jspdf';
@@ -138,6 +138,74 @@ export function DispatchPickingDialog({ dispatch, open, onOpenChange, onConfirmD
     doc.output('dataurlnewwindow');
 };
 
+const handleGenerateDTE = () => {
+    if (!dispatch) return;
+
+    const doc = new jsPDF();
+    const today = new Date();
+
+    // --- Header ---
+    doc.setFontSize(18);
+    doc.setFont('helvetica', 'bold');
+    doc.text(`Guía de Despacho Electrónica (SIMULACIÓN)`, doc.internal.pageSize.getWidth() / 2, 22, { align: 'center' });
+    
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Folio: (simulado) ${dispatch.id.substring(0, 8)}`, 190, 30, { align: 'right' });
+    doc.text(`Fecha: ${today.toLocaleDateString('es-CL')}`, 190, 35, { align: 'right' });
+
+    // --- Watermark ---
+    doc.setFontSize(50);
+    doc.setTextColor(220, 220, 220);
+    doc.text("DOCUMENTO DE MUESTRA", doc.internal.pageSize.getWidth() / 2, doc.internal.pageSize.getHeight() / 2, { align: 'center', angle: -45 });
+    doc.setTextColor(0, 0, 0);
+
+
+    // --- Client Info ---
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.text("Cliente:", 14, 50);
+    doc.setFont('helvetica', 'normal');
+    doc.text(dispatch.exporterName, 16, 57);
+    doc.text(`RUT: (Dato no disponible)`, 16, 64);
+    
+    doc.setFont('helvetica', 'bold');
+    doc.text("Destino:", 100, 50);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Packing (ID: ${dispatch.packingId || 'No especificado'})`, 102, 57);
+
+    // --- Table ---
+    const tableData = allItems.map(item => [
+      item.displayLotId,
+      item.chamberId,
+      item.coordinate,
+      quantities[item.chamberLotId] ?? item.binCount,
+    ]);
+    
+    const tableHeaders = [['Lote', 'Cámara', 'Coordenada', 'Bins']];
+
+    (doc as any).autoTable({
+      startY: 75,
+      head: tableHeaders,
+      body: tableData,
+      theme: 'grid',
+      headStyles: { fillColor: [22, 163, 74] },
+    });
+    
+    // --- Footer ---
+    const finalY = (doc as any).lastAutoTable.finalY;
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.text(`Total a Despachar: ${totalPickedBins} bins`, 14, finalY + 15);
+    
+    doc.setFontSize(8);
+    doc.setTextColor(150);
+    doc.text("Este documento es una simulación y no tiene validez tributaria.", 14, doc.internal.pageSize.getHeight() - 10);
+
+
+    doc.output('dataurlnewwindow');
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl">
@@ -192,10 +260,16 @@ export function DispatchPickingDialog({ dispatch, open, onOpenChange, onConfirmD
           </Table>
         </div>
         <DialogFooter className="sm:justify-between pt-4">
-           <Button variant="outline" onClick={handleGeneratePDF}>
-            <FileText className="mr-2 h-4 w-4" />
-            Generar PDF
-          </Button>
+           <div className="flex gap-2">
+               <Button variant="outline" onClick={handleGeneratePDF}>
+                <FileText className="mr-2 h-4 w-4" />
+                Generar Picking PDF
+              </Button>
+               <Button variant="outline" onClick={handleGenerateDTE}>
+                <Building className="mr-2 h-4 w-4" />
+                Generar DTE (sim)
+              </Button>
+          </div>
           <div className="flex gap-2">
             <DialogClose asChild>
               <Button type="button" variant="outline">Cancelar</Button>
