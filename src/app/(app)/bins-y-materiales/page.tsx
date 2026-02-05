@@ -4,7 +4,7 @@ import * as React from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
-import type { Exporter } from '@/lib/types';
+import type { Exporter, PendingDocument } from '@/lib/types';
 import { Label } from '@/components/ui/label';
 import { useProducersByExporter } from '@/hooks/use-producers-by-exporter';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -13,6 +13,9 @@ import { ExitsTab } from '@/components/bins-materials/ExitsTab';
 import { StockTab } from '@/components/bins-materials/StockTab';
 import { Checkbox } from '@/components/ui/checkbox';
 import { PendingDocsTab } from '@/components/bins-materials/PendingDocsTab';
+import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import { collection, query, where } from 'firebase/firestore';
+import { Badge } from '@/components/ui/badge';
 
 export default function BinsYMaterialesPage() {
   const [selectedExporterId, setSelectedExporterId] = React.useState<string | null>(null);
@@ -22,6 +25,16 @@ export default function BinsYMaterialesPage() {
 
   const { data: exporters, loading: loadingExporters } = useFirestoreCollection<Exporter>('exporters');
   const { data: producers, loading: loadingProducers } = useProducersByExporter(selectedExporterId);
+  const firestore = useFirestore();
+
+  const pendingDocsQuery = useMemoFirebase(() => {
+    if (!firestore) return null;
+    return query(collection(firestore, 'documentosPendientes'), where('estado', '==', 'PENDIENTE'));
+  }, [firestore]);
+
+  const { data: pendingDocs } = useCollection<PendingDocument>(pendingDocsQuery);
+
+  const pendingDocsCount = pendingDocs?.length || 0;
 
   const handleDirectDispatchChange = (checked: boolean) => {
     setIsDirectDispatch(checked);
@@ -107,7 +120,12 @@ export default function BinsYMaterialesPage() {
           <TabsList className="grid w-full grid-cols-4">
               <TabsTrigger value="entradas" disabled={!selectedExporterId || !selectedProducerId}>Entradas</TabsTrigger>
               <TabsTrigger value="salidas" disabled={!selectedExporterId || !selectedProducerId || isDirectDispatch}>Salidas</TabsTrigger>
-              <TabsTrigger value="documentos_pendientes">Documentos Pendientes</TabsTrigger>
+              <TabsTrigger value="documentos_pendientes" className="flex items-center gap-2">
+                Documentos Pendientes
+                {pendingDocsCount > 0 && (
+                  <Badge className="h-5 w-5 p-0 flex items-center justify-center">{pendingDocsCount}</Badge>
+                )}
+              </TabsTrigger>
               <TabsTrigger value="stock">Stock</TabsTrigger>
           </TabsList>
           <TabsContent value="entradas" className="mt-4">
