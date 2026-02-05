@@ -134,8 +134,8 @@ export default function LoginPage() {
         <CardHeader className="text-center">
           <div className="flex justify-center items-center mb-4">
             <div className="flex items-baseline gap-1">
-                <span className="font-bold text-4xl text-primary">Fri</span>
-                <Apple className="w-8 h-8 text-primary" />
+                <span className="font-bold text-5xl text-primary">Fri</span>
+                <Apple className="w-10 h-10 text-primary translate-y-1" />
             </div>
           </div>
           <CardTitle className="text-2xl">
