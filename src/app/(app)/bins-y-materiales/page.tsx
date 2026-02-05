@@ -12,6 +12,7 @@ import { EntriesTab } from '@/components/bins-materials/EntriesTab';
 import { ExitsTab } from '@/components/bins-materials/ExitsTab';
 import { StockTab } from '@/components/bins-materials/StockTab';
 import { Checkbox } from '@/components/ui/checkbox';
+import { PendingDocsTab } from '@/components/bins-materials/PendingDocsTab';
 
 export default function BinsYMaterialesPage() {
   const [selectedExporterId, setSelectedExporterId] = React.useState<string | null>(null);
@@ -103,9 +104,10 @@ export default function BinsYMaterialesPage() {
       </Card>
       
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
               <TabsTrigger value="entradas" disabled={!selectedExporterId || !selectedProducerId}>Entradas</TabsTrigger>
               <TabsTrigger value="salidas" disabled={!selectedExporterId || !selectedProducerId || isDirectDispatch}>Salidas</TabsTrigger>
+              <TabsTrigger value="documentos_pendientes">Documentos Pendientes</TabsTrigger>
               <TabsTrigger value="stock">Stock</TabsTrigger>
           </TabsList>
           <TabsContent value="entradas" className="mt-4">
@@ -138,6 +140,9 @@ export default function BinsYMaterialesPage() {
                     </CardContent>
                 </Card>
             )}
+          </TabsContent>
+          <TabsContent value="documentos_pendientes" className="mt-4">
+            <PendingDocsTab />
           </TabsContent>
           <TabsContent value="stock" className="mt-4">
               <StockTab exporterId={selectedExporterId} />
