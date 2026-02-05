@@ -67,9 +67,6 @@ const ProducerForm = ({ form, exporters }: { form: any; exporters: Exporter[] })
        <FormField control={form.control} name="rut" render={({ field }) => (
         <FormItem><FormLabel>RUT</FormLabel><FormControl><Input {...field} value={field.value ?? ''} autoComplete="off" /></FormControl><FormMessage /></FormItem>
       )} />
-       <FormField control={form.control} name="razon_social" render={({ field }) => (
-        <FormItem><FormLabel>Razón Social</FormLabel><FormControl><Input {...field} value={field.value ?? ''} autoComplete="off" /></FormControl><FormMessage /></FormItem>
-      )} />
       <FormField control={form.control} name="giro" render={({ field }) => (
         <FormItem><FormLabel>Giro</FormLabel><FormControl><Input {...field} value={field.value ?? ''} autoComplete="off" /></FormControl><FormMessage /></FormItem>
       )} />
@@ -286,7 +283,7 @@ export default function DatosMaestrosPage() {
               ]}
               RenderFormComponent={ProducerForm}
               docNameField="name"
-              csvHeaders={['producerId', 'shortName', 'name', 'exporterId', 'rut', 'razon_social', 'giro', 'direccion', 'comuna', 'ciudad']}
+              csvHeaders={['producerId', 'shortName', 'name', 'exporterId', 'rut', 'giro', 'direccion', 'comuna', 'ciudad']}
               csvTemplateFileName="plantilla_productores.csv"
               formProps={{ exporters: loadingExporters ? [] : exporters }}
             />

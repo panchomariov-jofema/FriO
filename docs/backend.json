@@ -51,10 +51,6 @@
           "type": "string",
           "description": "RUT of the producer."
         },
-        "razon_social": {
-          "type": "string",
-          "description": "Legal name of the producer."
-        },
         "giro": {
           "type": "string",
           "description": "Business activity of the producer."

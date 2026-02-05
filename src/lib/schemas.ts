@@ -12,7 +12,6 @@ export const producerSchema = z.object({
   name: z.string().min(1, 'El nombre es obligatorio'),
   exporterId: z.string().min(1, 'El ID de exportador es obligatorio'),
   rut: z.string().optional(),
-  razon_social: z.string().optional(),
   giro: z.string().optional(),
   direccion: z.string().optional(),
   comuna: z.string().optional(),

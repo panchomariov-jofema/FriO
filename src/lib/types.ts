@@ -16,7 +16,6 @@ export interface Producer {
   name: string;
   exporterId: string;
   rut?: string;
-  razon_social?: string;
   giro?: string;
   direccion?: string;
   comuna?: string;
