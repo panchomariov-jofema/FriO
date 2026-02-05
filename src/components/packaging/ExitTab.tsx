@@ -12,12 +12,13 @@ import { Button } from '@/components/ui/button';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
 import type { OtherClient, PackagingReception, PackagingMaster } from '@/lib/types';
 import { packagingExitSchema } from '@/lib/schemas';
-import { PlusCircle, Trash2 } from 'lucide-react';
+import { PlusCircle, Trash2, ScanLine } from 'lucide-react';
 import { useFirestore } from '@/firebase';
 import { addDoc, collection, doc, writeBatch, serverTimestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '../ui/alert-dialog';
 
 type ExitFormValues = z.infer<typeof packagingExitSchema>;
 
@@ -50,6 +51,10 @@ export function ExitTab() {
   });
 
   const selectedClientId = form.watch('clientId');
+  
+  // Scanner state
+  const [scanningIndex, setScanningIndex] = React.useState<number | null>(null);
+  const [scannedValue, setScannedValue] = React.useState('');
 
   const packagingClients = React.useMemo(() => {
     return [...new Map((allClients || []).filter(c => c.type.toLowerCase() === 'embalaje').map(item => [item.clientId, item])).values()];
@@ -145,6 +150,25 @@ export function ExitTab() {
       });
     }
   };
+  
+  // Scanner confirm handler
+  const handleScanConfirm = () => {
+    if (scanningIndex !== null) {
+        const master = clientPackagingMasters.find(m => m.code === scannedValue);
+        if (master) {
+            handleItemCodeChange(scanningIndex, scannedValue);
+        } else {
+            toast({
+                title: "Código no encontrado",
+                description: "El código de artículo escaneado no está en stock o no existe.",
+                variant: "destructive",
+            });
+        }
+        setScanningIndex(null);
+        setScannedValue('');
+    }
+  };
+
 
   const isLoading = loadingClients || loadingMasters || loadingReceptions;
 
@@ -197,16 +221,49 @@ export function ExitTab() {
                             render={({ field: itemField }) => (
                               <FormItem>
                                 <FormLabel>Código de Artículo</FormLabel>
-                                <Select onValueChange={(value) => handleItemCodeChange(index, value)} value={itemField.value} disabled={!selectedClientId || clientPackagingMasters.length === 0}>
-                                    <FormControl><SelectTrigger>
-                                        <SelectValue placeholder={!selectedClientId ? "Seleccione cliente" : "Seleccione un código"} />
-                                    </SelectTrigger></FormControl>
-                                    <SelectContent>
-                                      {clientPackagingMasters.map((m) => (
-                                          <SelectItem key={m.code} value={m.code}>{m.code} - {m.name}</SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                </Select>
+                                <div className="flex items-center gap-2">
+                                  <Select onValueChange={(value) => handleItemCodeChange(index, value)} value={itemField.value} disabled={!selectedClientId || clientPackagingMasters.length === 0}>
+                                      <FormControl><SelectTrigger>
+                                          <SelectValue placeholder={!selectedClientId ? "Seleccione cliente" : "Seleccione un código"} />
+                                      </SelectTrigger></FormControl>
+                                      <SelectContent>
+                                        {clientPackagingMasters.map((m) => (
+                                            <SelectItem key={m.code} value={m.code}>{m.code} - {m.name}</SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                  </Select>
+                                   <AlertDialog open={scanningIndex === index} onOpenChange={(isOpen) => { if (!isOpen) setScanningIndex(null); }}>
+                                    <AlertDialogTrigger asChild>
+                                      <Button type="button" variant="outline" size="icon" className="shrink-0" onClick={() => setScanningIndex(index)}>
+                                          <ScanLine className="h-4 w-4" />
+                                          <span className="sr-only">Escanear código</span>
+                                      </Button>
+                                    </AlertDialogTrigger>
+                                    <AlertDialogContent>
+                                      <AlertDialogHeader>
+                                        <AlertDialogTitle>Simulación de Escáner</AlertDialogTitle>
+                                        <AlertDialogDescription>
+                                          Ingrese el valor del código de barras.
+                                        </AlertDialogDescription>
+                                      </AlertDialogHeader>
+                                      <Input 
+                                          value={scannedValue} 
+                                          onChange={(e) => setScannedValue(e.target.value)} 
+                                          placeholder="Ingrese el valor del código de barras..."
+                                          onKeyDown={(e) => {
+                                              if (e.key === 'Enter') {
+                                                  e.preventDefault();
+                                                  handleScanConfirm();
+                                              }
+                                          }}
+                                      />
+                                      <AlertDialogFooter>
+                                        <AlertDialogCancel onClick={() => setScannedValue('')}>Cancelar</AlertDialogCancel>
+                                        <AlertDialogAction onClick={handleScanConfirm}>Aceptar</AlertDialogAction>
+                                      </AlertDialogFooter>
+                                    </AlertDialogContent>
+                                  </AlertDialog>
+                                </div>
                                 <FormMessage />
                               </FormItem>
                             )}
