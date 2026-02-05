@@ -3,7 +3,7 @@ import './globals.css';
 import { FirebaseClientProvider } from '@/firebase';
 
 export const metadata: Metadata = {
-  title: 'FÑO',
+  title: 'FriO',
   description: 'Gestión de frigorífico',
 };
 

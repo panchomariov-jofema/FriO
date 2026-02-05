@@ -141,7 +141,7 @@ export default function LoginPage() {
           <CardDescription>
             {isSignUp
               ? 'Ingrese sus datos para registrarse.'
-              : 'Bienvenido a FÑO.'}
+              : 'Bienvenido a FriO.'}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

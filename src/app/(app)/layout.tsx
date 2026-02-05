@@ -251,9 +251,10 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
           <SidebarHeader>
             <div className="flex items-center gap-2 p-2">
               <Apple className="w-8 h-8 text-primary" />
-              <span className="font-bold text-lg group-data-[collapsible=icon]:hidden">
-                FÑO
-              </span>
+              <div className="flex items-baseline group-data-[collapsible=icon]:hidden">
+                <span className="font-bold text-xl">Fri</span>
+                <Apple className="w-5 h-5 text-primary" />
+              </div>
             </div>
           </SidebarHeader>
           <SidebarContent>
@@ -262,7 +263,7 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
             </SidebarMenu>
           </SidebarContent>
           <SidebarFooter className='group-data-[collapsible=icon]:hidden'>
-            <p className="text-xs text-muted-foreground text-center">© 2024 FÑO</p>
+            <p className="text-xs text-muted-foreground text-center">© 2024 FriO</p>
           </SidebarFooter>
         </Sidebar>
         <SidebarInset>
