@@ -134,7 +134,7 @@ export default function LoginPage() {
       <Card className="w-full max-w-md bg-card/95 backdrop-blur-sm border-border/20">
         <CardHeader className="text-center">
           <div className="flex justify-center items-center mb-4">
-            <FrioLogo className="w-32 h-auto text-primary" />
+            <FrioLogo className="text-6xl text-primary" />
           </div>
           <CardTitle className="text-2xl">
             {isSignUp ? 'Crear una cuenta' : 'Iniciar Sesión'}

@@ -251,8 +251,8 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
         <Sidebar>
           <SidebarHeader>
             <div className="flex items-center justify-center p-2 h-14">
-               <FrioLogo className="w-24 h-auto text-primary group-data-[collapsible=icon]:hidden" />
-               <CustomAppleIcon className="w-10 h-10 text-primary hidden group-data-[collapsible=icon]:block" />
+               <FrioLogo className="text-4xl text-primary group-data-[collapsible=icon]:hidden" />
+               <CustomAppleIcon className="text-3xl h-10 w-10 text-primary hidden group-data-[collapsible=icon]:block" />
             </div>
           </SidebarHeader>
           <SidebarContent>

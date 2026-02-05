@@ -1,21 +1,14 @@
 import * as React from 'react';
+import { cn } from '@/lib/utils';
 
-export const CustomAppleIcon = React.forwardRef<SVGSVGElement, React.SVGProps<SVGSVGElement>>(
+export const CustomAppleIcon = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
     ({ className, ...props }, ref) => (
-    <svg
+    <div
         ref={ref}
-        viewBox="0 0 24 24"
-        fill="currentColor"
-        xmlns="http://www.w3.org/2000/svg"
-        className={className}
+        className={cn("flex items-center justify-center font-bold font-body", className)}
         {...props}
     >
-        <g transform="scale(1.2) translate(-2, -2)">
-            {/* The tilde/virgulilla path */}
-            <path d="M15,4 C16,2 18,2 19,4" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-            {/* The apple body path */}
-            <path d="M19.5,10.5C19.5,5.5,16,5,15,5.5C13.5,6,12,8,12,8C12,8,10.5,6,9,5.5C8,5,4.5,5.5,4.5,10.5C4.5,16.5,8,22,12,22C16,22,19.5,16.5,19.5,10.5Z" />
-        </g>
-    </svg>
+        F
+    </div>
 ));
 CustomAppleIcon.displayName = 'CustomAppleIcon';
