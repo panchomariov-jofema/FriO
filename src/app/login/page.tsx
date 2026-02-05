@@ -133,7 +133,7 @@ export default function LoginPage() {
       <Card className="w-full max-w-md bg-card/95 backdrop-blur-sm border-border/20">
         <CardHeader className="text-center">
           <div className="flex justify-center items-center mb-4">
-            <div className="flex items-center gap-1">
+            <div className="flex items-baseline gap-1">
                 <span className="font-bold text-4xl text-primary">Fri</span>
                 <Apple className="w-8 h-8 text-primary" />
             </div>

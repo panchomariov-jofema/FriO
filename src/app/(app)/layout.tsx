@@ -250,9 +250,9 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
         <Sidebar>
           <SidebarHeader>
             <div className="flex items-center justify-center p-2 h-14">
-              <div className="flex items-center gap-1">
-                <span className="font-bold text-xl group-data-[collapsible=icon]:hidden">Fri</span>
-                <Apple className="w-5 h-5 text-primary" />
+              <div className="flex items-baseline gap-1">
+                <span className="font-bold text-3xl group-data-[collapsible=icon]:hidden">Fri</span>
+                <Apple className="w-6 h-6 text-primary" />
               </div>
             </div>
           </SidebarHeader>
