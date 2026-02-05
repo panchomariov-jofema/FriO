@@ -437,50 +437,50 @@ function DespachosPageContent() {
 
   return (
     <div className="space-y-6">
-      {/* Summary Cards */}
-      <div className="relative">
-        <div className="absolute top-0 right-0 flex items-center space-x-2 z-10">
+      <div className="flex justify-end">
+        <div className="flex items-center space-x-2">
           <Switch id="cherry-filter" checked={showCherryOnly} onCheckedChange={setShowCherryOnly} />
           <Label htmlFor="cherry-filter">Solo Cereza</Label>
         </div>
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          <Card>
-            <CardHeader><CardTitle>Stock por Cámara</CardTitle></CardHeader>
-            <CardContent>
-              {loadingChamberLots || loadingOtherFruit ? <Skeleton className="h-20" /> : (
-                <ul className="space-y-1 text-sm">
-                  {Object.entries(binsPerChamber).map(([chamber, count]) => (
-                    <li key={chamber} className="flex justify-between"><span>{chamber}:</span><span className="font-semibold">{count} bins</span></li>
-                  ))}
-                </ul>
-              )}
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader><CardTitle>Stock por Exportador</CardTitle></CardHeader>
-            <CardContent>
-              {loadingChamberLots || loadingExporters || loadingOtherFruit ? <Skeleton className="h-20" /> : (
-                <ul className="space-y-1 text-sm">
-                  {Object.entries(binsPerExporter).map(([exporterKey, count]) => (
-                    <li key={exporterKey} className="flex justify-between"><span>{getExporterName(exporterKey)}:</span><span className="font-semibold">{count} bins</span></li>
-                  ))}
-                </ul>
-              )}
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader><CardTitle>Stock por Productor</CardTitle></CardHeader>
-            <CardContent>
-              {loadingChamberLots || loadingProducers ? <Skeleton className="h-20" /> : (
-                <ul className="space-y-1 text-sm max-h-48 overflow-y-auto">
-                  {Object.entries(binsPerProducer).map(([producerName, count]) => (
-                    <li key={producerName} className="flex justify-between"><span>{producerName}:</span><span className="font-semibold">{count} bins</span></li>
-                  ))}
-                </ul>
-              )}
-            </CardContent>
-          </Card>
-        </div>
+      </div>
+      {/* Summary Cards */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <Card>
+          <CardHeader><CardTitle>Stock por Cámara</CardTitle></CardHeader>
+          <CardContent>
+            {loadingChamberLots || loadingOtherFruit ? <Skeleton className="h-20" /> : (
+              <ul className="space-y-1 text-sm">
+                {Object.entries(binsPerChamber).map(([chamber, count]) => (
+                  <li key={chamber} className="flex justify-between"><span>{chamber}:</span><span className="font-semibold">{count} bins</span></li>
+                ))}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader><CardTitle>Stock por Exportador</CardTitle></CardHeader>
+          <CardContent>
+            {loadingChamberLots || loadingExporters || loadingOtherFruit ? <Skeleton className="h-20" /> : (
+              <ul className="space-y-1 text-sm">
+                {Object.entries(binsPerExporter).map(([exporterKey, count]) => (
+                  <li key={exporterKey} className="flex justify-between"><span>{getExporterName(exporterKey)}:</span><span className="font-semibold">{count} bins</span></li>
+                ))}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader><CardTitle>Stock por Productor</CardTitle></CardHeader>
+          <CardContent>
+            {loadingChamberLots || loadingProducers ? <Skeleton className="h-20" /> : (
+              <ul className="space-y-1 text-sm max-h-48 overflow-y-auto">
+                {Object.entries(binsPerProducer).map(([producerName, count]) => (
+                  <li key={producerName} className="flex justify-between"><span>{producerName}:</span><span className="font-semibold">{count} bins</span></li>
+                ))}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
       </div>
       
       <Tabs defaultValue="automatico" className="w-full">
