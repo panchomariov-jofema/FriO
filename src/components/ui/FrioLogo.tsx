@@ -10,7 +10,7 @@ export const FrioLogo = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HT
             {...props}
         >
             {/* Circle background */}
-            <div className="absolute w-[150%] h-[150%] top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-accent rounded-full"></div>
+            <div className="absolute w-[150%] h-[150%] top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-primary/20 rounded-full"></div>
             
             {/* The original logo content, sits on top */}
             <div className={cn("relative flex items-baseline justify-center tracking-tight")}>
