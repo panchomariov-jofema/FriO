@@ -108,16 +108,16 @@ export function ExitsTab({ exporterId, exporterName, producerId }: ExitsTabProps
       const changedItem = allItems[changedIndex];
 
       if (changedItem && changedItem.binMaterialCode === rules.binCode) {
-        const pivotQty = changedItem.quantity;
+        const pivotQty = Number(changedItem.quantity);
         
-        if (typeof pivotQty !== 'number' || isNaN(pivotQty)) return;
+        if (isNaN(pivotQty)) return;
 
         Object.entries(rules.related).forEach(([relatedCode, multiplier]) => {
           const relatedItemIndex = allItems.findIndex(item => item.binMaterialCode === relatedCode);
 
           if (relatedItemIndex !== -1) {
             const newVal = pivotQty * multiplier;
-            if (value.items[relatedItemIndex].quantity !== newVal) {
+            if (Number(form.getValues(`items.${relatedItemIndex}.quantity`)) !== newVal) {
               form.setValue(`items.${relatedItemIndex}.quantity`, newVal, { shouldValidate: true });
             }
           }
