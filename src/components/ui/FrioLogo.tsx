@@ -10,7 +10,7 @@ export const FrioLogo = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HT
             {...props}
         >
             <span>Fri</span>
-            <CustomAppleIcon className="h-[0.85em] w-[0.85em] -ml-[0.05em] " />
+            <CustomAppleIcon className="relative top-[0.1em] h-[0.85em] w-[0.85em] -ml-[0.05em]" />
         </div>
     )
 );
