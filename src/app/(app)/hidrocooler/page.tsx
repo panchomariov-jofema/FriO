@@ -363,6 +363,7 @@ function HidrocoolerPageContent() {
           open={isProcessDialogOpen}
           onOpenChange={setProcessDialogOpen}
           onProcess={handleStartProcessing}
+          processingLots={processingLots || []}
         />
       )}
 
