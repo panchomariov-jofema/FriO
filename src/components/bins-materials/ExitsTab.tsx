@@ -60,6 +60,16 @@ export function ExitsTab({ exporterId, producerId }: ExitsTabProps) {
     defaultValues: { document: '', driverName: '', driverRUT: '', items: [] },
   });
 
+  const getMultiplierLabel = (itemCode: string): string => {
+    const rules = calculationRules[exporterId];
+    if (!rules) return '';
+    const multiplier = rules.related[itemCode];
+    if (multiplier !== undefined) {
+        return ` (x${multiplier})`;
+    }
+    return '';
+  };
+
   const nextExitNumber = React.useMemo(() => {
     if (!movements) return 1;
     const exitMovements = movements.filter(m => m.type === 'salida' && m.document && !isNaN(parseInt(m.document, 10)));
@@ -286,7 +296,10 @@ export function ExitsTab({ exporterId, producerId }: ExitsTabProps) {
                         name={`items.${index}.quantity`}
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel className="text-base">{item.binMaterialName}</FormLabel>
+                            <FormLabel className="text-base">
+                                {item.binMaterialName}
+                                <span className="text-muted-foreground text-sm font-normal">{getMultiplierLabel(item.binMaterialCode)}</span>
+                            </FormLabel>
                             <FormControl>
                                 <Input type="number" {...field} value={field.value ?? ''} autoComplete="off" min="0" placeholder="Cantidad a retirar" className="h-12 text-lg" />
                             </FormControl>
@@ -320,7 +333,10 @@ export function ExitsTab({ exporterId, producerId }: ExitsTabProps) {
                                 ))
                             ) : formItems.map((item, index) => (
                                 <TableRow key={item.binMaterialId}>
-                                    <TableCell className="font-medium">{item.binMaterialName}</TableCell>
+                                    <TableCell className="font-medium">
+                                        {item.binMaterialName}
+                                        <span className="text-muted-foreground text-sm font-normal">{getMultiplierLabel(item.binMaterialCode)}</span>
+                                    </TableCell>
                                     <TableCell>
                                         <FormField
                                             control={form.control}

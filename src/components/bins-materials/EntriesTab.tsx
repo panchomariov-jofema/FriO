@@ -61,6 +61,16 @@ export function EntriesTab({ exporterId, producerId, isDirectDispatch }: Entries
     defaultValues: { document: '', driverName: '', driverRUT: '', packingId: undefined, items: [] },
   });
 
+  const getMultiplierLabel = (itemCode: string): string => {
+    const rules = calculationRules[exporterId];
+    if (!rules) return '';
+    const multiplier = rules.related[itemCode];
+    if (multiplier !== undefined) {
+        return ` (x${multiplier})`;
+    }
+    return '';
+  };
+
   React.useEffect(() => {
     if (materials.length > 0) {
       form.reset({
@@ -296,7 +306,10 @@ export function EntriesTab({ exporterId, producerId, isDirectDispatch }: Entries
                         name={`items.${index}.quantity`}
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel className="text-base">{item.binMaterialName}</FormLabel>
+                            <FormLabel className="text-base">
+                                {item.binMaterialName}
+                                <span className="text-muted-foreground text-sm font-normal">{getMultiplierLabel(item.binMaterialCode)}</span>
+                            </FormLabel>
                             <FormControl>
                                 <Input type="number" {...field} value={field.value ?? ''} autoComplete="off" min="0" placeholder="Cantidad" className="h-12 text-lg" />
                             </FormControl>
@@ -327,7 +340,10 @@ export function EntriesTab({ exporterId, producerId, isDirectDispatch }: Entries
                                 ))
                             ) : formItems.map((item, index) => (
                                 <TableRow key={item.binMaterialId}>
-                                    <TableCell className="font-medium">{item.binMaterialName}</TableCell>
+                                    <TableCell className="font-medium">
+                                      {item.binMaterialName}
+                                      <span className="text-muted-foreground text-sm font-normal">{getMultiplierLabel(item.binMaterialCode)}</span>
+                                    </TableCell>
                                     <TableCell>
                                         <FormField
                                             control={form.control}
