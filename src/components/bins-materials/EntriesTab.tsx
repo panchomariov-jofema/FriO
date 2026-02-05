@@ -39,6 +39,7 @@ type MovementFormValues = z.infer<typeof movementSchema>;
 
 interface EntriesTabProps {
   exporterId: string;
+  exporterName: string | null;
   producerId: string;
   isDirectDispatch: boolean;
 }
@@ -50,7 +51,7 @@ const calculationRules: Record<string, { binCode: string; related: Record<string
     'BLOSSOM': { binCode: '10011', related: { '10012': 24, '10013': 1 } }
 };
 
-export function EntriesTab({ exporterId, producerId, isDirectDispatch }: EntriesTabProps) {
+export function EntriesTab({ exporterId, exporterName, producerId, isDirectDispatch }: EntriesTabProps) {
   const { toast } = useToast();
   const firestore = useFirestore();
   const { materials, loading: loadingMaterials } = useBinMaterialsByExporter(exporterId);
@@ -62,7 +63,8 @@ export function EntriesTab({ exporterId, producerId, isDirectDispatch }: Entries
   });
 
   const getMultiplierLabel = (itemCode: string): string => {
-    const rules = calculationRules[exporterId];
+    if (!exporterName) return '';
+    const rules = calculationRules[exporterName];
     if (!rules) return '';
     const multiplier = rules.related[itemCode];
     if (multiplier !== undefined) {
@@ -93,8 +95,9 @@ export function EntriesTab({ exporterId, producerId, isDirectDispatch }: Entries
       if (!name || !name.startsWith('items.') || !name.endsWith('.quantity')) {
         return;
       }
-
-      const rules = calculationRules[exporterId];
+      
+      if (!exporterName) return;
+      const rules = calculationRules[exporterName];
       if (!rules) return;
 
       const allItems = value.items;
@@ -125,7 +128,7 @@ export function EntriesTab({ exporterId, producerId, isDirectDispatch }: Entries
     });
 
     return () => subscription.unsubscribe();
-  }, [form, exporterId]);
+  }, [form, exporterName]);
 
   const onSubmit = async (values: MovementFormValues) => {
     if (!firestore) return;

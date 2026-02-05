@@ -29,6 +29,11 @@ export default function BinsYMaterialesPage() {
     }
   };
 
+  const selectedExporterName = React.useMemo(() => {
+    if (!selectedExporterId || !exporters) return null;
+    return exporters.find(e => e.exporterId === selectedExporterId)?.name || null;
+  }, [selectedExporterId, exporters]);
+
   return (
     <div className="space-y-4">
       <Card>
@@ -107,6 +112,7 @@ export default function BinsYMaterialesPage() {
              {selectedExporterId && selectedProducerId ? (
                 <EntriesTab 
                   exporterId={selectedExporterId} 
+                  exporterName={selectedExporterName}
                   producerId={selectedProducerId} 
                   isDirectDispatch={isDirectDispatch} 
                 />
@@ -122,6 +128,7 @@ export default function BinsYMaterialesPage() {
               {selectedExporterId && selectedProducerId ? (
                 <ExitsTab 
                   exporterId={selectedExporterId}
+                  exporterName={selectedExporterName}
                   producerId={selectedProducerId} 
                 />
                ) : (

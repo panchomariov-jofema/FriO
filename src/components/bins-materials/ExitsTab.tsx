@@ -37,6 +37,7 @@ type MovementFormValues = z.infer<typeof movementSchema>;
 
 interface ExitsTabProps {
   exporterId: string;
+  exporterName: string | null;
   producerId: string;
 }
 
@@ -48,7 +49,7 @@ const calculationRules: Record<string, { binCode: string; related: Record<string
 };
 
 
-export function ExitsTab({ exporterId, producerId }: ExitsTabProps) {
+export function ExitsTab({ exporterId, exporterName, producerId }: ExitsTabProps) {
   const { toast } = useToast();
   const firestore = useFirestore();
   const { materials, loading: loadingMaterials } = useBinMaterialsByExporter(exporterId);
@@ -61,7 +62,8 @@ export function ExitsTab({ exporterId, producerId }: ExitsTabProps) {
   });
 
   const getMultiplierLabel = (itemCode: string): string => {
-    const rules = calculationRules[exporterId];
+    if (!exporterName) return '';
+    const rules = calculationRules[exporterName];
     if (!rules) return '';
     const multiplier = rules.related[itemCode];
     if (multiplier !== undefined) {
@@ -91,8 +93,9 @@ export function ExitsTab({ exporterId, producerId }: ExitsTabProps) {
       if (!name || !name.startsWith('items.') || !name.endsWith('.quantity')) {
         return;
       }
-
-      const rules = calculationRules[exporterId];
+      
+      if (!exporterName) return;
+      const rules = calculationRules[exporterName];
       if (!rules) return;
 
       const allItems = value.items;
@@ -123,7 +126,7 @@ export function ExitsTab({ exporterId, producerId }: ExitsTabProps) {
     });
 
     return () => subscription.unsubscribe();
-  }, [form, exporterId]);
+  }, [form, exporterName]);
 
   const getStockForMaterial = React.useCallback((binMaterialId: string) => {
     const stockItem = stockData.find(s => s.exporterId === exporterId && s.binMaterialId === binMaterialId);
