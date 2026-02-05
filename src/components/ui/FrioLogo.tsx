@@ -9,8 +9,8 @@ export const FrioLogo = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HT
             className={cn("flex items-baseline justify-center font-body font-bold tracking-tight", className)}
             {...props}
         >
-            <span>Fri</span>
-            <CustomAppleIcon className="relative top-[0.1em] h-[0.85em] w-[0.85em] -ml-[0.05em]" />
+            <span className="text-foreground">Fri</span>
+            <CustomAppleIcon className="text-primary relative top-[0.1em] h-[0.85em] w-[0.85em] -ml-[0.05em]" />
         </div>
     )
 );
