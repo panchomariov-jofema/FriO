@@ -148,17 +148,13 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
             typeof permission === 'string' ? permission : permission.name
         ));
         setActivePermissions(currentUserProfile.modulesAccess);
-    } else if (user.isAnonymous) {
-        // Guest user gets access to all modules for demo purposes
+    } else {
+        // Fallback for guest users or logged-in users without a profile: give access to all modules for demo purposes.
         const allModuleNames = navStructure.flatMap(item =>
             item.type === 'item' ? [item.label] : [item.label, ...item.items.map((sub: any) => sub.label)]
         );
         accessibleModuleNames = new Set(allModuleNames);
-        setActivePermissions(allModuleNames);
-    } else {
-        // Logged-in user with no profile found gets no access
-        accessibleModuleNames = new Set();
-        setActivePermissions([]);
+        setActivePermissions(allModuleNames as any);
     }
       
     const filterNavItems = (items: any[], accessibleNames: Set<string>): any[] => {
