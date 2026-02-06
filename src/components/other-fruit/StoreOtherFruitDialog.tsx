@@ -106,7 +106,7 @@ export function StoreOtherFruitDialog({ item, open, onOpenChange, onConfirm, all
     const emptyCoords = allPossibleCoords.filter(coord => !occupancyMap.has(coord));
     const currentSuggestion = emptyCoords.length > 0 ? emptyCoords[0] : null;
     
-    return { availableCoordinatesForNewLots: emptyCoords, suggestion: currentSuggestion };
+    return { availableCoordinates: emptyCoords, suggestion: currentSuggestion };
 
   }, [selectedChamberId, item, allReceptions, allChamberLots, chamberStrategies, form.watch('strategy')]);
 
@@ -215,8 +215,8 @@ export function StoreOtherFruitDialog({ item, open, onOpenChange, onConfirm, all
                     <Select onValueChange={field.onChange} value={field.value} disabled={!selectedChamberId}>
                         <FormControl><SelectTrigger><SelectValue placeholder={!selectedChamberId ? "Seleccione cámara" : "Seleccione..."} /></SelectTrigger></FormControl>
                         <SelectContent>
-                        {availableCoordinatesForNewLots.length > 0 ? (
-                            availableCoordinatesForNewLots.map(coord => (
+                        {availableCoordinates.length > 0 ? (
+                            availableCoordinates.map(coord => (
                             <SelectItem key={coord} value={coord}>{coord}</SelectItem>
                             ))
                         ) : (
