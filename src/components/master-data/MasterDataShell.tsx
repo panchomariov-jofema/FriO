@@ -87,7 +87,7 @@ interface MasterDataShellProps<T extends MasterData> {
 }
 
 const defaultProfiles = [
-  { profileId: 'MAESTRO', name: 'Maestro', modulesAccess: ['Dashboard', 'Bins y Materiales', 'Recepción', 'Hidrocooler', 'Cámaras', 'Despachos', 'Reportes', 'Embalajes', 'Socios Comerciales', 'Datos Maestros'] },
+  { profileId: 'MAESTRO', name: 'Maestro', modulesAccess: ['Dashboard', 'Bins y Materiales', 'Recepción', 'Hidrocooler', 'Cámaras', 'Despachos', 'Reportes', 'Embalajes', 'Socios Comerciales', 'Fall Creek', 'Datos Maestros'] },
   { profileId: 'EJECUTIVO', name: 'Ejecutivo', modulesAccess: ['Dashboard', 'Reportes'] },
   { profileId: 'EXP_SUBSOLE', name: 'Exportador Subsole', modulesAccess: [{ name: 'Dashboard', fixedExporterId: 'SUBSOLE' }] },
   { profileId: 'EXP_MEYER', name: 'Exportador Meyer', modulesAccess: [{ name: 'Dashboard', fixedExporterId: 'MEYER' }] },
@@ -96,7 +96,7 @@ const defaultProfiles = [
   { profileId: 'SUP_SUBSOLE', name: 'Supervisor Subsole', modulesAccess: ['Recepción', 'Despachos'] },
   { profileId: 'SUP_HIDRO', name: 'Supervisor Hidrocooler', modulesAccess: ['Hidrocooler'] },
   { profileId: 'GRUERO', name: 'Gruero', modulesAccess: ['Cámaras', { name: 'Embalajes', allowedTabs: ['almacenamiento'] }, { name: 'Socios Comerciales', allowedTabs: ['almacenamiento'] }] },
-  { profileId: 'JEF_LOG', name: 'Logística Facturación', modulesAccess: ['Dashboard', 'Bins y Materiales', 'Reportes'] },
+  { profileId: 'JEF_LOG', name: 'Jefe de Logística', modulesAccess: ['Dashboard', 'Bins y Materiales', 'Recepción', 'Hidrocooler', 'Cámaras', 'Despachos', 'Embalajes', 'Socios Comerciales', 'Fall Creek', 'Reportes'] },
 ];
 
 
@@ -241,7 +241,7 @@ export function MasterDataShell<T extends MasterData>({
     });
   };
   
-  const handleFileImport = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
@@ -280,6 +280,9 @@ export function MasterDataShell<T extends MasterData>({
           packings: 'name',
         };
         const keyField = keyFields[collectionName];
+        
+        const batch = writeBatch(firestore);
+        let operations = 0;
 
         for (let i = 1; i < lines.length; i++) {
             const values = lines[i].split(',').map(v => v.trim().replace(/"/g, ''));
@@ -306,12 +309,18 @@ export function MasterDataShell<T extends MasterData>({
                 }
         
                 if (existingDocRef) {
-                    await updateDoc(existingDocRef, validatedData);
+                    batch.update(existingDocRef, validatedData);
                 } else {
-                    const collRef = collection(firestore, collectionName);
-                    await addDoc(collRef, validatedData);
+                    const newDocRef = doc(collection(firestore, collectionName));
+                    batch.set(newDocRef, validatedData);
                 }
                 successCount++;
+                operations++;
+
+                if (operations >= 400) {
+                  await batch.commit();
+                  operations = 0;
+                }
 
             } catch (error) {
                 if (error instanceof z.ZodError) {
@@ -321,6 +330,10 @@ export function MasterDataShell<T extends MasterData>({
                     errors.push(`Línea ${i + 1}: Error al guardar en base de datos.`);
                 }
             }
+        }
+
+        if (operations > 0) {
+            await batch.commit();
         }
         
         toast({
