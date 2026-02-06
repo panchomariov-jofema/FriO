@@ -172,14 +172,6 @@ export function ManualDispatchTab({ exporters, loadingExporters, chamberLots, lo
                 bins: binsToDispatch,
             };
             
-            // Reserve the entire original lot. The picking dialog will handle splitting the remainder.
-            for (const lot of lotsToDispatch) {
-                if (quantities[lot.id] > 0) {
-                    const lotRef = doc(firestore, 'chamberLots', lot.id);
-                    batch.update(lotRef, { status: 'Despachado' });
-                }
-            }
-
             const dispatchRef = doc(collection(firestore, 'dispatches'));
             batch.set(dispatchRef, dispatchData);
 

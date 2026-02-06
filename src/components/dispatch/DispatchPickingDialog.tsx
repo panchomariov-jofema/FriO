@@ -29,9 +29,10 @@ interface DispatchPickingDialogProps {
   onOpenChange: (open: boolean) => void;
   onConfirmDispatch: (dispatch: Dispatch, quantities: Record<string, number>) => void;
   isConfirming: boolean;
+  isPickingMode?: boolean;
 }
 
-export function DispatchPickingDialog({ dispatch, open, onOpenChange, onConfirmDispatch, isConfirming }: DispatchPickingDialogProps) {
+export function DispatchPickingDialog({ dispatch, open, onOpenChange, onConfirmDispatch, isConfirming, isPickingMode = false }: DispatchPickingDialogProps) {
   const [pickedItems, setPickedItems] = React.useState<Record<string, boolean>>({});
   const [quantities, setQuantities] = React.useState<Record<string, number>>({});
   const { toast } = useToast();
@@ -224,6 +225,7 @@ const handleGenerateDTE = () => {
                       checked={selectAllState}
                       onCheckedChange={handleSelectAll}
                       aria-label="Seleccionar todo"
+                      disabled={!isPickingMode}
                     />
                 </TableHead>
                 <TableHead>Lote</TableHead>
@@ -239,6 +241,7 @@ const handleGenerateDTE = () => {
                      <Checkbox
                         checked={!!pickedItems[bin.chamberLotId]}
                         onCheckedChange={(checked) => handleItemCheck(bin.chamberLotId, !!checked)}
+                        disabled={!isPickingMode}
                       />
                   </TableCell>
                   <TableCell>{bin.displayLotId}</TableCell>
@@ -252,6 +255,7 @@ const handleGenerateDTE = () => {
                       max={bin.binCount}
                       min={0}
                       className="h-8 w-20"
+                      disabled={!isPickingMode}
                     />
                   </TableCell>
                 </TableRow>
@@ -274,9 +278,11 @@ const handleGenerateDTE = () => {
             <DialogClose asChild>
               <Button type="button" variant="outline">Cancelar</Button>
             </DialogClose>
-            <Button onClick={() => onConfirmDispatch(dispatch, quantities)} disabled={!allItemsPicked || isConfirming}>
-              {isConfirming ? 'Confirmando...' : 'Confirmar Salida'}
-            </Button>
+            {isPickingMode && (
+              <Button onClick={() => onConfirmDispatch(dispatch, quantities)} disabled={!allItemsPicked || isConfirming}>
+                {isConfirming ? 'Confirmando...' : 'Confirmar Salida'}
+              </Button>
+            )}
           </div>
         </DialogFooter>
       </DialogContent>

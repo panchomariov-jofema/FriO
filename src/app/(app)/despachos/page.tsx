@@ -47,7 +47,6 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { chambersConfig } from '@/lib/chambers-config';
 import { usePackingsByExporter } from '@/hooks/use-packings-by-exporter';
@@ -73,60 +72,23 @@ const dispatchSchema = z.object({
 type DispatchFormValues = z.infer<typeof dispatchSchema>;
 
 
-function convertToCSV(data: any[], headers: string[]) {
-    const headerRow = headers.join(';');
-    const rows = data.map(row => 
-        headers.map(header => {
-            let value = row[header];
-            if (value instanceof Date) {
-                value = value.toLocaleString();
-            } else if (typeof value === 'object' && value !== null && value?.toDate) {
-                value = value.toDate().toLocaleString();
-            }
-            const stringValue = String(value ?? '');
-            return `"${stringValue.replace(/"/g, '""')}"`;
-        }).join(';')
-    );
-    return [headerRow, ...rows].join('\n');
-}
-
-
-function downloadCSV(csvString: string, filename: string) {
-    const blob = new Blob([`\uFEFF${csvString}`], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    if (link.download !== undefined) {
-        const url = URL.createObjectURL(blob);
-        link.setAttribute('href', url);
-        link.setAttribute('download', filename);
-        link.style.visibility = 'hidden';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-    }
-}
-
-
 function DespachosPageContent() {
   const { data: exporters, loading: loadingExporters } = useFirestoreCollection<Exporter>('exporters');
   const { data: chamberLots, loading: loadingChamberLots } = useFirestoreCollection<ChamberLot>('chamberLots');
-  const { data: receptionLots, loading: loadingReceptionLots } = useFirestoreCollection<ReceptionLot>('receptionLots');
   const { data: producers, loading: loadingProducers } = useFirestoreCollection<Producer>('producers');
   const { data: otherFruitReceptions, loading: loadingOtherFruit } = useFirestoreCollection<OtherFruitReception>('otherFruitReceptions');
 
   const { user } = useUser();
   const firestore = useFirestore();
   const { toast } = useToast();
-  const [isConfirming, setIsConfirming] = React.useState(false);
   const [isUndoing, setIsUndoing] = React.useState(false);
-  const [pickingDispatch, setPickingDispatch] = React.useState<Dispatch | null>(null);
+  const [dispatchToView, setDispatchToView] = React.useState<Dispatch | null>(null);
   const [showOnlyPending, setShowOnlyPending] = React.useState(true);
   const [showCherryOnly, setShowCherryOnly] = React.useState(false);
   
   const dispatchesQuery = useMemoFirebase(() => {
     if (!firestore || !user) return null;
     const collRef = collection(firestore, 'dispatches');
-    // The query without orderBy is more stable and avoids needing composite indexes
-    // Sorting will be done on the client side.
     if (showOnlyPending) {
       return query(collRef, where('status', '==', 'Pendiente de Picking'));
     }
@@ -137,7 +99,6 @@ function DespachosPageContent() {
 
   const filteredDispatches = React.useMemo(() => {
     if (!dispatches) return [];
-    // Always sort by date on the client side
     return [...dispatches].sort((a,b) => (b.createdAt?.toMillis() ?? 0) - (a.createdAt?.toMillis() ?? 0));
   }, [dispatches]);
 
@@ -285,21 +246,12 @@ function DespachosPageContent() {
           bins: dispatchBinsPayload,
         };
   
-        const batch = writeBatch(firestore);
-
-        binsToDispatch.forEach(lot => {
-            const lotRef = doc(firestore, 'chamberLots', lot.id);
-            batch.update(lotRef, { status: 'Despachado' });
-        });
-
         const dispatchRef = doc(collection(firestore, 'dispatches'));
-        batch.set(dispatchRef, dispatchData);
-
-        await batch.commit();
+        await writeBatch(firestore).set(dispatchRef, dispatchData).commit();
         
         toast({
           title: 'Solicitud de Despacho Creada',
-          description: `Se ha creado una solicitud con ${accumulatedBins} bins para ${selectedExporter.name}.`,
+          description: `Se ha creado una solicitud con ${accumulatedBins} bins para ${selectedExporter.name}. La tarea está disponible en el módulo de Picking.`,
         });
         form.reset({ exporterId: undefined, packingId: undefined, maxBins: 0 });
   
@@ -316,100 +268,13 @@ function DespachosPageContent() {
     }
   };
 
-  const handleConfirmDispatch = async (dispatchToConfirm: Dispatch, pickedQuantities: Record<string, number>) => {
-    if (!firestore || !chamberLots) return;
-    setIsConfirming(true);
-
-    try {
-        const batch = writeBatch(firestore);
-        const chamberLotsCollectionRef = collection(firestore, 'chamberLots');
-
-        const finalBins: Dispatch['bins'] = [];
-        let finalTotalBins = 0;
-        let finalTotalNetWeight = 0;
-
-        for (const originalBin of dispatchToConfirm.bins) {
-            const pickedCount = pickedQuantities[originalBin.chamberLotId] ?? 0;
-            const originalCount = originalBin.binCount;
-            const remainder = originalCount - pickedCount;
-
-            const lotRef = doc(firestore, 'chamberLots', originalBin.chamberLotId);
-            batch.delete(lotRef);
-
-            if (remainder > 0) {
-                const originalLotData = chamberLots.find(l => l.id === originalBin.chamberLotId);
-                if (originalLotData) {
-                    const newLotData = {
-                        ...originalLotData,
-                        binCount: remainder,
-                        status: 'Almacenado' as const,
-                    };
-                    delete (newLotData as any).id;
-                    const newLotRef = doc(chamberLotsCollectionRef);
-                    batch.set(newLotRef, newLotData);
-                }
-            }
-
-            if (pickedCount > 0) {
-                const lotData = chamberLots.find(l => l.id === originalBin.chamberLotId);
-                finalTotalBins += pickedCount;
-                if (lotData?.netWeightPerBin) {
-                    finalTotalNetWeight += pickedCount * lotData.netWeightPerBin;
-                }
-                finalBins.push({ ...originalBin, binCount: pickedCount });
-            }
-        }
-        
-        const dispatchRef = doc(firestore, 'dispatches', dispatchToConfirm.id);
-        batch.update(dispatchRef, {
-            status: 'Completado',
-            bins: finalBins,
-            totalBins: finalTotalBins,
-            totalNetWeight: finalTotalNetWeight,
-        });
-
-        await batch.commit();
-
-        toast({
-            title: 'Éxito',
-            description: `Despacho para ${dispatchToConfirm.exporterName} completado.`,
-        });
-        setPickingDispatch(null);
-
-    } catch (e: any) {
-        console.error('Error confirming dispatch:', e);
-        toast({
-            variant: 'destructive',
-            title: 'Error',
-            description: 'Ocurrió un error al confirmar el despacho.',
-        });
-        errorEmitter.emit('permission-error', new FirestorePermissionError({
-            path: `dispatches/${dispatchToConfirm.id}`,
-            operation: 'update',
-        }));
-    } finally {
-        setIsConfirming(false);
-    }
-  };
-
   const handleUndoDispatch = async (dispatchToUndo: Dispatch) => {
     if (!firestore) return;
     setIsUndoing(true);
 
     try {
-      const batch = writeBatch(firestore);
-
-      // Revert status of chamber lots
-      dispatchToUndo.bins.forEach(bin => {
-        const lotRef = doc(firestore, 'chamberLots', bin.chamberLotId);
-        batch.update(lotRef, { status: 'Almacenado' });
-      });
-      
-      // Delete the dispatch document
       const dispatchRef = doc(firestore, 'dispatches', dispatchToUndo.id);
-      batch.delete(dispatchRef);
-
-      await batch.commit();
+      await deleteDoc(dispatchRef);
       
       toast({
         title: 'Solicitud Deshecha',
@@ -538,7 +403,7 @@ function DespachosPageContent() {
           <div className="flex justify-between items-center">
             <div>
               <CardTitle>Solicitudes de Despacho</CardTitle>
-              <CardDescription>Lista de solicitudes creadas.</CardDescription>
+              <CardDescription>Lista de solicitudes creadas. El picking se realiza en el módulo de Socios Comerciales.</CardDescription>
             </div>
             <div className="flex items-center space-x-2">
                 <Checkbox id="show-pending" checked={showOnlyPending} onCheckedChange={(checked) => setShowOnlyPending(!!checked)} />
@@ -572,28 +437,25 @@ function DespachosPageContent() {
                       <TableCell><Badge variant={dispatch.status === 'Completado' ? 'default' : 'secondary'}>{dispatch.status}</Badge></TableCell>
                       <TableCell className="text-right">
                         {dispatch.status === 'Pendiente de Picking' ? (
-                          <div className="flex justify-end gap-2">
-                            <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                    <Button variant="outline" size="sm">Deshacer</Button>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                    <AlertDialogHeader>
-                                        <AlertDialogTitle>¿Está seguro de deshacer esta solicitud?</AlertDialogTitle>
-                                        <AlertDialogDescription>Esta acción devolverá los lotes al stock disponible y eliminará la solicitud de despacho. No se puede revertir.</AlertDialogDescription>
-                                    </AlertDialogHeader>
-                                    <AlertDialogFooter>
-                                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                        <AlertDialogAction onClick={() => handleUndoDispatch(dispatch)} disabled={isUndoing}>
-                                            {isUndoing ? 'Deshaciendo...' : 'Sí, Deshacer'}
-                                        </AlertDialogAction>
-                                    </AlertDialogFooter>
-                                </AlertDialogContent>
-                            </AlertDialog>
-                            <Button size="sm" onClick={() => setPickingDispatch(dispatch)}>Hacer Picking</Button>
-                          </div>
+                          <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                  <Button variant="outline" size="sm">Deshacer</Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                      <AlertDialogTitle>¿Está seguro de deshacer esta solicitud?</AlertDialogTitle>
+                                      <AlertDialogDescription>Esta acción eliminará la solicitud de despacho. No se puede revertir.</AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                      <AlertDialogAction onClick={() => handleUndoDispatch(dispatch)} disabled={isUndoing}>
+                                          {isUndoing ? 'Deshaciendo...' : 'Sí, Deshacer'}
+                                      </AlertDialogAction>
+                                  </AlertDialogFooter>
+                              </AlertDialogContent>
+                          </AlertDialog>
                         ) : (
-                          <Button variant="outline" size="sm" onClick={() => setPickingDispatch(dispatch)}>Ver PDF</Button>
+                          <Button variant="outline" size="sm" onClick={() => setDispatchToView(dispatch)}>Ver PDF</Button>
                         )}
                       </TableCell>
                     </TableRow>
@@ -607,13 +469,14 @@ function DespachosPageContent() {
         </CardContent>
       </Card>
       
-      {pickingDispatch && (
+      {dispatchToView && (
         <DispatchPickingDialog 
-            dispatch={pickingDispatch}
-            open={!!pickingDispatch}
-            onOpenChange={(open) => !open && setPickingDispatch(null)}
-            onConfirmDispatch={handleConfirmDispatch}
-            isConfirming={isConfirming}
+            dispatch={dispatchToView}
+            open={!!dispatchToView}
+            onOpenChange={(open) => !open && setDispatchToView(null)}
+            onConfirmDispatch={() => {}} // No-op, just for viewing
+            isConfirming={false}
+            isPickingMode={false} // Important: Disables confirmation functionality
         />
       )}
     </div>
