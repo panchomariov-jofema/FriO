@@ -84,7 +84,7 @@ const defaultProfiles = [
   { profileId: 'SUP_SUBSOLE', name: 'Supervisor Subsole', modulesAccess: ['Recepción', 'Despachos'] },
   { profileId: 'SUP_HIDRO', name: 'Supervisor Hidrocooler', modulesAccess: ['Hidrocooler'] },
   { profileId: 'GRUERO', name: 'Gruero', modulesAccess: ['Cámaras', { name: 'Embalajes', allowedTabs: ['almacenamiento'] }, { name: 'Socios Comerciales', allowedTabs: ['almacenamiento'] }] },
-  { profileId: 'JEF_LOG', name: 'Jefe de Logística', modulesAccess: ['Dashboard', 'Bins y Materiales', 'Recepción', 'Hidrocooler', 'Cámaras', 'Despachos', 'Reportes', 'Embalajes', 'Socios Comerciales', 'Fall Creek'] },
+  { profileId: 'JEF_LOG', name: 'Jefe de Logística', modulesAccess: ["Dashboard", "Bins y Materiales", "Recepción", "Hidrocooler", "Cámaras", "Despachos", "Embalajes", "Socios Comerciales", "Fall Creek", "Reportes"] },
 ];
 
 
@@ -117,10 +117,7 @@ export function MasterDataShell<T extends MasterData>({
 
   const handleEdit = (item: T) => {
     setCurrentItem(item);
-    const itemData = typeof (item as any).modulesAccess === 'object' 
-        ? {...item, modulesAccess: JSON.stringify((item as any).modulesAccess)} 
-        : item;
-    form.reset(itemData);
+    form.reset(item);
   };
 
   const handleCancelEdit = () => {
@@ -136,15 +133,7 @@ export function MasterDataShell<T extends MasterData>({
   };
 
   const onSubmit = async (values: z.infer<typeof schema>) => {
-      // If modulesAccess exists and is a string, convert it to an array
       const dataToSave = {...values};
-      if (typeof dataToSave.modulesAccess === 'string') {
-        try {
-          dataToSave.modulesAccess = JSON.parse(dataToSave.modulesAccess);
-        } catch (e) {
-          dataToSave.modulesAccess = values.modulesAccess.split(',').map((s: string) => s.trim());
-        }
-      }
       
       if (currentItem?.id) { // --- UPDATE ---
         const docRef = doc(firestore, collectionName, currentItem.id);
