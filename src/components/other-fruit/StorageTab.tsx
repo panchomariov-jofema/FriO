@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -17,6 +16,8 @@ import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { useChamberStrategy } from '@/contexts/ChamberStrategyContext';
 import { StorePackagingDialog } from '../packaging/StorePackagingDialog';
+import { chambersConfig } from '@/lib/chambers-config';
+import { getPairedCoordinates, getSortedCoordinates } from '@/lib/utils';
 
 type PendingFruitItem = OtherFruitReceptionItem & {
     type: 'fruit';
@@ -91,10 +92,125 @@ export function OtherFruitStorageTab({ clientId: fixedClientId }: { clientId?: s
 
   const handleFruitStoreConfirm = async (data: { chamberId: string; coordinate: string; totalQuantity: number; quantityPerLocation: number; strategy: 'secuencial' | 'pareado' }) => {
     if (!selectedItem || selectedItem.type !== 'fruit' || !firestore) return;
-    // This logic is from the original OtherFruitStorageTab
-    // ... (omitted for brevity, assume it's complex and correct)
-    toast({ title: 'Almacenamiento de fruta aún no implementado en esta vista unificada.' });
-    setSelectedItem(null);
+
+    const { chamberId, coordinate: startCoordinate, totalQuantity, quantityPerLocation, strategy } = data;
+
+    const originalReception = otherFruitReceptions.find(r => r.id === selectedItem.receptionId);
+    if (!originalReception) {
+        toast({ title: "Error", description: "No se encontró la recepción original.", variant: "destructive" });
+        return;
+    }
+
+    const chamberConfig = chambersConfig[chamberId];
+    if (!chamberConfig) {
+        toast({ title: "Error", description: "Configuración de cámara no encontrada.", variant: "destructive" });
+        return;
+    }
+
+    // --- 1. Get available coordinates ---
+    const occupancyMap = new Map<string, number>();
+    (allChamberLots || []).forEach(l => {
+        if (l.status === 'Almacenado' && l.chamberId === chamberId && l.coordinate) {
+            occupancyMap.set(l.coordinate, (occupancyMap.get(l.coordinate) || 0) + l.binCount);
+        }
+    });
+    (otherFruitReceptions || []).forEach(r => {
+        r.items.forEach((item, index) => {
+            const isCurrentItem = r.id === selectedItem.receptionId && index === selectedItem.itemIndex;
+            if (isCurrentItem) return;
+
+            if (item.status === 'Almacenado' && item.storageLocation?.chamberId === chamberId && item.storageLocation.coordinate) {
+                const equivalentUnits = r.unit === 'Bins' ? item.quantity : item.quantity * 2;
+                occupancyMap.set(item.storageLocation.coordinate, (occupancyMap.get(item.storageLocation.coordinate) || 0) + equivalentUnits);
+            }
+        });
+    });
+
+    let allPossibleCoords;
+    if (strategy === 'pareado') {
+        allPossibleCoords = getPairedCoordinates(chamberConfig);
+    } else {
+        const globalStrategy = chamberStrategies[chamberId] || 'secuencial';
+        allPossibleCoords = getSortedCoordinates(chamberConfig, globalStrategy);
+    }
+    const availableCoords = allPossibleCoords.filter(coord => !occupancyMap.has(coord) && !chamberConfig.blocked?.includes(coord));
+
+    if (!availableCoords.includes(startCoordinate)) {
+        toast({ variant: 'destructive', title: 'Error de ubicación', description: `La coordenada de inicio (${startCoordinate}) no es válida o ya está ocupada.` });
+        return;
+    }
+    
+    // --- 2. Prepare updates ---
+    const receptionRef = doc(firestore, 'otherFruitReceptions', selectedItem.receptionId);
+    const originalPendingItem = originalReception.items[selectedItem.itemIndex];
+    
+    if (originalPendingItem.quantity < totalQuantity) {
+        toast({ variant: 'destructive', title: 'Cantidad Inválida', description: `No puede almacenar más de lo pendiente (${originalPendingItem.quantity}).`});
+        return;
+    }
+
+    const newStoredItems: OtherFruitReceptionItem[] = [];
+    let remainingToStore = totalQuantity;
+    const startIndex = availableCoords.indexOf(startCoordinate);
+    const coordsToFill = availableCoords.slice(startIndex);
+
+    for (const coord of coordsToFill) {
+        if (remainingToStore <= 0) break;
+        
+        const quantityForThisCoord = Math.min(remainingToStore, quantityPerLocation);
+
+        newStoredItems.push({
+            ...originalPendingItem,
+            quantity: quantityForThisCoord,
+            status: 'Almacenado',
+            storageLocation: {
+                chamberId,
+                coordinate: coord
+            },
+            storedAt: new Date(),
+        });
+        
+        remainingToStore -= quantityForThisCoord;
+    }
+
+    if (remainingToStore > 0) {
+        toast({ variant: 'destructive', title: 'Error de espacio', description: `No hay suficientes coordenadas disponibles para almacenar ${totalQuantity} ${selectedItem.unit}. Faltaron ${remainingToStore}.` });
+        return;
+    }
+
+    const remainingPendingQuantity = originalPendingItem.quantity - totalQuantity;
+    
+    const finalItemsArray = originalReception.items.filter((_, index) => index !== selectedItem.itemIndex);
+    if (remainingPendingQuantity > 0) {
+        finalItemsArray.push({
+            ...originalPendingItem,
+            quantity: remainingPendingQuantity,
+        });
+    }
+    finalItemsArray.push(...newStoredItems);
+    
+    const stillHasPending = finalItemsArray.some(item => item.status === 'Pendiente de almacenar' && item.quantity > 0);
+    const newStatus = stillHasPending ? 'Parcialmente Almacenado' : 'Almacenado';
+
+    const updateData = {
+        items: finalItemsArray,
+        status: newStatus,
+        updatedAt: serverTimestamp(),
+    };
+
+    try {
+        await updateDoc(receptionRef, updateData);
+        toast({ title: 'Éxito', description: `${totalQuantity} ${selectedItem.unit} almacenados en ${chamberConfig.name}.` });
+        setSelectedItem(null);
+    } catch (error) {
+        console.error("Error storing fruit item:", error);
+        toast({ variant: 'destructive', title: 'Error', description: 'No se pudo actualizar la ubicación.' });
+        errorEmitter.emit('permission-error', new FirestorePermissionError({
+            path: receptionRef.path,
+            operation: 'update',
+            requestResourceData: updateData
+        }));
+    }
   };
   
   const handlePackagingStoreConfirm = async (location: { warehouse: string; aisle: string; }) => {
