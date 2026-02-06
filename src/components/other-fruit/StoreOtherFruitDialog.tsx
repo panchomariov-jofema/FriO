@@ -106,7 +106,7 @@ export function StoreOtherFruitDialog({ item, open, onOpenChange, onConfirm, all
     const emptyCoords = allPossibleCoords.filter(coord => !occupancyMap.has(coord) && !chamberConfig.blocked?.includes(coord));
     const currentSuggestion = emptyCoords.length > 0 ? emptyCoords[0] : null;
     
-    return { availableCoordinates, suggestion: currentSuggestion };
+    return { availableCoordinates: emptyCoords, suggestion: currentSuggestion };
 
   }, [selectedChamberId, item, allReceptions, allChamberLots, chamberStrategies, form.watch('strategy')]);
 
