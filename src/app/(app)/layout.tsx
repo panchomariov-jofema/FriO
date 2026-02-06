@@ -121,7 +121,7 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
       return;
     }
       
-    let accessibleModuleNames: Set<string>;
+    let accessibleModuleNames: Set<string> = new Set();
     let currentUserProfile: Profile | null = null;
 
     if (!user.isAnonymous) {
@@ -144,16 +144,21 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
     }
     
     if (currentUserProfile) {
-         accessibleModuleNames = new Set(currentUserProfile.modulesAccess.map((permission: ModulePermission) => 
+        accessibleModuleNames = new Set(currentUserProfile.modulesAccess.map((permission: ModulePermission) =>
             typeof permission === 'string' ? permission : permission.name
         ));
         setActivePermissions(currentUserProfile.modulesAccess);
-    } else { // Anonymous or no profile found
-        const allModuleNames = navStructure.flatMap(item => 
+    } else if (user.isAnonymous) {
+        // Guest user gets access to all modules for demo purposes
+        const allModuleNames = navStructure.flatMap(item =>
             item.type === 'item' ? [item.label] : [item.label, ...item.items.map((sub: any) => sub.label)]
         );
         accessibleModuleNames = new Set(allModuleNames);
         setActivePermissions(allModuleNames);
+    } else {
+        // Logged-in user with no profile found gets no access
+        accessibleModuleNames = new Set();
+        setActivePermissions([]);
     }
       
     const filterNavItems = (items: any[], accessibleNames: Set<string>): any[] => {
