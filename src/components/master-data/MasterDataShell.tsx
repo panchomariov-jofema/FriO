@@ -96,6 +96,7 @@ const defaultProfiles = [
   { profileId: 'SUP_SUBSOLE', name: 'Supervisor Subsole', modulesAccess: ['Recepción', 'Despachos'] },
   { profileId: 'SUP_HIDRO', name: 'Supervisor Hidrocooler', modulesAccess: ['Hidrocooler'] },
   { profileId: 'GRUERO', name: 'Gruero', modulesAccess: ['Cámaras', { name: 'Embalajes', allowedTabs: ['almacenamiento'] }, { name: 'Socios Comerciales', allowedTabs: ['almacenamiento'] }] },
+  { profileId: 'FEF_LOG', name: 'Logística Facturación', modulesAccess: ['Dashboard', 'Bins y Materiales', 'Reportes'] },
 ];
 
 
