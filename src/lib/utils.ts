@@ -26,15 +26,12 @@ export const getSortedCoordinates = (chamberConfig: Chamber, strategy?: 'secuenc
     const coords: string[] = [];
     chamberConfig.columns.forEach((col, colIndex) => {
       const isOddColumn = colIndex % 2 !== 0;
-      // Create a mutable copy of rows that are not blocked
-      const availableRows = [...chamberConfig.rows].filter(row => !chamberConfig.blocked?.includes(`${col.name}${row}`));
       
-      if (isOddColumn) {
-        // For odd columns (B, D, F...), reverse the order of rows to go from top to bottom visually (e.g., 12, 11, ... 1)
-        availableRows.reverse();
-      }
+      const unblockedRows = chamberConfig.rows.filter(row => !chamberConfig.blocked?.includes(`${col.name}${row}`));
+      
+      const rowsToIterate = isOddColumn ? [...unblockedRows].reverse() : unblockedRows;
 
-      availableRows.forEach(row => {
+      rowsToIterate.forEach(row => {
         coords.push(`${col.name}${row}`);
       });
     });
