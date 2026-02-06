@@ -72,29 +72,43 @@ export function StoreOtherFruitDialog({ item, open, onOpenChange, onConfirm, all
       return { availableCoordinates: [], suggestion: null };
     }
 
-    const occupiedCoords = new Set<string>();
+    const occupancyMap = new Map<string, { lots: {displayLotId: string, binCount: number }[] }>();
     (allChamberLots || []).forEach(lot => {
         if (lot.status === 'Almacenado' && lot.chamberId === selectedChamberId && lot.coordinate && lot.binCount > 0) {
-          occupiedCoords.add(lot.coordinate);
+          if (!occupancyMap.has(lot.coordinate)) {
+            occupancyMap.set(lot.coordinate, { lots: [] });
+          }
+          occupancyMap.get(lot.coordinate)!.lots.push({ displayLotId: lot.displayLotId, binCount: lot.binCount });
         }
     });
     (allReceptions || []).forEach(reception => {
         reception.items.forEach(storedItem => {
             if (storedItem.status === 'Almacenado' && storedItem.storageLocation?.chamberId === selectedChamberId && storedItem.storageLocation.coordinate && storedItem.quantity > 0) {
-                occupiedCoords.add(storedItem.storageLocation.coordinate);
+                const lotId = `other_${reception.id}_${storedItem.productCode}`;
+                if (!occupancyMap.has(storedItem.storageLocation.coordinate)) {
+                    occupancyMap.set(storedItem.storageLocation.coordinate, { lots: [] });
+                }
+                occupancyMap.get(storedItem.storageLocation.coordinate)!.lots.push({ displayLotId: lotId, binCount: 9 });
             }
         });
     });
-    
-    const sortFunction = selectedStrategy === 'pareado' ? getPairedCoordinates : getSortedCoordinates;
-    const allPossibleCoords = sortFunction(chamberConfig);
-    
-    const availableCoords = allPossibleCoords.filter(coord => !occupiedCoords.has(coord));
-    const currentSuggestion = availableCoords.length > 0 ? availableCoords[0] : null;
-    
-    return { availableCoordinates: availableCoords, suggestion: currentSuggestion };
 
-  }, [selectedChamberId, item, allReceptions, allChamberLots, selectedStrategy]);
+    const globalStrategy = chamberStrategies[selectedChamberId] || 'secuencial';
+    const formStrategy = form.getValues('strategy'); // This is for 'pareado' override
+
+    let allPossibleCoords;
+    if (formStrategy === 'pareado') {
+      allPossibleCoords = getPairedCoordinates(chamberConfig);
+    } else {
+      allPossibleCoords = getSortedCoordinates(chamberConfig, globalStrategy);
+    }
+    
+    const emptyCoords = allPossibleCoords.filter(coord => !occupancyMap.has(coord));
+    const currentSuggestion = emptyCoords.length > 0 ? emptyCoords[0] : null;
+    
+    return { availableCoordinatesForNewLots: emptyCoords, suggestion: currentSuggestion };
+
+  }, [selectedChamberId, item, allReceptions, allChamberLots, chamberStrategies, form.watch('strategy')]);
 
   useEffect(() => {
     if (open && item) {
@@ -201,8 +215,8 @@ export function StoreOtherFruitDialog({ item, open, onOpenChange, onConfirm, all
                     <Select onValueChange={field.onChange} value={field.value} disabled={!selectedChamberId}>
                         <FormControl><SelectTrigger><SelectValue placeholder={!selectedChamberId ? "Seleccione cámara" : "Seleccione..."} /></SelectTrigger></FormControl>
                         <SelectContent>
-                        {availableCoordinates.length > 0 ? (
-                            availableCoordinates.map(coord => (
+                        {availableCoordinatesForNewLots.length > 0 ? (
+                            availableCoordinatesForNewLots.map(coord => (
                             <SelectItem key={coord} value={coord}>{coord}</SelectItem>
                             ))
                         ) : (

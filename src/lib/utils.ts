@@ -20,16 +20,33 @@ export const naturalSort = (a: string, b: string) => {
   return aNum - bNum;
 };
 
-// Sequential / "Snake" (FIFO) layout.
-export const getSortedCoordinates = (chamberConfig: Chamber): string[] => {
-  // Returns A1, A2... B1, B2...
+// Sequential or "Snake" (FIFO) layout.
+export const getSortedCoordinates = (chamberConfig: Chamber, strategy?: 'secuencial' | 'fifo'): string[] => {
+  if (strategy === 'fifo') {
+    const coords: string[] = [];
+    chamberConfig.columns.forEach((col, colIndex) => {
+      const rows = [...chamberConfig.rows]; // Create a mutable copy
+      if (colIndex % 2 !== 0) { // Odd-indexed columns (B, D, F...) are reversed based on visual layout
+        rows.reverse();
+      }
+      rows.forEach(row => {
+        const coord = `${col.name}${row}`;
+        if (!chamberConfig.blocked?.includes(coord)) {
+          coords.push(coord);
+        }
+      });
+    });
+    return coords;
+  }
+  
+  // Default to sequential column-by-column sort
   return chamberConfig.columns
     .flatMap(col => chamberConfig.rows.map(row => `${col.name}${row}`))
     .filter(coord => !chamberConfig.blocked?.includes(coord))
     .sort(naturalSort);
 };
 
-// New Paired / Z-pattern layout for Fall Creek
+// Paired / Z-pattern layout for Fall Creek
 export const getPairedCoordinates = (chamberConfig: Chamber): string[] => {
     const coords: string[] = [];
     const columns = chamberConfig.columns.map(c => c.name);
