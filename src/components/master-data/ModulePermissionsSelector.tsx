@@ -43,11 +43,32 @@ const ALL_MODULES_CONFIG = [
 ];
 
 interface ModulePermissionsSelectorProps {
-  value: ModulePermission[];
+  value: ModulePermission[] | string; // Allow string to handle bad data
   onChange: (value: ModulePermission[]) => void;
 }
 
-export function ModulePermissionsSelector({ value: selectedPermissions, onChange }: ModulePermissionsSelectorProps) {
+export function ModulePermissionsSelector({ value, onChange }: ModulePermissionsSelectorProps) {
+  // Defensively ensure `selectedPermissions` is always an array.
+  let selectedPermissions: ModulePermission[];
+  if (Array.isArray(value)) {
+    selectedPermissions = value;
+  } else if (typeof value === 'string') {
+    try {
+      // It might be a JSON stringified array
+      const parsed = JSON.parse(value);
+      selectedPermissions = Array.isArray(parsed) ? parsed : [];
+    } catch (e) {
+      // It might be a comma-separated string
+      if (value) {
+        selectedPermissions = value.split(',').map(s => s.trim());
+      } else {
+        selectedPermissions = [];
+      }
+    }
+  } else {
+    selectedPermissions = [];
+  }
+
 
   const handleParentChange = (moduleId: string, subModules: { id: string, label: string }[] | undefined, checked: boolean) => {
     let newPermissions = [...selectedPermissions];
@@ -55,7 +76,7 @@ export function ModulePermissionsSelector({ value: selectedPermissions, onChange
     // Remove existing simple string or object for this module
     newPermissions = newPermissions.filter(p => {
         if (typeof p === 'string') return p !== moduleId;
-        if (typeof p === 'object' && 'name' in p) return p.name !== moduleId;
+        if (typeof p === 'object' && p !== null && 'name' in p) return p.name !== moduleId;
         return true;
     });
 
@@ -74,7 +95,7 @@ export function ModulePermissionsSelector({ value: selectedPermissions, onChange
   const handleChildChange = (parentId: string, subModuleId: string, checked: boolean) => {
     let newPermissions = [...selectedPermissions];
     
-    const parentPermission = newPermissions.find(p => typeof p === 'object' && 'name' in p && p.name === parentId);
+    const parentPermission = newPermissions.find(p => typeof p === 'object' && p !== null && 'name' in p && p.name === parentId);
     
     if (parentPermission && typeof parentPermission === 'object' && 'allowedTabs' in parentPermission) {
         let newTabs = parentPermission.allowedTabs ? [...parentPermission.allowedTabs] : [];
@@ -86,11 +107,11 @@ export function ModulePermissionsSelector({ value: selectedPermissions, onChange
 
         if (newTabs.length === 0) {
             // If no tabs are selected, remove the parent object entirely
-            newPermissions = newPermissions.filter(p => (typeof p === 'object' && 'name' in p) ? p.name !== parentId : true);
+            newPermissions = newPermissions.filter(p => (typeof p === 'object' && p !== null && 'name' in p) ? p.name !== parentId : true);
         } else {
             // Update the parent object with new tabs
             newPermissions = newPermissions.map(p => 
-                (typeof p === 'object' && 'name' in p && p.name === parentId) 
+                (typeof p === 'object' && p !== null && 'name' in p && p.name === parentId) 
                 ? { ...p, allowedTabs: newTabs } 
                 : p
             );
@@ -111,14 +132,14 @@ export function ModulePermissionsSelector({ value: selectedPermissions, onChange
 
                     const parentPermission = selectedPermissions.find(p => {
                         if (typeof p === 'string') return p === module.id;
-                        if (typeof p === 'object' && 'name' in p) return p.name === module.id;
+                        if (typeof p === 'object' && p !== null && 'name' in p) return p.name === module.id;
                         return false;
                     });
                     
                     let isParentChecked = !!parentPermission;
                     let isIndeterminate = false;
 
-                    if (module.subModules && typeof parentPermission === 'object' && 'allowedTabs' in parentPermission) {
+                    if (module.subModules && typeof parentPermission === 'object' && parentPermission !== null && 'allowedTabs' in parentPermission) {
                         const selectedTabsCount = parentPermission.allowedTabs?.length || 0;
                         if (selectedTabsCount > 0 && selectedTabsCount < module.subModules.length) {
                             isIndeterminate = true;
@@ -154,6 +175,7 @@ export function ModulePermissionsSelector({ value: selectedPermissions, onChange
                                         {module.subModules.map(subModule => {
                                             const isChildChecked = 
                                                 typeof parentPermission === 'object' && 
+                                                parentPermission !== null &&
                                                 'allowedTabs' in parentPermission &&
                                                 Array.isArray(parentPermission.allowedTabs) &&
                                                 parentPermission.allowedTabs.includes(subModule.id);
