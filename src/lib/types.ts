@@ -150,7 +150,8 @@ export type ModulePermission =
   | string 
   | { name: 'Dashboard', fixedExporterId: string }
   | { name: 'Embalajes', allowedTabs: string[] }
-  | { name: 'Socios Comerciales', allowedTabs: string[] };
+  | { name: 'Socios Comerciales', allowedTabs: string[] }
+  | { name: 'Bins y Materiales', allowedTabs: string[] };
 
 export interface Profile {
   id: string;

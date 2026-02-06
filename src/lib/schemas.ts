@@ -107,6 +107,10 @@ const modulePermissionSchema = z.union([
   z.object({
       name: z.literal('Socios Comerciales'),
       allowedTabs: z.array(z.string())
+  }),
+  z.object({
+    name: z.literal('Bins y Materiales'),
+    allowedTabs: z.array(z.string())
   })
 ]);
 

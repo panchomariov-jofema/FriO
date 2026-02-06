@@ -10,7 +10,16 @@ import { Card, CardContent } from '../ui/card';
 // This structure should match the available modules and their sub-modules (tabs)
 const ALL_MODULES_CONFIG = [
     { id: 'Dashboard', label: 'Dashboard' },
-    { id: 'Bins y Materiales', label: 'Bins y Materiales' },
+    {
+        id: 'Bins y Materiales',
+        label: 'Bins y Materiales',
+        subModules: [
+            { id: 'entradas', label: 'Entradas' },
+            { id: 'salidas', label: 'Salidas' },
+            { id: 'documentos_pendientes', label: 'Documentos Pendientes' },
+            { id: 'stock', label: 'Stock' },
+        ],
+    },
     { id: 'Recepción', label: 'Recepción' },
     { id: 'Hidrocooler', label: 'Hidrocooler' },
     { id: 'Cámaras', label: 'Cámaras' },
@@ -54,11 +63,11 @@ export function ModulePermissionsSelector({ value, onChange }: ModulePermissions
     selectedPermissions = value;
   } else if (typeof value === 'string') {
     try {
-      // It might be a JSON stringified array
+      // First, try to parse it as JSON, which is how it might be stored.
       const parsed = JSON.parse(value);
       selectedPermissions = Array.isArray(parsed) ? parsed : [];
     } catch (e) {
-      // It might be a comma-separated string
+      // If it's not JSON, assume it's a comma-separated string.
       if (value) {
         selectedPermissions = value.split(',').map(s => s.trim());
       } else {
@@ -83,7 +92,7 @@ export function ModulePermissionsSelector({ value, onChange }: ModulePermissions
     if (checked) {
         if (subModules) {
             // Add as an object with all sub-modules
-            newPermissions.push({ name: moduleId as 'Embalajes' | 'Socios Comerciales', allowedTabs: subModules.map(sm => sm.id) });
+            newPermissions.push({ name: moduleId as any, allowedTabs: subModules.map(sm => sm.id) });
         } else {
             // Add as a simple string
             newPermissions.push(moduleId);
@@ -118,7 +127,7 @@ export function ModulePermissionsSelector({ value, onChange }: ModulePermissions
         }
     } else if (checked) {
         // Parent doesn't exist, create it with this one submodule
-         newPermissions.push({ name: parentId as 'Embalajes' | 'Socios Comerciales', allowedTabs: [subModuleId] });
+         newPermissions.push({ name: parentId as any, allowedTabs: [subModuleId] });
     }
 
     onChange(newPermissions);
