@@ -194,7 +194,7 @@ export default function CamarasPage() {
             if (item.unit === 'Bins') {
                 return sum + item.quantity;
             } else if (item.unit === 'Pallets') {
-                return sum + (item.quantity * 2); // 1 pallet = 2 bins
+                return sum + item.quantity; // FIX: Pallets now count as 1 unit for occupancy, not 2.
             }
             return sum;
         }, 0);

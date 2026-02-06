@@ -443,7 +443,7 @@ export default function DashboardPage() {
             .filter(item => item.unit === 'Pallets')
             .reduce((sum, item) => sum + item.quantity, 0);
         
-        const calculatedTotalBinsInStock = producerFruitBinsInStock + otherFruitBins + (otherFruitPallets * 2);
+        const calculatedTotalBinsInStock = producerFruitBinsInStock + otherFruitBins + otherFruitPallets;
 
         const producerPendingStorage = finalChamberLots
             .filter(lot => lot.status === 'Pendiente por Almacenar')
@@ -511,7 +511,7 @@ export default function DashboardPage() {
                 .filter(item => item.unit === 'Pallets')
                 .reduce((sum, item) => sum + item.quantity, 0);
             
-            const occupiedEquivalentBins = binsInChamber + otherBins + (otherPallets * 2);
+            const occupiedEquivalentBins = binsInChamber + otherBins + otherPallets;
 
             return {
                 name: chamber.name,
@@ -636,7 +636,7 @@ export default function DashboardPage() {
 
         clientReceptions.forEach(reception => {
             reception.items.forEach(item => {
-                const equivalentBins = reception.unit === 'Pallets' ? item.quantity * 2 : item.quantity;
+                const equivalentBins = item.quantity;
                 if (item.status === 'Almacenado' && item.quantity > 0) {
                     if (!quantityByProduct[item.productName]) {
                         quantityByProduct[item.productName] = { name: item.productName, quantity: 0, unit: reception.unit };
