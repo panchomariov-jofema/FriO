@@ -1,8 +1,9 @@
+
 'use client';
 
 import * as React from 'react';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
-import type { OtherFruitMovement, OtherFruitReception, OtherClient, OtherFruitMovementLocation } from '@/lib/types';
+import type { OtherFruitMovement, OtherFruitReception, OtherClient, OtherFruitMovementLocation, PackagingMovement, PackagingReception } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -14,71 +15,87 @@ import { doc, writeBatch, serverTimestamp } from 'firebase/firestore';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { OtherFruitPickingDialog } from './OtherFruitPickingDialog';
+import { PackagingPickingDialog } from '../packaging/PackagingPickingDialog';
+import { packagingExitSchema } from '@/lib/schemas';
+import { z } from 'zod';
+
+type ExitFormValues = z.infer<typeof packagingExitSchema>;
+
+type ConsolidatedMovement = (OtherFruitMovement & { taskType: 'fruit' }) | (PackagingMovement & { taskType: 'packaging' });
 
 export function OtherFruitPickingTab() {
-  const { data: allMovements, loading: loadingMovements } = useFirestoreCollection<OtherFruitMovement>('otherFruitMovements');
-  const { data: allReceptions, loading: loadingReceptions } = useFirestoreCollection<OtherFruitReception>('otherFruitReceptions');
+  const { data: otherFruitMovements, loading: loadingFruitMovements } = useFirestoreCollection<OtherFruitMovement>('otherFruitMovements');
+  const { data: packagingMovements, loading: loadingPackagingMovements } = useFirestoreCollection<PackagingMovement>('packagingMovements');
+  const { data: allReceptions, loading: loadingReceptions } = useFirestoreCollection<PackagingReception>('packagingReceptions');
   const { data: allClients, loading: loadingClients } = useFirestoreCollection<OtherClient>('otherClients');
   const firestore = useFirestore();
   const { toast } = useToast();
 
-  const [pickingMovement, setPickingMovement] = React.useState<OtherFruitMovement | null>(null);
+  const [pickingMovement, setPickingMovement] = React.useState<ConsolidatedMovement | null>(null);
   const [isConfirming, setIsConfirming] = React.useState(false);
 
-  const pendingMovements = React.useMemo(() => {
-    return (allMovements || [])
+  const pendingMovements = React.useMemo((): ConsolidatedMovement[] => {
+    const fruitTasks: ConsolidatedMovement[] = (otherFruitMovements || [])
       .filter(m => m.type === 'salida' && m.status === 'Pendiente de Picking')
+      .map(m => ({ ...m, taskType: 'fruit' }));
+
+    const packagingTasks: ConsolidatedMovement[] = (packagingMovements || [])
+      .filter(m => m.type === 'salida' && m.status === 'Pendiente de Picking')
+      .map(m => ({ ...m, taskType: 'packaging' }));
+
+    return [...fruitTasks, ...packagingTasks]
       .sort((a, b) => (b.createdAt?.toMillis() ?? 0) - (a.createdAt?.toMillis() ?? 0));
-  }, [allMovements]);
+  }, [otherFruitMovements, packagingMovements]);
+
+  const clientMap = React.useMemo(() => {
+    return (allClients || []).reduce((acc, client) => {
+        acc[client.clientId] = client.name;
+        return acc;
+    }, {} as Record<string,string>)
+  }, [allClients]);
   
-  const handleStartPicking = (movement: OtherFruitMovement) => {
+  const handleStartPicking = (movement: ConsolidatedMovement) => {
     setPickingMovement(movement);
   };
   
-  const handleConfirmExit = async (confirmedMovement: OtherFruitMovement) => {
+  const handleConfirmFruitExit = async (confirmedMovement: OtherFruitMovement) => {
     if (!firestore || !confirmedMovement) return;
     setIsConfirming(true);
 
     try {
         const batch = writeBatch(firestore);
         
-        // 1. Update the status of the OtherFruitMovement document
         const movementRef = doc(firestore, 'otherFruitMovements', confirmedMovement.id);
         batch.update(movementRef, { 
             status: 'Completado',
-            items: confirmedMovement.items, // Update items with actual picked quantities
+            items: confirmedMovement.items,
         });
 
-        // 2. Group updates by receptionId to correctly update stock
-        const updatesByReceptionId: Record<string, OtherFruitMovementLocation[]> = {};
+        const receptionUpdates = new Map<string, { ref: any, items: any[] }>();
         (confirmedMovement.locations || []).forEach(loc => {
-            if (!updatesByReceptionId[loc.receptionId]) {
-                updatesByReceptionId[loc.receptionId] = [];
+            if (!receptionUpdates.has(loc.receptionId)) {
+                const receptionDoc = allReceptions.find(r => r.id === loc.receptionId);
+                if (receptionDoc) {
+                    receptionUpdates.set(loc.receptionId, {
+                        ref: doc(firestore, 'otherFruitReceptions', loc.receptionId),
+                        items: JSON.parse(JSON.stringify(receptionDoc.items))
+                    });
+                }
             }
-            updatesByReceptionId[loc.receptionId].push(loc);
+            
+            const update = receptionUpdates.get(loc.receptionId);
+            if (update) {
+                const itemToUpdate = update.items[loc.itemIndex];
+                if (itemToUpdate && itemToUpdate.quantity >= loc.quantity) {
+                    itemToUpdate.quantity -= loc.quantity;
+                    if (itemToUpdate.quantity === 0) itemToUpdate.status = 'Despachado';
+                }
+            }
         });
 
-        // 3. Iterate over grouped updates and apply them to the batch
-        for (const receptionId in updatesByReceptionId) {
-            const receptionDoc = allReceptions.find(r => r.id === receptionId);
-            if (receptionDoc) {
-                const receptionRef = doc(firestore, 'otherFruitReceptions', receptionId);
-                const newItems = JSON.parse(JSON.stringify(receptionDoc.items)); // Copy once per reception
-
-                // Apply all updates for this specific reception document
-                updatesByReceptionId[receptionId].forEach(location => {
-                    const itemToUpdate = newItems[location.itemIndex];
-                    if (itemToUpdate && itemToUpdate.quantity >= location.quantity) {
-                        itemToUpdate.quantity -= location.quantity;
-                        if (itemToUpdate.quantity === 0) {
-                             itemToUpdate.status = 'Despachado';
-                        }
-                    }
-                });
-
-                batch.update(receptionRef, { items: newItems, updatedAt: serverTimestamp() });
-            }
-        }
+        receptionUpdates.forEach(update => {
+            batch.update(update.ref, { items: update.items, updatedAt: serverTimestamp() });
+        });
         
         await batch.commit();
         toast({ title: 'Éxito', description: 'Salida de fruta confirmada y stock actualizado.' });
@@ -87,24 +104,60 @@ export function OtherFruitPickingTab() {
     } catch (error) {
         console.error("Error confirming fruit exit:", error);
         toast({ variant: 'destructive', title: 'Error', description: 'No se pudo confirmar la salida.' });
-        errorEmitter.emit('permission-error', new FirestorePermissionError({
-            path: 'otherFruitMovements or otherFruitReceptions',
-            operation: 'write'
-        }));
+    } finally {
+        setIsConfirming(false);
+    }
+  };
+
+  const handleConfirmPackagingExit = async (confirmedPayload: ExitFormValues) => {
+    if (!firestore || !pickingMovement) return;
+    setIsConfirming(true);
+    
+    try {
+        const batch = writeBatch(firestore);
+        const movementRef = doc(firestore, 'packagingMovements', pickingMovement.id);
+        batch.update(movementRef, { status: 'Completado' });
+        
+        for(const item of confirmedPayload.items) {
+            if (item.locations) {
+              for(const loc of item.locations) {
+                if (loc.palletsToWithdraw > 0) {
+                    const receptionDoc = allReceptions.find(r => r.id === loc.receptionId);
+                    if (receptionDoc) {
+                        const receptionRef = doc(firestore, 'packagingReceptions', loc.receptionId);
+                        const newItems = JSON.parse(JSON.stringify(receptionDoc.items));
+                        const itemToUpdate = newItems[loc.itemIndex];
+
+                        if (itemToUpdate && itemToUpdate.palletCount >= loc.palletsToWithdraw) {
+                            itemToUpdate.palletCount -= loc.palletsToWithdraw;
+                        }
+                        batch.update(receptionRef, { items: newItems, updatedAt: serverTimestamp() });
+                    }
+                }
+              }
+            }
+        }
+        
+        await batch.commit();
+        toast({ title: 'Éxito', description: 'Salida de embalaje confirmada y stock actualizado.' });
+        setPickingMovement(null);
+    } catch (error) {
+        console.error("Error confirming packaging exit:", error);
+        toast({ variant: 'destructive', title: 'Error', description: 'No se pudo confirmar la salida.' });
     } finally {
         setIsConfirming(false);
     }
   };
 
 
-  const loading = loadingMovements || loadingReceptions || loadingClients;
+  const loading = loadingFruitMovements || loadingPackagingMovements || loadingReceptions || loadingClients;
 
   return (
     <>
       <Card>
         <CardHeader>
-          <CardTitle>Despachos Pendientes de Picking</CardTitle>
-          <CardDescription>Lista de solicitudes de despacho de fruta que deben ser verificadas y confirmadas por el operador de bodega.</CardDescription>
+          <CardTitle>Tareas de Picking Pendientes</CardTitle>
+          <CardDescription>Lista de solicitudes de despacho (Fruta y Embalajes) que deben ser verificadas por el operador de bodega.</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="rounded-md border">
@@ -112,8 +165,8 @@ export function OtherFruitPickingTab() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Fecha Solicitud</TableHead>
+                  <TableHead>Tipo</TableHead>
                   <TableHead>Cliente</TableHead>
-                  <TableHead className="hidden sm:table-cell">Documento</TableHead>
                   <TableHead>Artículos</TableHead>
                   <TableHead>Estado</TableHead>
                   <TableHead className="text-right">Acciones</TableHead>
@@ -128,9 +181,13 @@ export function OtherFruitPickingTab() {
                   pendingMovements.map((mov) => (
                     <TableRow key={mov.id}>
                       <TableCell>{mov.createdAt?.toDate().toLocaleString() ?? 'N/A'}</TableCell>
-                      <TableCell>{mov.clientName}</TableCell>
-                      <TableCell className="hidden sm:table-cell">{mov.document}</TableCell>
-                      <TableCell>{mov.items.reduce((sum, item) => sum + item.quantity, 0)} {mov.unit}</TableCell>
+                      <TableCell>
+                        <Badge variant={mov.taskType === 'fruit' ? 'outline' : 'default'}>
+                            {mov.taskType === 'fruit' ? 'Fruta' : 'Embalaje'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>{(mov as any).clientName || clientMap[mov.clientId]}</TableCell>
+                      <TableCell>{mov.items.reduce((sum, item) => sum + (item as any).quantity || (item as any).palletCount, 0)} {(mov as any).unit || 'pallets'}</TableCell>
                       <TableCell><Badge variant="secondary">{mov.status}</Badge></TableCell>
                       <TableCell className="text-right">
                         <Button size="sm" onClick={() => handleStartPicking(mov)}>Hacer Picking</Button>
@@ -139,7 +196,7 @@ export function OtherFruitPickingTab() {
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={6} className="h-24 text-center">No hay despachos pendientes de picking.</TableCell>
+                    <TableCell colSpan={6} className="h-24 text-center">No hay tareas de picking pendientes.</TableCell>
                   </TableRow>
                 )}
               </TableBody>
@@ -148,13 +205,25 @@ export function OtherFruitPickingTab() {
         </CardContent>
       </Card>
       
-      {pickingMovement && (
+      {pickingMovement?.taskType === 'fruit' && (
         <OtherFruitPickingDialog
-          movement={pickingMovement}
+          movement={pickingMovement as OtherFruitMovement}
           open={!!pickingMovement}
           onOpenChange={(open) => !open && setPickingMovement(null)}
-          onConfirmExit={handleConfirmExit}
+          onConfirmExit={handleConfirmFruitExit}
           isConfirming={isConfirming}
+        />
+      )}
+       {pickingMovement?.taskType === 'packaging' && (
+        <PackagingPickingDialog 
+          movement={pickingMovement as PackagingMovement}
+          open={!!pickingMovement}
+          onOpenChange={(open) => !open && setPickingMovement(null)}
+          onConfirmExit={handleConfirmPackagingExit}
+          isConfirming={isConfirming}
+          clientName={clientMap[pickingMovement.clientId] || ''}
+          allReceptions={allReceptions || []}
+          loadingReceptions={loadingReceptions}
         />
       )}
     </>

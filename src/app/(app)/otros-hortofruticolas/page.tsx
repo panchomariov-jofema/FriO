@@ -10,29 +10,38 @@ import { OtherFruitExitTab } from '@/components/other-fruit/ExitTab';
 import { StockAndRelocationTab } from '@/components/other-fruit/StockAndRelocationTab';
 import { OtherFruitPickingTab } from '@/components/other-fruit/PickingTab';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
-import type { OtherFruitMovement, OtherFruitReception } from '@/lib/types';
+import type { OtherFruitMovement, OtherFruitReception, PackagingMovement, PackagingReception } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
 import { usePermissions } from '@/contexts/PermissionsContext';
 
 export default function OtrosHortofruticolasPage() {
     const { data: otherFruitMovements } = useFirestoreCollection<OtherFruitMovement>('otherFruitMovements');
     const { data: otherFruitReceptions } = useFirestoreCollection<OtherFruitReception>('otherFruitReceptions');
+    const { data: packagingMovements } = useFirestoreCollection<PackagingMovement>('packagingMovements');
+    const { data: packagingReceptions } = useFirestoreCollection<PackagingReception>('packagingReceptions');
     const { permissions } = usePermissions();
 
     const pendingPickingCount = React.useMemo(() => {
-        if (!otherFruitMovements) return 0;
-        return (otherFruitMovements || []).filter(
+        const fruitCount = (otherFruitMovements || []).filter(
             (mov) => mov.type === 'salida' && mov.status === 'Pendiente de Picking'
         ).length;
-    }, [otherFruitMovements]);
+        const packagingCount = (packagingMovements || []).filter(
+            (mov) => mov.type === 'salida' && mov.status === 'Pendiente de Picking'
+        ).length;
+        return fruitCount + packagingCount;
+    }, [otherFruitMovements, packagingMovements]);
     
     const pendingStorageCount = React.useMemo(() => {
-        if (!otherFruitReceptions) return 0;
-        return (otherFruitReceptions || [])
+        const fruitCount = (otherFruitReceptions || [])
             .flatMap(reception => reception.items)
             .filter(item => item.status === 'Pendiente de almacenar')
             .length;
-    }, [otherFruitReceptions]);
+        const packagingCount = (packagingReceptions || [])
+            .flatMap(reception => reception.items)
+            .filter(item => item.status === 'Pendiente de almacenar')
+            .length;
+        return fruitCount + packagingCount;
+    }, [otherFruitReceptions, packagingReceptions]);
 
     const allowedTabs = React.useMemo(() => {
       const permission = permissions.find(p => typeof p === 'object' && p !== null && 'name' in p && p.name === 'Socios Comerciales');
@@ -61,7 +70,7 @@ export default function OtrosHortofruticolasPage() {
             <Card>
                 <CardHeader>
                     <CardTitle>Gestión de Socios Comerciales</CardTitle>
-                    <CardDescription>Recepción, almacenamiento y despacho de productos de socios comerciales.</CardDescription>
+                    <CardDescription>Recepción, almacenamiento y despacho de productos de socios comerciales (Fruta y Embalajes).</CardDescription>
                 </CardHeader>
             </Card>
 

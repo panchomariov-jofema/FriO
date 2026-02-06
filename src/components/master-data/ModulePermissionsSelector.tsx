@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -29,9 +30,7 @@ const ALL_MODULES_CONFIG = [
         label: 'Embalajes',
         subModules: [
             { id: 'recepcion', label: 'Recepción' },
-            { id: 'almacenamiento', label: 'Almacenamiento' },
             { id: 'salidas', label: 'Despacho' },
-            { id: 'picking', label: 'Picking' },
             { id: 'stock', label: 'Stock' },
         ],
     },
@@ -61,19 +60,15 @@ export function ModulePermissionsSelector({ value, onChange }: ModulePermissions
   let selectedPermissions: ModulePermission[];
   if (Array.isArray(value)) {
     selectedPermissions = value;
-  } else if (typeof value === 'string') {
+  } else if (typeof value === 'string' && value.trim().startsWith('[')) {
     try {
-      // First, try to parse it as JSON, which is how it might be stored.
       const parsed = JSON.parse(value);
       selectedPermissions = Array.isArray(parsed) ? parsed : [];
     } catch (e) {
-      // If it's not JSON, assume it's a comma-separated string.
-      if (value) {
-        selectedPermissions = value.split(',').map(s => s.trim());
-      } else {
-        selectedPermissions = [];
-      }
+      selectedPermissions = [];
     }
+  } else if (typeof value === 'string') {
+    selectedPermissions = value.split(',').map(s => s.trim()).filter(Boolean);
   } else {
     selectedPermissions = [];
   }
