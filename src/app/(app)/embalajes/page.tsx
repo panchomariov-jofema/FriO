@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -19,12 +20,14 @@ import { ExitTab } from '@/components/packaging/ExitTab';
 import { StockAndRelocationTab } from '@/components/packaging/StockAndRelocationTab';
 import { PendingPickingTab } from '@/components/packaging/PendingPickingTab';
 import { Badge } from '@/components/ui/badge';
+import { usePermissions } from '@/contexts/PermissionsContext';
 
 export default function EmbalajesPage() {
   const firestore = useFirestore();
   const { toast } = useToast();
   const { data: packagingReceptions } = useFirestoreCollection<PackagingReception>('packagingReceptions');
   const { data: packagingMovements } = useFirestoreCollection<PackagingMovement>('packagingMovements');
+  const { permissions } = usePermissions();
 
   const pendingPickingCount = React.useMemo(() => {
     if (!packagingMovements) return 0;
@@ -32,6 +35,27 @@ export default function EmbalajesPage() {
       (mov) => mov.type === 'salida' && mov.status === 'Pendiente de Picking'
     ).length;
   }, [packagingMovements]);
+
+  const allowedTabs = React.useMemo(() => {
+    const embalajesPermission = permissions.find(p => typeof p === 'object' && p !== null && 'name' in p && p.name === 'Embalajes');
+    if (!embalajesPermission || typeof embalajesPermission === 'string') {
+        return ['recepcion', 'almacenamiento', 'salidas', 'picking', 'stock'];
+    }
+    if (typeof embalajesPermission === 'object' && embalajesPermission.allowedTabs) {
+        return embalajesPermission.allowedTabs;
+    }
+    return [];
+  }, [permissions]);
+
+  const tabsConfig = [
+    { value: 'recepcion', label: 'Recepción' },
+    { value: 'almacenamiento', label: 'Almacenamiento' },
+    { value: 'salidas', label: 'Despacho' },
+    { value: 'picking', label: 'Picking', badge: pendingPickingCount },
+    { value: 'stock', label: 'Stock' },
+  ];
+
+  const visibleTabs = tabsConfig.filter(tab => allowedTabs.includes(tab.value));
 
 
   const handleClearStock = async () => {
@@ -63,7 +87,7 @@ export default function EmbalajesPage() {
 
   return (
     <div className="space-y-4">
-      <Tabs defaultValue="recepcion" className="w-full">
+      <Tabs defaultValue={visibleTabs.length > 0 ? visibleTabs[0].value : 'recepcion'} className="w-full">
         <Card className="mb-4">
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
@@ -96,41 +120,27 @@ export default function EmbalajesPage() {
               </AlertDialogContent>
             </AlertDialog>
           </CardHeader>
-          <CardContent>
-            <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 md:grid-cols-5">
-              <TabsTrigger value="recepcion">Recepción</TabsTrigger>
-              <TabsTrigger value="almacenamiento">Almacenamiento</TabsTrigger>
-              <TabsTrigger value="salidas">Despacho</TabsTrigger>
-              <TabsTrigger value="picking" className="flex items-center gap-2">
-                Picking
-                {pendingPickingCount > 0 && (
-                  <Badge className="h-5 w-5 p-0 flex items-center justify-center">{pendingPickingCount}</Badge>
-                )}
-              </TabsTrigger>
-              <TabsTrigger value="stock">Stock</TabsTrigger>
-            </TabsList>
-          </CardContent>
+          {visibleTabs.length > 0 && (
+            <CardContent>
+                <TabsList className="grid w-full" style={{ gridTemplateColumns: `repeat(${visibleTabs.length}, 1fr)`}}>
+                {visibleTabs.map(tab => (
+                    <TabsTrigger key={tab.value} value={tab.value} className="flex items-center gap-2">
+                    {tab.label}
+                    {tab.badge > 0 && (
+                        <Badge className="h-5 w-5 p-0 flex items-center justify-center">{tab.badge}</Badge>
+                    )}
+                    </TabsTrigger>
+                ))}
+                </TabsList>
+            </CardContent>
+          )}
         </Card>
         
-        <TabsContent value="recepcion">
-          <ReceptionTab />
-        </TabsContent>
-        
-        <TabsContent value="almacenamiento">
-          <StorageTab />
-        </TabsContent>
-        
-        <TabsContent value="salidas">
-          <ExitTab />
-        </TabsContent>
-
-        <TabsContent value="picking">
-            <PendingPickingTab />
-        </TabsContent>
-
-        <TabsContent value="stock">
-            <StockAndRelocationTab />
-        </TabsContent>
+        {allowedTabs.includes('recepcion') && <TabsContent value="recepcion"><ReceptionTab /></TabsContent>}
+        {allowedTabs.includes('almacenamiento') && <TabsContent value="almacenamiento"><StorageTab /></TabsContent>}
+        {allowedTabs.includes('salidas') && <TabsContent value="salidas"><ExitTab /></TabsContent>}
+        {allowedTabs.includes('picking') && <TabsContent value="picking"><PendingPickingTab /></TabsContent>}
+        {allowedTabs.includes('stock') && <TabsContent value="stock"><StockAndRelocationTab /></TabsContent>}
       </Tabs>
     </div>
   );

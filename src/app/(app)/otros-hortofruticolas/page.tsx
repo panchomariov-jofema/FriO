@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -11,10 +12,12 @@ import { OtherFruitPickingTab } from '@/components/other-fruit/PickingTab';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
 import type { OtherFruitMovement, OtherFruitReception } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
+import { usePermissions } from '@/contexts/PermissionsContext';
 
 export default function OtrosHortofruticolasPage() {
     const { data: otherFruitMovements } = useFirestoreCollection<OtherFruitMovement>('otherFruitMovements');
     const { data: otherFruitReceptions } = useFirestoreCollection<OtherFruitReception>('otherFruitReceptions');
+    const { permissions } = usePermissions();
 
     const pendingPickingCount = React.useMemo(() => {
         if (!otherFruitMovements) return 0;
@@ -31,6 +34,28 @@ export default function OtrosHortofruticolasPage() {
             .length;
     }, [otherFruitReceptions]);
 
+    const allowedTabs = React.useMemo(() => {
+      const permission = permissions.find(p => typeof p === 'object' && p !== null && 'name' in p && p.name === 'Socios Comerciales');
+      if (!permission || typeof permission === 'string') {
+        return ['recepcion', 'almacenamiento', 'salidas', 'picking', 'stock'];
+      }
+      if (typeof permission === 'object' && permission.allowedTabs) {
+        return permission.allowedTabs;
+      }
+      return [];
+    }, [permissions]);
+
+    const tabsConfig = [
+        { value: 'recepcion', label: 'Recepción' },
+        { value: 'almacenamiento', label: 'Almacenamiento', badge: pendingStorageCount },
+        { value: 'salidas', label: 'Despacho' },
+        { value: 'picking', label: 'Picking', badge: pendingPickingCount },
+        { value: 'stock', label: 'Stock' },
+    ];
+    
+    const visibleTabs = tabsConfig.filter(tab => allowedTabs.includes(tab.value));
+
+
     return (
         <div className="space-y-4">
             <Card>
@@ -40,44 +65,25 @@ export default function OtrosHortofruticolasPage() {
                 </CardHeader>
             </Card>
 
-            <Tabs defaultValue="recepcion" className="w-full">
-                <TabsList className="grid w-full grid-cols-5">
-                    <TabsTrigger value="recepcion">Recepción</TabsTrigger>
-                    <TabsTrigger value="almacenamiento" className="flex items-center gap-2">
-                        Almacenamiento
-                        {pendingStorageCount > 0 && (
-                            <Badge className="h-5 w-5 p-0 flex items-center justify-center">{pendingStorageCount}</Badge>
-                        )}
-                    </TabsTrigger>
-                    <TabsTrigger value="salidas">Despacho</TabsTrigger>
-                    <TabsTrigger value="picking" className="flex items-center gap-2">
-                        Picking
-                        {pendingPickingCount > 0 && (
-                            <Badge className="h-5 w-5 p-0 flex items-center justify-center">{pendingPickingCount}</Badge>
-                        )}
-                    </TabsTrigger>
-                    <TabsTrigger value="stock">Stock</TabsTrigger>
-                </TabsList>
+            <Tabs defaultValue={visibleTabs.length > 0 ? visibleTabs[0].value : 'recepcion'} className="w-full">
+                {visibleTabs.length > 0 && (
+                    <TabsList className="grid w-full" style={{ gridTemplateColumns: `repeat(${visibleTabs.length}, 1fr)` }}>
+                        {visibleTabs.map(tab => (
+                            <TabsTrigger key={tab.value} value={tab.value} className="flex items-center gap-2">
+                            {tab.label}
+                            {tab.badge > 0 && (
+                                <Badge className="h-5 w-5 p-0 flex items-center justify-center">{tab.badge}</Badge>
+                            )}
+                            </TabsTrigger>
+                        ))}
+                    </TabsList>
+                )}
                 
-                <TabsContent value="recepcion">
-                    <OtherFruitReceptionTab />
-                </TabsContent>
-
-                <TabsContent value="almacenamiento">
-                    <OtherFruitStorageTab />
-                </TabsContent>
-
-                <TabsContent value="salidas">
-                    <OtherFruitExitTab />
-                </TabsContent>
-
-                <TabsContent value="picking">
-                    <OtherFruitPickingTab />
-                </TabsContent>
-
-                <TabsContent value="stock">
-                    <StockAndRelocationTab />
-                </TabsContent>
+                {allowedTabs.includes('recepcion') && <TabsContent value="recepcion"><OtherFruitReceptionTab /></TabsContent>}
+                {allowedTabs.includes('almacenamiento') && <TabsContent value="almacenamiento"><OtherFruitStorageTab /></TabsContent>}
+                {allowedTabs.includes('salidas') && <TabsContent value="salidas"><OtherFruitExitTab /></TabsContent>}
+                {allowedTabs.includes('picking') && <TabsContent value="picking"><OtherFruitPickingTab /></TabsContent>}
+                {allowedTabs.includes('stock') && <TabsContent value="stock"><StockAndRelocationTab /></TabsContent>}
             </Tabs>
         </div>
     );

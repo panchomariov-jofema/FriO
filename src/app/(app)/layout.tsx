@@ -45,6 +45,7 @@ import { cn } from '@/lib/utils';
 import { ChamberStrategyProvider } from '@/contexts/ChamberStrategyContext';
 import { FrioLogo } from '@/components/ui/FrioLogo';
 import { CustomAppleIcon } from '@/components/ui/CustomAppleIcon';
+import { PermissionsProvider } from '@/contexts/PermissionsContext';
 
 // Define the structure with types and potential nesting
 const navStructure: any[] = [
@@ -84,6 +85,7 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
   const { data: profiles, loading: loadingProfiles } = useFirestoreCollection<Profile>('profiles');
   const [accessibleNav, setAccessibleNav] = React.useState<any[] | null>(null);
   const { setOpenMobile } = useSidebar();
+  const [activePermissions, setActivePermissions] = React.useState<ModulePermission[]>([]);
   
   const [openCollapsibles, setOpenCollapsibles] = React.useState<Record<string, boolean>>({});
 
@@ -112,51 +114,46 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
   }, [pathname, isChildActive]);
 
   React.useEffect(() => {
-    if (isUserLoading) return;
+    if (isUserLoading || loadingUsers || loadingProfiles) return;
 
     if (!user) {
       router.push('/login');
       return;
     }
-
-    if (loadingUsers || loadingProfiles) return;
       
     let accessibleModuleNames: Set<string>;
+    let currentUserProfile: Profile | null = null;
 
-    if (user.isAnonymous) {
-        accessibleModuleNames = new Set(navStructure.flatMap(item => 
-            item.type === 'item' ? [item.label] : [item.label, ...item.items.map((sub: any) => sub.label)]
-        ));
-    } else {
+    if (!user.isAnonymous) {
         const emailUsername = user?.email
           ? user.email.split('@')[0].toLowerCase()
           : null;
 
-        let currentUserMaster: UserMaster | null = null;
-        let userProfile: Profile | null = null;
-
         if (emailUsername && users.length > 0 && profiles.length > 0) {
-          currentUserMaster = users.find(
+          const currentUserMaster = users.find(
             (u) => typeof u.userName === 'string'
               && u.userName.toLowerCase() === emailUsername
           ) ?? null;
 
           if (currentUserMaster) {
-            userProfile = profiles.find(
+            currentUserProfile = profiles.find(
               (p) => p.profileId === currentUserMaster!.profileId
             ) ?? null;
           }
         }
-        
-        if (userProfile) {
-             accessibleModuleNames = new Set(userProfile.modulesAccess.map((permission: ModulePermission) => 
-                typeof permission === 'string' ? permission : permission.name
-            ));
-        } else {
-            accessibleModuleNames = new Set(navStructure.flatMap(item => 
-                item.type === 'item' ? [item.label] : [item.label, ...item.items.map((sub: any) => sub.label)]
-            ));
-        }
+    }
+    
+    if (currentUserProfile) {
+         accessibleModuleNames = new Set(currentUserProfile.modulesAccess.map((permission: ModulePermission) => 
+            typeof permission === 'string' ? permission : permission.name
+        ));
+        setActivePermissions(currentUserProfile.modulesAccess);
+    } else { // Anonymous or no profile found
+        const allModuleNames = navStructure.flatMap(item => 
+            item.type === 'item' ? [item.label] : [item.label, ...item.items.map((sub: any) => sub.label)]
+        );
+        accessibleModuleNames = new Set(allModuleNames);
+        setActivePermissions(allModuleNames);
     }
       
     const filterNavItems = (items: any[], accessibleNames: Set<string>): any[] => {
@@ -274,7 +271,9 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
               </Button>
           </header>
           <main className="p-4">
+            <PermissionsProvider permissions={activePermissions}>
               {children}
+            </PermissionsProvider>
           </main>
         </SidebarInset>
       </>
