@@ -74,18 +74,6 @@ function downloadCSV(csvString: string, filename: string) {
 }
 
 
-interface MasterDataShellProps<T extends MasterData> {
-  title: string;
-  collectionName: string;
-  schema: z.ZodType<any, any>;
-  columns: { key: keyof T; header: string }[];
-  RenderFormComponent: React.ComponentType<{ form: any, [key: string]: any }>;
-  docNameField: keyof T;
-  csvHeaders: (keyof T)[];
-  csvTemplateFileName: string;
-  formProps?: Record<string, any>;
-}
-
 const defaultProfiles = [
   { profileId: 'MAESTRO', name: 'Maestro', modulesAccess: ['Dashboard', 'Bins y Materiales', 'Recepción', 'Hidrocooler', 'Cámaras', 'Despachos', 'Reportes', 'Embalajes', 'Socios Comerciales', 'Fall Creek', 'Datos Maestros'] },
   { profileId: 'EJECUTIVO', name: 'Ejecutivo', modulesAccess: ['Dashboard', 'Reportes'] },
@@ -96,7 +84,7 @@ const defaultProfiles = [
   { profileId: 'SUP_SUBSOLE', name: 'Supervisor Subsole', modulesAccess: ['Recepción', 'Despachos'] },
   { profileId: 'SUP_HIDRO', name: 'Supervisor Hidrocooler', modulesAccess: ['Hidrocooler'] },
   { profileId: 'GRUERO', name: 'Gruero', modulesAccess: ['Cámaras', { name: 'Embalajes', allowedTabs: ['almacenamiento'] }, { name: 'Socios Comerciales', allowedTabs: ['almacenamiento'] }] },
-  { profileId: 'JEF_LOG', name: 'Jefe de Logística', modulesAccess: ['Dashboard', 'Bins y Materiales', 'Recepción', 'Hidrocooler', 'Cámaras', 'Despachos', 'Embalajes', 'Socios Comerciales', 'Fall Creek', 'Reportes'] },
+  { profileId: 'JEF_LOG', name: 'Jefe de Logística', modulesAccess: ['Dashboard', 'Bins y Materiales', 'Recepción', 'Hidrocooler', 'Cámaras', 'Despachos', 'Reportes', 'Embalajes', 'Socios Comerciales', 'Fall Creek'] },
 ];
 
 
