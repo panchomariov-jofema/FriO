@@ -32,7 +32,7 @@ import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
 import type { ChamberLot, Dispatch, Exporter, Producer, ReceptionLot, OtherFruitReception } from '@/lib/types';
 import { useFirestore, useCollection, useMemoFirebase, useUser } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
-import { collection, query, where, writeBatch, serverTimestamp, doc, orderBy } from 'firebase/firestore';
+import { collection, query, where, writeBatch, serverTimestamp, doc, orderBy, deleteDoc, addDoc } from 'firebase/firestore';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -47,6 +47,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
+  AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { chambersConfig } from '@/lib/chambers-config';
 import { usePackingsByExporter } from '@/hooks/use-packings-by-exporter';
@@ -92,7 +93,7 @@ function DespachosPageContent() {
     if (showOnlyPending) {
       return query(collRef, where('status', '==', 'Pendiente de Picking'));
     }
-    return query(collRef);
+    return query(collRef, orderBy('createdAt', 'desc'));
   }, [firestore, showOnlyPending, user]);
   
   const { data: dispatches, loading: loadingDispatches } = useCollection<Dispatch>(dispatchesQuery);
@@ -116,7 +117,6 @@ function DespachosPageContent() {
   const { data: packings, loading: loadingPackings } = usePackingsByExporter(selectedExporterId);
   
   const getExporterName = (exporterId: string) => {
-    if (exporterId === 'undefined' || !exporterId) return 'Subsole';
     return exporters?.find(e => e.exporterId === exporterId)?.name || exporterId;
   };
 
@@ -246,8 +246,7 @@ function DespachosPageContent() {
           bins: dispatchBinsPayload,
         };
   
-        const dispatchRef = doc(collection(firestore, 'dispatches'));
-        await writeBatch(firestore).set(dispatchRef, dispatchData).commit();
+        await addDoc(collection(firestore, 'dispatches'), dispatchData);
         
         toast({
           title: 'Solicitud de Despacho Creada',
