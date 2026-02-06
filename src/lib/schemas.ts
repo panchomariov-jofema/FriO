@@ -105,7 +105,7 @@ const modulePermissionSchema = z.union([
       allowedTabs: z.array(z.string())
   }),
   z.object({
-      name: z.literal('Otros Hortofrutícolas'),
+      name: z.literal('Socios Comerciales'),
       allowedTabs: z.array(z.string())
   })
 ]);
@@ -113,19 +113,21 @@ const modulePermissionSchema = z.union([
 export const profileSchema = z.object({
   profileId: z.string().min(1, 'El ID de perfil es obligatorio'),
   name: z.string().min(1, 'El nombre es obligatorio'),
-  modulesAccess: z.any().transform((val) => {
-    if (Array.isArray(val)) return val;
+  modulesAccess: z.preprocess((val) => {
+    // This function runs before any other validation
+    // If we receive a string (from CSV or bad data in DB), we try to parse it.
     if (typeof val === 'string') {
       try {
-        // Attempt to parse as JSON for complex rules
+        // First, try to parse it as JSON, which is how it was incorrectly stored.
         return JSON.parse(val);
       } catch (e) {
-        // Fallback for simple comma-separated string
+        // If it's not JSON, assume it's a comma-separated list (from CSV).
         return val.split(',').map(s => s.trim());
       }
     }
-    return [];
-  }),
+    // If it's already an array or something else, pass it through.
+    return val;
+  }, z.array(modulePermissionSchema).default([])), // Now validate that it's an array of the correct shape.
 });
 
 
