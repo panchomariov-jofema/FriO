@@ -96,7 +96,7 @@ const defaultProfiles = [
   { profileId: 'SUP_SUBSOLE', name: 'Supervisor Subsole', modulesAccess: ['Recepción', 'Despachos'] },
   { profileId: 'SUP_HIDRO', name: 'Supervisor Hidrocooler', modulesAccess: ['Hidrocooler'] },
   { profileId: 'GRUERO', name: 'Gruero', modulesAccess: ['Cámaras', { name: 'Embalajes', allowedTabs: ['almacenamiento'] }, { name: 'Socios Comerciales', allowedTabs: ['almacenamiento'] }] },
-  { profileId: 'FEF_LOG', name: 'Logística Facturación', modulesAccess: ['Dashboard', 'Bins y Materiales', 'Reportes'] },
+  { profileId: 'JEF_LOG', name: 'Logística Facturación', modulesAccess: ['Dashboard', 'Bins y Materiales', 'Reportes'] },
 ];
 
 
@@ -160,7 +160,7 @@ export function MasterDataShell<T extends MasterData>({
       
       if (currentItem?.id) { // --- UPDATE ---
         const docRef = doc(firestore, collectionName, currentItem.id);
-        updateDoc(docRef, dataToSave)
+        await updateDoc(docRef, dataToSave)
         .then(()=> {
             toast({ title: 'Éxito', description: 'Registro actualizado correctamente.' });
             handleCancelEdit();
