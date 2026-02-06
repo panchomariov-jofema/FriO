@@ -14,6 +14,7 @@ import type {
   UserMaster,
   Profile,
   Hidrocooler,
+  ModulePermission,
 } from '@/lib/types';
 import {
   exporterSchema,
@@ -31,6 +32,7 @@ import { Input } from '@/components/ui/input';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { ModulePermissionsSelector } from '@/components/master-data/ModulePermissionsSelector';
 
 const ExporterForm = ({ form }: { form: any }) => (
   <>
@@ -198,15 +200,20 @@ const ProfileForm = ({ form }: { form: any }) => (
       <FormField control={form.control} name="name" render={({ field }) => (
         <FormItem><FormLabel>Nombre</FormLabel><FormControl><Input {...field} autoComplete="off" /></FormControl><FormMessage /></FormItem>
       )} />
-      <FormField control={form.control} name="modulesAccess" render={({ field }) => (
-        <FormItem>
-          <FormLabel>Acceso a Módulos (JSON o simple)</FormLabel>
-          <FormControl>
-            <Textarea {...field} placeholder='["Dashboard", {"name": "Cámaras", "rules":...}] o Dashboard,Recepción,Cámaras...' autoComplete="off" rows={5} />
-          </FormControl>
-          <FormMessage />
-        </FormItem>
-      )} />
+      <FormField
+        control={form.control}
+        name="modulesAccess"
+        render={({ field }) => (
+          <FormItem>
+            <FormLabel>Acceso a Módulos</FormLabel>
+             <ModulePermissionsSelector
+                value={field.value ?? []}
+                onChange={field.onChange}
+              />
+            <FormMessage />
+          </FormItem>
+        )}
+      />
     </>
 );
 
