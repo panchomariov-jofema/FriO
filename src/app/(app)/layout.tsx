@@ -263,14 +263,23 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
           </SidebarFooter>
         </Sidebar>
         <SidebarInset>
-           <header className="sticky top-0 z-30 flex items-center justify-between h-14 px-4 border-b bg-background">
+           <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b bg-background px-4">
               <SidebarTrigger />
-              <div className="flex-1" />
-              <Button variant="ghost" size="sm" onClick={handleSignOut}>
+              <div className="flex flex-1 items-center justify-end gap-4">
+                {user && (
+                  <span className="hidden text-sm text-muted-foreground sm:inline">
+                    Bienvenido,{' '}
+                    {user.isAnonymous
+                      ? 'Invitado'
+                      : user.displayName || user.email}
+                  </span>
+                )}
+                <Button variant="ghost" size="sm" onClick={handleSignOut}>
                   <LogOut className="h-4 w-4 sm:mr-2" />
                   <span className="hidden sm:inline">Cerrar Sesión</span>
-              </Button>
-          </header>
+                </Button>
+              </div>
+            </header>
           <main className="p-4">
             <PermissionsProvider permissions={activePermissions}>
               {children}
