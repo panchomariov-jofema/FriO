@@ -191,6 +191,34 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
 
   }, [user, isUserLoading, router, users, profiles, loadingUsers, loadingProfiles]);
 
+  React.useEffect(() => {
+    if (accessibleNav && pathname === '/dashboard') {
+        const hasDashboardAccess = accessibleNav.some(item => item.href === '/dashboard' && item.type === 'item');
+        
+        if (!hasDashboardAccess) {
+            const findFirstHref = (items: any[]): string | null => {
+                for (const item of items) {
+                    if (item.type === 'item' && item.href) {
+                        return item.href;
+                    }
+                    if (item.type === 'group' && item.items) {
+                        const firstChildHref = findFirstHref(item.items);
+                        if (firstChildHref) {
+                            return firstChildHref;
+                        }
+                    }
+                }
+                return null;
+            };
+
+            const firstAccessiblePage = findFirstHref(accessibleNav);
+            if (firstAccessiblePage && firstAccessiblePage !== '/dashboard') {
+                router.push(firstAccessiblePage);
+            }
+        }
+    }
+  }, [accessibleNav, pathname, router]);
+
   const loading = isUserLoading || accessibleNav === null;
 
   if (loading || !user) {
