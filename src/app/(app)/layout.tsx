@@ -150,8 +150,8 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
     }
     
     if (currentUserProfile) {
-        // Special case for 'GRUERO' profile or any profile containing 'gruero'
-        if (currentUserProfile.profileId.toLowerCase().includes('gruero')) {
+        // Special case for 'grua' profile or any profile containing 'grua'
+        if (currentUserProfile.profileId.toLowerCase().includes('grua')) {
             setAccessibleNav(grueroNavStructure);
             setActivePermissions(currentUserProfile.modulesAccess);
             return; // Exit early to use the special nav
