@@ -76,6 +76,12 @@ const navStructure: any[] = [
     { type: 'item', href: '/datos-maestros', label: 'Datos Maestros', icon: Database },
 ];
 
+const grueroNavStructure: any[] = [
+    { type: 'item', href: '/camaras', label: 'Cámaras', icon: Building2 },
+    { type: 'item', href: '/otros-hortofruticolas', label: 'Socios Comerciales', icon: Grape },
+];
+
+
 function AppLayoutContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -144,6 +150,13 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
     }
     
     if (currentUserProfile) {
+        // Special case for 'GRUERO' profile
+        if (currentUserProfile.profileId === 'GRUERO') {
+            setAccessibleNav(grueroNavStructure);
+            setActivePermissions(currentUserProfile.modulesAccess);
+            return; // Exit early to use the special nav
+        }
+
         accessibleModuleNames = new Set(currentUserProfile.modulesAccess.map((permission: ModulePermission) =>
             typeof permission === 'string' ? permission : permission.name
         ));
