@@ -226,7 +226,43 @@ export function OtherFruitPickingTab() {
           <CardDescription>Lista de solicitudes de despacho (Fruta y Embalajes) que deben ser verificadas por el operador de bodega.</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="rounded-md border">
+            {/* Mobile View */}
+            <div className="md:hidden space-y-3">
+              {loading ? (
+                   Array.from({ length: 2 }).map((_, i) => <Skeleton key={i} className="h-32 w-full" />)
+              ) : pendingMovements.length > 0 ? (
+                  pendingMovements.map((mov) => {
+                     const isProducerFruit = mov.taskType === 'producerFruit';
+                     const clientName = isProducerFruit ? (mov as Dispatch).exporterName : (mov as any).clientName || clientMap[mov.clientId];
+                     const quantity = isProducerFruit ? `${(mov as Dispatch).totalBins} Bins` : `${(mov as any).items.reduce((sum: number, item: any) => sum + (item.quantity || item.palletCount), 0)} ${(mov as any).unit || 'Pallets'}`;
+                     const typeLabel = mov.taskType === 'fruit' ? 'Fruta (Socio)' : mov.taskType === 'packaging' ? 'Embalaje' : 'Fruta (Productor)';
+
+                      return (
+                          <Card key={mov.id} className="p-4">
+                              <div className="flex justify-between items-start gap-4">
+                                  <div>
+                                      <CardTitle className="text-lg">{clientName}</CardTitle>
+                                      <CardDescription>{mov.createdAt?.toDate().toLocaleString() ?? 'N/A'}</CardDescription>
+                                      <div className="mt-2">
+                                          <Badge variant={mov.taskType === 'fruit' ? 'outline' : mov.taskType === 'packaging' ? 'default' : 'secondary'}>
+                                              {typeLabel}
+                                          </Badge>
+                                          <p className="font-semibold text-lg mt-1">{quantity}</p>
+                                      </div>
+                                  </div>
+                                  <Button size="lg" onClick={() => handleStartPicking(mov)}>Hacer Picking</Button>
+                              </div>
+                          </Card>
+                      )
+                  })
+              ) : (
+                   <div className="h-24 text-center flex items-center justify-center">
+                      <p>No hay tareas de picking pendientes.</p>
+                   </div>
+              )}
+          </div>
+          {/* Desktop View */}
+          <div className="hidden md:block rounded-md border">
             <Table>
               <TableHeader>
                 <TableRow>

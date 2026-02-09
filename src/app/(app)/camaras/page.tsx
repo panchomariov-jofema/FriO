@@ -194,7 +194,7 @@ export default function CamarasPage() {
             if (item.unit === 'Bins') {
                 return sum + item.quantity;
             } else if (item.unit === 'Pallets') {
-                return sum + item.quantity; // FIX: Pallets now count as 1 unit for occupancy, not 2.
+                return sum + item.quantity; // Pallets now count as 1 unit for occupancy, not 2.
             }
             return sum;
         }, 0);
@@ -496,7 +496,35 @@ export default function CamarasPage() {
             </div>
         </CardHeader>
         <CardContent>
-          <div className="rounded-md border">
+          {/* Mobile View */}
+          <div className="md:hidden space-y-3">
+              {loading ? (
+                  Array.from({ length: 2 }).map((_, i) => <Skeleton key={i} className="h-36 w-full" />)
+              ) : (sortedPendingLots || []).length > 0 ? (
+                  sortedPendingLots.map((lot) => (
+                      <Card key={lot.id} className="p-4">
+                          <div className="flex justify-between items-start">
+                              <div>
+                                  <CardTitle className="text-lg">{lot.displayLotId}</CardTitle>
+                                  <CardDescription>{lot.producerShortName} / {exporterMap[lot.exporterId] || lot.exporterId}</CardDescription>
+                              </div>
+                              <Button size="lg" onClick={() => handleStoreClick(lot)}>Almacenar</Button>
+                          </div>
+                          <div className="mt-4 text-sm">
+                              <p><strong>Bins:</strong> {lot.binCount}</p>
+                              <p><strong>Fecha Recepción:</strong> {lot.receptionDate?.toDate().toLocaleString('es-CL')}</p>
+                          </div>
+                      </Card>
+                  ))
+              ) : (
+                  <div className="h-24 text-center flex items-center justify-center">
+                      <p>No hay lotes de productor pendientes.</p>
+                  </div>
+              )}
+          </div>
+
+          {/* Desktop View */}
+          <div className="hidden md:block rounded-md border">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -624,7 +652,7 @@ export default function CamarasPage() {
                                       const visualCoord = `${col.name}${row}`;
                                       
                                       if (config.blocked?.includes(visualCoord)) {
-                                          return <div key={visualCoord} className="h-10 sm:h-12 w-full rounded border-2 bg-gray-200 dark:bg-gray-700 relative"><div className="absolute inset-0 bg-repeat bg-[length:10px_10px]" style={{backgroundImage: "repeating-linear-gradient(-45deg, hsl(var(--muted-foreground)/0.3), hsl(var(--muted-foreground)/0.3) 1px, transparent 1px, transparent 5px)"}} /></div>;
+                                          return <div key={visualCoord} className="h-12 w-full rounded border-2 bg-gray-200 dark:bg-gray-700 relative"><div className="absolute inset-0 bg-repeat bg-[length:10px_10px]" style={{backgroundImage: "repeating-linear-gradient(-45deg, hsl(var(--muted-foreground)/0.3), hsl(var(--muted-foreground)/0.3) 1px, transparent 1px, transparent 5px)"}} /></div>;
                                       }
                                       
                                       let dataCoord = visualCoord;
@@ -656,7 +684,7 @@ export default function CamarasPage() {
                                           <Popover key={visualCoord}>
                                           <PopoverTrigger asChild>
                                               <div 
-                                              className={cn("h-10 sm:h-12 w-full rounded border-2 flex items-center justify-center text-xs font-mono relative overflow-hidden cursor-pointer",
+                                              className={cn("h-12 w-full rounded border-2 flex items-center justify-center text-xs font-mono relative overflow-hidden cursor-pointer",
                                                   isOccupied ? 'border-[var(--lot-color-border)] bg-[var(--lot-color-bg)]' : 'bg-background border-dashed'
                                               )}
                                               style={{

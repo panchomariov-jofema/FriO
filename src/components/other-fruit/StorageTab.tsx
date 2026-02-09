@@ -257,7 +257,36 @@ export function OtherFruitStorageTab({ clientId: fixedClientId }: { clientId?: s
           <CardDescription>Artículos de fruta y embalajes que esperan una ubicación en bodega o cámara.</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="rounded-md border">
+          {/* Mobile View */}
+          <div className="md:hidden space-y-3">
+              {loading ? (
+                   Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-32 w-full" />)
+              ) : pendingItems.length > 0 ? (
+                  pendingItems.map((item) => (
+                      <Card key={`${item.receptionId}-${item.itemIndex}`} className="p-4">
+                          <div className="flex justify-between items-start gap-4">
+                              <div>
+                                  <CardTitle className="text-lg">{item.type === 'fruit' ? item.productName : item.packagingMasterName}</CardTitle>
+                                  <CardDescription>{item.clientName} / Doc: {item.document}</CardDescription>
+                                  <div className="mt-2">
+                                      <Badge variant={item.type === 'fruit' ? 'outline' : 'default'}>
+                                          {item.type === 'fruit' ? 'Fruta' : 'Embalaje'}
+                                      </Badge>
+                                      <p className="font-semibold text-lg mt-1">{(item as any).quantity || (item as any).palletCount} {item.unit}</p>
+                                  </div>
+                              </div>
+                              <Button size="lg" onClick={() => handleStoreClick(item)}>Almacenar</Button>
+                          </div>
+                      </Card>
+                  ))
+              ) : (
+                   <div className="h-24 text-center flex items-center justify-center">
+                      <p>No hay productos pendientes de almacenar.</p>
+                   </div>
+              )}
+          </div>
+          {/* Desktop View */}
+          <div className="hidden md:block rounded-md border">
             <Table>
               <TableHeader>
                 <TableRow>
