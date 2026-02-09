@@ -72,6 +72,7 @@ export default function OtherFruitKardexReportPage() {
                     quantity: totalQuantity,
                     unit: reception.unit,
                     weight: totalWeight > 0 ? totalWeight : undefined,
+                    userName: reception.userName,
                 });
             });
         }
@@ -99,6 +100,7 @@ export default function OtherFruitKardexReportPage() {
                     quantity: -totalQuantity,
                     unit: movement.unit,
                     weight: totalWeight > 0 ? -totalWeight : undefined,
+                    userName: movement.userName,
                 });
             });
         }
@@ -134,8 +136,9 @@ export default function OtherFruitKardexReportPage() {
             "Nombre Producto": item.productName,
             "Cantidad": `${item.quantity} ${item.unit}`,
             "Peso (kg)": item.weight ? item.weight.toFixed(2) : '0.00',
+            "Usuario": item.userName || '',
         }));
-        const headers = ["Fecha", "Tipo", "Cliente", "Documento", "Temperatura", "Lote Cliente", "Codigo Producto", "Nombre Producto", "Cantidad", "Peso (kg)"];
+        const headers = ["Fecha", "Tipo", "Cliente", "Documento", "Temperatura", "Lote Cliente", "Codigo Producto", "Nombre Producto", "Cantidad", "Peso (kg)", "Usuario"];
         const csv = convertToCSV(dataToExport, headers);
         downloadCSV(csv, 'kardex_fruta_otros_clientes.csv');
     };
@@ -181,11 +184,12 @@ export default function OtherFruitKardexReportPage() {
                                     <TableHead>Producto</TableHead>
                                     <TableHead>Cantidad</TableHead>
                                     <TableHead>Peso (kg)</TableHead>
+                                    <TableHead>Usuario</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
                                 {loading ? (
-                                    Array.from({ length: 5 }).map((_, i) => <TableRow key={i}><TableCell colSpan={10}><Skeleton className="h-4 w-full" /></TableCell></TableRow>)
+                                    Array.from({ length: 5 }).map((_, i) => <TableRow key={i}><TableCell colSpan={11}><Skeleton className="h-4 w-full" /></TableCell></TableRow>)
                                 ) : filteredData.length > 0 ? (
                                     filteredData.map((item) => (
                                     <TableRow key={item.key}>
@@ -207,10 +211,11 @@ export default function OtherFruitKardexReportPage() {
                                         <TableCell className={item.weight > 0 ? 'text-green-600' : 'text-red-600'}>
                                             {item.weight ? `${item.weight.toFixed(2)} kg` : '-'}
                                         </TableCell>
+                                        <TableCell>{item.userName || 'N/A'}</TableCell>
                                     </TableRow>
                                     ))
                                 ) : (
-                                    <TableRow><TableCell colSpan={10} className="h-24 text-center">No hay movimientos para los filtros seleccionados.</TableCell></TableRow>
+                                    <TableRow><TableCell colSpan={11} className="h-24 text-center">No hay movimientos para los filtros seleccionados.</TableCell></TableRow>
                                 )}
                             </TableBody>
                         </Table>

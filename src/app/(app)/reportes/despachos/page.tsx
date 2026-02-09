@@ -87,10 +87,11 @@ export default function DispatchReportPage() {
 
      const handleExport = () => {
         if (!reportData) return;
-        const headers = ['createdAt', 'exporterName', 'totalBins', 'totalNetWeight', 'producers', 'varieties', 'status'];
+        const headers = ['createdAt', 'exporterName', 'totalBins', 'totalNetWeight', 'producers', 'varieties', 'status', 'userName'];
         const dataForExport = reportData.map(dispatch => ({
             ...dispatch,
             totalNetWeight: dispatch.totalNetWeight ? dispatch.totalNetWeight.toFixed(2) : '0.00',
+            userName: dispatch.userName || '',
         }));
         const csv = convertToCSV(dataForExport, headers);
         downloadCSV(csv, 'reporte_despachos_a_packing.csv');
@@ -116,12 +117,13 @@ export default function DispatchReportPage() {
                                     <TableHead>Variedad(es)</TableHead>
                                     <TableHead>Total Bins</TableHead>
                                     <TableHead>Peso Neto Total</TableHead>
+                                    <TableHead>Usuario</TableHead>
                                     <TableHead>Estado</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
                                 {loading ? (
-                                    Array.from({ length: 5 }).map((_, i) => <TableRow key={i}><TableCell colSpan={7}><Skeleton className="h-4 w-full" /></TableCell></TableRow>)
+                                    Array.from({ length: 5 }).map((_, i) => <TableRow key={i}><TableCell colSpan={8}><Skeleton className="h-4 w-full" /></TableCell></TableRow>)
                                 ) : reportData && reportData.length > 0 ? (
                                     reportData.map(dispatch => (
                                         <TableRow key={dispatch.id}>
@@ -131,13 +133,14 @@ export default function DispatchReportPage() {
                                             <TableCell>{dispatch.varieties.join(', ')}</TableCell>
                                             <TableCell>{dispatch.totalBins}</TableCell>
                                             <TableCell>{dispatch.totalNetWeight ? `${dispatch.totalNetWeight.toFixed(2)} kg` : '-'}</TableCell>
+                                            <TableCell>{dispatch.userName || 'N/A'}</TableCell>
                                             <TableCell>
                                                 <Badge variant={dispatch.status === 'Completado' ? 'default' : 'secondary'}>{dispatch.status}</Badge>
                                             </TableCell>
                                         </TableRow>
                                     ))
                                 ) : (
-                                    <TableRow><TableCell colSpan={7} className="h-24 text-center">No hay despachos.</TableCell></TableRow>
+                                    <TableRow><TableCell colSpan={8} className="h-24 text-center">No hay despachos.</TableCell></TableRow>
                                 )}
                             </TableBody>
                         </Table>

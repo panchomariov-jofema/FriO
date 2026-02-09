@@ -9,7 +9,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { useFirestore } from '@/firebase';
+import { useFirestore, useUser } from '@/firebase';
 import { collection, query, where, runTransaction, serverTimestamp, getDocs, doc } from 'firebase/firestore';
 import type { BinMaterialStock, BinMaterialMovement, Producer } from '@/lib/types';
 import { useBinMaterialsByExporter } from '@/hooks/use-bin-materials-by-exporter';
@@ -55,6 +55,7 @@ const calculationRules: Record<string, { binCode: string; related: Record<string
 export function ExitsTab({ exporterId, exporterName, producerId }: ExitsTabProps) {
   const { toast } = useToast();
   const firestore = useFirestore();
+  const { user } = useUser();
   const { materials, loading: loadingMaterials } = useBinMaterialsByExporter(exporterId);
   const { data: stockData, loading: loadingStock } = useFirestoreCollection<BinMaterialStock>('binMaterialStock');
   const { data: movements, loading: loadingMovements } = useFirestoreCollection<BinMaterialMovement>('binMaterialMovements');
@@ -202,6 +203,8 @@ export function ExitsTab({ exporterId, exporterName, producerId }: ExitsTabProps
           producerId,
           items: itemsToProcess,
           createdAt: serverTimestamp(),
+          userId: user?.uid,
+          userName: user?.email,
         };
         transaction.set(movementRef, movementData);
         

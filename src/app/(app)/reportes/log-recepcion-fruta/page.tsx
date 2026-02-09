@@ -45,14 +45,15 @@ export default function ReceptionLogReportPage() {
 
      const handleExport = () => {
         if (!receptionLots) return;
-        const headers = ['createdAt', 'displayLotId', 'producerId', 'variety', 'binCount', 'status', 'totalWeight', 'pesoNeto'];
+        const headers = ['createdAt', 'displayLotId', 'producerId', 'variety', 'binCount', 'status', 'totalWeight', 'pesoNeto', 'userName'];
         const dataForExport = receptionLots.map(lot => {
             const pesoNeto = (lot.netWeightPerBin && lot.binCount > 0)
                 ? lot.netWeightPerBin * lot.binCount
                 : null;
             return {
                 ...lot,
-                pesoNeto: pesoNeto !== null ? pesoNeto.toFixed(2) : ''
+                pesoNeto: pesoNeto !== null ? pesoNeto.toFixed(2) : '',
+                userName: lot.userName || '',
             };
         });
         const csv = convertToCSV(dataForExport, headers);
@@ -80,12 +81,13 @@ export default function ReceptionLogReportPage() {
                                     <TableHead>N° Bins</TableHead>
                                     <TableHead>Peso Total (kg)</TableHead>
                                     <TableHead>Peso Neto (kg)</TableHead>
+                                    <TableHead>Usuario</TableHead>
                                     <TableHead>Estado</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
                                 {loading ? (
-                                    Array.from({ length: 5 }).map((_, i) => <TableRow key={i}><TableCell colSpan={8}><Skeleton className="h-4 w-full" /></TableCell></TableRow>)
+                                    Array.from({ length: 5 }).map((_, i) => <TableRow key={i}><TableCell colSpan={9}><Skeleton className="h-4 w-full" /></TableCell></TableRow>)
                                 ) : receptionLots && receptionLots.length > 0 ? (
                                     receptionLots.map(lot => {
                                         const pesoNeto = (lot.netWeightPerBin && lot.binCount > 0)
@@ -101,6 +103,7 @@ export default function ReceptionLogReportPage() {
                                             <TableCell>{lot.binCount}</TableCell>
                                             <TableCell>{lot.totalWeight?.toFixed(2)}</TableCell>
                                             <TableCell>{pesoNeto !== null ? pesoNeto.toFixed(2) : '-'}</TableCell>
+                                            <TableCell>{lot.userName || 'N/A'}</TableCell>
                                             <TableCell>
                                                 <Badge variant={lot.status === 'Cerrado' ? 'default' : 'secondary'}>{lot.status}</Badge>
                                             </TableCell>
@@ -108,7 +111,7 @@ export default function ReceptionLogReportPage() {
                                         )
                                     })
                                 ) : (
-                                    <TableRow><TableCell colSpan={8} className="h-24 text-center">No hay lotes de recepción.</TableCell></TableRow>
+                                    <TableRow><TableCell colSpan={9} className="h-24 text-center">No hay lotes de recepción.</TableCell></TableRow>
                                 )}
                             </TableBody>
                         </Table>

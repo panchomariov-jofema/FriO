@@ -9,7 +9,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { useFirestore } from '@/firebase';
+import { useFirestore, useUser } from '@/firebase';
 import { collection, query, where, runTransaction, serverTimestamp, getDocs, doc } from 'firebase/firestore';
 import { useBinMaterialsByExporter } from '@/hooks/use-bin-materials-by-exporter';
 import { errorEmitter } from '@/firebase/error-emitter';
@@ -54,6 +54,7 @@ const calculationRules: Record<string, { binCode: string; related: Record<string
 export function EntriesTab({ exporterId, exporterName, producerId, isDirectDispatch }: EntriesTabProps) {
   const { toast } = useToast();
   const firestore = useFirestore();
+  const { user } = useUser();
   const { materials, loading: loadingMaterials } = useBinMaterialsByExporter(exporterId);
   const { data: packings, loading: loadingPackings } = usePackingsByExporter(exporterId);
 
@@ -157,6 +158,8 @@ export function EntriesTab({ exporterId, exporterName, producerId, isDirectDispa
           producerId,
           items: itemsToProcess,
           createdAt: serverTimestamp(),
+          userId: user?.uid,
+          userName: user?.email,
         };
 
         if (isDirectDispatch) {

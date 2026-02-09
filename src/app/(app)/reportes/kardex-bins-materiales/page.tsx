@@ -52,6 +52,7 @@ interface KardexItem {
     cantidad: number;
     movimiento: string;
     tipo: 'Entrada' | 'Salida';
+    userName?: string;
 }
 
 
@@ -91,6 +92,7 @@ export default function BinMaterialKardexReportPage() {
                     cantidad: item.quantity,
                     movimiento: isDirectDispatch ? 'Despacho Directo' : 'Bins y Materiales',
                     tipo: (mov.type === 'entrada' && !isDirectDispatch) ? 'Entrada' : 'Salida',
+                    userName: mov.userName,
                 });
             });
         });
@@ -108,6 +110,7 @@ export default function BinMaterialKardexReportPage() {
                     cantidad: lot.binCount,
                     movimiento: 'Almacenamiento Cámara',
                     tipo: 'Entrada',
+                    userName: lot.userName,
                 });
             }
         });
@@ -127,6 +130,7 @@ export default function BinMaterialKardexReportPage() {
                         cantidad: bin.binCount,
                         movimiento: 'Despacho',
                         tipo: 'Salida',
+                        userName: dispatch.userName,
                     });
                 });
             }
@@ -146,6 +150,7 @@ export default function BinMaterialKardexReportPage() {
             { key: 'cantidad', label: 'Cantidad' },
             { key: 'movimiento', label: 'Movimiento' },
             { key: 'tipo', label: 'Entrada/Salida' },
+            { key: 'userName', label: 'Usuario' },
         ];
         
         const csv = convertToCSV(kardexData, headers);
@@ -183,13 +188,14 @@ export default function BinMaterialKardexReportPage() {
                                     <TableHead>Cód. Producto</TableHead>
                                     <TableHead>Producto</TableHead>
                                     <TableHead>Cantidad</TableHead>
+                                    <TableHead>Usuario</TableHead>
                                     <TableHead>Movimiento</TableHead>
                                     <TableHead>Entrada/Salida</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
                                 {loading ? (
-                                    Array.from({ length: 10 }).map((_, i) => <TableRow key={i}><TableCell colSpan={8}><Skeleton className="h-4 w-full" /></TableCell></TableRow>)
+                                    Array.from({ length: 10 }).map((_, i) => <TableRow key={i}><TableCell colSpan={9}><Skeleton className="h-4 w-full" /></TableCell></TableRow>)
                                 ) : kardexData.length > 0 ? (
                                     kardexData.map(item => (
                                         <TableRow key={item.key}>
@@ -201,6 +207,7 @@ export default function BinMaterialKardexReportPage() {
                                             <TableCell className={`font-semibold ${item.tipo === 'Entrada' ? 'text-green-600' : 'text-red-600'}`}>
                                                 {item.cantidad}
                                             </TableCell>
+                                            <TableCell>{item.userName || 'N/A'}</TableCell>
                                             <TableCell>{item.movimiento}</TableCell>
                                             <TableCell>
                                                 <Badge variant={getBadgeVariant(item.tipo)}>
@@ -210,7 +217,7 @@ export default function BinMaterialKardexReportPage() {
                                         </TableRow>
                                     ))
                                 ) : (
-                                    <TableRow><TableCell colSpan={8} className="h-24 text-center">No hay movimientos registrados.</TableCell></TableRow>
+                                    <TableRow><TableCell colSpan={9} className="h-24 text-center">No hay movimientos registrados.</TableCell></TableRow>
                                 )}
                             </TableBody>
                         </Table>

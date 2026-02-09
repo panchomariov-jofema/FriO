@@ -47,6 +47,8 @@ export interface BinMaterialMovement {
   }[];
   createdAt: Timestamp;
   observation?: string;
+  userId?: string;
+  userName?: string;
 }
 
 export interface BinMaterialStock {
@@ -97,6 +99,8 @@ export interface PackagingReception {
   status: 'Pendiente de almacenar' | 'Parcialmente Almacenado' | 'Almacenado';
   createdAt: Timestamp;
   updatedAt?: Timestamp;
+  userId?: string;
+  userName?: string;
 }
 
 export interface PackagingMovementItem {
@@ -114,6 +118,8 @@ export interface PackagingMovement {
   items: PackagingMovementItem[];
   status: 'Pendiente de Picking' | 'Completado';
   createdAt: Timestamp;
+  userId?: string;
+  userName?: string;
 }
 
 export interface PackagingExitItemLocation {
@@ -179,6 +185,8 @@ export interface ReceptionLot {
     preHydroTemp?: number;
     postHydroTemp?: number;
     createdAt: Timestamp | null;
+    userId?: string;
+    userName?: string;
 }
 
 export interface HidrocoolerLot {
@@ -190,6 +198,8 @@ export interface HidrocoolerLot {
   status: 'Pendiente de Pre-Hidro';
   netWeightPerBin?: number;
   receptionDate: Timestamp; // Changed from createdAt
+  userId?: string;
+  userName?: string;
 }
 
 export interface Hidrocooler {
@@ -210,6 +220,8 @@ export interface ProcessingLot {
   netWeightPerBin?: number;
   createdAt: Timestamp;
   receptionDate: Timestamp; // Propagated
+  userId?: string;
+  userName?: string;
 }
 
 export interface ChamberLot {
@@ -226,6 +238,8 @@ export interface ChamberLot {
     status: 'Pendiente por Almacenar' | 'Almacenado' | 'Despachado';
     receptionDate: Timestamp; // The true FIFO date
     storedAt: Timestamp; // When it was put in the chamber
+    userId?: string;
+    userName?: string;
 }
 
 export interface ChamberColumn {
@@ -266,6 +280,8 @@ export interface Dispatch {
     coordinate: string;
     binCount: number;
   }[];
+  userId?: string;
+  userName?: string;
 }
 
 export interface OtherFruitReceptionItem {
@@ -294,6 +310,8 @@ export interface OtherFruitReception {
   status: 'Pendiente de almacenar' | 'Parcialmente Almacenado' | 'Almacenado' | 'Despachado';
   createdAt: Timestamp;
   updatedAt?: Timestamp;
+  userId?: string;
+  userName?: string;
 }
 
 export interface OtherFruitMovementLocation {
@@ -329,6 +347,8 @@ export interface OtherFruitMovement {
   createdAt: Timestamp;
   status?: 'Pendiente de Picking' | 'Completado';
   locations?: OtherFruitMovementLocation[];
+  userId?: string;
+  userName?: string;
 }
 
 export interface PendingDocument {
