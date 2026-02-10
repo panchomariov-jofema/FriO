@@ -124,7 +124,7 @@ export function generateDteXml(doc: any): string {
       <UnmdItem>${escapeXml(item.unidad_medida)}</UnmdItem>
     </Detalle>`).join('');
 
-  const folio = doc.sourceMovementId ? doc.sourceMovementId.substring(0, 10) : 'S/F';
+  const folio = escapeXml(doc.documento.folio || 'S/F');
 
   return `<?xml version="1.0" encoding="ISO-8859-1"?>
 <EnvioDTE xmlns="http://www.sii.cl/SiiDte" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.sii.cl/SiiDte EnvioDTE_v1.0.xsd" version="1.0">

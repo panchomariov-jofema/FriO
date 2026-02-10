@@ -220,6 +220,7 @@ export function ExitsTab({ exporterId, exporterName, producerId }: ExitsTabProps
                 ciudad: producerData.ciudad || 'N/A',
             },
             documento: {
+                folio: values.document,
                 referencia_exportador: exporterName || 'N/A',
                 patente_vehiculo: values.patente_vehiculo,
                 observaciones: values.observaciones || '',

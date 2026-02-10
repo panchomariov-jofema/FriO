@@ -362,6 +362,7 @@ export interface PendingDocument {
     ciudad: string;
   };
   documento: {
+    folio: string;
     referencia_exportador: string;
     patente_vehiculo: string;
     observaciones: string;

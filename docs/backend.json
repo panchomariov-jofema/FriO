@@ -955,11 +955,12 @@
         "documento": {
           "type": "object",
           "properties": {
+            "folio": { "type": "string", "description": "The document folio number (correlative)." },
             "referencia_exportador": { "type": "string" },
             "patente_vehiculo": { "type": "string" },
             "observaciones": { "type": "string" }
           },
-          "required": ["referencia_exportador", "patente_vehiculo"]
+          "required": ["folio", "referencia_exportador", "patente_vehiculo"]
         },
         "items": {
           "type": "array",
