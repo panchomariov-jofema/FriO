@@ -14,11 +14,11 @@ import type { OtherClient, PackagingReception, PackagingMaster } from '@/lib/typ
 import { packagingExitSchema } from '@/lib/schemas';
 import { PlusCircle, Trash2, ScanLine } from 'lucide-react';
 import { useFirestore } from '@/firebase';
-import { addDoc, collection, doc, writeBatch, serverTimestamp } from 'firebase/firestore';
+import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '../ui/alert-dialog';
+import { BarcodeScanner } from '../BarcodeScanner';
 
 type ExitFormValues = z.infer<typeof packagingExitSchema>;
 
@@ -54,7 +54,6 @@ export function ExitTab() {
   
   // Scanner state
   const [scanningIndex, setScanningIndex] = React.useState<number | null>(null);
-  const [scannedValue, setScannedValue] = React.useState('');
 
   const packagingClients = React.useMemo(() => {
     return [...new Map((allClients || []).filter(c => c.type.toLowerCase() === 'embalaje').map(item => [item.clientId, item])).values()];
@@ -152,7 +151,7 @@ export function ExitTab() {
   };
   
   // Scanner confirm handler
-  const handleScanConfirm = () => {
+  const handleScanConfirm = (scannedValue: string) => {
     if (scanningIndex !== null) {
         const master = clientPackagingMasters.find(m => m.code === scannedValue);
         if (master) {
@@ -165,7 +164,6 @@ export function ExitTab() {
             });
         }
         setScanningIndex(null);
-        setScannedValue('');
     }
   };
 
@@ -232,37 +230,10 @@ export function ExitTab() {
                                         ))}
                                       </SelectContent>
                                   </Select>
-                                   <AlertDialog open={scanningIndex === index} onOpenChange={(isOpen) => { if (!isOpen) setScanningIndex(null); }}>
-                                    <AlertDialogTrigger asChild>
-                                      <Button type="button" variant="outline" size="icon" className="shrink-0" onClick={() => setScanningIndex(index)}>
-                                          <ScanLine className="h-4 w-4" />
-                                          <span className="sr-only">Escanear código</span>
-                                      </Button>
-                                    </AlertDialogTrigger>
-                                    <AlertDialogContent>
-                                      <AlertDialogHeader>
-                                        <AlertDialogTitle>Simulación de Escáner</AlertDialogTitle>
-                                        <AlertDialogDescription>
-                                          Ingrese el valor del código de barras.
-                                        </AlertDialogDescription>
-                                      </AlertDialogHeader>
-                                      <Input 
-                                          value={scannedValue} 
-                                          onChange={(e) => setScannedValue(e.target.value)} 
-                                          placeholder="Ingrese el valor del código de barras..."
-                                          onKeyDown={(e) => {
-                                              if (e.key === 'Enter') {
-                                                  e.preventDefault();
-                                                  handleScanConfirm();
-                                              }
-                                          }}
-                                      />
-                                      <AlertDialogFooter>
-                                        <AlertDialogCancel onClick={() => setScannedValue('')}>Cancelar</AlertDialogCancel>
-                                        <AlertDialogAction onClick={handleScanConfirm}>Aceptar</AlertDialogAction>
-                                      </AlertDialogFooter>
-                                    </AlertDialogContent>
-                                  </AlertDialog>
+                                  <Button type="button" variant="outline" size="icon" className="shrink-0" onClick={() => setScanningIndex(index)}>
+                                    <ScanLine className="h-4 w-4" />
+                                    <span className="sr-only">Escanear código</span>
+                                  </Button>
                                 </div>
                                 <FormMessage />
                               </FormItem>
@@ -311,6 +282,11 @@ export function ExitTab() {
           </Form>
         </CardContent>
       </Card>
+      <BarcodeScanner
+        open={scanningIndex !== null}
+        onOpenChange={(isOpen) => !isOpen && setScanningIndex(null)}
+        onScan={handleScanConfirm}
+      />
     </>
   );
 }

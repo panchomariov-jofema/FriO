@@ -19,7 +19,7 @@ import { useToast } from '@/hooks/use-toast';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { Label } from '@/components/ui/label';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '../ui/alert-dialog';
+import { BarcodeScanner } from '../BarcodeScanner';
 
 type ReceptionFormValues = z.infer<typeof packagingReceptionSchema>;
 
@@ -36,7 +36,6 @@ export function ReceptionTab() {
   const firestore = useFirestore();
   const { toast } = useToast();
   const [scanningIndex, setScanningIndex] = React.useState<number | null>(null);
-  const [scannedValue, setScannedValue] = React.useState('');
 
   const form = useForm<ReceptionFormValues>({
     resolver: zodResolver(packagingReceptionSchema),
@@ -122,12 +121,11 @@ export function ReceptionTab() {
     }
   };
 
-  const handleScanConfirm = () => {
+  const handleScanConfirm = (scannedValue: string) => {
     if (scanningIndex !== null) {
         form.setValue(`items.${scanningIndex}.packagingMasterCode`, scannedValue);
         handleCodeBlur(scanningIndex); // Trigger blur logic to find product
         setScanningIndex(null);
-        setScannedValue('');
     }
   };
 
@@ -143,158 +141,138 @@ export function ReceptionTab() {
 
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Recepción de Pallets de Embalaje</CardTitle>
-        <CardDescription>Registre la entrada de materiales de embalaje de un cliente.</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-            <div className="grid md:grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="clientId"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Cliente de Embalaje</FormLabel>
-                    <Select onValueChange={handleClientChange} value={field.value} disabled={loadingClients}>
+    <>
+      <Card>
+        <CardHeader>
+          <CardTitle>Recepción de Pallets de Embalaje</CardTitle>
+          <CardDescription>Registre la entrada de materiales de embalaje de un cliente.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+              <div className="grid md:grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="clientId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Cliente de Embalaje</FormLabel>
+                      <Select onValueChange={handleClientChange} value={field.value} disabled={loadingClients}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Seleccione un cliente..." />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {packagingClients.map(c => (
+                            <SelectItem key={c.id} value={c.clientId}>{c.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="document"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Documento de Entrada (Guía)</FormLabel>
                       <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Seleccione un cliente..." />
-                        </SelectTrigger>
+                        <Input
+                          {...field}
+                          autoComplete="off"
+                          inputMode="numeric"
+                          pattern="[0-9]*"
+                        />
                       </FormControl>
-                      <SelectContent>
-                        {packagingClients.map(c => (
-                          <SelectItem key={c.id} value={c.clientId}>{c.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="document"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Documento de Entrada (Guía)</FormLabel>
-                    <FormControl>
-                      <Input
-                        {...field}
-                        autoComplete="off"
-                        inputMode="numeric"
-                        pattern="[0-9]*"
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              
+              <div className="space-y-4">
+                <FormLabel>Ítems Recibidos</FormLabel>
+                {fields.map((field, index) => (
+                  <div key={field.id} className="flex items-start gap-2 p-3 border rounded-md">
+                    <div className="flex-1 grid sm:grid-cols-3 gap-4 items-start">
+                      <FormField
+                        control={form.control}
+                        name={`items.${index}.packagingMasterCode`}
+                        render={({ field: itemField }) => (
+                          <FormItem>
+                            <FormLabel>Cod. Artículo</FormLabel>
+                            <div className="flex items-center gap-2">
+                               <FormControl>
+                                   <Input 
+                                    {...itemField} 
+                                    onBlur={() => handleCodeBlur(index)} 
+                                    autoComplete="off" 
+                                    disabled={!selectedClientId || loadingMasters}
+                                    placeholder={!selectedClientId ? "Seleccione cliente" : "Ingrese código..."}
+                                    inputMode="numeric" 
+                                    pattern="[0-9]*"
+                                   />
+                               </FormControl>
+                                <Button type="button" variant="outline" size="icon" className="shrink-0" onClick={() => setScanningIndex(index)}>
+                                    <ScanLine className="h-4 w-4" />
+                                    <span className="sr-only">Escanear código</span>
+                                </Button>
+                             </div>
+                             <FormMessage />
+                          </FormItem>
+                        )}
                       />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-            
-            <div className="space-y-4">
-              <FormLabel>Ítems Recibidos</FormLabel>
-              {fields.map((field, index) => (
-                <div key={field.id} className="flex items-start gap-2 p-3 border rounded-md">
-                  <div className="flex-1 grid sm:grid-cols-3 gap-4 items-start">
-                    <FormField
-                      control={form.control}
-                      name={`items.${index}.packagingMasterCode`}
-                      render={({ field: itemField }) => (
-                        <FormItem>
-                          <FormLabel>Cod. Artículo</FormLabel>
-                          <div className="flex items-center gap-2">
-                             <FormControl>
-                                 <Input 
-                                  {...itemField} 
-                                  onBlur={() => handleCodeBlur(index)} 
-                                  autoComplete="off" 
-                                  disabled={!selectedClientId || loadingMasters}
-                                  placeholder={!selectedClientId ? "Seleccione cliente" : "Ingrese código..."}
-                                  inputMode="numeric" 
-                                  pattern="[0-9]*"
-                                 />
-                             </FormControl>
-                              <AlertDialog open={scanningIndex === index} onOpenChange={(isOpen) => { if (!isOpen) setScanningIndex(null); }}>
-                                <AlertDialogTrigger asChild>
-                                  <Button type="button" variant="outline" size="icon" className="shrink-0" onClick={() => setScanningIndex(index)}>
-                                      <ScanLine className="h-4 w-4" />
-                                      <span className="sr-only">Escanear código</span>
-                                  </Button>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                  <AlertDialogHeader>
-                                    <AlertDialogTitle>Simulación de Escáner</AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                      En la aplicación final, esto abriría la cámara para escanear un código de barras. Por ahora, puede ingresar el valor manualmente.
-                                    </AlertDialogDescription>
-                                  </AlertDialogHeader>
-                                  <Input 
-                                      value={scannedValue} 
-                                      onChange={(e) => setScannedValue(e.target.value)} 
-                                      placeholder="Ingrese el valor del código de barras..."
-                                      onKeyDown={(e) => {
-                                          if (e.key === 'Enter') {
-                                              e.preventDefault();
-                                              handleScanConfirm();
-                                          }
-                                      }}
-                                  />
-                                  <AlertDialogFooter>
-                                    <AlertDialogCancel onClick={() => setScannedValue('')}>Cancelar</AlertDialogCancel>
-                                    <AlertDialogAction onClick={handleScanConfirm}>Aceptar</AlertDialogAction>
-                                  </AlertDialogFooter>
-                                </AlertDialogContent>
-                              </AlertDialog>
-                           </div>
-                           <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                     <div className="space-y-2">
-                        <Label>Descripción</Label>
-                        <p className="font-medium text-sm h-10 flex items-center">
-                            {form.watch(`items.${index}.packagingMasterName`) || <span className="text-muted-foreground">--</span>}
-                        </p>
+                       <div className="space-y-2">
+                          <Label>Descripción</Label>
+                          <p className="font-medium text-sm h-10 flex items-center">
+                              {form.watch(`items.${index}.packagingMasterName`) || <span className="text-muted-foreground">--</span>}
+                          </p>
+                      </div>
+                      <FormField
+                        control={form.control}
+                        name={`items.${index}.palletCount`}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Cant. Pallets</FormLabel>
+                            <FormControl><Input type="number" {...field} value={field.value ?? ''} autoComplete="off" min="1" inputMode="numeric" /></FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
                     </div>
-                    <FormField
-                      control={form.control}
-                      name={`items.${index}.palletCount`}
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Cant. Pallets</FormLabel>
-                          <FormControl><Input type="number" {...field} value={field.value ?? ''} autoComplete="off" min="1" inputMode="numeric" /></FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                    <Button type="button" variant="destructive" size="icon" onClick={() => remove(index)} disabled={fields.length <= 1}>
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                   </div>
-                  <Button type="button" variant="destructive" size="icon" onClick={() => remove(index)} disabled={fields.length <= 1}>
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              ))}
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => append(defaultItem)}
-              >
-                <PlusCircle className="mr-2 h-4 w-4" />
-                Agregar Artículo
-              </Button>
-            </div>
+                ))}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => append(defaultItem)}
+                >
+                  <PlusCircle className="mr-2 h-4 w-4" />
+                  Agregar Artículo
+                </Button>
+              </div>
 
-            <div className="flex justify-end">
-              <Button type="submit" disabled={form.formState.isSubmitting}>
-                {form.formState.isSubmitting ? 'Registrando...' : 'Confirmar Recepción'}
-              </Button>
-            </div>
-          </form>
-        </Form>
-      </CardContent>
-    </Card>
+              <div className="flex justify-end">
+                <Button type="submit" disabled={form.formState.isSubmitting}>
+                  {form.formState.isSubmitting ? 'Registrando...' : 'Confirmar Recepción'}
+                </Button>
+              </div>
+            </form>
+          </Form>
+        </CardContent>
+      </Card>
+      <BarcodeScanner
+        open={scanningIndex !== null}
+        onOpenChange={(isOpen) => !isOpen && setScanningIndex(null)}
+        onScan={handleScanConfirm}
+      />
+    </>
   );
 }
