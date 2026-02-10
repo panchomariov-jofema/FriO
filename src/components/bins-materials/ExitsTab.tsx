@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { useFirestore, useUser } from '@/firebase';
 import { collection, query, where, runTransaction, serverTimestamp, getDocs, doc } from 'firebase/firestore';
-import type { BinMaterialStock, BinMaterialMovement, Producer } from '@/lib/types';
+import type { BinMaterialStock, BinMaterialMovement, Producer, BusinessEntity, DTEGuiaDespacho } from '@/lib/types';
 import { useBinMaterialsByExporter } from '@/hooks/use-bin-materials-by-exporter';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
 import { errorEmitter } from '@/firebase/error-emitter';
@@ -59,6 +59,7 @@ export function ExitsTab({ exporterId, exporterName, producerId }: ExitsTabProps
   const { materials, loading: loadingMaterials } = useBinMaterialsByExporter(exporterId);
   const { data: stockData, loading: loadingStock } = useFirestoreCollection<BinMaterialStock>('binMaterialStock');
   const { data: movements, loading: loadingMovements } = useFirestoreCollection<BinMaterialMovement>('binMaterialMovements');
+  const { data: businessEntities, loading: loadingEntities } = useFirestoreCollection<BusinessEntity>('businessEntities');
 
   const form = useForm<MovementFormValues>({
     resolver: zodResolver(movementSchema),
@@ -157,7 +158,12 @@ export function ExitsTab({ exporterId, exporterName, producerId }: ExitsTabProps
   }, [materials, form, nextExitNumber]);
 
   const onSubmit = async (values: MovementFormValues) => {
-    if (!firestore) return;
+    if (!firestore || !businessEntities) return;
+
+    if (businessEntities.length === 0) {
+        toast({ variant: 'destructive', title: 'Error de Configuración', description: 'Debe registrar al menos una entidad en "Datos Matriz" para emitir documentos.' });
+        return;
+    }
 
     const itemsToProcess = values.items.filter(item => item.quantity > 0);
 
@@ -193,6 +199,7 @@ export function ExitsTab({ exporterId, exporterName, producerId }: ExitsTabProps
 
     try {
       await runTransaction(firestore, async (transaction) => {
+        // Create BinMaterialMovement
         const movementRef = doc(collection(firestore, 'binMaterialMovements'));
         const movementData = {
           type: 'salida' as const,
@@ -208,36 +215,57 @@ export function ExitsTab({ exporterId, exporterName, producerId }: ExitsTabProps
         };
         transaction.set(movementRef, movementData);
         
-        // Create pending document
+        // Create pending DTE document
+        const emisorData = businessEntities[0];
         const pendingDocRef = doc(collection(firestore, 'documentosPendientes'));
-        const pendingDocData = {
+        const dteData: Omit<DTEGuiaDespacho, 'id' | 'createdAt'> = {
+            idDoc: {
+                tipoDTE: 52,
+                folio: parseInt(values.document, 10),
+                fchEmis: new Date().toISOString().split('T')[0],
+            },
+            emisor: {
+                RUTEmisor: emisorData.rut,
+                RznSocEmisor: emisorData.razonSocial,
+                GiroEmis: emisorData.giro,
+                Acteco: parseInt(emisorData.actividadComercial, 10) || undefined,
+                DirOrigen: emisorData.direccion,
+                CmnaOrigen: emisorData.comuna,
+            },
             receptor: {
-                rut: producerData.rut || 'N/A',
-                razon_social: producerData.name,
-                giro: producerData.giro || 'N/A',
-                direccion: producerData.direccion || 'N/A',
-                comuna: producerData.comuna || 'N/A',
-                ciudad: producerData.ciudad || 'N/A',
+                RUTRecep: producerData.rut || 'N/A',
+                RznSocRecep: producerData.name,
+                GiroRecep: producerData.giro || 'N/A',
+                DirRecep: producerData.direccion || 'N/A',
+                CmnaRecep: producerData.comuna || 'N/A',
+                CiudadRecep: producerData.ciudad || 'N/A',
             },
-            documento: {
-                folio: values.document,
-                referencia_exportador: exporterName || 'N/A',
-                patente_vehiculo: values.patente_vehiculo,
-                observaciones: values.observaciones || '',
+            transporte: {
+                Patente: values.patente_vehiculo,
+                DirDest: producerData.direccion || 'N/A',
+                CmnaDest: producerData.comuna || 'N/A',
+                CiudadDest: producerData.ciudad || 'N/A'
             },
-            items: itemsToProcess.map((item, index) => ({
-                item: index + 1,
-                codigo: item.binMaterialCode,
-                descripcion: item.binMaterialName,
-                unidad_medida: 'unidades',
-                cantidad: item.quantity,
+            totales: {
+                MntNeto: 0,
+                MntExe: 0,
+                IVA: 0,
+                MntTotal: 0,
+            },
+            detalle: itemsToProcess.map((item, index) => ({
+                NroLinDet: index + 1,
+                NmbItem: item.binMaterialName,
+                QtyItem: item.quantity,
+                UnmdItem: 'unid',
+                PrcItem: 0,
+                MontoItem: 0,
             })),
-            fecha_salida: serverTimestamp(),
             estado: 'PENDIENTE',
             sourceMovementId: movementRef.id,
         };
-        transaction.set(pendingDocRef, pendingDocData);
+        transaction.set(pendingDocRef, { ...dteData, createdAt: serverTimestamp() });
 
+        // Update stock
         for (const item of itemsToProcess) {
           const stockQuery = query(
             collection(firestore, 'binMaterialStock'),
@@ -285,7 +313,7 @@ export function ExitsTab({ exporterId, exporterName, producerId }: ExitsTabProps
     }
   };
   
-  const isLoading = loadingMaterials || loadingStock || loadingMovements;
+  const isLoading = loadingMaterials || loadingStock || loadingMovements || loadingEntities;
   const formItems = form.getValues('items');
 
   return (

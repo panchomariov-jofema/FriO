@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
-import type { PendingDocument } from '@/lib/types';
+import type { DTEGuiaDespacho } from '@/lib/types';
 import { collection, query, where, updateDoc, doc } from 'firebase/firestore';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
 import { Skeleton } from '../ui/skeleton';
@@ -24,9 +24,9 @@ export function PendingDocsTab() {
     return query(collection(firestore, 'documentosPendientes'), where('estado', '==', 'PENDIENTE'));
   }, [firestore]);
 
-  const { data: pendingDocs, loading } = useCollection<PendingDocument>(pendingDocsQuery);
+  const { data: pendingDocs, loading } = useCollection<DTEGuiaDespacho>(pendingDocsQuery);
   
-  const handleGenerateXml = async (docToProcess: PendingDocument) => {
+  const handleGenerateXml = async (docToProcess: DTEGuiaDespacho) => {
     const xmlString = generateDteXml(docToProcess);
     
     // Download the XML file
@@ -34,7 +34,7 @@ export function PendingDocsTab() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    const folio = docToProcess.sourceMovementId ? docToProcess.sourceMovementId.substring(0, 10) : 'S-F';
+    const folio = docToProcess.idDoc.folio;
     link.download = `DTE_52_F${folio}.xml`;
     document.body.appendChild(link);
     link.click();
@@ -75,10 +75,10 @@ export function PendingDocsTab() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Fecha Salida</TableHead>
-                <TableHead>Razón Social Receptor</TableHead>
-                <TableHead>Exportador Referencia</TableHead>
-                <TableHead>Patente Vehículo</TableHead>
+                <TableHead>Fecha Emisión</TableHead>
+                <TableHead>Folio</TableHead>
+                <TableHead>Receptor</TableHead>
+                <TableHead>Patente</TableHead>
                 <TableHead>Estado</TableHead>
                 <TableHead className="text-right">Acción</TableHead>
               </TableRow>
@@ -93,10 +93,10 @@ export function PendingDocsTab() {
               ) : pendingDocs && pendingDocs.length > 0 ? (
                 pendingDocs.map(doc => (
                     <TableRow key={doc.id}>
-                        <TableCell>{doc.fecha_salida?.toDate().toLocaleString('es-CL')}</TableCell>
-                        <TableCell>{doc.receptor.razon_social}</TableCell>
-                        <TableCell>{doc.documento.referencia_exportador}</TableCell>
-                        <TableCell className="font-mono">{doc.documento.patente_vehiculo}</TableCell>
+                        <TableCell>{doc.idDoc.fchEmis}</TableCell>
+                        <TableCell className="font-mono">{doc.idDoc.folio}</TableCell>
+                        <TableCell>{doc.receptor.RznSocRecep}</TableCell>
+                        <TableCell className="font-mono">{doc.transporte?.Patente}</TableCell>
                         <TableCell>
                             <Badge variant="destructive">{doc.estado}</Badge>
                         </TableCell>

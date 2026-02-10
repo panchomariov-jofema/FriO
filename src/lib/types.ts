@@ -351,32 +351,58 @@ export interface OtherFruitMovement {
   userName?: string;
 }
 
-export interface PendingDocument {
+export interface DTEGuiaDespacho {
   id: string;
+  idDoc: {
+    tipoDTE: number;
+    folio: number;
+    fchEmis: string; // YYYY-MM-DD
+  };
+  emisor: {
+    RUTEmisor: string;
+    RznSocEmisor: string;
+    GiroEmis: string;
+    Acteco?: number;
+    DirOrigen: string;
+    CmnaOrigen: string;
+  };
   receptor: {
-    rut: string;
-    razon_social: string;
-    giro: string;
-    direccion: string;
-    comuna: string;
-    ciudad: string;
+    RUTRecep: string;
+    RznSocRecep: string;
+    GiroRecep: string;
+    DirRecep: string;
+    CmnaRecep: string;
+    CiudadRecep: string;
   };
-  documento: {
-    folio: string;
-    referencia_exportador: string;
-    patente_vehiculo: string;
-    observaciones: string;
+  transporte?: {
+    Patente: string;
+    DirDest: string;
+    CmnaDest: string;
+    CiudadDest: string;
   };
-  items: {
-    item: number;
-    codigo: string;
-    descripcion: string;
-    unidad_medida: string;
-    cantidad: number;
+  totales: {
+    MntNeto: number;
+    MntExe?: number;
+    IVA?: number;
+    MntTotal: number;
+  };
+  detalle: {
+    NroLinDet: number;
+    NmbItem: string;
+    QtyItem: number;
+    UnmdItem: string;
+    PrcItem?: number;
+    MontoItem: number;
   }[];
-  fecha_salida: Timestamp;
+  referencias?: {
+    NroLinRef: number;
+    TpoDocRef: string;
+    FolioRef: number;
+    FchRef: string; // YYYY-MM-DD
+  }[];
   estado: 'PENDIENTE' | 'GENERADO';
   sourceMovementId: string;
+  createdAt: Timestamp;
 }
 
 

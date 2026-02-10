@@ -1,6 +1,6 @@
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
-import type { Chamber } from './types';
+import type { Chamber, DTEGuiaDespacho } from './types';
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -75,32 +75,10 @@ export const getPairedCoordinates = (chamberConfig: Chamber): string[] => {
     return coords;
 };
 
-export function generateDteXml(doc: any): string {
-  // Hardcoded Emitter data - This should ideally come from a config
-  const emisor = {
-    RUT: '76.123.456-7',
-    RazonSocial: 'FRIGO MANAGER SPA',
-    Giro: 'SERVICIOS DE FRIGORIFICO',
-    Direccion: 'AV. FRUTOS DEL PAIS 123',
-    Comuna: 'QUILICURA',
-    Ciudad: 'SANTIAGO'
-  };
-
-  const formatDate = (timestamp: any) => {
-    if (!timestamp?.toDate) return new Date().toISOString().split('T')[0];
-    return timestamp.toDate().toISOString().split('T')[0];
-  };
-
-  const formatDateTime = (timestamp: any) => {
-     if (!timestamp?.toDate) return new Date().toISOString();
-     return timestamp.toDate().toISOString();
-  }
-
-  const escapeXml = (unsafe: string) => {
-    if (typeof unsafe !== 'string') {
-      return '';
-    }
-    return unsafe.replace(/[<>&'"]/g, (c) => {
+export function generateDteXml(doc: DTEGuiaDespacho): string {
+  const escapeXml = (unsafe: any) => {
+    const str = String(unsafe ?? '');
+    return str.replace(/[<>&'"]/g, (c) => {
         switch (c) {
             case '<': return '&lt;';
             case '>': return '&gt;';
@@ -112,77 +90,80 @@ export function generateDteXml(doc: any): string {
     });
   };
 
-  const itemsXml = doc.items.map((item: any, index: number) => `
+  const itemsXml = doc.detalle.map((item) => `
     <Detalle>
-      <NroLinDet>${index + 1}</NroLinDet>
-      <CdgItem>
-        <TpoCodigo>INT1</TpoCodigo>
-        <VlrCodigo>${escapeXml(item.codigo)}</VlrCodigo>
-      </CdgItem>
-      <NmbItem>${escapeXml(item.descripcion)}</NmbItem>
-      <QtyItem>${item.cantidad}</QtyItem>
-      <UnmdItem>${escapeXml(item.unidad_medida)}</UnmdItem>
+      <NroLinDet>${item.NroLinDet}</NroLinDet>
+      <NmbItem>${escapeXml(item.NmbItem)}</NmbItem>
+      <QtyItem>${item.QtyItem}</QtyItem>
+      <UnmdItem>${escapeXml(item.UnmdItem)}</UnmdItem>
+      <PrcItem>${item.PrcItem || 0}</PrcItem>
+      <MontoItem>${item.MontoItem}</MontoItem>
     </Detalle>`).join('');
 
-  const folio = escapeXml(doc.documento.folio || 'S/F');
+  const referenciasXml = (doc.referencias || []).map(ref => `
+    <Referencia>
+       <NroLinRef>${ref.NroLinRef}</NroLinRef>
+       <TpoDocRef>${escapeXml(ref.TpoDocRef)}</TpoDocRef>
+       <FolioRef>${ref.FolioRef}</FolioRef>
+       <FchRef>${escapeXml(ref.FchRef)}</FchRef>
+    </Referencia>`).join('');
 
   return `<?xml version="1.0" encoding="ISO-8859-1"?>
 <EnvioDTE xmlns="http://www.sii.cl/SiiDte" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.sii.cl/SiiDte EnvioDTE_v1.0.xsd" version="1.0">
   <SetDTE ID="SetDoc">
     <Caratula version="1.0">
-      <RutEmisor>${emisor.RUT}</RutEmisor>
-      <RutEnvia>${emisor.RUT}</RutEnvia>
-      <RutReceptor>${escapeXml(doc.receptor.rut)}</RutReceptor>
+      <RutEmisor>${escapeXml(doc.emisor.RUTEmisor)}</RutEmisor>
+      <RutEnvia>${escapeXml(doc.emisor.RUTEmisor)}</RutEnvia>
+      <RutReceptor>${escapeXml(doc.receptor.RUTRecep)}</RutReceptor>
       <FchResol>2024-01-01</FchResol>
       <NroResol>0</NroResol>
-      <TmstFirmaEnv>${formatDateTime(new Date())}</TmstFirmaEnv>
+      <TmstFirmaEnv>${new Date().toISOString()}</TmstFirmaEnv>
       <SubTotDTE>
-        <TpoDTE>52</TpoDTE>
+        <TpoDTE>${doc.idDoc.tipoDTE}</TpoDTE>
         <NroDTE>1</NroDTE>
       </SubTotDTE>
     </Caratula>
     <DTE version="1.0">
-      <Documento ID="F${folio}T52">
+      <Documento ID="F${doc.idDoc.folio}T${doc.idDoc.tipoDTE}">
         <Encabezado>
           <IdDoc>
-            <TipoDTE>52</TipoDTE>
-            <Folio>${folio}</Folio>
-            <FchEmis>${formatDate(doc.fecha_salida)}</FchEmis>
+            <TipoDTE>${doc.idDoc.tipoDTE}</TipoDTE>
+            <Folio>${doc.idDoc.folio}</Folio>
+            <FchEmis>${escapeXml(doc.idDoc.fchEmis)}</FchEmis>
             <TipoDespacho>1</TipoDespacho>
             <IndTraslado>1</IndTraslado>
           </IdDoc>
           <Emisor>
-            <RUTEmisor>${emisor.RUT}</RUTEmisor>
-            <RznSoc>${emisor.RazonSocial}</RznSoc>
-            <GiroEmis>${emisor.Giro}</GiroEmis>
-            <DirOrigen>${emisor.Direccion}</DirOrigen>
-            <CmnaOrigen>${emisor.Comuna}</CmnaOrigen>
-            <CiudadOrigen>${emisor.Ciudad}</CiudadOrigen>
+            <RUTEmisor>${escapeXml(doc.emisor.RUTEmisor)}</RUTEmisor>
+            <RznSoc>${escapeXml(doc.emisor.RznSocEmisor)}</RznSoc>
+            <GiroEmis>${escapeXml(doc.emisor.GiroEmis)}</GiroEmis>
+            ${doc.emisor.Acteco ? `<Acteco>${doc.emisor.Acteco}</Acteco>` : ''}
+            <DirOrigen>${escapeXml(doc.emisor.DirOrigen)}</DirOrigen>
+            <CmnaOrigen>${escapeXml(doc.emisor.CmnaOrigen)}</CmnaOrigen>
           </Emisor>
           <Receptor>
-            <RUTRecep>${escapeXml(doc.receptor.rut)}</RUTRecep>
-            <RznSocRecep>${escapeXml(doc.receptor.razon_social)}</RznSocRecep>
-            <GiroRecep>${escapeXml(doc.receptor.giro)}</GiroRecep>
-            <DirRecep>${escapeXml(doc.receptor.direccion)}</DirRecep>
-            <CmnaRecep>${escapeXml(doc.receptor.comuna)}</CmnaRecep>
-            <CiudadRecep>${escapeXml(doc.receptor.ciudad)}</CiudadRecep>
+            <RUTRecep>${escapeXml(doc.receptor.RUTRecep)}</RUTRecep>
+            <RznSocRecep>${escapeXml(doc.receptor.RznSocRecep)}</RznSocRecep>
+            <GiroRecep>${escapeXml(doc.receptor.GiroRecep)}</GiroRecep>
+            <DirRecep>${escapeXml(doc.receptor.DirRecep)}</DirRecep>
+            <CmnaRecep>${escapeXml(doc.receptor.CmnaRecep)}</CmnaRecep>
+            <CiudadRecep>${escapeXml(doc.receptor.CiudadRecep)}</CiudadRecep>
           </Receptor>
-          <Transporte>
-            <Patente>${escapeXml(doc.documento.patente_vehiculo)}</Patente>
-            <DirDest>${escapeXml(doc.receptor.direccion)}</DirDest>
-            <CmnaDest>${escapeXml(doc.receptor.comuna)}</CmnaDest>
-            <CiudadDest>${escapeXml(doc.receptor.ciudad)}</CiudadDest>
-          </Transporte>
+          ${doc.transporte ? `<Transporte>
+            <Patente>${escapeXml(doc.transporte.Patente)}</Patente>
+            <DirDest>${escapeXml(doc.transporte.DirDest)}</DirDest>
+            <CmnaDest>${escapeXml(doc.transporte.CmnaDest)}</CmnaDest>
+            <CiudadDest>${escapeXml(doc.transporte.CiudadDest)}</CiudadDest>
+          </Transporte>` : ''}
           <Totales>
-            <MntTotal>0</MntTotal>
+            <MntNeto>${doc.totales.MntNeto}</MntNeto>
+            <MntExe>${doc.totales.MntExe || 0}</MntExe>
+            <IVA>${doc.totales.IVA || 0}</IVA>
+            <MntTotal>${doc.totales.MntTotal}</MntTotal>
           </Totales>
         </Encabezado>
         ${itemsXml}
-        <Referencia>
-           <NroLinRef>1</NroLinRef>
-           <CodRef>1</CodRef>
-           <RazonRef>${escapeXml(doc.documento.observaciones)}</RazonRef>
-        </Referencia>
+        ${referenciasXml}
       </Documento>
     </DTE>
   </SetDTE>

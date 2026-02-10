@@ -177,6 +177,12 @@
         "observation": {
           "type": "string",
           "description": "Optional observation about the movement, e.g., 'Despacho Directo'."
+        },
+        "userId": {
+            "type": "string"
+        },
+        "userName": {
+            "type": "string"
         }
       },
       "required": [
@@ -355,6 +361,12 @@
          "updatedAt": {
           "type": "string",
           "format": "date-time"
+        },
+        "userId": {
+            "type": "string"
+        },
+        "userName": {
+            "type": "string"
         }
       },
       "required": ["clientId", "clientName", "document", "items", "status", "createdAt"]
@@ -401,7 +413,13 @@
           }
         },
         "status": { "type": "string", "enum": ["Pendiente de almacenar", "Parcialmente Almacenado", "Almacenado"] },
-        "createdAt": { "type": "string", "format": "date-time" }
+        "createdAt": { "type": "string", "format": "date-time" },
+        "userId": {
+            "type": "string"
+        },
+        "userName": {
+            "type": "string"
+        }
       },
       "required": ["clientId", "clientName", "unit", "document", "items", "status", "createdAt"]
     },
@@ -446,6 +464,12 @@
         "createdAt": {
           "type": "string",
           "format": "date-time"
+        },
+        "userId": {
+            "type": "string"
+        },
+        "userName": {
+            "type": "string"
         }
       },
       "required": ["type", "clientId", "document", "items", "createdAt", "status"]
@@ -513,6 +537,12 @@
             },
             "required": ["receptionId", "itemIndex", "quantity", "unit", "productName", "location"]
           }
+        },
+        "userId": {
+            "type": "string"
+        },
+        "userName": {
+            "type": "string"
         }
       },
       "required": ["type", "clientId", "clientName", "unit", "items", "createdAt"]
@@ -650,6 +680,12 @@
           "type": "string",
           "format": "date-time",
           "description": "Timestamp of when the lot was created."
+        },
+        "userId": {
+            "type": "string"
+        },
+        "userName": {
+            "type": "string"
         }
       },
       "required": [
@@ -686,10 +722,15 @@
           "type": "string",
           "description": "Status of the lot in the hidrocooler (e.g., 'Pendiente de Pre-Hidro', 'En Proceso', 'Finalizado')."
         },
-        "createdAt": {
-          "type": "string",
-          "format": "date-time",
-          "description": "Timestamp of when the lot entered the hidrocooler process."
+        "receptionDate": {
+            "type": "string",
+            "format": "date-time"
+        },
+        "userId": {
+            "type": "string"
+        },
+        "userName": {
+            "type": "string"
         }
       },
       "required": [
@@ -697,7 +738,7 @@
         "producerShortName",
         "binCount",
         "status",
-        "createdAt"
+        "receptionDate"
       ]
     },
     "Hidrocooler": {
@@ -758,6 +799,12 @@
           "type": "string",
           "format": "date-time",
           "description": "Timestamp of when processing started."
+        },
+        "userId": {
+            "type": "string"
+        },
+        "userName": {
+            "type": "string"
         }
       },
       "required": [
@@ -813,10 +860,20 @@
           "enum": ["Pendiente por Almacenar", "Almacenado", "Despachado"],
           "description": "Status of the lot in the chamber."
         },
+        "receptionDate": {
+            "type": "string",
+            "format": "date-time"
+        },
         "storedAt": {
           "type": "string",
           "format": "date-time",
           "description": "Timestamp of when the lot was moved to the chamber module."
+        },
+        "userId": {
+            "type": "string"
+        },
+        "userName": {
+            "type": "string"
         }
       },
       "required": [
@@ -924,6 +981,12 @@
             },
             "required": ["chamberLotId", "displayLotId", "chamberId", "coordinate", "binCount"]
           }
+        },
+        "userId": {
+            "type": "string"
+        },
+        "userName": {
+            "type": "string"
         }
       },
       "required": [
@@ -935,52 +998,95 @@
         "bins"
       ]
     },
-    "PendingDocument": {
-      "title": "Pending Document",
-      "description": "Represents a pending DTE document to be generated from a material exit.",
+    "DTEGuiaDespacho": {
+      "title": "DTE Guía de Despacho",
+      "description": "Represents the data structure for an electronic shipping guide (DTE Tipo 52) as per SII requirements.",
       "type": "object",
       "properties": {
+        "idDoc": {
+          "type": "object",
+          "properties": {
+            "tipoDTE": { "type": "number", "description": "Document Type. 52 for Guía de Despacho." },
+            "folio": { "type": "number", "description": "Correlative document number." },
+            "fchEmis": { "type": "string", "format": "date", "description": "Emission date (YYYY-MM-DD)." }
+          },
+          "required": ["tipoDTE", "folio", "fchEmis"]
+        },
+        "emisor": {
+          "type": "object",
+          "properties": {
+            "RUTEmisor": { "type": "string" },
+            "RznSocEmisor": { "type": "string" },
+            "GiroEmis": { "type": "string" },
+            "Acteco": { "type": "number" },
+            "DirOrigen": { "type": "string" },
+            "CmnaOrigen": { "type": "string" }
+          },
+          "required": ["RUTEmisor", "RznSocEmisor", "GiroEmis", "DirOrigen", "CmnaOrigen"]
+        },
         "receptor": {
           "type": "object",
           "properties": {
-            "rut": { "type": "string" },
-            "razon_social": { "type": "string" },
-            "giro": { "type": "string" },
-            "direccion": { "type": "string" },
-            "comuna": { "type": "string" },
-            "ciudad": { "type": "string" }
+            "RUTRecep": { "type": "string" },
+            "RznSocRecep": { "type": "string" },
+            "GiroRecep": { "type": "string" },
+            "DirRecep": { "type": "string" },
+            "CmnaRecep": { "type": "string" },
+            "CiudadRecep": { "type": "string" }
           },
-          "required": ["rut", "razon_social", "giro", "direccion", "comuna", "ciudad"]
+          "required": ["RUTRecep", "RznSocRecep", "DirRecep", "CmnaRecep"]
         },
-        "documento": {
+        "transporte": {
+            "type": "object",
+            "properties": {
+                "Patente": { "type": "string" },
+                "DirDest": { "type": "string" },
+                "CmnaDest": { "type": "string" },
+                "CiudadDest": { "type": "string" }
+            }
+        },
+        "totales": {
           "type": "object",
           "properties": {
-            "folio": { "type": "string", "description": "The document folio number (correlative)." },
-            "referencia_exportador": { "type": "string" },
-            "patente_vehiculo": { "type": "string" },
-            "observaciones": { "type": "string" }
+            "MntNeto": { "type": "number" },
+            "MntExe": { "type": "number" },
+            "IVA": { "type": "number" },
+            "MntTotal": { "type": "number" }
           },
-          "required": ["folio", "referencia_exportador", "patente_vehiculo"]
+          "required": ["MntNeto", "MntTotal"]
         },
-        "items": {
+        "detalle": {
           "type": "array",
           "items": {
             "type": "object",
             "properties": {
-              "item": { "type": "number" },
-              "codigo": { "type": "string" },
-              "descripcion": { "type": "string" },
-              "unidad_medida": { "type": "string" },
-              "cantidad": { "type": "number" }
+              "NroLinDet": { "type": "number" },
+              "NmbItem": { "type": "string" },
+              "QtyItem": { "type": "number" },
+              "UnmdItem": { "type": "string" },
+              "PrcItem": { "type": "number" },
+              "MontoItem": { "type": "number" }
             },
-            "required": ["item", "codigo", "descripcion", "unidad_medida", "cantidad"]
+            "required": ["NroLinDet", "NmbItem", "QtyItem", "MontoItem"]
           }
         },
-        "fecha_salida": { "type": "string", "format": "date-time" },
+        "referencias": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "NroLinRef": { "type": "number" },
+              "TpoDocRef": { "type": "string" },
+              "FolioRef": { "type": "number" },
+              "FchRef": { "type": "string", "format": "date" }
+            },
+            "required": ["NroLinRef", "TpoDocRef", "FolioRef", "FchRef"]
+          }
+        },
         "estado": { "type": "string", "enum": ["PENDIENTE", "GENERADO"] },
         "sourceMovementId": { "type": "string", "description": "The ID of the original BinMaterialMovement document." }
       },
-      "required": ["receptor", "documento", "items", "fecha_salida", "estado", "sourceMovementId"]
+      "required": ["idDoc", "emisor", "receptor", "totales", "detalle", "estado", "sourceMovementId"]
     },
     "BusinessEntity": {
       "$schema": "http://json-schema.org/draft-07/schema#",
@@ -1371,9 +1477,9 @@
       {
         "path": "/documentosPendientes/{documentoId}",
         "definition": {
-          "entityName": "PendingDocument",
+          "entityName": "DTEGuiaDespacho",
           "schema": {
-            "$ref": "#/backend/entities/PendingDocument"
+            "$ref": "#/backend/entities/DTEGuiaDespacho"
           },
           "description": "Stores pending DTE documents generated from material exits.",
           "params": [
