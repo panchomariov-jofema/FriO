@@ -34,7 +34,8 @@ export function BarcodeScanner({ open, onOpenChange, onScan }: BarcodeScannerPro
       }
       
       try {
-        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+        // Use a more generic video constraint for better compatibility
+        stream = await navigator.mediaDevices.getUserMedia({ video: true });
         setHasCameraPermission(true);
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
@@ -81,7 +82,7 @@ export function BarcodeScanner({ open, onOpenChange, onScan }: BarcodeScannerPro
         <DialogHeader>
           <DialogTitle>Escanear Código de Barras</DialogTitle>
           <DialogDescription>
-            Apunte la cámara al código de barras. La lectura automática no está implementada, ingrese el valor manualmente.
+            Apunte la cámara al código de barras e ingrese el número manualmente.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
