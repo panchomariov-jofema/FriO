@@ -36,7 +36,17 @@ export function BarcodeScanner({ open, onOpenChange, onScan }: BarcodeScannerPro
           }
         };
 
-        const config = { fps: 10, qrbox: { width: 250, height: 250 } };
+        const config = { 
+            fps: 10, 
+            qrbox: (viewfinderWidth: number, viewfinderHeight: number) => {
+                const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
+                const qrboxSize = Math.floor(minEdge * 0.8);
+                return {
+                    width: qrboxSize,
+                    height: qrboxSize,
+                };
+            }
+        };
         
         html5QrCode.start(
             { facingMode: "environment" }, 
@@ -83,7 +93,7 @@ export function BarcodeScanner({ open, onOpenChange, onScan }: BarcodeScannerPro
             Apunte la cámara al código de barras. La lectura será automática.
           </DialogDescription>
         </DialogHeader>
-        <div id={qrcodeRegionId} className="w-full aspect-square" />
+        <div id={qrcodeRegionId} className="w-full aspect-square rounded-md overflow-hidden" />
         <DialogFooter>
           <Button type="button" variant="secondary" onClick={() => onOpenChange(false)}>
             Cancelar
