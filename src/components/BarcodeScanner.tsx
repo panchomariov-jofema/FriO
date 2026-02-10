@@ -1,7 +1,6 @@
 'use client';
 
 import * as React from 'react';
-import { Html5Qrcode } from 'html5-qrcode';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
@@ -21,33 +20,45 @@ export function BarcodeScanner({ open, onOpenChange, onScan }: BarcodeScannerPro
     if (!open) {
       return;
     }
-
-    // `Html5Qrcode` comes with its own camera permission handling.
-    const html5QrCode = new Html5Qrcode(qrcodeRegionId);
-    let isScanning = true;
-
-    const qrCodeSuccessCallback = (decodedText: string, decodedResult: any) => {
-      if (isScanning) {
-        isScanning = false; // Prevent multiple calls
-        onScan(decodedText);
-        onOpenChange(false);
-      }
-    };
-
-    const config = { fps: 10, qrbox: { width: 250, height: 250 } };
     
-    // Start scanning.
-    html5QrCode.start(
-        { facingMode: "environment" }, 
-        config, 
-        qrCodeSuccessCallback, 
-        undefined /* qrCodeErrorCallback is optional */
-    ).catch(err => {
-        console.error("Failed to start html5-qrcode scanner", err);
+    let html5QrCode: any = null;
+
+    // Dynamically import the library only on the client-side
+    import('html5-qrcode').then(({ Html5Qrcode }) => {
+        html5QrCode = new Html5Qrcode(qrcodeRegionId);
+        let isScanning = true;
+
+        const qrCodeSuccessCallback = (decodedText: string, decodedResult: any) => {
+          if (isScanning) {
+            isScanning = false; // Prevent multiple calls
+            onScan(decodedText);
+            onOpenChange(false);
+          }
+        };
+
+        const config = { fps: 10, qrbox: { width: 250, height: 250 } };
+        
+        html5QrCode.start(
+            { facingMode: "environment" }, 
+            config, 
+            qrCodeSuccessCallback, 
+            undefined
+        ).catch((err: any) => {
+            console.error("Failed to start html5-qrcode scanner", err);
+            toast({
+                variant: "destructive",
+                title: "Error de Cámara",
+                description: "No se pudo iniciar el escáner. Verifique los permisos de la cámara.",
+            });
+            onOpenChange(false);
+        });
+
+    }).catch((error) => {
+        console.error("Failed to load html5-qrcode library", error);
         toast({
             variant: "destructive",
-            title: "Error de Cámara",
-            description: "No se pudo iniciar el escáner. Verifique los permisos de la cámara.",
+            title: "Error de Carga",
+            description: "No se pudo cargar la biblioteca de escaneo.",
         });
         onOpenChange(false);
     });
@@ -55,13 +66,12 @@ export function BarcodeScanner({ open, onOpenChange, onScan }: BarcodeScannerPro
     // Cleanup function to stop the scanner when the component unmounts or dialog closes.
     return () => {
       if (html5QrCode && html5QrCode.isScanning) {
-        html5QrCode.stop().catch(err => {
-          // This can fail if the scanner is already stopped, so we just log the error.
+        html5QrCode.stop().catch((err: any) => {
           console.warn("Could not stop html5-qrcode scanner on cleanup:", err);
         });
       }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
   
   return (
