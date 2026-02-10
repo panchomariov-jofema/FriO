@@ -2,18 +2,22 @@
 
 import * as React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
 import type { PendingDocument } from '@/lib/types';
-import { collection, query, where } from 'firebase/firestore';
+import { collection, query, where, updateDoc, doc } from 'firebase/firestore';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
 import { Skeleton } from '../ui/skeleton';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
 import { useToast } from '@/hooks/use-toast';
+import { generateDteXml } from '@/lib/utils';
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError } from '@/firebase/errors';
 
 export function PendingDocsTab() {
   const firestore = useFirestore();
   const { toast } = useToast();
+  const { user } = useUser();
 
   const pendingDocsQuery = useMemoFirebase(() => {
     if (!firestore) return null;
@@ -22,16 +26,40 @@ export function PendingDocsTab() {
 
   const { data: pendingDocs, loading } = useCollection<PendingDocument>(pendingDocsQuery);
   
-  const handleCopyJson = (doc: PendingDocument) => {
-    const jsonString = JSON.stringify(doc, null, 2);
-    navigator.clipboard.writeText(jsonString)
-        .then(() => {
-            toast({ title: 'Copiado', description: 'El objeto JSON del documento se ha copiado al portapapeles.' });
-        })
-        .catch(err => {
-            console.error('Error al copiar JSON: ', err);
-            toast({ title: 'Error', description: 'No se pudo copiar el JSON.', variant: 'destructive' });
-        });
+  const handleGenerateXml = async (docToProcess: PendingDocument) => {
+    const xmlString = generateDteXml(docToProcess);
+    
+    // Download the XML file
+    const blob = new Blob([xmlString], { type: 'application/xml' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    const folio = docToProcess.sourceMovementId ? docToProcess.sourceMovementId.substring(0, 10) : 'S-F';
+    link.download = `DTE_52_F${folio}.xml`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    
+    // Update the document status to 'GENERADO'
+    if (firestore) {
+      try {
+        const docRef = doc(firestore, 'documentosPendientes', docToProcess.id);
+        await updateDoc(docRef, { 
+            estado: 'GENERADO',
+            generatedAt: new Date(),
+            generatedBy: user?.email || user?.uid,
+         });
+        toast({ title: 'XML Generado', description: `El DTE para el folio ${folio} se ha generado y el estado ha sido actualizado.` });
+      } catch (error) {
+        console.error('Error updating document status:', error);
+        toast({ title: 'Error', description: 'No se pudo actualizar el estado del documento.', variant: 'destructive' });
+        errorEmitter.emit('permission-error', new FirestorePermissionError({
+            path: `documentosPendientes/${docToProcess.id}`,
+            operation: 'update',
+        }));
+      }
+    }
   };
 
   return (
@@ -73,7 +101,7 @@ export function PendingDocsTab() {
                             <Badge variant="destructive">{doc.estado}</Badge>
                         </TableCell>
                         <TableCell className="text-right">
-                           <Button variant="outline" size="sm" onClick={() => handleCopyJson(doc)}>Capturar Datos</Button>
+                           <Button variant="outline" size="sm" onClick={() => handleGenerateXml(doc)}>Generar XML</Button>
                         </TableCell>
                     </TableRow>
                 ))
