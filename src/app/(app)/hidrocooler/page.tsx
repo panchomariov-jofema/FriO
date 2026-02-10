@@ -255,13 +255,41 @@ function HidrocoolerPageContent() {
           <CardDescription>Lotes que han ingresado desde Recepción y están pendientes de procesar.</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="rounded-md border">
+          {/* Mobile View */}
+          <div className="md:hidden space-y-3">
+              {loadingPending ? (
+                  Array.from({ length: 2 }).map((_, i) => <Skeleton key={i} className="h-36 w-full" />)
+              ) : sortedPendingLots.length > 0 ? (
+                  sortedPendingLots.map((lot) => (
+                      <Card key={lot.id} className="p-4">
+                          <div className="flex justify-between items-start">
+                              <div>
+                                  <CardTitle className="text-lg">{lot.displayLotId}</CardTitle>
+                                  <CardDescription>{lot.producerShortName}</CardDescription>
+                              </div>
+                              <Button size="lg" onClick={() => handleProcessClick(lot)}>Procesar</Button>
+                          </div>
+                          <div className="mt-4 text-sm grid grid-cols-2 gap-2">
+                              <p><strong>Bins:</strong> {lot.binCount}</p>
+                              <p><strong>Peso/Bin:</strong> {lot.netWeightPerBin?.toFixed(2) ?? '-'} kg</p>
+                              <p className="col-span-2"><strong>Fecha Recepción:</strong> {lot.receptionDate?.toDate().toLocaleString('es-CL')}</p>
+                          </div>
+                      </Card>
+                  ))
+              ) : (
+                  <div className="h-24 text-center flex items-center justify-center">
+                      <p>No hay lotes pendientes.</p>
+                  </div>
+              )}
+          </div>
+          {/* Desktop View */}
+          <div className="hidden md:block rounded-md border">
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Fecha Recepción</TableHead>
                   <TableHead>ID Lote</TableHead>
-                  <TableHead className="hidden md:table-cell">Productor</TableHead>
+                  <TableHead>Productor</TableHead>
                   <TableHead>Cantidad de Bins</TableHead>
                   <TableHead>Peso Neto/Bin (kg)</TableHead>
                   <TableHead className="text-right">Acciones</TableHead>
@@ -277,7 +305,7 @@ function HidrocoolerPageContent() {
                     <TableRow key={lot.id}>
                       <TableCell className="text-sm">{lot.receptionDate?.toDate().toLocaleString('es-CL', { year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute:'2-digit' })}</TableCell>
                       <TableCell className="font-medium">{lot.displayLotId}</TableCell>
-                      <TableCell className="hidden md:table-cell">{lot.producerShortName}</TableCell>
+                      <TableCell>{lot.producerShortName}</TableCell>
                       <TableCell>{lot.binCount}</TableCell>
                       <TableCell>{lot.netWeightPerBin?.toFixed(2) ?? '-'}</TableCell>
                       <TableCell className="text-right">
@@ -308,7 +336,43 @@ function HidrocoolerPageContent() {
             </div>
         </CardHeader>
         <CardContent>
-           <div className="rounded-md border">
+          {/* Mobile View */}
+          <div className="md:hidden space-y-3">
+              {loadingProcessing ? (
+                  Array.from({ length: 2 }).map((_, i) => <Skeleton key={i} className="h-40 w-full" />)
+              ) : filteredProcessingLots.length > 0 ? (
+                  filteredProcessingLots.map((lot) => (
+                      <Card key={lot.id} className="p-4">
+                          <div className="flex justify-between items-start">
+                              <div>
+                                  <CardTitle className="text-lg">{lot.displayLotId}</CardTitle>
+                                  <CardDescription>{lot.hidrocooler}</CardDescription>
+                              </div>
+                              <Badge variant={getStatusVariant(lot.status)}>{lot.status}</Badge>
+                          </div>
+                          <div className="mt-2 text-sm grid grid-cols-2 gap-2">
+                              <p><strong>Bins:</strong> {lot.binCount}</p>
+                              <p><strong>Peso/Bin:</strong> {lot.netWeightPerBin?.toFixed(2) ?? '-'} kg</p>
+                          </div>
+                           {lot.status === 'En Proceso' && (
+                            <div className="flex gap-2 justify-end mt-4">
+                              <Button variant="outline" size="icon" onClick={() => handleEditClick(lot)}>
+                                <Pencil className="h-4 w-4" />
+                                <span className="sr-only">Editar</span>
+                              </Button>
+                              <Button className="flex-1" onClick={() => handleFinishProcessingClick(lot)}>Finalizar Proceso</Button>
+                            </div>
+                          )}
+                      </Card>
+                  ))
+              ) : (
+                   <div className="h-24 text-center flex items-center justify-center">
+                      <p>No hay lotes en proceso.</p>
+                   </div>
+              )}
+          </div>
+          {/* Desktop View */}
+           <div className="hidden md:block rounded-md border">
             <Table>
               <TableHeader>
                 <TableRow>

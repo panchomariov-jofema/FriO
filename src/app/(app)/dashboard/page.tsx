@@ -949,7 +949,32 @@ export default function DashboardPage() {
                     <CardTitle>Últimos Lotes Ingresados (Recepción)</CardTitle>
                 </CardHeader>
                 <CardContent>
-                    <div className="rounded-md border">
+                    <div className="md:hidden space-y-3">
+                        {loading ? (
+                            Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-28 w-full" />)
+                        ) : (latestReceptions || []).length > 0 ? (
+                            latestReceptions.map(lot => (
+                                <Card key={lot.id} className="p-4">
+                                    <div className="flex justify-between items-start">
+                                        <div>
+                                            <CardTitle className="text-lg">{lot.displayLotId}</CardTitle>
+                                            <CardDescription>{lot.producerId} / {lot.variety}</CardDescription>
+                                        </div>
+                                        <Badge variant="secondary">{lot.status}</Badge>
+                                    </div>
+                                    <div className="mt-2 text-sm grid grid-cols-2 gap-x-4">
+                                        <p><strong>Fecha:</strong> {lot.createdAt?.toDate().toLocaleString()}</p>
+                                        <p><strong>Bins:</strong> {lot.binCount}</p>
+                                    </div>
+                                </Card>
+                            ))
+                        ) : (
+                            <div className="h-24 text-center flex items-center justify-center">
+                                <p>No hay registros de recepción recientes.</p>
+                            </div>
+                        )}
+                    </div>
+                    <div className="hidden md:block rounded-md border">
                         <Table>
                             <TableHeader>
                                 <TableRow>

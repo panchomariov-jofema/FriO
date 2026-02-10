@@ -46,6 +46,7 @@ import { ChamberStrategyProvider } from '@/contexts/ChamberStrategyContext';
 import { FrioLogo } from '@/components/ui/FrioLogo';
 import { CustomAppleIcon } from '@/components/ui/CustomAppleIcon';
 import { PermissionsProvider } from '@/contexts/PermissionsContext';
+import { PwaInstallPrompt } from '@/components/PwaInstallPrompt';
 
 // Define the structure with types and potential nesting
 const navStructure: any[] = [
@@ -101,6 +102,18 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
         (item.type === 'group' && isChildActive(item.items))
     );
   }, [pathname]);
+
+  React.useEffect(() => {
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function() {
+        navigator.serviceWorker.register('/sw.js').then(function(registration) {
+          console.log('ServiceWorker registration successful with scope: ', registration.scope);
+        }, function(err) {
+          console.log('ServiceWorker registration failed: ', err);
+        });
+      });
+    }
+  }, []);
 
   React.useEffect(() => {
     // When path changes, open the parent collapsible if a child is active
@@ -306,7 +319,8 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
         <SidebarInset>
            <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b bg-background px-4">
               <SidebarTrigger />
-              <div className="flex flex-1 items-center justify-end gap-4">
+              <div className="flex flex-1 items-center justify-end gap-2">
+                <PwaInstallPrompt />
                 {user && (
                   <span className="hidden text-sm text-muted-foreground sm:inline">
                     Bienvenido,{' '}
