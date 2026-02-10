@@ -34,8 +34,8 @@ export function BarcodeScanner({ open, onOpenChange, onScan }: BarcodeScannerPro
       }
       
       try {
-        // Use a more generic video constraint for better compatibility
-        stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        // Request the rear camera ('environment') for barcode scanning.
+        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
         setHasCameraPermission(true);
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
