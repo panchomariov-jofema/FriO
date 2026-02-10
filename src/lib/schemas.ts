@@ -16,6 +16,7 @@ export const producerSchema = z.object({
   direccion: z.string().optional(),
   comuna: z.string().optional(),
   ciudad: z.string().optional(),
+  status: z.enum(['activo', 'inactivo']).default('activo'),
 });
 
 export const binMaterialSchema = z.object({

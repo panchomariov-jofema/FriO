@@ -20,6 +20,7 @@ export interface Producer {
   direccion?: string;
   comuna?: string;
   ciudad?: string;
+  status?: 'activo' | 'inactivo';
 }
 
 export interface BinMaterial {

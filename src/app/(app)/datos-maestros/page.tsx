@@ -29,12 +29,13 @@ import {
   hidrocoolerSchema,
   businessEntitySchema,
 } from '@/lib/schemas';
-import { FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
+import { FormField, FormItem, FormLabel, FormControl, FormMessage, FormDescription } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { ModulePermissionsSelector } from '@/components/master-data/ModulePermissionsSelector';
+import { Switch } from '@/components/ui/switch';
 
 const ExporterForm = ({ form }: { form: any }) => (
   <>
@@ -83,6 +84,26 @@ const ProducerForm = ({ form, exporters }: { form: any; exporters: Exporter[] })
       <FormField control={form.control} name="ciudad" render={({ field }) => (
         <FormItem><FormLabel>Ciudad</FormLabel><FormControl><Input {...field} value={field.value ?? ''} autoComplete="off" /></FormControl><FormMessage /></FormItem>
       )} />
+      <FormField
+        control={form.control}
+        name="status"
+        render={({ field }) => (
+          <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
+            <div className="space-y-0.5">
+              <FormLabel>Estado</FormLabel>
+              <FormDescription>
+                Productores inactivos no se mostrarán en otras listas.
+              </FormDescription>
+            </div>
+            <FormControl>
+              <Switch
+                checked={field.value === 'activo'}
+                onCheckedChange={(checked) => field.onChange(checked ? 'activo' : 'inactivo')}
+              />
+            </FormControl>
+          </FormItem>
+        )}
+      />
     </>
   )
 };
@@ -310,6 +331,7 @@ export default function DatosMaestrosPage() {
                 {key: 'producerId', header: 'ID'}, 
                 {key: 'shortName', header: 'Nombre Corto'}, 
                 {key: 'name', header: 'Nombre'}, 
+                {key: 'status', header: 'Estado'},
                 {key: 'exporterId', header: 'ID Exportador'},
                 {key: 'rut', header: 'RUT'},
                 {key: 'giro', header: 'Giro'},
@@ -319,7 +341,7 @@ export default function DatosMaestrosPage() {
               ]}
               RenderFormComponent={ProducerForm}
               docNameField="name"
-              csvHeaders={['producerId', 'shortName', 'name', 'exporterId', 'rut', 'giro', 'direccion', 'comuna', 'ciudad']}
+              csvHeaders={['producerId', 'shortName', 'name', 'exporterId', 'rut', 'giro', 'direccion', 'comuna', 'ciudad', 'status']}
               csvTemplateFileName="plantilla_productores.csv"
               formProps={{ exporters: loadingExporters ? [] : exporters }}
             />

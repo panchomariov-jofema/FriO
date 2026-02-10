@@ -25,7 +25,11 @@ export function useProducersByExporter(exporterId: string | null) {
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
       const items: Producer[] = [];
       querySnapshot.forEach((doc) => {
-        items.push({ id: doc.id, ...doc.data() } as Producer);
+        const producer = { id: doc.id, ...doc.data() } as Producer;
+        // Only include active producers or those without a status property yet
+        if (producer.status !== 'inactivo') {
+            items.push(producer);
+        }
       });
       setData(items);
       setLoading(false);

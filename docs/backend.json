@@ -66,6 +66,14 @@
         "ciudad": {
           "type": "string",
           "description": "City of the producer."
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "activo",
+            "inactivo"
+          ],
+          "description": "Indicates if the producer is active or inactive."
         }
       },
       "required": [

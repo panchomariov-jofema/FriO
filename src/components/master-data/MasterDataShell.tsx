@@ -34,6 +34,8 @@ import { Skeleton } from '../ui/skeleton';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
+import { Switch } from '../ui/switch';
+import { Badge } from '../ui/badge';
 
 // Helper functions for CSV export
 function convertToCSV(data: any[], headers: string[]) {
@@ -130,6 +132,28 @@ export function MasterDataShell<T extends MasterData>({
   const handleDeleteDialogOpen = (item: T) => {
     setItemToDelete(item);
     setIsDeleteDialogOpen(true);
+  };
+
+  const handleStatusToggle = async (item: T) => {
+    if (!item.id || !('status' in item)) return;
+
+    const newStatus = (item as any).status === 'activo' ? 'inactivo' : 'activo';
+    const docRef = doc(firestore, collectionName, item.id);
+    
+    try {
+        await updateDoc(docRef, { status: newStatus });
+        toast({ title: 'Éxito', description: 'Estado actualizado.' });
+    } catch (error) {
+        toast({ variant: 'destructive', title: 'Error', description: 'No se pudo actualizar el estado.' });
+        errorEmitter.emit(
+          'permission-error',
+          new FirestorePermissionError({
+            path: docRef.path,
+            operation: 'update',
+            requestResourceData: { status: newStatus },
+          })
+        );
+    }
   };
 
   const onSubmit = async (values: z.infer<typeof schema>) => {
@@ -464,7 +488,22 @@ export function MasterDataShell<T extends MasterData>({
                     <TableRow key={item.id} className={currentItem?.id === item.id ? 'bg-muted/50' : ''}>
                     {columns.map((col) => (
                         <TableCell key={String(col.key)}>
-                            {Array.isArray(item[col.key]) ? JSON.stringify(item[col.key]) : String(item[col.key] ?? '')}
+                           {collectionName === 'producers' && col.key === 'status' ? (
+                                <div className="flex items-center space-x-2">
+                                    <Switch
+                                        checked={(item as any).status === 'activo'}
+                                        onCheckedChange={() => handleStatusToggle(item)}
+                                        aria-label={`Cambiar estado para ${String((item as any).name)}`}
+                                    />
+                                    <Badge variant={(item as any).status === 'activo' ? 'default' : 'secondary'}>
+                                        {(item as any).status || 'inactivo'}
+                                    </Badge>
+                                </div>
+                            ) : Array.isArray(item[col.key]) ? (
+                                JSON.stringify(item[col.key])
+                            ) : (
+                                String(item[col.key] ?? '—')
+                            )}
                         </TableCell>
                     ))}
                     <TableCell className="text-right">
