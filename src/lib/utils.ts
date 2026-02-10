@@ -90,6 +90,11 @@ export function generateDteXml(doc: DTEGuiaDespacho): string {
     });
   };
 
+  const formatRut = (rut: string | undefined): string => {
+    if (!rut) return '';
+    return rut.replace(/\./g, ''); // Remove all dots
+  };
+
   const itemsXml = doc.detalle.map((item) => `
     <Detalle>
       <NroLinDet>${item.NroLinDet}</NroLinDet>
@@ -112,9 +117,9 @@ export function generateDteXml(doc: DTEGuiaDespacho): string {
 <EnvioDTE xmlns="http://www.sii.cl/SiiDte" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.sii.cl/SiiDte EnvioDTE_v1.0.xsd" version="1.0">
   <SetDTE ID="SetDoc">
     <Caratula version="1.0">
-      <RutEmisor>${escapeXml(doc.emisor.RUTEmisor)}</RutEmisor>
-      <RutEnvia>${escapeXml(doc.emisor.RUTEmisor)}</RutEnvia>
-      <RutReceptor>${escapeXml(doc.receptor.RUTRecep)}</RutReceptor>
+      <RutEmisor>${escapeXml(formatRut(doc.emisor.RUTEmisor))}</RutEmisor>
+      <RutEnvia>${escapeXml(formatRut(doc.emisor.RUTEmisor))}</RutEnvia>
+      <RutReceptor>${escapeXml(formatRut(doc.receptor.RUTRecep))}</RutReceptor>
       <FchResol>2024-01-01</FchResol>
       <NroResol>0</NroResol>
       <TmstFirmaEnv>${new Date().toISOString()}</TmstFirmaEnv>
@@ -134,7 +139,7 @@ export function generateDteXml(doc: DTEGuiaDespacho): string {
             <IndTraslado>1</IndTraslado>
           </IdDoc>
           <Emisor>
-            <RUTEmisor>${escapeXml(doc.emisor.RUTEmisor)}</RUTEmisor>
+            <RUTEmisor>${escapeXml(formatRut(doc.emisor.RUTEmisor))}</RUTEmisor>
             <RznSoc>${escapeXml(doc.emisor.RznSocEmisor)}</RznSoc>
             <GiroEmis>${escapeXml(doc.emisor.GiroEmis)}</GiroEmis>
             ${doc.emisor.Acteco ? `<Acteco>${doc.emisor.Acteco}</Acteco>` : ''}
@@ -142,7 +147,7 @@ export function generateDteXml(doc: DTEGuiaDespacho): string {
             <CmnaOrigen>${escapeXml(doc.emisor.CmnaOrigen)}</CmnaOrigen>
           </Emisor>
           <Receptor>
-            <RUTRecep>${escapeXml(doc.receptor.RUTRecep)}</RUTRecep>
+            <RUTRecep>${escapeXml(formatRut(doc.receptor.RUTRecep))}</RUTRecep>
             <RznSocRecep>${escapeXml(doc.receptor.RznSocRecep)}</RznSocRecep>
             <GiroRecep>${escapeXml(doc.receptor.GiroRecep)}</GiroRecep>
             <DirRecep>${escapeXml(doc.receptor.DirRecep)}</DirRecep>
