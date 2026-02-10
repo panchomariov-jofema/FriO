@@ -195,3 +195,13 @@ export const hidrocoolerSchema = z.object({
   name: z.string().min(1, 'El nombre es obligatorio'),
   binCount: z.coerce.number().positive("La cantidad de bins debe ser un número positivo."),
 });
+
+export const businessEntitySchema = z.object({
+  rut: z.string().min(1, 'El RUT es obligatorio'),
+  razonSocial: z.string().min(1, 'La Razón Social es obligatoria'),
+  direccion: z.string().min(1, 'La Dirección es obligatoria'),
+  ciudad: z.string().min(1, 'La Ciudad es obligatoria'),
+  comuna: z.string().min(1, 'La Comuna es obligatoria'),
+  giro: z.string().min(1, 'El Giro/Actividad es obligatorio'),
+  actividadComercial: z.string().min(1, 'La Act. Comercial es obligatoria'),
+});

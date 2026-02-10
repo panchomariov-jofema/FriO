@@ -981,6 +981,51 @@
         "sourceMovementId": { "type": "string", "description": "The ID of the original BinMaterialMovement document." }
       },
       "required": ["receptor", "documento", "items", "fecha_salida", "estado", "sourceMovementId"]
+    },
+    "BusinessEntity": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Business Entity",
+      "type": "object",
+      "description": "Represents a business entity for tax and commercial documents.",
+      "properties": {
+        "rut": {
+          "type": "string",
+          "description": "The RUT of the business entity."
+        },
+        "razonSocial": {
+          "type": "string",
+          "description": "The business name."
+        },
+        "direccion": {
+          "type": "string",
+          "description": "The address of the business."
+        },
+        "ciudad": {
+          "type": "string",
+          "description": "The city of the business."
+        },
+        "comuna": {
+          "type": "string",
+          "description": "The comuna (municipality) of the business."
+        },
+        "giro": {
+          "type": "string",
+          "description": "The main business activity."
+        },
+        "actividadComercial": {
+          "type": "string",
+          "description": "The commercial activity."
+        }
+      },
+      "required": [
+        "rut",
+        "razonSocial",
+        "direccion",
+        "ciudad",
+        "comuna",
+        "giro",
+        "actividadComercial"
+      ]
     }
   },
   "auth": {
@@ -1335,6 +1380,22 @@
             {
               "name": "documentoId",
               "description": "The unique identifier for the pending document."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/businessEntities/{entityId}",
+        "definition": {
+          "entityName": "BusinessEntity",
+          "schema": {
+            "$ref": "#/backend/entities/BusinessEntity"
+          },
+          "description": "Stores master business entity data for document generation.",
+          "params": [
+            {
+              "name": "entityId",
+              "description": "The unique identifier for the business entity."
             }
           ]
         }

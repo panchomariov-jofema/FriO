@@ -162,7 +162,8 @@ export function MasterDataShell<T extends MasterData>({
           packagingMaster: 'code',
           usersMaster: 'userName',
           profiles: 'profileId',
-          packings: 'name', // special case, might need composite check
+          packings: 'name',
+          businessEntities: 'rut',
         };
         
         const keyField = keyFields[collectionName];

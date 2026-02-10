@@ -398,5 +398,15 @@ export type StoredItem = {
   clientLotId?: string;
 }
 
+export interface BusinessEntity {
+  id: string;
+  rut: string;
+  razonSocial: string;
+  direccion: string;
+  ciudad: string;
+  comuna: string;
+  giro: string;
+  actividadComercial: string;
+}
 
-export type MasterData = Exporter | Producer | BinMaterial | OtherClient | PackagingMaster | UserMaster | Profile | Packing | Hidrocooler;
+export type MasterData = Exporter | Producer | BinMaterial | OtherClient | PackagingMaster | UserMaster | Profile | Packing | Hidrocooler | BusinessEntity;

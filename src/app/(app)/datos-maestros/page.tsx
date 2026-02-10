@@ -15,6 +15,7 @@ import type {
   Profile,
   Hidrocooler,
   ModulePermission,
+  BusinessEntity,
 } from '@/lib/types';
 import {
   exporterSchema,
@@ -26,6 +27,7 @@ import {
   userMasterSchema,
   profileSchema,
   hidrocoolerSchema,
+  businessEntitySchema,
 } from '@/lib/schemas';
 import { FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
@@ -228,6 +230,32 @@ const HidrocoolerForm = ({ form }: { form: any }) => (
     </>
 );
 
+const BusinessEntityForm = ({ form }: { form: any }) => (
+  <>
+    <FormField control={form.control} name="rut" render={({ field }) => (
+      <FormItem><FormLabel>RUT</FormLabel><FormControl><Input {...field} autoComplete="off" /></FormControl><FormMessage /></FormItem>
+    )} />
+    <FormField control={form.control} name="razonSocial" render={({ field }) => (
+      <FormItem><FormLabel>Razón Social</FormLabel><FormControl><Input {...field} autoComplete="off" /></FormControl><FormMessage /></FormItem>
+    )} />
+    <FormField control={form.control} name="direccion" render={({ field }) => (
+      <FormItem><FormLabel>Dirección</FormLabel><FormControl><Input {...field} autoComplete="off" /></FormControl><FormMessage /></FormItem>
+    )} />
+    <FormField control={form.control} name="ciudad" render={({ field }) => (
+      <FormItem><FormLabel>Ciudad</FormLabel><FormControl><Input {...field} autoComplete="off" /></FormControl><FormMessage /></FormItem>
+    )} />
+    <FormField control={form.control} name="comuna" render={({ field }) => (
+      <FormItem><FormLabel>Comuna</FormLabel><FormControl><Input {...field} autoComplete="off" /></FormControl><FormMessage /></FormItem>
+    )} />
+    <FormField control={form.control} name="giro" render={({ field }) => (
+      <FormItem><FormLabel>Giro/Actividad</FormLabel><FormControl><Input {...field} autoComplete="off" /></FormControl><FormMessage /></FormItem>
+    )} />
+    <FormField control={form.control} name="actividadComercial" render={({ field }) => (
+      <FormItem><FormLabel>Act. Comercial</FormLabel><FormControl><Input {...field} autoComplete="off" /></FormControl><FormMessage /></FormItem>
+    )} />
+  </>
+);
+
 export default function DatosMaestrosPage() {
   const { data: exporters, loading: loadingExporters } = useFirestoreCollection<Exporter>('exporters');
   const { data: otherClients, loading: loadingOtherClients } = useFirestoreCollection<OtherClient>('otherClients');
@@ -243,6 +271,7 @@ export default function DatosMaestrosPage() {
     { value: 'usersMaster', label: 'Usuarios' },
     { value: 'profiles', label: 'Perfiles' },
     { value: 'hidrocoolers', label: 'Hidro-coolers' },
+    { value: 'businessEntities', label: 'Datos Matriz' },
   ];
 
   return (
@@ -260,7 +289,7 @@ export default function DatosMaestrosPage() {
           </TabsList>
           
           <TabsContent value="exporters" className="mt-4">
-            <MasterDataShell
+            <MasterDataShell<Exporter>
               title="Exportadores"
               collectionName="exporters"
               schema={exporterSchema}
@@ -273,7 +302,7 @@ export default function DatosMaestrosPage() {
             />
           </TabsContent>
           <TabsContent value="producers" className="mt-4">
-            <MasterDataShell
+            <MasterDataShell<Producer>
               title="Productores"
               collectionName="producers"
               schema={producerSchema}
@@ -296,7 +325,7 @@ export default function DatosMaestrosPage() {
             />
           </TabsContent>
           <TabsContent value="binMaterials" className="mt-4">
-            <MasterDataShell
+            <MasterDataShell<BinMaterial>
               title="Bins y Materiales"
               collectionName="binMaterials"
               schema={binMaterialSchema}
@@ -309,7 +338,7 @@ export default function DatosMaestrosPage() {
             />
           </TabsContent>
           <TabsContent value="otherClients" className="mt-4">
-            <MasterDataShell
+            <MasterDataShell<OtherClient>
               title="Otros Clientes"
               collectionName="otherClients"
               schema={otherClientSchema}
@@ -322,7 +351,7 @@ export default function DatosMaestrosPage() {
             />
           </TabsContent>
           <TabsContent value="packagingMaster" className="mt-4">
-             <MasterDataShell
+             <MasterDataShell<PackagingMaster>
                 title="Maestro de Embalajes"
                 collectionName="packagingMaster"
                 schema={packagingMasterSchema}
@@ -335,7 +364,7 @@ export default function DatosMaestrosPage() {
               />
           </TabsContent>
            <TabsContent value="packing" className="mt-4">
-             <MasterDataShell
+             <MasterDataShell<Packing>
                 title="Packing"
                 collectionName="packings"
                 schema={packingSchema}
@@ -348,7 +377,7 @@ export default function DatosMaestrosPage() {
               />
           </TabsContent>
            <TabsContent value="usersMaster" className="mt-4">
-             <MasterDataShell
+             <MasterDataShell<UserMaster>
                 title="Maestro de Usuarios"
                 collectionName="usersMaster"
                 schema={userMasterSchema}
@@ -361,7 +390,7 @@ export default function DatosMaestrosPage() {
               />
           </TabsContent>
           <TabsContent value="profiles" className="mt-4">
-            <MasterDataShell
+            <MasterDataShell<Profile>
               title="Perfiles"
               collectionName="profiles"
               schema={profileSchema}
@@ -374,7 +403,7 @@ export default function DatosMaestrosPage() {
             />
           </TabsContent>
           <TabsContent value="hidrocoolers" className="mt-4">
-            <MasterDataShell
+            <MasterDataShell<Hidrocooler>
               title="Hidrocoolers"
               collectionName="hidrocoolers"
               schema={hidrocoolerSchema}
@@ -383,6 +412,24 @@ export default function DatosMaestrosPage() {
               docNameField="name"
               csvHeaders={['name', 'binCount']}
               csvTemplateFileName="plantilla_hidrocoolers.csv"
+              formProps={{}}
+            />
+          </TabsContent>
+          <TabsContent value="businessEntities" className="mt-4">
+            <MasterDataShell<BusinessEntity>
+              title="Datos Matriz"
+              collectionName="businessEntities"
+              schema={businessEntitySchema}
+              columns={[
+                {key: 'rut', header: 'RUT'}, 
+                {key: 'razonSocial', header: 'Razón Social'}, 
+                {key: 'giro', header: 'Giro'}, 
+                {key: 'actividadComercial', header: 'Act. Comercial'}
+              ]}
+              RenderFormComponent={BusinessEntityForm}
+              docNameField="razonSocial"
+              csvHeaders={['rut', 'razonSocial', 'direccion', 'ciudad', 'comuna', 'giro', 'actividadComercial']}
+              csvTemplateFileName="plantilla_datos_matriz.csv"
               formProps={{}}
             />
           </TabsContent>
