@@ -13,6 +13,9 @@ import { useToast } from '@/hooks/use-toast';
 import { generateDteXml } from '@/lib/utils';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
+import { Download } from 'lucide-react';
 
 export function PendingDocsTab() {
   const firestore = useFirestore();
@@ -62,6 +65,63 @@ export function PendingDocsTab() {
     }
   };
 
+  const handleGeneratePdf = (docToProcess: DTEGuiaDespacho) => {
+    const pdf = new jsPDF();
+    
+    // Title
+    pdf.setFontSize(18);
+    pdf.text('Guía de Despacho', pdf.internal.pageSize.getWidth() / 2, 22, { align: 'center' });
+
+    // Header info
+    pdf.setFontSize(10);
+    pdf.text(`Folio: ${docToProcess.idDoc.folio}`, 190, 30, { align: 'right' });
+    pdf.text(`Fecha: ${docToProcess.idDoc.fchEmis}`, 190, 35, { align: 'right' });
+
+    // Emisor
+    pdf.setFontSize(12);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text("Emisor:", 14, 45);
+    pdf.setFont('helvetica', 'normal');
+    pdf.text(docToProcess.emisor.RznSocEmisor, 16, 52);
+    pdf.text(`RUT: ${docToProcess.emisor.RUTEmisor}`, 16, 59);
+    pdf.text(`${docToProcess.emisor.DirOrigen}, ${docToProcess.emisor.CmnaOrigen}`, 16, 66);
+
+    // Receptor
+    pdf.setFont('helvetica', 'bold');
+    pdf.text("Receptor:", 100, 45);
+    pdf.setFont('helvetica', 'normal');
+    pdf.text(docToProcess.receptor.RznSocRecep, 102, 52);
+    pdf.text(`RUT: ${docToProcess.receptor.RUTRecep}`, 102, 59);
+    pdf.text(`${docToProcess.receptor.DirRecep}, ${docToProcess.receptor.CmnaRecep}`, 102, 66);
+
+    // Transporte
+    if (docToProcess.transporte) {
+        pdf.setFont('helvetica', 'bold');
+        pdf.text("Transporte:", 14, 76);
+        pdf.setFont('helvetica', 'normal');
+        pdf.text(`Patente: ${docToProcess.transporte.Patente}`, 16, 83);
+        if (docToProcess.transporte.DirDest) {
+            pdf.text(`Dirección Destino: ${docToProcess.transporte.DirDest}`, 16, 90);
+        }
+    }
+    
+    const tableData = docToProcess.detalle.map(item => [
+      item.NmbItem,
+      item.QtyItem,
+      item.UnmdItem,
+    ]);
+    
+    (pdf as any).autoTable({
+      startY: (docToProcess.transporte ? 95 : 75),
+      head: [['Descripción', 'Cantidad', 'Unidad']],
+      body: tableData,
+      theme: 'grid',
+      headStyles: { fillColor: [34, 197, 94] },
+    });
+    
+    pdf.output('dataurlnewwindow');
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -101,7 +161,12 @@ export function PendingDocsTab() {
                             <Badge variant="destructive">{doc.estado}</Badge>
                         </TableCell>
                         <TableCell className="text-right">
-                           <Button variant="outline" size="sm" onClick={() => handleGenerateXml(doc)}>Generar XML</Button>
+                           <div className="flex items-center justify-end gap-2">
+                             <Button variant="outline" size="sm" onClick={() => handleGeneratePdf(doc)}>
+                               <Download className="h-4 w-4" />
+                             </Button>
+                             <Button variant="outline" size="sm" onClick={() => handleGenerateXml(doc)}>Generar XML</Button>
+                           </div>
                         </TableCell>
                     </TableRow>
                 ))
