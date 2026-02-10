@@ -135,9 +135,12 @@ export function MasterDataShell<T extends MasterData>({
   };
 
   const handleStatusToggle = async (item: T) => {
-    if (!item.id || !('status' in item)) return;
+    if (!item.id) return;
+    
+    const currentStatus = (item as any).status;
+    // Treat undefined or any value other than 'inactivo' as active.
+    const newStatus = currentStatus === 'inactivo' ? 'activo' : 'inactivo';
 
-    const newStatus = (item as any).status === 'activo' ? 'inactivo' : 'activo';
     const docRef = doc(firestore, collectionName, item.id);
     
     try {
@@ -491,12 +494,12 @@ export function MasterDataShell<T extends MasterData>({
                            {collectionName === 'producers' && col.key === 'status' ? (
                                 <div className="flex items-center space-x-2">
                                     <Switch
-                                        checked={(item as any).status === 'activo'}
+                                        checked={(item as any).status !== 'inactivo'}
                                         onCheckedChange={() => handleStatusToggle(item)}
                                         aria-label={`Cambiar estado para ${String((item as any).name)}`}
                                     />
-                                    <Badge variant={(item as any).status === 'activo' ? 'default' : 'secondary'}>
-                                        {(item as any).status || 'inactivo'}
+                                    <Badge variant={(item as any).status === 'inactivo' ? 'secondary' : 'default'}>
+                                        {(item as any).status === 'inactivo' ? 'inactivo' : 'activo'}
                                     </Badge>
                                 </div>
                             ) : Array.isArray(item[col.key]) ? (

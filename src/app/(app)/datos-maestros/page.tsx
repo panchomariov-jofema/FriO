@@ -97,7 +97,7 @@ const ProducerForm = ({ form, exporters }: { form: any; exporters: Exporter[] })
             </div>
             <FormControl>
               <Switch
-                checked={field.value === 'activo'}
+                checked={field.value !== 'inactivo'}
                 onCheckedChange={(checked) => field.onChange(checked ? 'activo' : 'inactivo')}
               />
             </FormControl>
