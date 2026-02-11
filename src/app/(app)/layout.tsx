@@ -104,18 +104,6 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
   }, [pathname]);
 
   React.useEffect(() => {
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', function() {
-        navigator.serviceWorker.register('/sw.js').then(function(registration) {
-          console.log('ServiceWorker registration successful with scope: ', registration.scope);
-        }, function(err) {
-          console.log('ServiceWorker registration failed: ', err);
-        });
-      });
-    }
-  }, []);
-
-  React.useEffect(() => {
     // When path changes, open the parent collapsible if a child is active
     const newOpenState: Record<string, boolean> = {};
     const checkAndSetOpen = (items: any[]) => {
