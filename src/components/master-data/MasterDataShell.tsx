@@ -89,6 +89,22 @@ const defaultProfiles = [
   { profileId: 'JEF_LOG', name: 'Jefe de Logística', modulesAccess: ["Dashboard", "Bins y Materiales", "Recepción", "Hidrocooler", "Cámaras", "Despachos", "Embalajes", "Socios Comerciales", "Fall Creek", "Reportes"] },
 ];
 
+interface MasterDataShellProps<T extends MasterData> {
+  title: string;
+  collectionName: string;
+  schema: z.ZodType<any>;
+  columns: Array<{
+    key: string;
+    header: string;
+    render?: (item: T) => React.ReactNode;
+  }>;
+  RenderFormComponent: React.ComponentType<any>;
+  docNameField: keyof T;
+  csvHeaders: string[];
+  csvTemplateFileName: string;
+  formProps: any;
+}
+
 
 export function MasterDataShell<T extends MasterData>({
   title,
@@ -493,7 +509,9 @@ export function MasterDataShell<T extends MasterData>({
                     <TableRow key={item.id} className={currentItem?.id === item.id ? 'bg-muted/50' : ''}>
                     {columns.map((col) => (
                         <TableCell key={String(col.key)}>
-                           {['producers', 'otherClients'].includes(collectionName) && col.key === 'status' ? (
+                            {col.render ? (
+                                col.render(item)
+                            ) : ['producers', 'otherClients'].includes(collectionName) && col.key === 'status' ? (
                                 <div className="flex items-center space-x-2">
                                     <Switch
                                         checked={(item as any).status !== 'inactivo'}
@@ -504,10 +522,10 @@ export function MasterDataShell<T extends MasterData>({
                                         {(item as any).status === 'inactivo' ? 'inactivo' : 'activo'}
                                     </Badge>
                                 </div>
-                            ) : Array.isArray(item[col.key]) ? (
-                                JSON.stringify(item[col.key])
+                            ) : Array.isArray(item[col.key as keyof T]) ? (
+                                JSON.stringify(item[col.key as keyof T])
                             ) : (
-                                String(item[col.key] ?? '—')
+                                String(item[col.key as keyof T] ?? '—')
                             )}
                         </TableCell>
                     ))}

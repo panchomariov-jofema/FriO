@@ -399,6 +399,12 @@ export default function DatosMaestrosPage() {
   const { data: profiles, loading: loadingProfiles } = useFirestoreCollection<Profile>('profiles');
   const { data: warehouses, loading: loadingWarehouses } = useFirestoreCollection<Warehouse>('warehouses');
 
+  const warehouseMap = React.useMemo(() => {
+    if (loadingWarehouses || !warehouses) return new Map<string, string>();
+    return new Map(warehouses.map(w => [w.id, w.name]));
+  }, [warehouses, loadingWarehouses]);
+
+
   const tabs = [
     { value: 'exporters', label: 'Exportadores' },
     { value: 'producers', label: 'Productores' },
@@ -522,7 +528,17 @@ export default function DatosMaestrosPage() {
               title="Pasillos de Embalaje"
               collectionName="aisles"
               schema={aisleSchema}
-              columns={[{key: 'name', header: 'Nombre'}, {key: 'warehouseIds', header: 'Almacenes'}]}
+              columns={[
+                {key: 'name', header: 'Nombre'},
+                {
+                    key: 'warehouseIds', 
+                    header: 'Almacenes',
+                    render: (item: Aisle) => {
+                        if (!item.warehouseIds || item.warehouseIds.length === 0) return 'N/A';
+                        return item.warehouseIds.map(id => warehouseMap.get(id) || id).join(', ');
+                    }
+                }
+              ]}
               RenderFormComponent={AisleForm}
               docNameField="name"
               csvHeaders={['name', 'warehouseIds']}
