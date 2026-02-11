@@ -1,10 +1,10 @@
-const CACHE_NAME = 'frigomanager-v1';
+const CACHE_NAME = 'frio-cache-v1';
 const urlsToCache = [
   '/',
   '/login',
   '/dashboard',
   '/manifest.json',
-  '/logo.svg'
+  '/logo.svg',
 ];
 
 self.addEventListener('install', event => {
@@ -22,25 +22,9 @@ self.addEventListener('fetch', event => {
     caches.match(event.request)
       .then(response => {
         if (response) {
-          return response; // Cache hit
+          return response;
         }
-        return fetch(event.request); // Network
-      }
-    )
-  );
-});
-
-self.addEventListener('activate', event => {
-  const cacheWhitelist = [CACHE_NAME];
-  event.waitUntil(
-    caches.keys().then(cacheNames => {
-      return Promise.all(
-        cacheNames.map(cacheName => {
-          if (cacheWhitelist.indexOf(cacheName) === -1) {
-            return caches.delete(cacheName);
-          }
-        })
-      );
-    })
+        return fetch(event.request);
+      })
   );
 });
