@@ -41,6 +41,7 @@ export const packagingMasterSchema = z.object({
 });
 
 export const packagingReceptionItemSchema = z.object({
+    lote: z.string().optional(),
     packagingMasterId: z.string().min(1, "Debe ingresar un código de artículo válido."),
     packagingMasterCode: z.string().min(1, "Debe ingresar un código de artículo."),
     packagingMasterName: z.string(),
@@ -71,6 +72,7 @@ const packagingExitItemLocationSchema = z.object({
 });
 
 export const packagingExitItemSchema = z.object({
+    lote: z.string().optional(),
     packagingMasterId: z.string().min(1, "Debe ingresar un código de artículo válido."),
     packagingMasterCode: z.string().min(1, "Debe ingresar un código de artículo."),
     packagingMasterName: z.string(),
@@ -216,3 +218,5 @@ export const aisleSchema = z.object({
   name: z.string().min(1, 'El nombre es obligatorio'),
   warehouseIds: z.array(z.string()).min(1, 'Debe seleccionar al menos un almacén.'),
 });
+
+    

@@ -24,6 +24,7 @@ import { BarcodeScanner } from '../BarcodeScanner';
 type ReceptionFormValues = z.infer<typeof packagingReceptionSchema>;
 
 const defaultItem = {
+  lote: '',
   packagingMasterId: '',
   packagingMasterCode: '',
   packagingMasterName: '',
@@ -69,6 +70,7 @@ export function ReceptionTab() {
     // Add status to each item
     const itemsWithStatus: Omit<PackagingReceptionItem, 'storageLocation' | 'storedAt'>[] = values.items.map(item => ({
         ...item,
+        lote: item.lote || undefined, // Ensure empty strings are not saved
         status: 'Pendiente de almacenar'
     }));
 
@@ -197,7 +199,20 @@ export function ReceptionTab() {
                 <FormLabel>Ítems Recibidos</FormLabel>
                 {fields.map((field, index) => (
                   <div key={field.id} className="flex items-start gap-2 p-3 border rounded-md">
-                    <div className="flex-1 grid sm:grid-cols-3 gap-4 items-start">
+                    <div className="flex-1 grid sm:grid-cols-4 gap-4 items-start">
+                       <FormField
+                        control={form.control}
+                        name={`items.${index}.lote`}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Lote (Opcional)</FormLabel>
+                            <FormControl>
+                              <Input {...field} value={field.value ?? ''} autoComplete="off" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
                       <FormField
                         control={form.control}
                         name={`items.${index}.packagingMasterCode`}
@@ -276,3 +291,5 @@ export function ReceptionTab() {
     </>
   );
 }
+
+    

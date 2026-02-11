@@ -14,7 +14,6 @@ import { useToast } from '@/hooks/use-toast';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { Download, Upload } from 'lucide-react';
-import { packagingReceptionSchema } from '@/lib/schemas';
 
 interface StoredPackagingItem {
     id: string; // receptionId + itemIndex
@@ -24,6 +23,7 @@ interface StoredPackagingItem {
     document: string;
     code: string;
     name: string;
+    lote?: string;
     palletCount: number;
     location: {
         warehouse: string;
@@ -89,6 +89,7 @@ export function StockAndRelocationTab() {
                     document: reception.document,
                     code: item.packagingMasterCode,
                     name: item.packagingMasterName,
+                    lote: item.lote,
                     palletCount: item.palletCount,
                     location: item.storageLocation!,
                 }))
@@ -137,11 +138,12 @@ export function StockAndRelocationTab() {
   };
 
   const handleExport = () => {
-    const headers = ['clientName', 'code', 'name', 'location', 'palletCount'];
+    const headers = ['clientName', 'code', 'name', 'lote', 'location', 'palletCount'];
     const dataToExport = storedItems.map(item => ({
         clientName: item.clientName,
         code: item.code,
         name: item.name,
+        lote: item.lote || '',
         location: `${item.location.warehouse} / ${item.location.aisle}`,
         palletCount: item.palletCount,
     }));
@@ -150,7 +152,7 @@ export function StockAndRelocationTab() {
   };
 
   const handleDownloadTemplate = () => {
-    const headers = ['clientId', 'document', 'packagingMasterCode', 'palletCount', 'warehouse', 'aisle'];
+    const headers = ['clientId', 'document', 'lote', 'packagingMasterCode', 'palletCount', 'warehouse', 'aisle'];
     const csvContent = "data:text/csv;charset=utf-8," + headers.join(',');
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
@@ -175,7 +177,7 @@ export function StockAndRelocationTab() {
       }
       
       const fileHeaders = lines[0].split(',').map(h => h.trim());
-      const expectedHeaders = ['clientId', 'document', 'packagingMasterCode', 'palletCount', 'warehouse', 'aisle'];
+      const expectedHeaders = ['clientId', 'document', 'lote', 'packagingMasterCode', 'palletCount', 'warehouse', 'aisle'];
       if (JSON.stringify(fileHeaders) !== JSON.stringify(expectedHeaders)) {
         toast({ title: 'Error de formato', description: `Las cabeceras del CSV no coinciden. Esperado: ${expectedHeaders.join(', ')}`, variant: 'destructive' });
         return;
@@ -220,6 +222,7 @@ export function StockAndRelocationTab() {
         }
 
         receptionsToCreate[receptionKey].items.push({
+            lote: row.lote || undefined,
             packagingMasterId: master.id,
             packagingMasterCode: master.code,
             packagingMasterName: master.name,
@@ -292,9 +295,10 @@ export function StockAndRelocationTab() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead>Cliente</TableHead>
                   <TableHead className="hidden sm:table-cell">Código</TableHead>
                   <TableHead>Artículo</TableHead>
-                  <TableHead>Cliente</TableHead>
+                  <TableHead>Lote</TableHead>
                   <TableHead>Ubicación</TableHead>
                   <TableHead>Cant. Pallets</TableHead>
                   <TableHead className="text-right">Acciones</TableHead>
@@ -303,14 +307,15 @@ export function StockAndRelocationTab() {
               <TableBody>
                 {isLoading ? (
                   Array.from({ length: 5 }).map((_, i) => (
-                    <TableRow key={i}><TableCell colSpan={6}><Skeleton className="h-4 w-full" /></TableCell></TableRow>
+                    <TableRow key={i}><TableCell colSpan={7}><Skeleton className="h-4 w-full" /></TableCell></TableRow>
                   ))
                 ) : storedItems.length > 0 ? (
                   storedItems.map((item) => (
                     <TableRow key={item.id}>
+                        <TableCell>{item.clientName}</TableCell>
                         <TableCell className="font-mono hidden sm:table-cell">{item.code}</TableCell>
                         <TableCell className="font-medium">{item.name}</TableCell>
-                        <TableCell>{item.clientName}</TableCell>
+                        <TableCell>{item.lote || '-'}</TableCell>
                         <TableCell>{item.location.warehouse} / {item.location.aisle}</TableCell>
                         <TableCell className="font-semibold">{item.palletCount}</TableCell>
                         <TableCell className="text-right">
@@ -320,7 +325,7 @@ export function StockAndRelocationTab() {
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={6} className="h-24 text-center">No hay stock almacenado.</TableCell>
+                    <TableCell colSpan={7} className="h-24 text-center">No hay stock almacenado.</TableCell>
                   </TableRow>
                 )}
               </TableBody>
@@ -338,3 +343,5 @@ export function StockAndRelocationTab() {
     </>
   );
 }
+
+    

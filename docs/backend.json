@@ -383,6 +383,10 @@
           "items": {
             "type": "object",
             "properties": {
+              "lote": {
+                "type": "string",
+                "description": "Optional batch number for the packaging item."
+              },
               "packagingMasterId": { "type": "string" },
               "packagingMasterCode": { "type": "string" },
               "packagingMasterName": { "type": "string" },
@@ -506,6 +510,10 @@
           "items": {
             "type": "object",
             "properties": {
+              "lote": {
+                "type": "string",
+                "description": "Optional batch number for the packaging item."
+              },
               "packagingMasterId": { "type": "string" },
               "packagingMasterCode": { "type": "string" },
               "packagingMasterName": { "type": "string" },

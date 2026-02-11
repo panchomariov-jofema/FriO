@@ -79,6 +79,7 @@ export interface PackagingMaster {
 }
 
 export interface PackagingReceptionItem {
+    lote?: string;
     packagingMasterId: string;
     packagingMasterCode: string;
     packagingMasterName: string;
@@ -106,6 +107,7 @@ export interface PackagingReception {
 }
 
 export interface PackagingMovementItem {
+    lote?: string;
     packagingMasterId: string;
     packagingMasterCode: string;
     packagingMasterName: string;
@@ -449,3 +451,5 @@ export interface Aisle {
 }
 
 export type MasterData = Exporter | Producer | BinMaterial | OtherClient | PackagingMaster | UserMaster | Profile | Packing | Hidrocooler | BusinessEntity | Warehouse | Aisle;
+
+    

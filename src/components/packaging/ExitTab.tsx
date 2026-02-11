@@ -19,6 +19,7 @@ import { useToast } from '@/hooks/use-toast';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { BarcodeScanner } from '../BarcodeScanner';
+import { Label } from '../ui/label';
 
 type ExitFormValues = z.infer<typeof packagingExitSchema>;
 
@@ -36,6 +37,8 @@ export function ExitTab() {
   const firestore = useFirestore();
   const { toast } = useToast();
   
+  const [loteFilter, setLoteFilter] = React.useState('');
+
   const form = useForm<ExitFormValues>({
     resolver: zodResolver(packagingExitSchema),
     defaultValues: {
@@ -59,25 +62,33 @@ export function ExitTab() {
     return [...new Map((allClients || []).filter(c => c.type.toLowerCase() === 'embalaje' && c.status !== 'inactivo').map(item => [item.clientId, item])).values()];
   }, [allClients]);
 
-  const { inStockMasterCodes, stockByCode } = React.useMemo(() => {
+  const { inStockMasterCodes, stockByCodeAndLote } = React.useMemo(() => {
     const codes = new Set<string>();
-    const stockMap = new Map<string, number>();
+    const stockMap = new Map<string, Map<string, number>>();
 
     if (selectedClientId && allReceptions) {
         allReceptions.forEach(reception => {
             if (reception.clientId === selectedClientId) {
                 reception.items.forEach(item => {
                     if (item.status === 'Almacenado' && item.palletCount > 0) {
-                        codes.add(item.packagingMasterCode);
-                        const currentStock = stockMap.get(item.packagingMasterCode) || 0;
-                        stockMap.set(item.packagingMasterCode, currentStock + item.palletCount);
+                        const lotMatch = !loteFilter || (item.lote && item.lote.toLowerCase().includes(loteFilter.toLowerCase()));
+                        if (lotMatch) {
+                            codes.add(item.packagingMasterCode);
+                            const lote = item.lote || '';
+                            if (!stockMap.has(item.packagingMasterCode)) {
+                                stockMap.set(item.packagingMasterCode, new Map<string, number>());
+                            }
+                            const loteMap = stockMap.get(item.packagingMasterCode)!;
+                            const currentStock = loteMap.get(lote) || 0;
+                            loteMap.set(lote, currentStock + item.palletCount);
+                        }
                     }
                 });
             }
         });
     }
-    return { inStockMasterCodes: codes, stockByCode: stockMap };
-  }, [selectedClientId, allReceptions]);
+    return { inStockMasterCodes: codes, stockByCodeAndLote: stockMap };
+  }, [selectedClientId, allReceptions, loteFilter]);
   
   const clientPackagingMasters = React.useMemo(() => {
       if (!selectedClientId) return [];
@@ -92,12 +103,21 @@ export function ExitTab() {
     
     // Validate stock before submitting
     for (const item of values.items) {
-        const availableStock = stockByCode.get(item.packagingMasterCode) || 0;
+        const stockForCode = stockByCodeAndLote.get(item.packagingMasterCode);
+        if (!stockForCode) {
+             toast({ variant: 'destructive', title: 'Stock Insuficiente', description: `No hay stock para "${item.packagingMasterName}".` });
+             return;
+        }
+
+        const availableStock = loteFilter 
+            ? stockForCode.get(loteFilter) || 0
+            : Array.from(stockForCode.values()).reduce((sum, current) => sum + current, 0);
+
         if (item.palletCount > availableStock) {
             toast({
                 variant: 'destructive',
                 title: 'Stock Insuficiente',
-                description: `No hay suficiente stock para "${item.packagingMasterName}". Disponible: ${availableStock}, Solicitado: ${item.palletCount}.`,
+                description: `No hay suficiente stock para "${item.packagingMasterName}" ${loteFilter ? `en el lote "${loteFilter}"` : ''}. Disponible: ${availableStock}, Solicitado: ${item.palletCount}.`,
             });
             return; // Stop submission
         }
@@ -109,6 +129,7 @@ export function ExitTab() {
             clientId: values.clientId,
             document: values.document || '',
             items: values.items.map(item => ({
+                lote: loteFilter || undefined,
                 packagingMasterId: item.packagingMasterId,
                 packagingMasterCode: item.packagingMasterCode,
                 packagingMasterName: item.packagingMasterName,
@@ -122,6 +143,7 @@ export function ExitTab() {
         
         toast({ title: 'Solicitud Creada', description: 'La solicitud de salida ha sido creada y está pendiente de picking.' });
         form.reset({ clientId: values.clientId, document: '', items: [defaultItem] });
+        setLoteFilter('');
 
     } catch (error) {
         console.error("Error creating packaging exit request:", error);
@@ -135,6 +157,7 @@ export function ExitTab() {
   
   const handleClientChange = (value: string) => {
     form.reset({ clientId: value, document: '', items: [defaultItem] });
+    setLoteFilter('');
   };
   
   const handleItemCodeChange = (index: number, newCode: string) => {
@@ -150,7 +173,6 @@ export function ExitTab() {
     }
   };
   
-  // Scanner confirm handler
   const handleScanConfirm = (scannedValue: string) => {
     if (scanningIndex !== null) {
         const master = clientPackagingMasters.find(m => m.code === scannedValue);
@@ -180,7 +202,7 @@ export function ExitTab() {
         <CardContent>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-              <div className="grid md:grid-cols-2 gap-4">
+              <div className="grid md:grid-cols-3 gap-4">
                 <FormField
                   control={form.control}
                   name="clientId"
@@ -195,6 +217,15 @@ export function ExitTab() {
                     </FormItem>
                   )}
                 />
+                 <div>
+                    <Label>Filtrar por Lote (Opcional)</Label>
+                    <Input
+                        value={loteFilter}
+                        onChange={(e) => setLoteFilter(e.target.value)}
+                        placeholder="Ingrese un lote..."
+                        disabled={!selectedClientId}
+                    />
+                </div>
                 <FormField
                   control={form.control}
                   name="document"
@@ -210,57 +241,63 @@ export function ExitTab() {
               
               <div className="space-y-4">
                 <FormLabel>Ítems Solicitados</FormLabel>
-                {fields.map((field, index) => (
-                  <div key={field.id} className="flex items-end gap-2 p-3 border rounded-md">
-                    <div className="flex-1 grid sm:grid-cols-2 gap-4">
-                       <FormField
-                            control={form.control}
-                            name={`items.${index}.packagingMasterCode`}
-                            render={({ field: itemField }) => (
-                              <FormItem>
-                                <FormLabel>Código de Artículo</FormLabel>
-                                <div className="flex items-center gap-2">
-                                  <Select onValueChange={(value) => handleItemCodeChange(index, value)} value={itemField.value} disabled={!selectedClientId || clientPackagingMasters.length === 0}>
-                                      <FormControl><SelectTrigger>
-                                          <SelectValue placeholder={!selectedClientId ? "Seleccione cliente" : "Seleccione un código"} />
-                                      </SelectTrigger></FormControl>
-                                      <SelectContent>
-                                        {clientPackagingMasters.map((m) => (
-                                            <SelectItem key={m.code} value={m.code}>{m.code} - {m.name}</SelectItem>
-                                        ))}
-                                      </SelectContent>
-                                  </Select>
-                                  <Button type="button" variant="outline" size="icon" className="shrink-0" onClick={() => setScanningIndex(index)}>
-                                    <ScanLine className="h-4 w-4" />
-                                    <span className="sr-only">Escanear código</span>
-                                  </Button>
-                                </div>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                        <FormField
-                            control={form.control}
-                            name={`items.${index}.palletCount`}
-                            render={({ field: itemField }) => (
-                                <FormItem>
-                                    <FormLabel>Cantidad de Pallets</FormLabel>
-                                    <FormControl>
-                                        <Input type="number" {...itemField} value={itemField.value ?? ''} autoComplete="off" min="1" />
-                                    </FormControl>
-                                    <p className="text-xs text-muted-foreground pt-1">
-                                        Stock: {stockByCode.get(form.getValues(`items.${index}.packagingMasterCode`)) || 0}
-                                    </p>
+                {fields.map((field, index) => {
+                    const currentCode = form.watch(`items.${index}.packagingMasterCode`);
+                    const stockForCode = stockByCodeAndLote.get(currentCode);
+                    const totalStock = stockForCode ? Array.from(stockForCode.values()).reduce((a, b) => a + b, 0) : 0;
+                    
+                    return (
+                      <div key={field.id} className="flex items-end gap-2 p-3 border rounded-md">
+                        <div className="flex-1 grid sm:grid-cols-2 gap-4">
+                           <FormField
+                                control={form.control}
+                                name={`items.${index}.packagingMasterCode`}
+                                render={({ field: itemField }) => (
+                                  <FormItem>
+                                    <FormLabel>Código de Artículo</FormLabel>
+                                    <div className="flex items-center gap-2">
+                                      <Select onValueChange={(value) => handleItemCodeChange(index, value)} value={itemField.value} disabled={!selectedClientId || clientPackagingMasters.length === 0}>
+                                          <FormControl><SelectTrigger>
+                                              <SelectValue placeholder={!selectedClientId ? "Seleccione cliente" : "Seleccione un código"} />
+                                          </SelectTrigger></FormControl>
+                                          <SelectContent>
+                                            {clientPackagingMasters.map((m) => (
+                                                <SelectItem key={m.code} value={m.code}>{m.code} - {m.name}</SelectItem>
+                                            ))}
+                                          </SelectContent>
+                                      </Select>
+                                      <Button type="button" variant="outline" size="icon" className="shrink-0" onClick={() => setScanningIndex(index)}>
+                                        <ScanLine className="h-4 w-4" />
+                                        <span className="sr-only">Escanear código</span>
+                                      </Button>
+                                    </div>
                                     <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-                    </div>
-                    <Button type="button" variant="destructive" size="icon" onClick={() => remove(index)} disabled={fields.length <= 1}>
-                        <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                ))}
+                                  </FormItem>
+                                )}
+                              />
+                            <FormField
+                                control={form.control}
+                                name={`items.${index}.palletCount`}
+                                render={({ field: itemField }) => (
+                                    <FormItem>
+                                        <FormLabel>Cantidad de Pallets</FormLabel>
+                                        <FormControl>
+                                            <Input type="number" {...itemField} value={itemField.value ?? ''} autoComplete="off" min="1" />
+                                        </FormControl>
+                                        <p className="text-xs text-muted-foreground pt-1">
+                                            Stock Disponible: {totalStock}
+                                        </p>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                        </div>
+                        <Button type="button" variant="destructive" size="icon" onClick={() => remove(index)} disabled={fields.length <= 1}>
+                            <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    )
+                })}
                 <Button
                   type="button"
                   variant="outline"
@@ -290,3 +327,5 @@ export function ExitTab() {
     </>
   );
 }
+
+    
