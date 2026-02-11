@@ -83,29 +83,6 @@ export default function EmbalajesPage() {
                 Recepción y gestión de stock de materiales de embalaje en pallets.
               </CardDescription>
             </div>
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                  <Button variant="destructive" size="icon">
-                      <Trash2 className="h-4 w-4" />
-                      <span className="sr-only">Limpiar Stock</span>
-                  </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                  <AlertDialogHeader>
-                      <AlertDialogTitle>¿Está seguro de limpiar todo el stock?</AlertDialogTitle>
-                      <AlertDialogDescription>
-                          Esta acción no se puede deshacer. Se eliminarán permanentemente TODAS las recepciones
-                          de embalajes. Esta herramienta es solo para fines de desarrollo y pruebas.
-                      </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                      <AlertDialogAction onClick={handleClearStock} className="bg-destructive hover:bg-destructive/90">
-                          Sí, Limpiar Stock
-                      </AlertDialogAction>
-                  </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
           </CardHeader>
           {visibleTabs.length > 0 && (
             <CardContent>
