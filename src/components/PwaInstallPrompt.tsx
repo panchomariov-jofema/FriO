@@ -41,8 +41,8 @@ export const PwaInstallPrompt = () => {
 
   return (
     <Button variant="outline" size="sm" onClick={handleInstallClick}>
-        <Download className="h-4 w-4 sm:mr-2" />
-        <span className="hidden sm:inline">Instalar App</span>
+        <Download className="h-4 w-4 mr-2" />
+        <span>Instalar App</span>
     </Button>
   );
 };
