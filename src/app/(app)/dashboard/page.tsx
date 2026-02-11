@@ -349,7 +349,7 @@ export default function DashboardPage() {
             }));
 
         const clientOptions = (otherClients || [])
-            .filter(c => c.type === 'fruta' && allowedClientNames.includes(c.name))
+            .filter(c => c.type === 'fruta' && allowedClientNames.includes(c.name) && c.status !== 'inactivo')
             .map(c => ({
                 value: `otherclient_${c.id}`,
                 label: c.name,

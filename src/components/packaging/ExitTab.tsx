@@ -56,7 +56,7 @@ export function ExitTab() {
   const [scanningIndex, setScanningIndex] = React.useState<number | null>(null);
 
   const packagingClients = React.useMemo(() => {
-    return [...new Map((allClients || []).filter(c => c.type.toLowerCase() === 'embalaje').map(item => [item.clientId, item])).values()];
+    return [...new Map((allClients || []).filter(c => c.type.toLowerCase() === 'embalaje' && c.status !== 'inactivo').map(item => [item.clientId, item])).values()];
   }, [allClients]);
 
   const { inStockMasterCodes, stockByCode } = React.useMemo(() => {

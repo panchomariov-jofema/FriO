@@ -54,7 +54,7 @@ export function ReceptionTab() {
   const selectedClientId = form.watch('clientId');
 
   const packagingClients = React.useMemo(() => {
-    return allClients.filter(c => c.type.toLowerCase() === 'embalaje');
+    return (allClients || []).filter(c => c.type.toLowerCase() === 'embalaje' && c.status !== 'inactivo');
   }, [allClients]);
 
   const onSubmit = async (values: ReceptionFormValues) => {

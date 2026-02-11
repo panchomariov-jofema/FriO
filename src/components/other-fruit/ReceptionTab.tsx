@@ -68,7 +68,7 @@ export function OtherFruitReceptionTab({ clientId: fixedClientId }: { clientId?:
   });
 
   const fruitClients = React.useMemo(() => {
-    return (allClients || []).filter(c => c.type.toUpperCase() === 'FRUTA');
+    return (allClients || []).filter(c => c.type.toUpperCase() === 'FRUTA' && c.status !== 'inactivo');
   }, [allClients]);
 
   React.useEffect(() => {
