@@ -445,6 +445,7 @@ export interface Warehouse {
 export interface Aisle {
   id: string;
   name: string;
+  warehouseIds: string[];
 }
 
 export type MasterData = Exporter | Producer | BinMaterial | OtherClient | PackagingMaster | UserMaster | Profile | Packing | Hidrocooler | BusinessEntity | Warehouse | Aisle;

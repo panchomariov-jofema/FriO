@@ -40,6 +40,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { ModulePermissionsSelector } from '@/components/master-data/ModulePermissionsSelector';
 import { Switch } from '@/components/ui/switch';
+import { Checkbox } from '@/components/ui/checkbox';
 
 const ExporterForm = ({ form }: { form: any }) => (
   <>
@@ -309,11 +310,66 @@ const WarehouseForm = ({ form }: { form: any }) => (
   </>
 );
 
-const AisleForm = ({ form }: { form: any }) => (
+const AisleForm = ({ form, warehouses }: { form: any; warehouses: Warehouse[] }) => (
   <>
     <FormField control={form.control} name="name" render={({ field }) => (
       <FormItem><FormLabel>Nombre del Pasillo</FormLabel><FormControl><Input {...field} autoComplete="off" /></FormControl><FormMessage /></FormItem>
     )} />
+    <FormField
+      control={form.control}
+      name="warehouseIds"
+      render={() => (
+        <FormItem>
+          <div className="mb-2">
+            <FormLabel className="text-base">
+              Almacenes Asociados
+            </FormLabel>
+            <FormDescription>
+              Seleccione los almacenes a los que pertenece este pasillo.
+            </FormDescription>
+          </div>
+          <div className="max-h-40 overflow-y-auto space-y-2 rounded-md border p-4">
+            {warehouses.map((warehouse) => (
+              <FormField
+                key={warehouse.id}
+                control={form.control}
+                name="warehouseIds"
+                render={({ field }) => {
+                  return (
+                    <FormItem
+                      key={warehouse.id}
+                      className="flex flex-row items-start space-x-3 space-y-0"
+                    >
+                      <FormControl>
+                        <Checkbox
+                          checked={field.value?.includes(warehouse.id)}
+                          onCheckedChange={(checked) => {
+                            return checked
+                              ? field.onChange([
+                                  ...(field.value || []),
+                                  warehouse.id,
+                                ])
+                              : field.onChange(
+                                  field.value?.filter(
+                                    (value: string) => value !== warehouse.id
+                                  )
+                                );
+                          }}
+                        />
+                      </FormControl>
+                      <FormLabel className="font-normal">
+                        {warehouse.name}
+                      </FormLabel>
+                    </FormItem>
+                  );
+                }}
+              />
+            ))}
+          </div>
+          <FormMessage />
+        </FormItem>
+      )}
+    />
   </>
 );
 
@@ -321,6 +377,7 @@ export default function DatosMaestrosPage() {
   const { data: exporters, loading: loadingExporters } = useFirestoreCollection<Exporter>('exporters');
   const { data: otherClients, loading: loadingOtherClients } = useFirestoreCollection<OtherClient>('otherClients');
   const { data: profiles, loading: loadingProfiles } = useFirestoreCollection<Profile>('profiles');
+  const { data: warehouses, loading: loadingWarehouses } = useFirestoreCollection<Warehouse>('warehouses');
 
   const tabs = [
     { value: 'exporters', label: 'Exportadores' },
@@ -445,12 +502,12 @@ export default function DatosMaestrosPage() {
               title="Pasillos de Embalaje"
               collectionName="aisles"
               schema={aisleSchema}
-              columns={[{key: 'name', header: 'Nombre'}]}
+              columns={[{key: 'name', header: 'Nombre'}, {key: 'warehouseIds', header: 'Almacenes'}]}
               RenderFormComponent={AisleForm}
               docNameField="name"
-              csvHeaders={['name']}
+              csvHeaders={['name', 'warehouseIds']}
               csvTemplateFileName="plantilla_pasillos.csv"
-              formProps={{}}
+              formProps={{ warehouses: loadingWarehouses ? [] : warehouses }}
             />
           </TabsContent>
            <TabsContent value="packing" className="mt-4">

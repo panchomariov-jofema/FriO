@@ -32,7 +32,21 @@ export function StorePackagingDialog({ item, open, onOpenChange, onConfirm }: St
   });
 
   const { data: warehouses, loading: loadingWarehouses } = useFirestoreCollection<Warehouse>('warehouses');
-  const { data: aisles, loading: loadingAisles } = useFirestoreCollection<Aisle>('aisles');
+  const { data: allAisles, loading: loadingAisles } = useFirestoreCollection<Aisle>('aisles');
+  
+  const selectedWarehouseName = form.watch('warehouse');
+
+  const filteredAisles = React.useMemo(() => {
+    if (!selectedWarehouseName || !allAisles || !warehouses) {
+      return [];
+    }
+    const selectedWarehouse = warehouses.find(w => w.name === selectedWarehouseName);
+    if (!selectedWarehouse) {
+      return [];
+    }
+    return allAisles.filter(a => a.warehouseIds && a.warehouseIds.includes(selectedWarehouse.id));
+  }, [selectedWarehouseName, allAisles, warehouses]);
+
 
   React.useEffect(() => {
     if (open) {
@@ -64,7 +78,7 @@ export function StorePackagingDialog({ item, open, onOpenChange, onConfirm }: St
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Almacén</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value} disabled={loadingWarehouses}>
+                    <Select onValueChange={(value) => { field.onChange(value); form.resetField('aisle'); }} value={field.value} disabled={loadingWarehouses}>
                       <FormControl>
                         <SelectTrigger><SelectValue placeholder="Seleccione..." /></SelectTrigger>
                       </FormControl>
@@ -84,14 +98,20 @@ export function StorePackagingDialog({ item, open, onOpenChange, onConfirm }: St
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Pasillo</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value} disabled={loadingAisles}>
+                    <Select onValueChange={field.onChange} value={field.value} disabled={loadingAisles || !selectedWarehouseName}>
                       <FormControl>
-                        <SelectTrigger><SelectValue placeholder="Seleccione..." /></SelectTrigger>
+                        <SelectTrigger><SelectValue placeholder={!selectedWarehouseName ? 'Seleccione almacén' : 'Seleccione...'} /></SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {aisles.map(a => (
-                          <SelectItem key={a.id} value={a.name}>{a.name}</SelectItem>
-                        ))}
+                         {filteredAisles.length > 0 ? (
+                          filteredAisles.map(a => (
+                            <SelectItem key={a.id} value={a.name}>{a.name}</SelectItem>
+                          ))
+                        ) : (
+                          <div className="p-2 text-xs text-center text-muted-foreground">
+                            {selectedWarehouseName ? "No hay pasillos para este almacén." : "Seleccione un almacén."}
+                          </div>
+                        )}
                       </SelectContent>
                     </Select>
                     <FormMessage />

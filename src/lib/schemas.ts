@@ -214,4 +214,5 @@ export const warehouseSchema = z.object({
 
 export const aisleSchema = z.object({
   name: z.string().min(1, 'El nombre es obligatorio'),
+  warehouseIds: z.array(z.string()).min(1, 'Debe seleccionar al menos un almacén.'),
 });
