@@ -2,17 +2,16 @@
   "name": "FriO",
   "short_name": "FriO",
   "description": "Gestión de frigorífico",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#FFFFFF",
+  "theme_color": "#22c55e",
   "icons": [
     {
       "src": "/logo.svg",
-      "sizes": "48x48 72x72 96x96 128x128 144x144 152x152 192x192 256x256 512x512",
+      "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any maskable"
     }
-  ],
-  "theme_color": "#22c55e",
-  "background_color": "#ffffff",
-  "display": "standalone",
-  "scope": "/",
-  "start_url": "/login"
+  ]
 }
