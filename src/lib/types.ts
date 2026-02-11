@@ -437,4 +437,14 @@ export interface BusinessEntity {
   actividadComercial: string;
 }
 
-export type MasterData = Exporter | Producer | BinMaterial | OtherClient | PackagingMaster | UserMaster | Profile | Packing | Hidrocooler | BusinessEntity;
+export interface Warehouse {
+  id: string;
+  name: string;
+}
+
+export interface Aisle {
+  id: string;
+  name: string;
+}
+
+export type MasterData = Exporter | Producer | BinMaterial | OtherClient | PackagingMaster | UserMaster | Profile | Packing | Hidrocooler | BusinessEntity | Warehouse | Aisle;

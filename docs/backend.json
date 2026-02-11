@@ -1140,6 +1140,32 @@
         "giro",
         "actividadComercial"
       ]
+    },
+    "Warehouse": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Warehouse",
+      "type": "object",
+      "description": "Represents a packaging warehouse.",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Name of the warehouse."
+        }
+      },
+      "required": ["name"]
+    },
+    "Aisle": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Aisle",
+      "type": "object",
+      "description": "Represents a packaging aisle.",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Name of the aisle."
+        }
+      },
+      "required": ["name"]
     }
   },
   "auth": {
@@ -1510,6 +1536,38 @@
             {
               "name": "entityId",
               "description": "The unique identifier for the business entity."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/warehouses/{warehouseId}",
+        "definition": {
+          "entityName": "Warehouse",
+          "schema": {
+            "$ref": "#/backend/entities/Warehouse"
+          },
+          "description": "Stores packaging warehouse configurations.",
+          "params": [
+            {
+              "name": "warehouseId",
+              "description": "The unique identifier for the warehouse."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/aisles/{aisleId}",
+        "definition": {
+          "entityName": "Aisle",
+          "schema": {
+            "$ref": "#/backend/entities/Aisle"
+          },
+          "description": "Stores packaging aisle configurations.",
+          "params": [
+            {
+              "name": "aisleId",
+              "description": "The unique identifier for the aisle."
             }
           ]
         }

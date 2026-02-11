@@ -8,8 +8,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import type { PackagingReceptionItem } from '@/lib/types';
-import { packagingStorageConfig } from '@/lib/packaging-storage-config';
+import type { PackagingReceptionItem, Warehouse, Aisle } from '@/lib/types';
+import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
 
 interface StorePackagingDialogProps {
   item: (PackagingReceptionItem & { document?: string }) | null;
@@ -30,6 +30,9 @@ export function StorePackagingDialog({ item, open, onOpenChange, onConfirm }: St
     resolver: zodResolver(storeSchema),
     defaultValues: { warehouse: undefined, aisle: undefined },
   });
+
+  const { data: warehouses, loading: loadingWarehouses } = useFirestoreCollection<Warehouse>('warehouses');
+  const { data: aisles, loading: loadingAisles } = useFirestoreCollection<Aisle>('aisles');
 
   React.useEffect(() => {
     if (open) {
@@ -61,12 +64,12 @@ export function StorePackagingDialog({ item, open, onOpenChange, onConfirm }: St
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Almacén</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
+                    <Select onValueChange={field.onChange} value={field.value} disabled={loadingWarehouses}>
                       <FormControl>
                         <SelectTrigger><SelectValue placeholder="Seleccione..." /></SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {packagingStorageConfig.warehouses.map(w => (
+                        {warehouses.map(w => (
                           <SelectItem key={w.id} value={w.name}>{w.name}</SelectItem>
                         ))}
                       </SelectContent>
@@ -81,13 +84,13 @@ export function StorePackagingDialog({ item, open, onOpenChange, onConfirm }: St
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Pasillo</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
+                    <Select onValueChange={field.onChange} value={field.value} disabled={loadingAisles}>
                       <FormControl>
                         <SelectTrigger><SelectValue placeholder="Seleccione..." /></SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {packagingStorageConfig.aisles.map(a => (
-                          <SelectItem key={a} value={a}>{a}</SelectItem>
+                        {aisles.map(a => (
+                          <SelectItem key={a.id} value={a.name}>{a.name}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>

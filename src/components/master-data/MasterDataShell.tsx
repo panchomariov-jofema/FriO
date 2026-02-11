@@ -191,6 +191,8 @@ export function MasterDataShell<T extends MasterData>({
           profiles: 'profileId',
           packings: 'name',
           businessEntities: 'rut',
+          warehouses: 'name',
+          aisles: 'name',
         };
         
         const keyField = keyFields[collectionName];

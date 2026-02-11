@@ -16,6 +16,8 @@ import type {
   Hidrocooler,
   ModulePermission,
   BusinessEntity,
+  Warehouse,
+  Aisle,
 } from '@/lib/types';
 import {
   exporterSchema,
@@ -28,6 +30,8 @@ import {
   profileSchema,
   hidrocoolerSchema,
   businessEntitySchema,
+  warehouseSchema,
+  aisleSchema,
 } from '@/lib/schemas';
 import { FormField, FormItem, FormLabel, FormControl, FormMessage, FormDescription } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
@@ -297,6 +301,22 @@ const BusinessEntityForm = ({ form }: { form: any }) => (
   </>
 );
 
+const WarehouseForm = ({ form }: { form: any }) => (
+  <>
+    <FormField control={form.control} name="name" render={({ field }) => (
+      <FormItem><FormLabel>Nombre del Almacén</FormLabel><FormControl><Input {...field} autoComplete="off" /></FormControl><FormMessage /></FormItem>
+    )} />
+  </>
+);
+
+const AisleForm = ({ form }: { form: any }) => (
+  <>
+    <FormField control={form.control} name="name" render={({ field }) => (
+      <FormItem><FormLabel>Nombre del Pasillo</FormLabel><FormControl><Input {...field} autoComplete="off" /></FormControl><FormMessage /></FormItem>
+    )} />
+  </>
+);
+
 export default function DatosMaestrosPage() {
   const { data: exporters, loading: loadingExporters } = useFirestoreCollection<Exporter>('exporters');
   const { data: otherClients, loading: loadingOtherClients } = useFirestoreCollection<OtherClient>('otherClients');
@@ -308,6 +328,8 @@ export default function DatosMaestrosPage() {
     { value: 'binMaterials', label: 'Bins y Mat.' },
     { value: 'otherClients', label: 'Otros Clientes' },
     { value: 'packagingMaster', label: 'Embalajes' },
+    { value: 'warehouses', label: 'Almacenes (Emb.)' },
+    { value: 'aisles', label: 'Pasillos (Emb.)' },
     { value: 'packing', label: 'Packing' },
     { value: 'usersMaster', label: 'Usuarios' },
     { value: 'profiles', label: 'Perfiles' },
@@ -404,6 +426,32 @@ export default function DatosMaestrosPage() {
                 csvTemplateFileName="plantilla_embalajes.csv"
                 formProps={{ otherClients: loadingOtherClients ? [] : otherClients }}
               />
+          </TabsContent>
+           <TabsContent value="warehouses" className="mt-4">
+            <MasterDataShell<Warehouse>
+              title="Almacenes de Embalaje"
+              collectionName="warehouses"
+              schema={warehouseSchema}
+              columns={[{key: 'name', header: 'Nombre'}]}
+              RenderFormComponent={WarehouseForm}
+              docNameField="name"
+              csvHeaders={['name']}
+              csvTemplateFileName="plantilla_almacenes.csv"
+              formProps={{}}
+            />
+          </TabsContent>
+          <TabsContent value="aisles" className="mt-4">
+            <MasterDataShell<Aisle>
+              title="Pasillos de Embalaje"
+              collectionName="aisles"
+              schema={aisleSchema}
+              columns={[{key: 'name', header: 'Nombre'}]}
+              RenderFormComponent={AisleForm}
+              docNameField="name"
+              csvHeaders={['name']}
+              csvTemplateFileName="plantilla_pasillos.csv"
+              formProps={{}}
+            />
           </TabsContent>
            <TabsContent value="packing" className="mt-4">
              <MasterDataShell<Packing>

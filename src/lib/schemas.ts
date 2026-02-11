@@ -207,3 +207,11 @@ export const businessEntitySchema = z.object({
   giro: z.string().min(1, 'El Giro/Actividad es obligatorio'),
   actividadComercial: z.string().min(1, 'La Act. Comercial es obligatoria'),
 });
+
+export const warehouseSchema = z.object({
+  name: z.string().min(1, 'El nombre es obligatorio'),
+});
+
+export const aisleSchema = z.object({
+  name: z.string().min(1, 'El nombre es obligatorio'),
+});
