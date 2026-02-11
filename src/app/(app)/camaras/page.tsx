@@ -592,6 +592,30 @@ export default function CamarasPage() {
                             {loading ? <Skeleton className="h-8 w-32" /> : `${totalNetWeightInStock.toLocaleString('es-CL', {maximumFractionDigits: 0})} kg`}
                         </div>
                     </div>
+                    {process.env.NODE_ENV === 'development' && (
+                        <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                                <Button variant="destructive" size="sm" className="hidden md:flex">
+                                    <Trash2 className="mr-2 h-4 w-4" />
+                                    Limpiar Stock
+                                </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                                <AlertDialogHeader>
+                                    <AlertDialogTitle>¿Está seguro de limpiar todo el stock?</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                    Esta acción eliminará permanentemente todos los lotes almacenados en todas las cámaras (productores y otros clientes). Esta acción no se puede deshacer.
+                                    </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                    <AlertDialogAction onClick={handleClearStock} className="bg-destructive hover:bg-destructive/90">
+                                    Sí, Limpiar Todo
+                                    </AlertDialogAction>
+                                </AlertDialogFooter>
+                            </AlertDialogContent>
+                        </AlertDialog>
+                    )}
                 </div>
             </CardHeader>
             <CardContent>
