@@ -33,12 +33,13 @@ import {
   SidebarTrigger,
   SidebarFooter,
   useSidebar,
+  SidebarMenuBadge,
 } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
 import { useAuth, useUser } from '@/firebase';
 import { LoadingScreen } from '@/components/LoadingScreen';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
-import type { UserMaster, Profile, ModulePermission } from '@/lib/types';
+import type { UserMaster, Profile, ModulePermission, OtherFruitReception, PackagingReception, OtherFruitMovement, PackagingMovement, Dispatch } from '@/lib/types';
 import { signOut } from 'firebase/auth';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { cn } from '@/lib/utils';
@@ -90,6 +91,14 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
   const { user, isUserLoading } = useUser();
   const { data: users, loading: loadingUsers } = useFirestoreCollection<UserMaster>('usersMaster');
   const { data: profiles, loading: loadingProfiles } = useFirestoreCollection<Profile>('profiles');
+
+  const { data: otherFruitReceptions, loading: loadingOFR } = useFirestoreCollection<OtherFruitReception>('otherFruitReceptions');
+  const { data: packagingReceptions, loading: loadingPR } = useFirestoreCollection<PackagingReception>('packagingReceptions');
+  const { data: otherFruitMovements, loading: loadingOFM } = useFirestoreCollection<OtherFruitMovement>('otherFruitMovements');
+  const { data: packagingMovements, loading: loadingPM } = useFirestoreCollection<PackagingMovement>('packagingMovements');
+  const { data: dispatches, loading: loadingDispatches } = useFirestoreCollection<Dispatch>('dispatches');
+
+
   const [accessibleNav, setAccessibleNav] = React.useState<any[] | null>(null);
   const { setOpenMobile } = useSidebar();
   const [activePermissions, setActivePermissions] = React.useState<ModulePermission[]>([]);
@@ -102,6 +111,44 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
         (item.type === 'group' && isChildActive(item.items))
     );
   }, [pathname]);
+
+  const notificationCounts = React.useMemo(() => {
+    const counts: Record<string, number> = {};
+
+    const sociosComercialesStorage = (otherFruitReceptions || [])
+        .filter(r => r.status === 'Pendiente de almacenar' || r.status === 'Parcialmente Almacenado').length;
+    const sociosComercialesPicking = (otherFruitMovements || [])
+        .filter(m => m.type === 'salida' && m.status === 'Pendiente de Picking').length;
+    counts['Socios Comerciales'] = sociosComercialesStorage + sociosComercialesPicking;
+
+    const embalajesStorage = (packagingReceptions || [])
+        .filter(r => r.status === 'Pendiente de almacenar' || r.status === 'Parcialmente Almacenado').length;
+    const embalajesPicking = (packagingMovements || [])
+        .filter(m => m.type === 'salida' && m.status === 'Pendiente de Picking').length;
+    counts['Embalajes'] = embalajesStorage + embalajesPicking;
+
+    counts['Despachos'] = (dispatches || []).filter(d => d.status === 'Pendiente de Picking').length;
+    
+    return counts;
+  }, [otherFruitReceptions, otherFruitMovements, packagingReceptions, packagingMovements, dispatches]);
+  
+  const dynamicNavStructure = React.useMemo(() => {
+    const addBadges = (items: any[]): any[] => {
+      return items.map(item => {
+        if (item.type === 'item') {
+          return { ...item, badge: notificationCounts[item.label] || 0 };
+        }
+        if (item.type === 'group') {
+          const newItems = addBadges(item.items);
+          const groupBadge = newItems.reduce((sum, subItem) => sum + (subItem.badge || 0), 0);
+          return { ...item, items: newItems, badge: groupBadge };
+        }
+        return item;
+      });
+    };
+    return addBadges(navStructure);
+  }, [notificationCounts]);
+  
 
   React.useEffect(() => {
     // When path changes, open the parent collapsible if a child is active
@@ -179,7 +226,7 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
         if (item.type === 'group') {
           const accessibleSubItems = filterNavItems(item.items, accessibleNames);
           if (accessibleSubItems.length > 0) {
-            return { ...item, items: accessibleSubItems };
+            return { ...item, items: accessibleSubItems, badge: accessibleSubItems.reduce((sum, i) => sum + (i.badge || 0), 0) };
           }
           return null;
         }
@@ -187,10 +234,10 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
       }).filter(Boolean);
     };
 
-    const filteredNav = filterNavItems(navStructure, accessibleModuleNames);
+    const filteredNav = filterNavItems(dynamicNavStructure, accessibleModuleNames);
     setAccessibleNav(filteredNav);
 
-  }, [user, isUserLoading, router, users, profiles, loadingUsers, loadingProfiles]);
+  }, [user, isUserLoading, router, users, profiles, loadingUsers, loadingProfiles, dynamicNavStructure]);
 
   React.useEffect(() => {
     if (accessibleNav && pathname === '/dashboard') {
@@ -220,7 +267,7 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
     }
   }, [accessibleNav, pathname, router]);
 
-  const loading = isUserLoading || accessibleNav === null;
+  const loading = isUserLoading || accessibleNav === null || loadingOFR || loadingPR || loadingOFM || loadingPM || loadingDispatches;
 
   if (loading || !user) {
     return <LoadingScreen />;
@@ -250,6 +297,7 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
         return (
             <SidebarMenuItem key={item.href} onClick={() => setOpenMobile(false)}>
                 {menuItemContent}
+                {item.badge > 0 && <SidebarMenuBadge>{item.badge}</SidebarMenuBadge>}
             </SidebarMenuItem>
         )
     }
@@ -274,6 +322,7 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
                             <ChevronRight className={cn("h-4 w-4 shrink-0 transition-transform duration-200", openCollapsibles[item.label] && "rotate-90")} />
                         </SidebarMenuButton>
                     </CollapsibleTrigger>
+                    {item.badge > 0 && <SidebarMenuBadge>{item.badge}</SidebarMenuBadge>}
                 </SidebarMenuItem>
                 <CollapsibleContent>
                     <SidebarMenu className="pl-6">
