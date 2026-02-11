@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Button } from '@/components/ui/button';
 import type { PackagingReceptionItem, Warehouse, Aisle } from '@/lib/types';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
+import { naturalSort } from '@/lib/utils';
 
 interface StorePackagingDialogProps {
   item: (PackagingReceptionItem & { document?: string }) | null;
@@ -34,6 +35,11 @@ export function StorePackagingDialog({ item, open, onOpenChange, onConfirm }: St
   const { data: warehouses, loading: loadingWarehouses } = useFirestoreCollection<Warehouse>('warehouses');
   const { data: allAisles, loading: loadingAisles } = useFirestoreCollection<Aisle>('aisles');
   
+  const sortedWarehouses = React.useMemo(() => {
+    if (!warehouses) return [];
+    return [...warehouses].sort((a,b) => naturalSort(a.name, b.name));
+  }, [warehouses]);
+  
   const selectedWarehouseName = form.watch('warehouse');
 
   const filteredAisles = React.useMemo(() => {
@@ -44,7 +50,8 @@ export function StorePackagingDialog({ item, open, onOpenChange, onConfirm }: St
     if (!selectedWarehouse) {
       return [];
     }
-    return allAisles.filter(a => a.warehouseIds && a.warehouseIds.includes(selectedWarehouse.id));
+    return allAisles.filter(a => a.warehouseIds && a.warehouseIds.includes(selectedWarehouse.id))
+      .sort((a,b) => naturalSort(a.name, b.name));
   }, [selectedWarehouseName, allAisles, warehouses]);
 
 
@@ -83,7 +90,7 @@ export function StorePackagingDialog({ item, open, onOpenChange, onConfirm }: St
                         <SelectTrigger><SelectValue placeholder="Seleccione..." /></SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {warehouses.map(w => (
+                        {sortedWarehouses.map(w => (
                           <SelectItem key={w.id} value={w.name}>{w.name}</SelectItem>
                         ))}
                       </SelectContent>

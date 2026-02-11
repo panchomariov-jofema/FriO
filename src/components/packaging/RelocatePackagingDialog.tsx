@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
 import type { Warehouse, Aisle } from '@/lib/types';
+import { naturalSort } from '@/lib/utils';
 
 interface RelocatePackagingDialogProps {
   item: {
@@ -42,6 +43,11 @@ export function RelocatePackagingDialog({ item, open, onOpenChange, onConfirm }:
   const { data: warehouses, loading: loadingWarehouses } = useFirestoreCollection<Warehouse>('warehouses');
   const { data: allAisles, loading: loadingAisles } = useFirestoreCollection<Aisle>('aisles');
 
+  const sortedWarehouses = React.useMemo(() => {
+    if (!warehouses) return [];
+    return [...warehouses].sort((a,b) => naturalSort(a.name, b.name));
+  }, [warehouses]);
+
   const selectedWarehouseName = form.watch('warehouse');
 
   const filteredAisles = React.useMemo(() => {
@@ -52,7 +58,8 @@ export function RelocatePackagingDialog({ item, open, onOpenChange, onConfirm }:
     if (!selectedWarehouse) {
       return [];
     }
-    return allAisles.filter(a => a.warehouseIds && a.warehouseIds.includes(selectedWarehouse.id));
+    return allAisles.filter(a => a.warehouseIds && a.warehouseIds.includes(selectedWarehouse.id))
+      .sort((a,b) => naturalSort(a.name, b.name));
   }, [selectedWarehouseName, allAisles, warehouses]);
 
 
@@ -99,7 +106,7 @@ export function RelocatePackagingDialog({ item, open, onOpenChange, onConfirm }:
                         <SelectTrigger><SelectValue placeholder="Seleccione..." /></SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {warehouses.map(w => (
+                        {sortedWarehouses.map(w => (
                           <SelectItem key={w.id} value={w.name}>{w.name}</SelectItem>
                         ))}
                       </SelectContent>
