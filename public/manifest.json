@@ -1,15 +1,15 @@
 {
-  "name": "FriO",
+  "name": "FriO App",
   "short_name": "FriO",
   "description": "Gestión de frigorífico",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#FFFFFF",
+  "background_color": "#ffffff",
   "theme_color": "#22c55e",
   "icons": [
     {
       "src": "/logo.svg",
-      "sizes": "any",
+      "sizes": "48x48 72x72 96x96 128x128 256x256 512x512",
       "type": "image/svg+xml",
       "purpose": "any maskable"
     }
