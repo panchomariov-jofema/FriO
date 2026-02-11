@@ -41,6 +41,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { ModulePermissionsSelector } from '@/components/master-data/ModulePermissionsSelector';
 import { Switch } from '@/components/ui/switch';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Button } from '@/components/ui/button';
 
 const ExporterForm = ({ form }: { form: any }) => (
   <>
@@ -310,7 +311,20 @@ const WarehouseForm = ({ form }: { form: any }) => (
   </>
 );
 
-const AisleForm = ({ form, warehouses }: { form: any; warehouses: Warehouse[] }) => (
+const AisleForm = ({ form, warehouses }: { form: any; warehouses: Warehouse[] }) => {
+  const warehouseIds = form.watch('warehouseIds') || [];
+  const areAllSelected = warehouses.length > 0 && warehouseIds.length === warehouses.length;
+
+  const handleToggleSelectAll = () => {
+    if (areAllSelected) {
+      form.setValue('warehouseIds', [], { shouldDirty: true });
+    } else {
+      const allWarehouseIds = warehouses.map(w => w.id);
+      form.setValue('warehouseIds', allWarehouseIds, { shouldDirty: true });
+    }
+  };
+
+  return (
   <>
     <FormField control={form.control} name="name" render={({ field }) => (
       <FormItem><FormLabel>Nombre del Pasillo</FormLabel><FormControl><Input {...field} autoComplete="off" /></FormControl><FormMessage /></FormItem>
@@ -318,7 +332,7 @@ const AisleForm = ({ form, warehouses }: { form: any; warehouses: Warehouse[] })
     <FormField
       control={form.control}
       name="warehouseIds"
-      render={() => (
+      render={({ field }) => (
         <FormItem>
           <div className="mb-2">
             <FormLabel className="text-base">
@@ -327,6 +341,11 @@ const AisleForm = ({ form, warehouses }: { form: any; warehouses: Warehouse[] })
             <FormDescription>
               Seleccione los almacenes a los que pertenece este pasillo.
             </FormDescription>
+          </div>
+          <div className="mb-2">
+            <Button type="button" variant="outline" size="sm" onClick={handleToggleSelectAll} disabled={warehouses.length === 0}>
+                {areAllSelected ? 'Deseleccionar Todos' : 'Seleccionar Todos'}
+            </Button>
           </div>
           <div className="max-h-40 overflow-y-auto space-y-2 rounded-md border p-4">
             {warehouses.map((warehouse) => (
@@ -371,7 +390,8 @@ const AisleForm = ({ form, warehouses }: { form: any; warehouses: Warehouse[] })
       )}
     />
   </>
-);
+)};
+
 
 export default function DatosMaestrosPage() {
   const { data: exporters, loading: loadingExporters } = useFirestoreCollection<Exporter>('exporters');
