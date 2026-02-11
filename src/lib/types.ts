@@ -68,6 +68,7 @@ export interface OtherClient {
   name: string;
   type: 'embalaje' | 'frio_hortofruticola' | 'fruta';
   unit: 'Bins' | 'Pallets';
+  status?: 'activo' | 'inactivo';
 }
 
 export interface PackagingMaster {

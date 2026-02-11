@@ -161,6 +161,26 @@ const OtherClientForm = ({ form }: { form: any }) => (
         </Select>
         <FormMessage /></FormItem>
       )} />
+      <FormField
+        control={form.control}
+        name="status"
+        render={({ field }) => (
+          <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
+            <div className="space-y-0.5">
+              <FormLabel>Estado</FormLabel>
+              <FormDescription>
+                Clientes inactivos no se mostrarán en otras listas.
+              </FormDescription>
+            </div>
+            <FormControl>
+              <Switch
+                checked={field.value !== 'inactivo'}
+                onCheckedChange={(checked) => field.onChange(checked ? 'activo' : 'inactivo')}
+              />
+            </FormControl>
+          </FormItem>
+        )}
+      />
     </>
 );
 
@@ -364,10 +384,10 @@ export default function DatosMaestrosPage() {
               title="Otros Clientes"
               collectionName="otherClients"
               schema={otherClientSchema}
-              columns={[{key: 'clientId', header: 'ID'}, {key: 'name', header: 'Nombre'}, {key: 'type', header: 'Tipo'}, {key: 'unit', header: 'Unidad'}]}
+              columns={[{key: 'clientId', header: 'ID'}, {key: 'name', header: 'Nombre'}, {key: 'type', header: 'Tipo'}, {key: 'unit', header: 'Unidad'}, {key: 'status', header: 'Estado'}]}
               RenderFormComponent={OtherClientForm}
               docNameField="name"
-              csvHeaders={['clientId', 'name', 'type', 'unit']}
+              csvHeaders={['clientId', 'name', 'type', 'unit', 'status']}
               csvTemplateFileName="plantilla_otros_clientes.csv"
               formProps={{}}
             />

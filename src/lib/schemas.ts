@@ -31,6 +31,7 @@ export const otherClientSchema = z.object({
   name: z.string().min(1, 'El nombre es obligatorio'),
   type: z.enum(['embalaje', 'frio_hortofruticola', 'fruta'], { required_error: 'El tipo es obligatorio.'}),
   unit: z.enum(['Bins', 'Pallets'], { required_error: 'La unidad es obligatoria.'}),
+  status: z.enum(['activo', 'inactivo']).default('activo'),
 });
 
 export const packagingMasterSchema = z.object({
