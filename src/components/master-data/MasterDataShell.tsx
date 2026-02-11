@@ -103,6 +103,7 @@ interface MasterDataShellProps<T extends MasterData> {
   csvHeaders: string[];
   csvTemplateFileName: string;
   formProps: any;
+  exportDataTransform?: (data: T[]) => any[];
 }
 
 
@@ -116,6 +117,7 @@ export function MasterDataShell<T extends MasterData>({
   csvHeaders,
   csvTemplateFileName,
   formProps,
+  exportDataTransform,
 }: MasterDataShellProps<T>) {
   const { data, loading } = useFirestoreCollection<T>(collectionName);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState(false);
@@ -398,8 +400,9 @@ export function MasterDataShell<T extends MasterData>({
         });
         return;
     }
+    const dataToExport = exportDataTransform ? exportDataTransform(data) : data;
     const headers = csvHeaders as string[];
-    const csv = convertToCSV(data, headers);
+    const csv = convertToCSV(dataToExport, headers);
     const date = new Date().toISOString().split('T')[0];
     downloadCSV(csv, `export_${collectionName}_${date}.csv`);
   };
