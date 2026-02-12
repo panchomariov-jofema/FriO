@@ -153,7 +153,7 @@ export function ReceptionTab() {
           </div>
           {selectedClientId && (
             <Button variant="secondary" size="sm" onClick={() => setIsCreateProductOpen(true)}>
-              Crear Producto
+              Nuevo Producto
             </Button>
           )}
         </CardHeader>
