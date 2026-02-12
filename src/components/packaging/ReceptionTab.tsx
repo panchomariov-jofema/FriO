@@ -147,13 +147,20 @@ export function ReceptionTab() {
     <>
       <Card>
         <CardHeader>
-          <CardTitle>Recepción de Pallets de Embalaje</CardTitle>
-          <CardDescription>Registre la entrada de materiales de embalaje de un cliente.</CardDescription>
+            <div className="flex flex-row items-start justify-between">
+                <div>
+                    <CardTitle>Recepción de Pallets de Embalaje</CardTitle>
+                    <CardDescription>Registre la entrada de materiales de embalaje de un cliente.</CardDescription>
+                </div>
+                <Button variant="secondary" size="sm" onClick={() => setIsCreateProductOpen(true)} disabled={!selectedClientId}>
+                    Nuevo Producto
+                </Button>
+            </div>
         </CardHeader>
         <CardContent>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-              <div className="grid md:grid-cols-3 gap-4">
+              <div className="grid md:grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
                   name="clientId"
@@ -194,12 +201,6 @@ export function ReceptionTab() {
                     </FormItem>
                   )}
                 />
-                <FormItem>
-                  <FormLabel>&nbsp;</FormLabel>
-                  <Button type="button" variant="secondary" onClick={() => setIsCreateProductOpen(true)} className="w-full" disabled={!selectedClientId}>
-                    Nuevo Producto
-                  </Button>
-                </FormItem>
               </div>
               
               <div className="space-y-4">
