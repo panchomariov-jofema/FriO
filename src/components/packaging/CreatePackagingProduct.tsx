@@ -1,11 +1,9 @@
-
 'use client';
 
 import * as React from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -16,13 +14,14 @@ import { packagingMasterSchema } from '@/lib/schemas';
 
 interface CreatePackagingProductProps {
   clientId: string;
+  onProductCreated?: () => void;
 }
 
 // We only need code and name, clientId is passed as a prop.
 const createProductSchema = packagingMasterSchema.omit({ clientId: true });
 type CreateProductFormValues = z.infer<typeof createProductSchema>;
 
-export function CreatePackagingProduct({ clientId }: CreatePackagingProductProps) {
+export function CreatePackagingProduct({ clientId, onProductCreated }: CreatePackagingProductProps) {
   const firestore = useFirestore();
   const { toast } = useToast();
   const form = useForm<CreateProductFormValues>({
@@ -64,6 +63,7 @@ export function CreatePackagingProduct({ clientId }: CreatePackagingProductProps
         description: `Producto "${values.name}" creado.`,
       });
       form.reset();
+      onProductCreated?.();
     } catch (error) {
       console.error('Error creating new packaging product:', error);
       toast({
@@ -75,49 +75,38 @@ export function CreatePackagingProduct({ clientId }: CreatePackagingProductProps
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-lg">Crear Nuevo Producto</CardTitle>
-        <CardDescription className="text-sm">
-          Añada un nuevo artículo al maestro de embalajes para este cliente.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField
-              control={form.control}
-              name="code"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Código</FormLabel>
-                  <FormControl>
-                    <Input {...field} autoComplete="off" />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="name"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Nombre</FormLabel>
-                  <FormControl>
-                    <Input {...field} autoComplete="off" />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <Button type="submit" className="w-full" disabled={form.formState.isSubmitting}>
-              {form.formState.isSubmitting ? 'Guardando...' : 'Guardar Producto'}
-            </Button>
-          </form>
-        </Form>
-      </CardContent>
-    </Card>
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 pt-4">
+        <FormField
+          control={form.control}
+          name="code"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Código</FormLabel>
+              <FormControl>
+                <Input {...field} autoComplete="off" />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="name"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Nombre</FormLabel>
+              <FormControl>
+                <Input {...field} autoComplete="off" />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <Button type="submit" className="w-full" disabled={form.formState.isSubmitting}>
+          {form.formState.isSubmitting ? 'Guardando...' : 'Guardar Producto'}
+        </Button>
+      </form>
+    </Form>
   );
 }
-    

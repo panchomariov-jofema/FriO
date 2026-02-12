@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -21,6 +20,7 @@ import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { BarcodeScanner } from '../BarcodeScanner';
 import { CreatePackagingProduct } from './CreatePackagingProduct';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 
 type ReceptionFormValues = z.infer<typeof packagingReceptionSchema>;
 
@@ -38,6 +38,7 @@ export function ReceptionTab() {
   const firestore = useFirestore();
   const { toast } = useToast();
   const [scanningIndex, setScanningIndex] = React.useState<number | null>(null);
+  const [isCreateProductOpen, setIsCreateProductOpen] = React.useState(false);
 
   const form = useForm<ReceptionFormValues>({
     resolver: zodResolver(packagingReceptionSchema),
@@ -132,7 +133,6 @@ export function ReceptionTab() {
     }
   };
 
-
   const handleClientChange = (value: string) => {
     form.setValue('clientId', value);
     form.reset({
@@ -145,161 +145,173 @@ export function ReceptionTab() {
 
   return (
     <>
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2">
-            <Card>
-                <CardHeader>
-                <CardTitle>Recepción de Pallets de Embalaje</CardTitle>
-                <CardDescription>Registre la entrada de materiales de embalaje de un cliente.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                <Form {...form}>
-                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-                    <div className="grid md:grid-cols-2 gap-4">
-                        <FormField
-                        control={form.control}
-                        name="clientId"
-                        render={({ field }) => (
-                            <FormItem>
-                            <FormLabel>Cliente de Embalaje</FormLabel>
-                            <Select onValueChange={handleClientChange} value={field.value} disabled={loadingClients}>
-                                <FormControl>
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Seleccione un cliente..." />
-                                </SelectTrigger>
-                                </FormControl>
-                                <SelectContent>
-                                {packagingClients.map(c => (
-                                    <SelectItem key={c.id} value={c.clientId}>{c.name}</SelectItem>
-                                ))}
-                                </SelectContent>
-                            </Select>
-                            <FormMessage />
-                            </FormItem>
-                        )}
+      <Card>
+        <CardHeader className="flex flex-row items-start justify-between">
+          <div>
+            <CardTitle>Recepción de Pallets de Embalaje</CardTitle>
+            <CardDescription>Registre la entrada de materiales de embalaje de un cliente.</CardDescription>
+          </div>
+          {selectedClientId && (
+            <Button variant="outline" size="sm" onClick={() => setIsCreateProductOpen(true)}>
+              <PlusCircle className="mr-2 h-4 w-4" />
+              Crear Producto
+            </Button>
+          )}
+        </CardHeader>
+        <CardContent>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+              <div className="grid md:grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="clientId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Cliente de Embalaje</FormLabel>
+                      <Select onValueChange={handleClientChange} value={field.value} disabled={loadingClients}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Seleccione un cliente..." />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {packagingClients.map(c => (
+                            <SelectItem key={c.id} value={c.clientId}>{c.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="document"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Documento de Entrada (Guía)</FormLabel>
+                      <FormControl>
+                        <Input
+                          {...field}
+                          autoComplete="off"
+                          inputMode="numeric"
+                          pattern="[0-9]*"
                         />
-                        <FormField
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              
+              <div className="space-y-4">
+                <FormLabel>Ítems Recibidos</FormLabel>
+                {fields.map((field, index) => (
+                  <div key={field.id} className="flex items-start gap-2 p-3 border rounded-md">
+                    <div className="flex-1 grid sm:grid-cols-4 gap-4 items-start">
+                      <FormField
                         control={form.control}
-                        name="document"
+                        name={`items.${index}.lote`}
                         render={({ field }) => (
-                            <FormItem>
-                            <FormLabel>Documento de Entrada (Guía)</FormLabel>
+                          <FormItem>
+                            <FormLabel>Lote (Opcional)</FormLabel>
                             <FormControl>
-                                <Input
-                                {...field}
-                                autoComplete="off"
-                                inputMode="numeric"
-                                pattern="[0-9]*"
-                                />
+                              <Input {...field} value={field.value ?? ''} autoComplete="off" />
                             </FormControl>
                             <FormMessage />
-                            </FormItem>
+                          </FormItem>
                         )}
-                        />
-                    </div>
-                    
-                    <div className="space-y-4">
-                        <FormLabel>Ítems Recibidos</FormLabel>
-                        {fields.map((field, index) => (
-                        <div key={field.id} className="flex items-start gap-2 p-3 border rounded-md">
-                            <div className="flex-1 grid sm:grid-cols-4 gap-4 items-start">
-                            <FormField
-                                control={form.control}
-                                name={`items.${index}.lote`}
-                                render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Lote (Opcional)</FormLabel>
-                                    <FormControl>
-                                    <Input {...field} value={field.value ?? ''} autoComplete="off" />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                                )}
-                            />
-                            <FormField
-                                control={form.control}
-                                name={`items.${index}.packagingMasterCode`}
-                                render={({ field: itemField }) => (
-                                <FormItem>
-                                    <FormLabel>Cod. Artículo</FormLabel>
-                                    <div className="flex items-center gap-2">
-                                    <FormControl>
-                                        <Input 
-                                        {...itemField} 
-                                        onBlur={() => handleCodeBlur(index)} 
-                                        autoComplete="off" 
-                                        disabled={!selectedClientId || loadingMasters}
-                                        placeholder={!selectedClientId ? "Seleccione cliente" : "Ingrese código..."}
-                                        inputMode="numeric" 
-                                        pattern="[0-9]*"
-                                        />
-                                    </FormControl>
-                                        <Button type="button" variant="outline" size="icon" className="shrink-0" onClick={() => setScanningIndex(index)}>
-                                            <ScanLine className="h-4 w-4" />
-                                            <span className="sr-only">Escanear código</span>
-                                        </Button>
-                                    </div>
-                                    <FormMessage />
-                                </FormItem>
-                                )}
-                            />
-                            <div className="space-y-2">
-                                <FormLabel>Descripción</FormLabel>
-                                <p className="font-medium text-sm h-10 flex items-center">
-                                    {form.watch(`items.${index}.packagingMasterName`) || <span className="text-muted-foreground">--</span>}
-                                </p>
+                      />
+                      <FormField
+                        control={form.control}
+                        name={`items.${index}.packagingMasterCode`}
+                        render={({ field: itemField }) => (
+                          <FormItem>
+                            <FormLabel>Cod. Artículo</FormLabel>
+                            <div className="flex items-center gap-2">
+                              <FormControl>
+                                <Input 
+                                  {...itemField} 
+                                  onBlur={() => handleCodeBlur(index)} 
+                                  autoComplete="off" 
+                                  disabled={!selectedClientId || loadingMasters}
+                                  placeholder={!selectedClientId ? "Seleccione cliente" : "Ingrese código..."}
+                                  inputMode="numeric" 
+                                  pattern="[0-9]*"
+                                />
+                              </FormControl>
+                                <Button type="button" variant="outline" size="icon" className="shrink-0" onClick={() => setScanningIndex(index)}>
+                                    <ScanLine className="h-4 w-4" />
+                                    <span className="sr-only">Escanear código</span>
+                                </Button>
                             </div>
-                            <FormField
-                                control={form.control}
-                                name={`items.${index}.palletCount`}
-                                render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Cant. Pallets</FormLabel>
-                                    <FormControl><Input type="number" {...field} value={field.value ?? ''} autoComplete="off" min="1" inputMode="numeric" /></FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                                )}
-                            />
-                            </div>
-                            <Button type="button" variant="destructive" size="icon" onClick={() => remove(index)} disabled={fields.length <= 1}>
-                            <Trash2 className="h-4 w-4" />
-                            </Button>
-                        </div>
-                        ))}
-                        <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => append(defaultItem)}
-                        disabled={!selectedClientId}
-                        >
-                        <PlusCircle className="mr-2 h-4 w-4" />
-                        Agregar Artículo
-                        </Button>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <div className="space-y-2">
+                        <FormLabel>Descripción</FormLabel>
+                        <p className="font-medium text-sm h-10 flex items-center">
+                            {form.watch(`items.${index}.packagingMasterName`) || <span className="text-muted-foreground">--</span>}
+                        </p>
+                      </div>
+                      <FormField
+                        control={form.control}
+                        name={`items.${index}.palletCount`}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Cant. Pallets</FormLabel>
+                            <FormControl><Input type="number" {...field} value={field.value ?? ''} autoComplete="off" min="1" inputMode="numeric" /></FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
                     </div>
+                    <Button type="button" variant="destructive" size="icon" onClick={() => remove(index)} disabled={fields.length <= 1}>
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => append(defaultItem)}
+                  disabled={!selectedClientId}
+                >
+                  <PlusCircle className="mr-2 h-4 w-4" />
+                  Agregar Artículo
+                </Button>
+              </div>
 
-                    <div className="flex justify-end">
-                        <Button type="submit" disabled={form.formState.isSubmitting}>
-                        {form.formState.isSubmitting ? 'Registrando...' : 'Confirmar Recepción'}
-                        </Button>
-                    </div>
-                    </form>
-                </Form>
-                </CardContent>
-            </Card>
-        </div>
-        <div className="lg:col-span-1">
-          {selectedClientId ? (
-            <CreatePackagingProduct clientId={selectedClientId} />
-          ) : (
-            <Card className="flex items-center justify-center h-full border-dashed">
-              <CardContent className="text-center pt-6">
-                <p className="text-muted-foreground">Seleccione un cliente para poder crear un nuevo producto.</p>
-              </CardContent>
-            </Card>
-          )}
-        </div>
-      </div>
+              <div className="flex justify-end">
+                <Button type="submit" disabled={form.formState.isSubmitting}>
+                  {form.formState.isSubmitting ? 'Registrando...' : 'Confirmar Recepción'}
+                </Button>
+              </div>
+            </form>
+          </Form>
+        </CardContent>
+      </Card>
+      
+      {/* Dialog for Creating a new product */}
+      <Dialog open={isCreateProductOpen} onOpenChange={setIsCreateProductOpen}>
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle>Crear Nuevo Producto</DialogTitle>
+                <DialogDescription>
+                    Añada un nuevo artículo al maestro de embalajes para este cliente.
+                </DialogDescription>
+            </DialogHeader>
+            {selectedClientId && (
+                <CreatePackagingProduct
+                    clientId={selectedClientId}
+                    onProductCreated={() => setIsCreateProductOpen(false)}
+                />
+            )}
+        </DialogContent>
+      </Dialog>
+      
       <BarcodeScanner
         open={scanningIndex !== null}
         onOpenChange={(isOpen) => !isOpen && setScanningIndex(null)}
@@ -308,4 +320,3 @@ export function ReceptionTab() {
     </>
   );
 }
-    
