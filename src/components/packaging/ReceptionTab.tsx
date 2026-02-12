@@ -152,8 +152,7 @@ export function ReceptionTab() {
             <CardDescription>Registre la entrada de materiales de embalaje de un cliente.</CardDescription>
           </div>
           {selectedClientId && (
-            <Button variant="outline" size="sm" onClick={() => setIsCreateProductOpen(true)}>
-              <PlusCircle className="mr-2 h-4 w-4" />
+            <Button variant="secondary" size="sm" onClick={() => setIsCreateProductOpen(true)}>
               Crear Producto
             </Button>
           )}
