@@ -48,7 +48,7 @@ export function ExitTab() {
     },
   });
 
-  const { fields, append, remove, update } = useFieldArray({
+  const { fields, append, remove } = useFieldArray({
     control: form.control,
     name: 'items',
   });
@@ -167,31 +167,31 @@ export function ExitTab() {
     setLoteFilter('');
   };
   
-  const handleItemCodeChange = (index: number, newCode: string) => {
-    const master = clientPackagingMasters.find(m => m.code === newCode);
-    if (master) {
-      update(index, {
-        ...form.getValues(`items.${index}`),
-        packagingMasterCode: newCode,
-        packagingMasterName: master.name,
-        packagingMasterId: master.id || '',
-        palletCount: 1,
-      });
+  const handleCodeBlur = (index: number) => {
+    const code = form.getValues(`items.${index}.packagingMasterCode`);
+    if (!code) {
+      form.setValue(`items.${index}.packagingMasterId`, '');
+      form.setValue(`items.${index}.packagingMasterName`, '');
+      return;
+    }
+    
+    const foundMaster = allPackagingMasters.find(m => m.clientId === selectedClientId && m.code === code);
+    
+    if (foundMaster) {
+      form.setValue(`items.${index}.packagingMasterId`, foundMaster.id || '', { shouldValidate: true });
+      form.setValue(`items.${index}.packagingMasterName`, foundMaster.name);
+      form.clearErrors(`items.${index}.packagingMasterCode`);
+    } else {
+      form.setValue(`items.${index}.packagingMasterId`, '');
+      form.setValue(`items.${index}.packagingMasterName`, '');
+      form.setError(`items.${index}.packagingMasterCode`, { message: 'Código no encontrado.' });
     }
   };
-  
+
   const handleScanConfirm = (scannedValue: string) => {
     if (scanningIndex !== null) {
-        const master = clientPackagingMasters.find(m => m.code === scannedValue);
-        if (master) {
-            handleItemCodeChange(scanningIndex, scannedValue);
-        } else {
-            toast({
-                title: "Código no encontrado",
-                description: "El código de artículo escaneado no está en stock o no existe.",
-                variant: "destructive",
-            });
-        }
+        form.setValue(`items.${scanningIndex}.packagingMasterCode`, scannedValue);
+        handleCodeBlur(scanningIndex); // Trigger blur logic to find product
         setScanningIndex(null);
     }
   };
@@ -255,24 +255,23 @@ export function ExitTab() {
                     
                     return (
                       <div key={field.id} className="flex items-end gap-2 p-3 border rounded-md">
-                        <div className="flex-1 grid sm:grid-cols-2 gap-4">
+                        <div className="flex-1 grid grid-cols-1 sm:grid-cols-10 gap-4 items-start">
                            <FormField
                                 control={form.control}
                                 name={`items.${index}.packagingMasterCode`}
                                 render={({ field: itemField }) => (
-                                  <FormItem>
+                                  <FormItem className="sm:col-span-3">
                                     <FormLabel>Código de Artículo</FormLabel>
                                     <div className="flex items-center gap-2">
-                                      <Select onValueChange={(value) => handleItemCodeChange(index, value)} value={itemField.value} disabled={!selectedClientId || clientPackagingMasters.length === 0}>
-                                          <FormControl><SelectTrigger>
-                                              <SelectValue placeholder={!selectedClientId ? "Seleccione cliente" : "Seleccione un código"} />
-                                          </SelectTrigger></FormControl>
-                                          <SelectContent>
-                                            {clientPackagingMasters.map((m) => (
-                                                <SelectItem key={m.code} value={m.code}>{m.code} - {m.name}</SelectItem>
-                                            ))}
-                                          </SelectContent>
-                                      </Select>
+                                      <FormControl>
+                                         <Input 
+                                            {...itemField} 
+                                            onBlur={() => handleCodeBlur(index)} 
+                                            autoComplete="off" 
+                                            disabled={!selectedClientId || loadingMasters}
+                                            placeholder={!selectedClientId ? "Seleccione cliente" : "Ingrese código..."}
+                                        />
+                                      </FormControl>
                                       <Button type="button" variant="outline" size="icon" className="shrink-0" onClick={() => setScanningIndex(index)}>
                                         <ScanLine className="h-4 w-4" />
                                         <span className="sr-only">Escanear código</span>
@@ -282,14 +281,20 @@ export function ExitTab() {
                                   </FormItem>
                                 )}
                               />
+                            <div className="space-y-2 sm:col-span-5">
+                                <FormLabel>Descripción</FormLabel>
+                                <div className="font-medium text-sm h-10 flex items-center p-2 border border-input bg-background rounded-md">
+                                    {form.watch(`items.${index}.packagingMasterName`) || <span className="text-muted-foreground">--</span>}
+                                </div>
+                            </div>
                             <FormField
                                 control={form.control}
                                 name={`items.${index}.palletCount`}
                                 render={({ field: itemField }) => (
-                                    <FormItem>
-                                        <FormLabel>Cantidad de Pallets</FormLabel>
+                                    <FormItem className="sm:col-span-2">
+                                        <FormLabel>Cant. Pallets</FormLabel>
                                         <FormControl>
-                                            <Input type="number" {...itemField} value={itemField.value ?? ''} autoComplete="off" min="1" />
+                                            <Input type="number" {...itemField} value={itemField.value ?? ''} autoComplete="off" min="1" className="w-full sm:w-auto"/>
                                         </FormControl>
                                         <p className="text-xs text-muted-foreground pt-1">
                                             Stock Disponible: {totalStock}
