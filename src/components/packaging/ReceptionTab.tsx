@@ -39,6 +39,7 @@ export function ReceptionTab() {
   const { toast } = useToast();
   const [scanningIndex, setScanningIndex] = React.useState<number | null>(null);
   const [isCreateProductOpen, setIsCreateProductOpen] = React.useState(false);
+  const [masterLote, setMasterLote] = React.useState('');
 
   const form = useForm<ReceptionFormValues>({
     resolver: zodResolver(packagingReceptionSchema),
@@ -55,6 +56,12 @@ export function ReceptionTab() {
   });
 
   const selectedClientId = form.watch('clientId');
+
+  React.useEffect(() => {
+    fields.forEach((_, index) => {
+        form.setValue(`items.${index}.lote`, masterLote);
+    });
+  }, [masterLote, fields, form]);
 
   const packagingClients = React.useMemo(() => {
     return (allClients || []).filter(c => c.type.toLowerCase() === 'embalaje' && c.status !== 'inactivo');
@@ -76,7 +83,7 @@ export function ReceptionTab() {
             ...rest,
             status: 'Pendiente de almacenar'
         };
-        if (lote) {
+        if (lote && lote.trim() !== '') {
             newItem.lote = lote;
         }
         return newItem as Omit<PackagingReceptionItem, 'storageLocation' | 'storedAt'>;
@@ -101,6 +108,7 @@ export function ReceptionTab() {
             document: '',
             items: [defaultItem],
         });
+        setMasterLote('');
     } catch (error) {
         console.error("Error creating packaging reception:", error);
         toast({ variant: 'destructive', title: 'Error', description: 'No se pudo registrar la recepción.' });
@@ -146,6 +154,7 @@ export function ReceptionTab() {
         clientId: value,
         items: [defaultItem]
     });
+    setMasterLote('');
   }
 
 
@@ -158,15 +167,15 @@ export function ReceptionTab() {
                     <CardTitle>Recepción de Pallets de Embalaje</CardTitle>
                     <CardDescription>Registre la entrada de materiales de embalaje de un cliente.</CardDescription>
                 </div>
-                <Button variant="default" size="sm" onClick={() => setIsCreateProductOpen(true)} disabled={!selectedClientId}>
-                    + Producto Nuevo
+                <Button variant="secondary" size="sm" onClick={() => setIsCreateProductOpen(true)} disabled={!selectedClientId}>
+                    Nuevo Producto
                 </Button>
             </div>
         </CardHeader>
         <CardContent>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-              <div className="grid md:grid-cols-2 gap-4">
+              <div className="grid md:grid-cols-3 gap-4 items-end">
                 <FormField
                   control={form.control}
                   name="clientId"
@@ -207,26 +216,25 @@ export function ReceptionTab() {
                     </FormItem>
                   )}
                 />
+                 <FormItem>
+                    <FormLabel>Lote (Opcional)</FormLabel>
+                    <FormControl>
+                        <Input 
+                            value={masterLote}
+                            onChange={(e) => setMasterLote(e.target.value)}
+                            disabled={!selectedClientId}
+                            placeholder="Aplica a todos los ítems"
+                            autoComplete="off"
+                        />
+                    </FormControl>
+                </FormItem>
               </div>
               
               <div className="space-y-4">
                 <FormLabel>Ítems Recibidos</FormLabel>
                 {fields.map((field, index) => (
                   <div key={field.id} className="flex items-start gap-2 p-3 border rounded-md">
-                    <div className="flex-1 grid sm:grid-cols-4 gap-4 items-start">
-                      <FormField
-                        control={form.control}
-                        name={`items.${index}.lote`}
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Lote (Opcional)</FormLabel>
-                            <FormControl>
-                              <Input {...field} value={field.value ?? ''} autoComplete="off" />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
+                    <div className="flex-1 grid sm:grid-cols-3 gap-4 items-start">
                       <FormField
                         control={form.control}
                         name={`items.${index}.packagingMasterCode`}
