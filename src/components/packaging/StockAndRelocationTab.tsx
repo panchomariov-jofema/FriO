@@ -253,8 +253,7 @@ export function StockAndRelocationTab() {
             };
         }
 
-        receptionsToCreate[receptionKey].items.push({
-            lote: rowData.lote || undefined,
+        const newItem: any = {
             packagingMasterId: master.id,
             packagingMasterCode: master.code,
             packagingMasterName: master.name,
@@ -262,7 +261,13 @@ export function StockAndRelocationTab() {
             status: 'Almacenado',
             storageLocation: { warehouse: rowData.warehouse, aisle: rowData.aisle },
             storedAt: new Date(),
-        });
+        };
+
+        if (rowData.lote) {
+            newItem.lote = rowData.lote;
+        }
+        
+        receptionsToCreate[receptionKey].items.push(newItem);
       }
       
       if (errors.length > 0) {
