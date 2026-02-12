@@ -31,22 +31,29 @@ interface StoredPackagingItem {
     }
 }
 
-// Helper functions for CSV export/import
-function convertToCSV(data: any[], headers: string[]) {
-    const headerRow = headers.join(';');
-    const rows = data.map(row =>
-        headers.map(header => {
-            let value = row[header];
-            if (value === undefined || value === null) {
-                return '""';
-            }
-            const stringValue = String(value);
-            return `"${stringValue.replace(/"/g, '""')}"`;
-        }).join(';')
-    );
-    return [headerRow, ...rows].join('\n');
-}
+const IMPORT_HEADER_MAP: { [key: string]: string } = {
+  'ID Cliente': 'clientId',
+  'Documento': 'document',
+  'Lote': 'lote',
+  'Codigo Articulo': 'packagingMasterCode',
+  'Cantidad Pallets': 'palletCount',
+  'Almacen': 'warehouse',
+  'Pasillo': 'aisle',
+};
+const SPANISH_IMPORT_HEADERS = Object.keys(IMPORT_HEADER_MAP);
 
+const EXPORT_HEADER_MAP: { [key: string]: string } = {
+  'Cliente': 'clientName',
+  'Código': 'code',
+  'Artículo': 'name',
+  'Lote': 'lote',
+  'Ubicación': 'location',
+  'Cant. Pallets': 'palletCount',
+};
+const SPANISH_EXPORT_HEADERS = Object.keys(EXPORT_HEADER_MAP);
+
+
+// Helper functions for CSV export/import
 function downloadCSV(csvString: string, filename: string) {
     const blob = new Blob([`\uFEFF${csvString}`], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement("a");
@@ -138,7 +145,10 @@ export function StockAndRelocationTab() {
   };
 
   const handleExport = () => {
-    const headers = ['clientName', 'code', 'name', 'lote', 'location', 'palletCount'];
+     if (!storedItems || storedItems.length === 0) {
+        toast({ variant: 'destructive', title: 'Sin datos', description: 'No hay stock para exportar.' });
+        return;
+    }
     const dataToExport = storedItems.map(item => ({
         clientName: item.clientName,
         code: item.code,
@@ -147,13 +157,24 @@ export function StockAndRelocationTab() {
         location: `${item.location.warehouse} / ${item.location.aisle}`,
         palletCount: item.palletCount,
     }));
-    const csv = convertToCSV(dataToExport, headers);
-    downloadCSV(csv, 'export_stock_embalajes.csv');
+    
+    const headerRow = SPANISH_EXPORT_HEADERS.join(';');
+    const rows = dataToExport.map(row => {
+      return SPANISH_EXPORT_HEADERS.map(header => {
+        const key = EXPORT_HEADER_MAP[header as keyof typeof EXPORT_HEADER_MAP];
+        const value = row[key as keyof typeof row];
+        const stringValue = String(value ?? '');
+        return `"${stringValue.replace(/"/g, '""')}"`;
+      }).join(';');
+    });
+
+    const csvString = [headerRow, ...rows].join('\n');
+    const date = new Date().toISOString().split('T')[0];
+    downloadCSV(csvString, `export_stock_embalajes_${date}.csv`);
   };
 
   const handleDownloadTemplate = () => {
-    const headers = ['clientId', 'document', 'lote', 'packagingMasterCode', 'palletCount', 'warehouse', 'aisle'];
-    const csvContent = "data:text/csv;charset=utf-8," + headers.join(',');
+    const csvContent = "data:text/csv;charset=utf-8," + SPANISH_IMPORT_HEADERS.join(',');
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
@@ -165,7 +186,10 @@ export function StockAndRelocationTab() {
   
   const handleFileImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (!file || !firestore) return;
+    if (!file || !firestore || !allClients || !allPackagingMasters) {
+        toast({ title: 'Error', description: 'Datos maestros no cargados. Intente de nuevo.', variant: 'destructive' });
+        return;
+    };
 
     const reader = new FileReader();
     reader.onload = async (e) => {
@@ -177,9 +201,10 @@ export function StockAndRelocationTab() {
       }
       
       const fileHeaders = lines[0].split(',').map(h => h.trim());
-      const expectedHeaders = ['clientId', 'document', 'lote', 'packagingMasterCode', 'palletCount', 'warehouse', 'aisle'];
-      if (JSON.stringify(fileHeaders) !== JSON.stringify(expectedHeaders)) {
-        toast({ title: 'Error de formato', description: `Las cabeceras del CSV no coinciden. Esperado: ${expectedHeaders.join(', ')}`, variant: 'destructive' });
+      const expectedSpanishHeaders = Object.keys(IMPORT_HEADER_MAP);
+      
+      if (fileHeaders.length !== expectedSpanishHeaders.length || !fileHeaders.every(h => expectedSpanishHeaders.includes(h))) {
+        toast({ title: 'Error de formato', description: `Las cabeceras del CSV no coinciden. Esperado: ${expectedSpanishHeaders.join(', ')}`, variant: 'destructive' });
         return;
       }
 
@@ -190,31 +215,38 @@ export function StockAndRelocationTab() {
 
       for (let i = 1; i < lines.length; i++) {
         const values = lines[i].split(',').map(v => v.trim());
-        const row = Object.fromEntries(expectedHeaders.map((h, idx) => [h, values[idx]]));
+        const rowData: { [key: string]: any } = {};
 
-        const clientName = clientMap.get(row.clientId);
-        const master = masterMap.get(row.packagingMasterCode);
+        fileHeaders.forEach((header, index) => {
+            const englishKey = IMPORT_HEADER_MAP[header];
+            if(englishKey) {
+                rowData[englishKey] = values[index];
+            }
+        });
+
+        const clientName = clientMap.get(rowData.clientId);
+        const master = masterMap.get(rowData.packagingMasterCode);
 
         if (!clientName) {
-            errors.push(`Línea ${i + 1}: El clientId "${row.clientId}" no existe.`);
+            errors.push(`Línea ${i + 2}: El ID Cliente "${rowData.clientId}" no existe.`);
             continue;
         }
-        if (!master || master.clientId !== row.clientId) {
-            errors.push(`Línea ${i + 1}: El packagingMasterCode "${row.packagingMasterCode}" no existe o no pertenece al cliente.`);
+        if (!master || master.clientId !== rowData.clientId) {
+            errors.push(`Línea ${i + 2}: El Codigo Articulo "${rowData.packagingMasterCode}" no existe o no pertenece al cliente.`);
             continue;
         }
-        const palletCount = parseInt(row.palletCount, 10);
+        const palletCount = parseInt(rowData.palletCount, 10);
         if (isNaN(palletCount) || palletCount <= 0) {
-             errors.push(`Línea ${i + 1}: palletCount debe ser un número positivo.`);
+             errors.push(`Línea ${i + 2}: Cantidad Pallets debe ser un número positivo.`);
             continue;
         }
         
-        const receptionKey = `${row.clientId}_${row.document}`;
+        const receptionKey = `${rowData.clientId}_${rowData.document}`;
         if (!receptionsToCreate[receptionKey]) {
             receptionsToCreate[receptionKey] = {
-                clientId: row.clientId,
+                clientId: rowData.clientId,
                 clientName: clientName,
-                document: row.document,
+                document: rowData.document,
                 items: [],
                 status: 'Almacenado',
                 createdAt: serverTimestamp(),
@@ -222,13 +254,13 @@ export function StockAndRelocationTab() {
         }
 
         receptionsToCreate[receptionKey].items.push({
-            lote: row.lote || undefined,
+            lote: rowData.lote || undefined,
             packagingMasterId: master.id,
             packagingMasterCode: master.code,
             packagingMasterName: master.name,
             palletCount: palletCount,
             status: 'Almacenado',
-            storageLocation: { warehouse: row.warehouse, aisle: row.aisle },
+            storageLocation: { warehouse: rowData.warehouse, aisle: rowData.aisle },
             storedAt: new Date(),
         });
       }
@@ -343,5 +375,3 @@ export function StockAndRelocationTab() {
     </>
   );
 }
-
-    
