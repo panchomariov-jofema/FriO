@@ -47,7 +47,7 @@ import { ChamberStrategyProvider } from '@/contexts/ChamberStrategyContext';
 import { FrioLogo } from '@/components/ui/FrioLogo';
 import { CustomAppleIcon } from '@/components/ui/CustomAppleIcon';
 import { PermissionsProvider } from '@/contexts/PermissionsContext';
-import { PwaInstallPrompt } from '@/components/PwaInstallPrompt';
+import { PwaInstallButton } from '@/components/pwa-install-button';
 
 // Define the structure with types and potential nesting
 const navStructure: any[] = [
@@ -357,7 +357,7 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
            <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b bg-background px-4">
               <SidebarTrigger />
               <div className="flex flex-1 items-center justify-end gap-2">
-                <PwaInstallPrompt />
+                <PwaInstallButton />
                 {user && (
                   <span className="hidden text-sm text-muted-foreground sm:inline">
                     Bienvenido,{' '}
