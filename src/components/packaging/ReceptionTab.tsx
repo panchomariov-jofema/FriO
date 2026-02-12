@@ -153,7 +153,7 @@ export function ReceptionTab() {
         <CardContent>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-              <div className="grid md:grid-cols-3 gap-4 items-end">
+              <div className="grid md:grid-cols-3 gap-4">
                 <FormField
                   control={form.control}
                   name="clientId"
@@ -194,11 +194,12 @@ export function ReceptionTab() {
                     </FormItem>
                   )}
                 />
-                 {selectedClientId && (
-                    <Button variant="secondary" onClick={() => setIsCreateProductOpen(true)} className="w-full">
-                        Nuevo Producto
-                    </Button>
-                )}
+                <FormItem>
+                  <FormLabel>&nbsp;</FormLabel>
+                  <Button type="button" variant="secondary" onClick={() => setIsCreateProductOpen(true)} className="w-full" disabled={!selectedClientId}>
+                    Nuevo Producto
+                  </Button>
+                </FormItem>
               </div>
               
               <div className="space-y-4">
