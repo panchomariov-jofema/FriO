@@ -15,6 +15,7 @@ import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { Download, Upload } from 'lucide-react';
 import { AdjustPackagingDialog } from './AdjustPackagingDialog';
+import { Input } from '@/components/ui/input';
 
 interface StoredPackagingItem {
     id: string; // receptionId + itemIndex
@@ -79,6 +80,7 @@ export function StockAndRelocationTab() {
   const [isDialogOpen, setDialogOpen] = React.useState(false);
   const [itemToAdjust, setItemToAdjust] = React.useState<StoredPackagingItem | null>(null);
   const [isAdjustDialogOpen, setAdjustDialogOpen] = React.useState(false);
+  const [codeFilter, setCodeFilter] = React.useState('');
   const firestore = useFirestore();
   const { toast } = useToast();
   const fileInputRef = React.useRef<HTMLInputElement>(null);
@@ -106,6 +108,16 @@ export function StockAndRelocationTab() {
         )
         .sort((a,b) => a.code.localeCompare(b.code) || a.clientName.localeCompare(b.clientName));
   }, [allReceptions]);
+  
+  const filteredItems = React.useMemo(() => {
+    if (!codeFilter) {
+        return storedItems;
+    }
+    return storedItems.filter(item => 
+        item.code.toLowerCase().includes(codeFilter.toLowerCase())
+    );
+  }, [storedItems, codeFilter]);
+
 
   const handleRelocateClick = (item: StoredPackagingItem) => {
     setItemToRelocate(item);
@@ -377,8 +389,16 @@ export function StockAndRelocationTab() {
                 />
             </div>
           </div>
+          <div className="pt-4">
+              <Input
+                placeholder="Filtrar por código de artículo..."
+                value={codeFilter}
+                onChange={(e) => setCodeFilter(e.target.value)}
+                className="max-w-sm"
+              />
+          </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="pt-0">
           <div className="rounded-md border">
             <Table>
               <TableHeader>
@@ -397,8 +417,8 @@ export function StockAndRelocationTab() {
                   Array.from({ length: 5 }).map((_, i) => (
                     <TableRow key={i}><TableCell colSpan={7}><Skeleton className="h-4 w-full" /></TableCell></TableRow>
                   ))
-                ) : storedItems.length > 0 ? (
-                  storedItems.map((item) => (
+                ) : filteredItems.length > 0 ? (
+                  filteredItems.map((item) => (
                     <TableRow key={item.id}>
                         <TableCell>{item.clientName}</TableCell>
                         <TableCell className="font-mono hidden sm:table-cell">{item.code}</TableCell>
@@ -416,7 +436,9 @@ export function StockAndRelocationTab() {
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={7} className="h-24 text-center">No hay stock almacenado.</TableCell>
+                    <TableCell colSpan={7} className="h-24 text-center">
+                        {codeFilter ? 'No se encontraron artículos con ese código.' : 'No hay stock almacenado.'}
+                    </TableCell>
                   </TableRow>
                 )}
               </TableBody>
