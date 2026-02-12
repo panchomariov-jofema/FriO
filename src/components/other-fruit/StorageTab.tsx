@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { StoreOtherFruitDialog } from './StoreOtherFruitDialog';
 import { useFirestore } from '@/firebase';
-import { doc, serverTimestamp, updateDoc } from 'firebase/firestore';
+import { doc, serverTimestamp, updateDoc, runTransaction } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
@@ -216,35 +216,117 @@ export function OtherFruitStorageTab({ clientId: fixedClientId }: { clientId?: s
   const handlePackagingStoreConfirm = async (location: { warehouse: string; aisle: string; }) => {
     if (!selectedItem || selectedItem.type !== 'packaging' || !firestore) return;
 
-    const receptionDocRef = doc(firestore, 'packagingReceptions', selectedItem.receptionId);
-    
-    const originalReception = packagingReceptions.find(r => r.id === selectedItem.receptionId);
-    if (!originalReception) return;
-
-    const updatedItems = JSON.parse(JSON.stringify(originalReception.items));
-    updatedItems[selectedItem.itemIndex] = {
-        ...updatedItems[selectedItem.itemIndex],
-        status: 'Almacenado',
-        storageLocation: location,
-        storedAt: new Date(),
-    };
-    
-    const allItemsStored = updatedItems.every((item: PackagingReceptionItem) => item.status === 'Almacenado');
-    const newStatus = allItemsStored ? 'Almacenado' : 'Parcialmente Almacenado';
-
-    const updateData = {
-        items: updatedItems,
-        status: newStatus,
-        updatedAt: serverTimestamp(),
-    };
-
     try {
-        await updateDoc(receptionDocRef, updateData);
-        toast({ title: 'Éxito', description: `Embalaje almacenado en ${location.warehouse} - ${location.aisle}.` });
-        setSelectedItem(null);
+        await runTransaction(firestore, async (transaction) => {
+            const itemToStore = selectedItem as PendingPackagingItem;
+            const quantityToStore = itemToStore.palletCount;
+            
+            let existingItemInfo: { reception: PackagingReception, itemIndex: number } | null = null;
+            
+            // Search all receptions for a match
+            for (const reception of packagingReceptions) {
+                const foundIndex = reception.items.findIndex(item => 
+                    item.status === 'Almacenado' &&
+                    item.packagingMasterCode === itemToStore.packagingMasterCode &&
+                    item.storageLocation?.warehouse === location.warehouse &&
+                    item.storageLocation?.aisle === location.aisle
+                );
+                
+                if (foundIndex !== -1) {
+                    // Make sure we are not matching the item with itself if it was somehow already stored
+                    if (reception.id === itemToStore.receptionId && foundIndex === itemToStore.itemIndex) {
+                        continue;
+                    }
+                    existingItemInfo = { reception, itemIndex: foundIndex };
+                    break; // Found the first match
+                }
+            }
+
+            if (existingItemInfo) {
+                // --- Case 1: An existing item was found ---
+                const { reception: existingReception, itemIndex: existingItemIndex } = existingItemInfo;
+                
+                const existingReceptionRef = doc(firestore, 'packagingReceptions', existingReception.id);
+                const currentReceptionRef = doc(firestore, 'packagingReceptions', itemToStore.receptionId);
+                
+                // Get fresh copies of the documents within the transaction
+                const [existingDocSnap, currentDocSnap] = await Promise.all([
+                    transaction.get(existingReceptionRef),
+                    transaction.get(currentReceptionRef)
+                ]);
+
+                if (!existingDocSnap.exists() || !currentDocSnap.exists()) {
+                    throw new Error("Uno de los documentos de recepción no existe.");
+                }
+
+                // Update the existing item's quantity
+                const updatedExistingItems = JSON.parse(JSON.stringify((existingDocSnap.data() as PackagingReception).items));
+                updatedExistingItems[existingItemIndex].palletCount += quantityToStore;
+                transaction.update(existingReceptionRef, {
+                    items: updatedExistingItems,
+                    updatedAt: serverTimestamp()
+                });
+
+                // "Consume" the item being stored by setting its quantity to 0
+                const currentItems = (currentDocSnap.data() as PackagingReception).items;
+                const updatedCurrentItems = JSON.parse(JSON.stringify(currentItems));
+                updatedCurrentItems[itemToStore.itemIndex].palletCount = 0;
+                updatedCurrentItems[itemToStore.itemIndex].status = 'Almacenado'; // Mark as stored even with 0 quantity
+                
+                let newStatus = currentDocSnap.data().status;
+                if (updatedCurrentItems.every((item: PackagingReceptionItem) => item.status === 'Almacenado' || item.palletCount === 0)) {
+                    newStatus = 'Almacenado';
+                } else if (updatedCurrentItems.some((item: PackagingReceptionItem) => item.status === 'Pendiente de almacenar' && item.palletCount > 0)) {
+                    newStatus = 'Parcialmente Almacenado';
+                }
+
+                transaction.update(currentReceptionRef, {
+                    items: updatedCurrentItems,
+                    status: newStatus,
+                    updatedAt: serverTimestamp()
+                });
+                
+                toast({ title: 'Éxito', description: `Stock sumado a la ubicación existente en ${location.warehouse} - ${location.aisle}.` });
+
+            } else {
+                // --- Case 2: No existing item found, so store it normally ---
+                const receptionDocRef = doc(firestore, 'packagingReceptions', itemToStore.receptionId);
+                const originalReceptionSnap = await transaction.get(receptionDocRef);
+                if (!originalReceptionSnap.exists()) throw new Error("La recepción original no existe.");
+
+                const originalReception = originalReceptionSnap.data() as PackagingReception;
+                const updatedItems = JSON.parse(JSON.stringify(originalReception.items));
+                
+                updatedItems[itemToStore.itemIndex] = {
+                    ...updatedItems[itemToStore.itemIndex],
+                    status: 'Almacenado',
+                    storageLocation: location,
+                    storedAt: new Date(),
+                };
+                
+                const allItemsStored = updatedItems.every((item: PackagingReceptionItem) => item.status === 'Almacenado' || item.palletCount === 0);
+                const newStatus = allItemsStored ? 'Almacenado' : 'Parcialmente Almacenado';
+
+                transaction.update(receptionDocRef, {
+                    items: updatedItems,
+                    status: newStatus,
+                    updatedAt: serverTimestamp(),
+                });
+                
+                toast({ title: 'Éxito', description: `Embalaje almacenado en ${location.warehouse} - ${location.aisle}.` });
+            }
+
+        }); // End of transaction
+
+        setSelectedItem(null); // Close dialog on success
+
     } catch (error) {
         console.error("Error storing packaging item:", error);
         toast({ variant: 'destructive', title: 'Error', description: 'No se pudo actualizar la ubicación.' });
+        errorEmitter.emit('permission-error', new FirestorePermissionError({
+            path: 'packagingReceptions',
+            operation: 'write'
+        }));
     }
   };
 
