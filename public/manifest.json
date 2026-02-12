@@ -1,6 +1,6 @@
 {
   "name": "FrigoManager",
-  "short_name": "FrigoManager",
+  "short_name": "Frigo",
   "description": "Gestión de frigorífico",
   "start_url": "/",
   "display": "standalone",
