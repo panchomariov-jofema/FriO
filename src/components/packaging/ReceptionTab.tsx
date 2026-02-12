@@ -25,7 +25,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 type ReceptionFormValues = z.infer<typeof packagingReceptionSchema>;
 
 const defaultItem = {
-  lote: '',
   packagingMasterId: '',
   packagingMasterCode: '',
   packagingMasterName: '',
@@ -45,6 +44,7 @@ export function ReceptionTab() {
     defaultValues: {
       clientId: '',
       document: '',
+      lote: '',
       items: [defaultItem],
     },
   });
@@ -69,19 +69,17 @@ export function ReceptionTab() {
         return;
     }
     
-    // Add status to each item and handle optional lote field
+    // Add status and the top-level 'lote' to each item
     const itemsWithStatus = values.items.map(item => {
-        const { lote, ...rest } = item;
         const newItem: any = {
-            ...rest,
+            ...item,
             status: 'Pendiente de almacenar'
         };
-        if (lote && lote.trim() !== '') {
-            newItem.lote = lote;
+        if (values.lote && values.lote.trim() !== '') {
+            newItem.lote = values.lote.trim();
         }
         return newItem as Omit<PackagingReceptionItem, 'storageLocation' | 'storedAt'>;
     });
-
 
     const receptionData = {
         clientId: values.clientId,
@@ -97,8 +95,9 @@ export function ReceptionTab() {
         await addDoc(collRef, receptionData);
         toast({ title: 'Éxito', description: 'Recepción de embalaje registrada. Ahora puede asignar una ubicación.' });
         form.reset({
-            clientId: '',
+            clientId: values.clientId, // Keep client selected
             document: '',
+            lote: '',
             items: [defaultItem],
         });
     } catch (error) {
@@ -140,10 +139,10 @@ export function ReceptionTab() {
   };
 
   const handleClientChange = (value: string) => {
-    form.setValue('clientId', value);
     form.reset({
-        ...form.getValues(),
         clientId: value,
+        document: '',
+        lote: '',
         items: [defaultItem]
     });
   }
@@ -166,7 +165,7 @@ export function ReceptionTab() {
         <CardContent>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-              <div className="grid md:grid-cols-2 gap-4 items-end">
+              <div className="grid md:grid-cols-3 gap-4 items-end">
                 <FormField
                   control={form.control}
                   name="clientId"
@@ -207,13 +206,26 @@ export function ReceptionTab() {
                     </FormItem>
                   )}
                 />
+                 <FormField
+                    control={form.control}
+                    name="lote"
+                    render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Lote (Opcional)</FormLabel>
+                            <FormControl>
+                                <Input {...field} autoComplete="off" placeholder="Lote para todos los artículos"/>
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    )}
+                    />
               </div>
               
               <div className="space-y-4">
                 <FormLabel>Ítems Recibidos</FormLabel>
                 {fields.map((field, index) => (
                   <div key={field.id} className="flex items-start gap-2 p-3 border rounded-md">
-                    <div className="flex-1 grid grid-cols-1 sm:grid-cols-12 gap-4 items-start">
+                    <div className="flex-1 grid grid-cols-1 sm:grid-cols-10 gap-4 items-start">
                        <FormField
                         control={form.control}
                         name={`items.${index}.packagingMasterCode`}
@@ -241,19 +253,6 @@ export function ReceptionTab() {
                           </FormItem>
                         )}
                       />
-                       <FormField
-                          control={form.control}
-                          name={`items.${index}.lote`}
-                          render={({ field: itemField }) => (
-                              <FormItem className="sm:col-span-2">
-                                  <FormLabel>Lote</FormLabel>
-                                  <FormControl>
-                                      <Input {...itemField} value={itemField.value ?? ''} autoComplete="off" placeholder="Opcional" />
-                                  </FormControl>
-                                  <FormMessage />
-                              </FormItem>
-                          )}
-                        />
                       <div className="space-y-2 sm:col-span-5">
                         <FormLabel>Descripción</FormLabel>
                         <p className="font-medium text-sm h-10 flex items-center">

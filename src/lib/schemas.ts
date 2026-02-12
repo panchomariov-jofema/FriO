@@ -51,7 +51,8 @@ export const packagingReceptionItemSchema = z.object({
 export const packagingReceptionSchema = z.object({
     clientId: z.string().min(1, "Debe seleccionar un cliente."),
     document: z.string().min(1, "El documento es obligatorio."),
-    items: z.array(packagingReceptionItemSchema).min(1, "Debe agregar al menos un artículo."),
+    lote: z.string().optional(),
+    items: z.array(packagingReceptionItemSchema.omit({ lote: true })).min(1, "Debe agregar al menos un artículo."),
 });
 
 export const stockLocationSchema = z.object({
@@ -218,5 +219,3 @@ export const aisleSchema = z.object({
   name: z.string().min(1, 'El nombre es obligatorio'),
   warehouseIds: z.array(z.string()).min(1, 'Debe seleccionar al menos un almacén.'),
 });
-
-    
