@@ -39,7 +39,6 @@ export function ReceptionTab() {
   const { toast } = useToast();
   const [scanningIndex, setScanningIndex] = React.useState<number | null>(null);
   const [isCreateProductOpen, setIsCreateProductOpen] = React.useState(false);
-  const [masterLote, setMasterLote] = React.useState('');
 
   const form = useForm<ReceptionFormValues>({
     resolver: zodResolver(packagingReceptionSchema),
@@ -56,12 +55,6 @@ export function ReceptionTab() {
   });
 
   const selectedClientId = form.watch('clientId');
-
-  React.useEffect(() => {
-    fields.forEach((_, index) => {
-        form.setValue(`items.${index}.lote`, masterLote);
-    });
-  }, [masterLote, fields, form]);
 
   const packagingClients = React.useMemo(() => {
     return (allClients || []).filter(c => c.type.toLowerCase() === 'embalaje' && c.status !== 'inactivo');
@@ -108,7 +101,6 @@ export function ReceptionTab() {
             document: '',
             items: [defaultItem],
         });
-        setMasterLote('');
     } catch (error) {
         console.error("Error creating packaging reception:", error);
         toast({ variant: 'destructive', title: 'Error', description: 'No se pudo registrar la recepción.' });
@@ -154,7 +146,6 @@ export function ReceptionTab() {
         clientId: value,
         items: [defaultItem]
     });
-    setMasterLote('');
   }
 
 
@@ -168,14 +159,14 @@ export function ReceptionTab() {
                     <CardDescription>Registre la entrada de materiales de embalaje de un cliente.</CardDescription>
                 </div>
                 <Button variant="secondary" size="sm" onClick={() => setIsCreateProductOpen(true)} disabled={!selectedClientId}>
-                    Nuevo Producto
+                    + Producto Nuevo
                 </Button>
             </div>
         </CardHeader>
         <CardContent>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-              <div className="grid md:grid-cols-3 gap-4 items-end">
+              <div className="grid md:grid-cols-2 gap-4 items-end">
                 <FormField
                   control={form.control}
                   name="clientId"
@@ -216,30 +207,18 @@ export function ReceptionTab() {
                     </FormItem>
                   )}
                 />
-                 <FormItem>
-                    <FormLabel>Lote (Opcional)</FormLabel>
-                    <FormControl>
-                        <Input 
-                            value={masterLote}
-                            onChange={(e) => setMasterLote(e.target.value)}
-                            disabled={!selectedClientId}
-                            placeholder="Aplica a todos los ítems"
-                            autoComplete="off"
-                        />
-                    </FormControl>
-                </FormItem>
               </div>
               
               <div className="space-y-4">
                 <FormLabel>Ítems Recibidos</FormLabel>
                 {fields.map((field, index) => (
                   <div key={field.id} className="flex items-start gap-2 p-3 border rounded-md">
-                    <div className="flex-1 grid sm:grid-cols-3 gap-4 items-start">
-                      <FormField
+                    <div className="flex-1 grid grid-cols-1 sm:grid-cols-12 gap-4 items-start">
+                       <FormField
                         control={form.control}
                         name={`items.${index}.packagingMasterCode`}
                         render={({ field: itemField }) => (
-                          <FormItem>
+                          <FormItem className="sm:col-span-3">
                             <FormLabel>Cod. Artículo</FormLabel>
                             <div className="flex items-center gap-2">
                               <FormControl>
@@ -262,23 +241,38 @@ export function ReceptionTab() {
                           </FormItem>
                         )}
                       />
-                      <div className="space-y-2">
+                       <FormField
+                          control={form.control}
+                          name={`items.${index}.lote`}
+                          render={({ field: itemField }) => (
+                              <FormItem className="sm:col-span-2">
+                                  <FormLabel>Lote</FormLabel>
+                                  <FormControl>
+                                      <Input {...itemField} value={itemField.value ?? ''} autoComplete="off" placeholder="Opcional" />
+                                  </FormControl>
+                                  <FormMessage />
+                              </FormItem>
+                          )}
+                        />
+                      <div className="space-y-2 sm:col-span-5">
                         <FormLabel>Descripción</FormLabel>
                         <p className="font-medium text-sm h-10 flex items-center">
                             {form.watch(`items.${index}.packagingMasterName`) || <span className="text-muted-foreground">--</span>}
                         </p>
                       </div>
-                      <FormField
-                        control={form.control}
-                        name={`items.${index}.palletCount`}
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Cant. Pallets</FormLabel>
-                            <FormControl><Input type="number" {...field} value={field.value ?? ''} autoComplete="off" min="1" inputMode="numeric" /></FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
+                       <FormField
+                          control={form.control}
+                          name={`items.${index}.palletCount`}
+                          render={({ field: itemField }) => (
+                              <FormItem className="sm:col-span-2">
+                                  <FormLabel>Cant. Pallets</FormLabel>
+                                  <FormControl>
+                                      <Input type="number" {...itemField} value={itemField.value ?? ''} autoComplete="off" min="1" inputMode="numeric" />
+                                  </FormControl>
+                                  <FormMessage />
+                              </FormItem>
+                          )}
+                        />
                     </div>
                     <Button type="button" variant="destructive" size="icon" onClick={() => remove(index)} disabled={fields.length <= 1}>
                       <Trash2 className="h-4 w-4" />
