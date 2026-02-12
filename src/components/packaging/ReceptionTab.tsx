@@ -146,7 +146,7 @@ export function ReceptionTab() {
   return (
     <>
       <Card>
-        <CardHeader className="flex flex-row items-start justify-between">
+        <CardHeader className="flex flex-row items-center justify-between">
           <div>
             <CardTitle>Recepción de Pallets de Embalaje</CardTitle>
             <CardDescription>Registre la entrada de materiales de embalaje de un cliente.</CardDescription>
