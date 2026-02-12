@@ -209,7 +209,7 @@ export function ExitTab() {
         <CardContent>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-              <div className="grid md:grid-cols-3 gap-4">
+              <div className="grid md:grid-cols-3 gap-4 items-end">
                 <FormField
                   control={form.control}
                   name="clientId"
@@ -224,7 +224,7 @@ export function ExitTab() {
                     </FormItem>
                   )}
                 />
-                 <div>
+                 <div className="space-y-2">
                     <Label>Filtrar por Lote (Opcional)</Label>
                     <Input
                         value={loteFilter}
