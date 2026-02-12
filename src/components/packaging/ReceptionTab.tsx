@@ -158,8 +158,8 @@ export function ReceptionTab() {
                     <CardTitle>Recepción de Pallets de Embalaje</CardTitle>
                     <CardDescription>Registre la entrada de materiales de embalaje de un cliente.</CardDescription>
                 </div>
-                <Button variant="secondary" size="sm" onClick={() => setIsCreateProductOpen(true)} disabled={!selectedClientId}>
-                    Nuevo Producto
+                <Button variant="default" size="sm" onClick={() => setIsCreateProductOpen(true)} disabled={!selectedClientId}>
+                    + Producto Nuevo
                 </Button>
             </div>
         </CardHeader>
