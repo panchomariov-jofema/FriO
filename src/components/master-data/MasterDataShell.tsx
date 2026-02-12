@@ -25,7 +25,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Form } from '@/components/ui/form';
 import { z } from 'zod';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
-import type { MasterData } from '@/lib/types';
+import type { MasterData, Warehouse } from '@/lib/types';
 import { addDoc, collection, deleteDoc, doc, updateDoc, writeBatch, query, where, getDocs } from 'firebase/firestore';
 import { useFirestore } from '@/firebase';
 import { Download, Pencil, Trash2, Upload } from 'lucide-react';
@@ -256,7 +256,7 @@ export function MasterDataShell<T extends MasterData>({
       }
   
       const headerLine = lines[0].trim().replace(/^\uFEFF/, '');
-      const fileHeaders = headerLine.split(';').map(h => h.trim().replace(/"/g, ''));
+      const fileHeaders = headerLine.split(',').map(h => h.trim().replace(/"/g, ''));
   
       const headerMap = new Map(columns.map(c => [c.header, c.key]));
   
@@ -292,7 +292,7 @@ export function MasterDataShell<T extends MasterData>({
       let operations = 0;
   
       for (let i = 1; i < lines.length; i++) {
-        const values = lines[i].split(';').map(v => v.trim().replace(/"/g, ''));
+        const values = lines[i].split(',').map(v => v.trim().replace(/"/g, ''));
         const rowData: { [key: string]: any } = {};
   
         fileHeaders.forEach((header, index) => {
@@ -304,6 +304,17 @@ export function MasterDataShell<T extends MasterData>({
   
         if (rowData.type && typeof rowData.type === 'string') {
           rowData.type = rowData.type.toLowerCase();
+        }
+
+        if (collectionName === 'aisles' && typeof rowData.warehouseIds === 'string' && formProps.warehouses) {
+            const warehouseNameMap = new Map((formProps.warehouses as Warehouse[]).map(w => [w.name, w.id]));
+            const names = rowData.warehouseIds.split(',').map(name => name.trim());
+            const ids = names.map(name => warehouseNameMap.get(name)).filter((id): id is string => !!id);
+            if (ids.length !== names.length && rowData.warehouseIds.trim() !== '') {
+                 errors.push(`Línea ${i + 1}: Uno o más nombres de almacén en "${rowData.warehouseIds}" no son válidos.`);
+                 continue;
+            }
+            rowData.warehouseIds = ids;
         }
   
         try {
@@ -361,13 +372,13 @@ export function MasterDataShell<T extends MasterData>({
         });
       }
     };
-    reader.readAsText(file);
+    reader.readAsText(file, 'ISO-8859-1');
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
   
   const handleDownloadTemplate = () => {
     const spanishHeaders = columns.map(c => c.header);
-    const csvContent = "data:text/csv;charset=utf-8," + spanishHeaders.join(';');
+    const csvContent = "data:text/csv;charset=utf-8," + spanishHeaders.join(',');
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
@@ -388,7 +399,7 @@ export function MasterDataShell<T extends MasterData>({
     }
     const dataToExport = exportDataTransform ? exportDataTransform(data) : data;
     const spanishHeaders = columns.map(c => c.header);
-    const headerRow = spanishHeaders.join(';');
+    const headerRow = spanishHeaders.join(',');
     const rows = dataToExport.map(row =>
       columns.map(col => {
         const value = row[col.key as keyof T];
@@ -398,16 +409,20 @@ export function MasterDataShell<T extends MasterData>({
         if (value instanceof Date) {
           return `"${value.toLocaleString('es-CL')}"`;
         }
-        if (typeof value === 'object' && value.toDate instanceof Function) { // Firebase Timestamp
-          return `"${value.toDate().toLocaleString('es-CL')}"`;
+        if (typeof value === 'object' && (value as any).toDate instanceof Function) { // Firebase Timestamp
+          return `"${(value as any).toDate().toLocaleString('es-CL')}"`;
         }
         if (Array.isArray(value) || typeof value === 'object') {
+          // Special case for our exportDataTransform for aisles
+          if (col.key === 'warehouseIds' && typeof value === 'string') {
+              return `"${value.replace(/"/g, '""')}"`;
+          }
           return `"${JSON.stringify(value).replace(/"/g, '""')}"`;
         }
         
         const stringValue = String(value);
         return `"${stringValue.replace(/"/g, '""')}"`;
-      }).join(';')
+      }).join(',')
     );
     
     const csvString = [headerRow, ...rows].join('\n');

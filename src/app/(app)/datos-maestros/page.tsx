@@ -541,13 +541,13 @@ export default function DatosMaestrosPage() {
               ]}
               RenderFormComponent={AisleForm}
               docNameField="name"
-              csvHeaders={['name', 'warehouseNames']}
+              csvHeaders={['name', 'warehouseIds']}
               csvTemplateFileName="plantilla_pasillos.csv"
               formProps={{ warehouses: loadingWarehouses ? [] : warehouses }}
               exportDataTransform={(dataToTransform: Aisle[]) =>
                 dataToTransform.map(aisle => ({
                   ...aisle,
-                  warehouseNames: (aisle.warehouseIds || [])
+                  warehouseIds: (aisle.warehouseIds || [])
                     .map(id => warehouseMap.get(id) || id)
                     .join(', '),
                 }))
