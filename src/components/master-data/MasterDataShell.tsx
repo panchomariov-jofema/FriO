@@ -37,30 +37,6 @@ import { FirestorePermissionError } from '@/firebase/errors';
 import { Switch } from '../ui/switch';
 import { Badge } from '../ui/badge';
 
-// Helper functions for CSV export
-function convertToCSV(data: any[], headers: string[]) {
-    const headerRow = headers.join(';');
-    const rows = data.map(row =>
-        headers.map(header => {
-            let value = row[header];
-            if (value === undefined || value === null) {
-                return '""';
-            }
-            if (value instanceof Date) {
-                value = value.toLocaleString('es-CL');
-            } else if (typeof value === 'object' && value.toDate instanceof Function) { // Firebase Timestamp
-                value = value.toDate().toLocaleString('es-CL');
-            } else if (Array.isArray(value) || typeof value === 'object') {
-                value = JSON.stringify(value);
-            }
-            
-            const stringValue = String(value);
-            return `"${stringValue.replace(/"/g, '""')}"`;
-        }).join(';')
-    );
-    return [headerRow, ...rows].join('\n');
-}
-
 function downloadCSV(csvString: string, filename: string) {
     const blob = new Blob([`\uFEFF${csvString}`], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement("a");
@@ -268,120 +244,130 @@ export function MasterDataShell<T extends MasterData>({
   
   const handleFileImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (!file) return;
-
+    if (!file || !firestore) return;
+  
     const reader = new FileReader();
     reader.onload = async (e) => {
-        const text = e.target?.result as string;
-        const lines = text.split('\n').filter(line => line.trim() !== '');
-        if (lines.length < 1) {
-            toast({ title: 'Error de archivo', description: 'El archivo CSV está vacío o tiene un formato incorrecto.', variant: 'destructive'});
-            return;
-        }
-        const fileHeaders = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
-
-        // Quick check to see if headers match
-        const expectedHeaders = csvHeaders as string[];
-        if (JSON.stringify(fileHeaders) !== JSON.stringify(expectedHeaders)) {
-            toast({
-                title: 'Error de formato',
-                description: `Las cabeceras del CSV no coinciden. Esperado: ${expectedHeaders.join(', ')}`,
-                variant: 'destructive',
-            });
-            return;
-        }
-
-        const errors: string[] = [];
-        let successCount = 0;
-
-        const keyFields: Record<string, string> = {
-          exporters: 'exporterId',
-          producers: 'producerId',
-          binMaterials: 'code',
-          otherClients: 'clientId',
-          packagingMaster: 'code',
-          usersMaster: 'userName',
-          profiles: 'profileId',
-          packings: 'name',
-        };
-        const keyField = keyFields[collectionName];
-        
-        const batch = writeBatch(firestore);
-        let operations = 0;
-
-        for (let i = 1; i < lines.length; i++) {
-            const values = lines[i].split(',').map(v => v.trim().replace(/"/g, ''));
-            const rowData: { [key: string]: any } = {};
-            
-            expectedHeaders.forEach((header, index) => {
-                rowData[header] = values[index];
-            });
-
-            if (rowData.type && typeof rowData.type === 'string') {
-              rowData.type = rowData.type.toLowerCase();
-            }
-
-            try {
-                const validatedData = schema.parse(rowData);
-
-                let existingDocRef: any = null;
-                if (keyField && validatedData[keyField]) {
-                    const q = query(collection(firestore, collectionName), where(keyField, "==", validatedData[keyField]));
-                    const querySnapshot = await getDocs(q);
-                    if (!querySnapshot.empty) {
-                        existingDocRef = querySnapshot.docs[0].ref;
-                    }
-                }
-        
-                if (existingDocRef) {
-                    batch.update(existingDocRef, validatedData);
-                } else {
-                    const newDocRef = doc(collection(firestore, collectionName));
-                    batch.set(newDocRef, validatedData);
-                }
-                successCount++;
-                operations++;
-
-                if (operations >= 400) {
-                  await batch.commit();
-                  operations = 0;
-                }
-
-            } catch (error) {
-                if (error instanceof z.ZodError) {
-                    errors.push(`Línea ${i + 1}: ${error.errors.map(e => e.message).join(', ')}`);
-                } else {
-                    console.error("Error processing import line:", error);
-                    errors.push(`Línea ${i + 1}: Error al guardar en base de datos.`);
-                }
-            }
-        }
-
-        if (operations > 0) {
-            await batch.commit();
-        }
-        
+      const text = e.target?.result as string;
+      const lines = text.split('\n').filter(line => line.trim() !== '');
+      if (lines.length < 1) {
+        toast({ title: 'Error de archivo', description: 'El archivo CSV está vacío o tiene un formato incorrecto.', variant: 'destructive' });
+        return;
+      }
+  
+      const headerLine = lines[0].trim().replace(/^\uFEFF/, '');
+      const fileHeaders = headerLine.split(';').map(h => h.trim().replace(/"/g, ''));
+  
+      const headerMap = new Map(columns.map(c => [c.header, c.key]));
+  
+      const unknownHeaders = fileHeaders.filter(h => !headerMap.has(h));
+      if (unknownHeaders.length > 0) {
         toast({
-            title: 'Importación Completada',
-            description: `${successCount} registros procesados. ${errors.length > 0 ? `${errors.length} errores.` : ''}`,
+          title: 'Error de formato',
+          description: `Cabeceras desconocidas en el archivo CSV: ${unknownHeaders.join(', ')}`,
+          variant: 'destructive',
         });
-
-        if (errors.length > 0) {
-            console.error("Import Errors:", errors);
-            toast({
-                title: `Se encontraron ${errors.length} errores de importación`,
-                description: (<div className="h-40 w-full overflow-y-auto">{errors.map((e, i)=><p key={i} className="text-xs">{e}</p>)}</div>),
-                variant: 'destructive',
-                duration: 9000,
-            });
+        return;
+      }
+  
+      const errors: string[] = [];
+      let successCount = 0;
+  
+      const keyFields: Record<string, string> = {
+        exporters: 'exporterId',
+        producers: 'producerId',
+        binMaterials: 'code',
+        otherClients: 'clientId',
+        packagingMaster: 'code',
+        usersMaster: 'userName',
+        profiles: 'profileId',
+        packings: 'name',
+        businessEntities: 'rut',
+        warehouses: 'name',
+        aisles: 'name',
+      };
+      const keyField = keyFields[collectionName];
+  
+      const batch = writeBatch(firestore);
+      let operations = 0;
+  
+      for (let i = 1; i < lines.length; i++) {
+        const values = lines[i].split(';').map(v => v.trim().replace(/"/g, ''));
+        const rowData: { [key: string]: any } = {};
+  
+        fileHeaders.forEach((header, index) => {
+          const englishKey = headerMap.get(header);
+          if (englishKey) {
+            rowData[englishKey] = values[index];
+          }
+        });
+  
+        if (rowData.type && typeof rowData.type === 'string') {
+          rowData.type = rowData.type.toLowerCase();
         }
+  
+        try {
+          const validatedData = schema.parse(rowData);
+  
+          let existingDocRef: any = null;
+          if (keyField && validatedData[keyField]) {
+            const q = query(collection(firestore, collectionName), where(keyField, "==", validatedData[keyField]));
+            const querySnapshot = await getDocs(q);
+            if (!querySnapshot.empty) {
+              existingDocRef = querySnapshot.docs[0].ref;
+            }
+          }
+  
+          if (existingDocRef) {
+            batch.update(existingDocRef, validatedData);
+          } else {
+            const newDocRef = doc(collection(firestore, collectionName));
+            batch.set(newDocRef, validatedData);
+          }
+          successCount++;
+          operations++;
+  
+          if (operations >= 400) {
+            await batch.commit();
+            operations = 0;
+          }
+  
+        } catch (error) {
+          if (error instanceof z.ZodError) {
+            errors.push(`Línea ${i + 1}: ${error.errors.map(e => e.message).join(', ')}`);
+          } else {
+            console.error("Import Errors:", error);
+            errors.push(`Línea ${i + 1}: Error al guardar en base de datos.`);
+          }
+        }
+      }
+  
+      if (operations > 0) {
+        await batch.commit();
+      }
+  
+      toast({
+        title: 'Importación Completada',
+        description: `${successCount} registros procesados. ${errors.length > 0 ? `${errors.length} errores.` : ''}`,
+      });
+  
+      if (errors.length > 0) {
+        console.error("Import Errors:", errors);
+        toast({
+          title: `Se encontraron ${errors.length} errores de importación`,
+          description: (<div className="h-40 w-full overflow-y-auto">{errors.map((e, i) => <p key={i} className="text-xs">{e}</p>)}</div>),
+          variant: 'destructive',
+          duration: 9000,
+        });
+      }
     };
     reader.readAsText(file);
-    if(fileInputRef.current) fileInputRef.current.value = '';
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
   
   const handleDownloadTemplate = () => {
-    const csvContent = "data:text/csv;charset=utf-8," + csvHeaders.join(',');
+    const spanishHeaders = columns.map(c => c.header);
+    const csvContent = "data:text/csv;charset=utf-8," + spanishHeaders.join(';');
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
@@ -393,18 +379,40 @@ export function MasterDataShell<T extends MasterData>({
   
   const handleExport = () => {
     if (!data || data.length === 0) {
-        toast({
-            variant: 'destructive',
-            title: 'Sin datos',
-            description: 'No hay datos para exportar.',
-        });
-        return;
+      toast({
+        variant: 'destructive',
+        title: 'Sin datos',
+        description: 'No hay datos para exportar.',
+      });
+      return;
     }
     const dataToExport = exportDataTransform ? exportDataTransform(data) : data;
-    const headers = csvHeaders as string[];
-    const csv = convertToCSV(dataToExport, headers);
+    const spanishHeaders = columns.map(c => c.header);
+    const headerRow = spanishHeaders.join(';');
+    const rows = dataToExport.map(row =>
+      columns.map(col => {
+        const value = row[col.key as keyof T];
+        if (value === undefined || value === null) {
+          return '""';
+        }
+        if (value instanceof Date) {
+          return `"${value.toLocaleString('es-CL')}"`;
+        }
+        if (typeof value === 'object' && value.toDate instanceof Function) { // Firebase Timestamp
+          return `"${value.toDate().toLocaleString('es-CL')}"`;
+        }
+        if (Array.isArray(value) || typeof value === 'object') {
+          return `"${JSON.stringify(value).replace(/"/g, '""')}"`;
+        }
+        
+        const stringValue = String(value);
+        return `"${stringValue.replace(/"/g, '""')}"`;
+      }).join(';')
+    );
+    
+    const csvString = [headerRow, ...rows].join('\n');
     const date = new Date().toISOString().split('T')[0];
-    downloadCSV(csv, `export_${collectionName}_${date}.csv`);
+    downloadCSV(csvString, `export_${collectionName}_${date}.csv`);
   };
 
   const handleSeedProfiles = async () => {
