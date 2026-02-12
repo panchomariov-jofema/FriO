@@ -106,12 +106,22 @@ export interface PackagingReception {
   userName?: string;
 }
 
+export interface PackagingExitItemLocation {
+  locationKey: string;
+  receptionId: string;
+  itemIndex: number;
+  palletsToWithdraw: number;
+  locationString?: string;
+  available?: number;
+}
+
 export interface PackagingMovementItem {
     lote?: string;
     packagingMasterId: string;
     packagingMasterCode: string;
     packagingMasterName: string;
     palletCount: number;
+    locations?: PackagingExitItemLocation[];
 }
 
 export interface PackagingMovement {
@@ -124,15 +134,6 @@ export interface PackagingMovement {
   createdAt: Timestamp;
   userId?: string;
   userName?: string;
-}
-
-export interface PackagingExitItemLocation {
-  locationKey: string;
-  receptionId: string;
-  itemIndex: number;
-  palletsToWithdraw: number;
-  locationString?: string;
-  available?: number;
 }
 
 export interface PackagingExitItem {

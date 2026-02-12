@@ -18,7 +18,7 @@ import { FileText, Building } from 'lucide-react';
 import { z } from 'zod';
 import { packagingExitSchema } from '@/lib/schemas';
 import { Input } from '../ui/input';
-import { PackagingMovement, PackagingReception } from '@/lib/types';
+import { PackagingMovement, PackagingReception, PackagingExitItemLocation } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
@@ -48,88 +48,108 @@ export function PackagingPickingDialog({ movement, open, onOpenChange, onConfirm
   const [quantities, setQuantities] = React.useState<Record<string, number>>({});
 
   React.useEffect(() => {
-    if (movement && allReceptions.length > 0) {
-        // This logic runs once when the dialog opens to prepare the picking list.
-        const stockMap: Record<string, { name: string, locations: { locationKey: string, locationString: string, available: number, receptionId: string, itemIndex: number }[] }> = {};
+    if (movement) {
+        // NEW: If the movement already has detailed locations, use them directly.
+        const hasPrecalculatedLocations = movement.items.every(
+            (item) => Array.isArray(item.locations) && item.locations.length > 0
+        );
 
-        allReceptions
-            .filter(r => r.clientId === movement.clientId && (r.status === 'Almacenado' || r.status === 'Parcialmente Almacenado'))
-            .forEach(reception => {
-                reception.items.forEach((item, index) => {
-                    if (item.status === 'Almacenado' && item.palletCount > 0 && item.storageLocation) {
-                        if (!stockMap[item.packagingMasterCode]) {
-                            stockMap[item.packagingMasterCode] = { name: item.packagingMasterName, locations: [] };
+        if (hasPrecalculatedLocations) {
+            const payload: ExitFormValues = {
+                clientId: movement.clientId,
+                document: movement.document,
+                items: movement.items.map(item => ({
+                    ...item,
+                    locations: item.locations!, 
+                })),
+            };
+            setConfirmedPayload(payload);
+            setPickedItems({});
+            return; // Exit early
+        }
+
+        // FALLBACK: Old logic to recalculate locations if not present.
+        if (allReceptions.length > 0) {
+            const stockMap: Record<string, { name: string, locations: { locationKey: string, locationString: string, available: number, receptionId: string, itemIndex: number }[] }> = {};
+
+            allReceptions
+                .filter(r => r.clientId === movement.clientId && (r.status === 'Almacenado' || r.status === 'Parcialmente Almacenado'))
+                .forEach(reception => {
+                    reception.items.forEach((item, index) => {
+                        if (item.status === 'Almacenado' && item.palletCount > 0 && item.storageLocation) {
+                            if (!stockMap[item.packagingMasterCode]) {
+                                stockMap[item.packagingMasterCode] = { name: item.packagingMasterName, locations: [] };
+                            }
+                            const locationKey = getLocationKey(reception.id, index);
+                            stockMap[item.packagingMasterCode].locations.push({
+                                locationKey,
+                                locationString: `${item.storageLocation.warehouse} / ${item.storageLocation.aisle}`,
+                                available: item.palletCount,
+                                receptionId: reception.id,
+                                itemIndex: index,
+                            });
                         }
-                        const locationKey = getLocationKey(reception.id, index);
-                        stockMap[item.packagingMasterCode].locations.push({
-                            locationKey,
-                            locationString: `${item.storageLocation.warehouse} / ${item.storageLocation.aisle}`,
-                            available: item.palletCount,
-                            receptionId: reception.id,
-                            itemIndex: index,
-                        });
-                    }
+                    });
                 });
-            });
 
-        const payload: ExitFormValues = {
-            clientId: movement.clientId,
-            document: movement.document,
-            items: [],
-        };
-
-        const errors: string[] = [];
-
-        for(const requestedItem of movement.items) {
-            const itemStock = stockMap[requestedItem.packagingMasterCode];
-            if (!itemStock) {
-                errors.push(`No hay stock para el artículo ${requestedItem.packagingMasterCode}.`);
-                continue;
-            }
-            
-            let needed = requestedItem.palletCount;
-            const newItem: z.infer<typeof packagingExitSchema.shape.items.element> = {
-                ...requestedItem,
-                palletCount: 0,
-                locations: [],
+            const payload: ExitFormValues = {
+                clientId: movement.clientId,
+                document: movement.document,
+                items: [],
             };
 
-            // FIFO: Sort locations by reception date
-            itemStock.locations.sort((a,b) => {
-                const receptionA = allReceptions.find(r => r.id === a.receptionId)!.createdAt.toMillis();
-                const receptionB = allReceptions.find(r => r.id === b.receptionId)!.createdAt.toMillis();
-                return receptionA - receptionB;
-            });
+            const errors: string[] = [];
 
-            for (const loc of itemStock.locations) {
-                if (needed > 0) {
-                    const toWithdraw = Math.min(needed, loc.available);
-                    newItem.locations!.push({
-                        ...loc,
-                        palletsToWithdraw: toWithdraw,
-                    });
-                    newItem.palletCount += toWithdraw;
-                    needed -= toWithdraw;
-                } else {
-                    break;
+            for(const requestedItem of movement.items) {
+                const itemStock = stockMap[requestedItem.packagingMasterCode];
+                if (!itemStock) {
+                    errors.push(`No hay stock para el artículo ${requestedItem.packagingMasterCode}.`);
+                    continue;
                 }
+                
+                let needed = requestedItem.palletCount;
+                const newItem: z.infer<typeof packagingExitSchema.shape.items.element> = {
+                    ...requestedItem,
+                    palletCount: 0,
+                    locations: [],
+                };
+
+                // FIFO: Sort locations by reception date
+                itemStock.locations.sort((a,b) => {
+                    const receptionA = allReceptions.find(r => r.id === a.receptionId)!.createdAt.toMillis();
+                    const receptionB = allReceptions.find(r => r.id === b.receptionId)!.createdAt.toMillis();
+                    return receptionA - receptionB;
+                });
+
+                for (const loc of itemStock.locations) {
+                    if (needed > 0) {
+                        const toWithdraw = Math.min(needed, loc.available);
+                        newItem.locations!.push({
+                            ...loc,
+                            palletsToWithdraw: toWithdraw,
+                        });
+                        newItem.palletCount += toWithdraw;
+                        needed -= toWithdraw;
+                    } else {
+                        break;
+                    }
+                }
+
+                if (needed > 0) {
+                    errors.push(`Stock insuficiente para ${requestedItem.packagingMasterCode}. Solicitado: ${requestedItem.palletCount}, Disponible: ${requestedItem.palletCount - needed}`);
+                }
+                payload.items.push(newItem);
             }
 
-            if (needed > 0) {
-                errors.push(`Stock insuficiente para ${requestedItem.packagingMasterCode}. Solicitado: ${requestedItem.palletCount}, Disponible: ${requestedItem.palletCount - needed}`);
+            if (errors.length > 0) {
+                toast({ title: 'Error de Stock', description: errors.join(' '), variant: 'destructive'});
+                onOpenChange(false);
+                return;
             }
-            payload.items.push(newItem);
+
+            setConfirmedPayload(payload);
+            setPickedItems({});
         }
-
-        if (errors.length > 0) {
-            toast({ title: 'Error de Stock', description: errors.join(' '), variant: 'destructive'});
-            onOpenChange(false);
-            return;
-        }
-
-        setConfirmedPayload(payload);
-        setPickedItems({});
-
     }
   }, [movement, allReceptions, toast, onOpenChange]);
 

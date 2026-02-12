@@ -10,11 +10,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
-import type { OtherClient, PackagingReception, PackagingMaster } from '@/lib/types';
+import type { OtherClient, PackagingReception, PackagingMaster, PackagingMovementItem, PackagingExitItemLocation } from '@/lib/types';
 import { packagingExitSchema } from '@/lib/schemas';
 import { PlusCircle, Trash2, ScanLine } from 'lucide-react';
 import { useFirestore } from '@/firebase';
-import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
+import { addDoc, collection, serverTimestamp, Timestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
@@ -29,6 +29,9 @@ const defaultItem = {
     packagingMasterName: '',
     palletCount: 1,
 };
+
+const getLocationKey = (receptionId: string, itemIndex: number) => `${receptionId}_${itemIndex}`;
+
 
 export function ExitTab() {
   const { data: allClients, loading: loadingClients } = useFirestoreCollection<OtherClient>('otherClients');
@@ -100,48 +103,95 @@ export function ExitTab() {
 
   const onSubmit = async (values: ExitFormValues) => {
     if (!firestore) return;
-    
-    // Validate stock before submitting
-    for (const item of values.items) {
-        const stockForCode = stockByCodeAndLote.get(item.packagingMasterCode);
-        if (!stockForCode) {
-             toast({ variant: 'destructive', title: 'Stock Insuficiente', description: `No hay stock para "${item.packagingMasterName}".` });
-             return;
-        }
 
-        const availableStock = loteFilter 
-            ? stockForCode.get(loteFilter) || 0
-            : Array.from(stockForCode.values()).reduce((sum, current) => sum + current, 0);
+    // Build available stock locations, sorted by FIFO
+    const availableStockLocations: {
+        receptionId: string;
+        itemIndex: number;
+        available: number;
+        locationString: string;
+        lote?: string;
+        createdAt: Timestamp;
+        packagingMasterCode: string;
+    }[] = (allReceptions || [])
+        .filter(r => r.clientId === values.clientId && (r.status === 'Almacenado' || r.status === 'Parcialmente Almacenado'))
+        .flatMap(reception => 
+            reception.items.map((item, index) => ({ item, index, reception }))
+        )
+        .filter(({ item }) => item.status === 'Almacenado' && item.palletCount > 0 && item.storageLocation)
+        .map(({ item, index, reception }) => ({
+            receptionId: reception.id,
+            itemIndex: index,
+            available: item.palletCount,
+            locationString: `${item.storageLocation!.warehouse} / ${item.storageLocation!.aisle}`,
+            lote: item.lote,
+            createdAt: reception.createdAt,
+            packagingMasterCode: item.packagingMasterCode,
+        }))
+        .sort((a,b) => a.createdAt.toMillis() - b.createdAt.toMillis());
 
-        if (item.palletCount > availableStock) {
-            toast({
-                variant: 'destructive',
-                title: 'Stock Insuficiente',
-                description: `No hay suficiente stock para "${item.packagingMasterName}" ${loteFilter ? `en el lote "${loteFilter}"` : ''}. Disponible: ${availableStock}, Solicitado: ${item.palletCount}.`,
+    const errors: string[] = [];
+    const newMovementItems: PackagingMovementItem[] = [];
+
+    for (const requestedItem of values.items) {
+        if (requestedItem.palletCount <= 0) continue;
+
+        let needed = requestedItem.palletCount;
+        const locationsToWithdraw: PackagingExitItemLocation[] = [];
+
+        const relevantStock = availableStockLocations.filter(loc => 
+            loc.packagingMasterCode === requestedItem.packagingMasterCode &&
+            (!loteFilter || (loc.lote || '').toLowerCase() === loteFilter.toLowerCase())
+        );
+
+        for (const stockLocation of relevantStock) {
+            if (needed === 0) break;
+
+            const canWithdraw = Math.min(needed, stockLocation.available);
+            
+            locationsToWithdraw.push({
+                locationKey: getLocationKey(stockLocation.receptionId, stockLocation.itemIndex),
+                receptionId: stockLocation.receptionId,
+                itemIndex: stockLocation.itemIndex,
+                palletsToWithdraw: canWithdraw,
+                locationString: stockLocation.locationString,
+                available: stockLocation.available,
             });
-            return; // Stop submission
+            
+            needed -= canWithdraw;
+            stockLocation.available -= canWithdraw; // "consume" stock for subsequent items
         }
+
+        if (needed > 0) {
+            errors.push(`Stock insuficiente para "${requestedItem.packagingMasterName}" ${loteFilter ? `en el lote "${loteFilter}"` : ''}. Faltan: ${needed}`);
+        } else {
+            const newItem: PackagingMovementItem = {
+                ...requestedItem,
+                palletCount: requestedItem.palletCount,
+                locations: locationsToWithdraw,
+            };
+            if (loteFilter) {
+                newItem.lote = loteFilter;
+            }
+            newMovementItems.push(newItem);
+        }
+    }
+     if (errors.length > 0) {
+        toast({ variant: 'destructive', title: 'Error de Stock', description: errors.join('\n') });
+        return;
+    }
+
+    if (newMovementItems.length === 0) {
+        toast({ variant: 'destructive', title: 'Sin ítems', description: 'Debe ingresar una cantidad para al menos un artículo.' });
+        return;
     }
 
     try {
-        const movementItems = values.items.map(item => {
-            const newItem: any = {
-                packagingMasterId: item.packagingMasterId,
-                packagingMasterCode: item.packagingMasterCode,
-                packagingMasterName: item.packagingMasterName,
-                palletCount: item.palletCount,
-            };
-            if (loteFilter) { // Only add 'lote' if loteFilter is not empty
-                newItem.lote = loteFilter;
-            }
-            return newItem;
-        });
-
         const movementData = {
             type: 'salida' as const,
             clientId: values.clientId,
             document: values.document || '',
-            items: movementItems,
+            items: newMovementItems,
             status: 'Pendiente de Picking' as const,
             createdAt: serverTimestamp(),
         };
