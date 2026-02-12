@@ -14,6 +14,7 @@ import { useToast } from '@/hooks/use-toast';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { Download, Upload } from 'lucide-react';
+import { AdjustPackagingDialog } from './AdjustPackagingDialog';
 
 interface StoredPackagingItem {
     id: string; // receptionId + itemIndex
@@ -76,6 +77,8 @@ export function StockAndRelocationTab() {
 
   const [itemToRelocate, setItemToRelocate] = React.useState<StoredPackagingItem | null>(null);
   const [isDialogOpen, setDialogOpen] = React.useState(false);
+  const [itemToAdjust, setItemToAdjust] = React.useState<StoredPackagingItem | null>(null);
+  const [isAdjustDialogOpen, setAdjustDialogOpen] = React.useState(false);
   const firestore = useFirestore();
   const { toast } = useToast();
   const fileInputRef = React.useRef<HTMLInputElement>(null);
@@ -109,6 +112,11 @@ export function StockAndRelocationTab() {
     setDialogOpen(true);
   };
   
+  const handleAdjustClick = (item: StoredPackagingItem) => {
+    setItemToAdjust(item);
+    setAdjustDialogOpen(true);
+  };
+
   const handleRelocateConfirm = async (newLocation: { warehouse: string; aisle: string; }) => {
     if (!itemToRelocate || !firestore) return;
 
@@ -136,6 +144,49 @@ export function StockAndRelocationTab() {
     } catch (error) {
         console.error("Error relocating packaging item:", error);
         toast({ variant: 'destructive', title: 'Error', description: 'No se pudo reubicar el pallet.' });
+        errorEmitter.emit('permission-error', new FirestorePermissionError({
+            path: receptionDocRef.path,
+            operation: 'update',
+            requestResourceData: updateData,
+        }));
+    }
+  };
+
+  const handleAdjustConfirm = async (newQuantity: number) => {
+    if (!itemToAdjust || !firestore) return;
+
+    if (newQuantity < 0) {
+        toast({ title: 'Error', description: 'La cantidad no puede ser negativa.', variant: 'destructive'});
+        return;
+    }
+
+    const receptionDocRef = doc(firestore, 'packagingReceptions', itemToAdjust.receptionId);
+    
+    const originalReception = allReceptions.find(r => r.id === itemToAdjust.receptionId);
+    if (!originalReception) return;
+
+    const updatedItems = JSON.parse(JSON.stringify(originalReception.items));
+    const itemToUpdate = updatedItems[itemToAdjust.itemIndex];
+    
+    if (itemToUpdate) {
+        itemToUpdate.palletCount = newQuantity;
+    } else {
+        toast({ title: 'Error', description: 'No se pudo encontrar el ítem original para actualizar.', variant: 'destructive'});
+        return;
+    }
+
+    const updateData = {
+        items: updatedItems,
+        updatedAt: serverTimestamp(),
+    };
+
+    try {
+        await updateDoc(receptionDocRef, updateData);
+        toast({ title: 'Éxito', description: `La cantidad de pallets ha sido ajustada a ${newQuantity}.` });
+        setAdjustDialogOpen(false);
+    } catch (error) {
+        console.error("Error adjusting packaging item:", error);
+        toast({ variant: 'destructive', title: 'Error', description: 'No se pudo ajustar la cantidad.' });
         errorEmitter.emit('permission-error', new FirestorePermissionError({
             path: receptionDocRef.path,
             operation: 'update',
@@ -356,7 +407,10 @@ export function StockAndRelocationTab() {
                         <TableCell>{item.location.warehouse} / {item.location.aisle}</TableCell>
                         <TableCell className="font-semibold">{item.palletCount}</TableCell>
                         <TableCell className="text-right">
-                            <Button size="sm" onClick={() => handleRelocateClick(item)}>Reubicar</Button>
+                           <div className="flex gap-2 justify-end">
+                                <Button variant="outline" size="sm" onClick={() => handleAdjustClick(item)}>Ajustar</Button>
+                                <Button size="sm" onClick={() => handleRelocateClick(item)}>Reubicar</Button>
+                            </div>
                         </TableCell>
                     </TableRow>
                   ))
@@ -376,6 +430,12 @@ export function StockAndRelocationTab() {
         open={isDialogOpen}
         onOpenChange={setDialogOpen}
         onConfirm={handleRelocateConfirm}
+       />
+       <AdjustPackagingDialog
+        item={itemToAdjust}
+        open={isAdjustDialogOpen}
+        onOpenChange={setAdjustDialogOpen}
+        onConfirm={handleAdjustConfirm}
        />
     </>
   );
