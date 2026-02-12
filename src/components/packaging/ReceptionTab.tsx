@@ -69,12 +69,18 @@ export function ReceptionTab() {
         return;
     }
     
-    // Add status to each item
-    const itemsWithStatus: Omit<PackagingReceptionItem, 'storageLocation' | 'storedAt'>[] = values.items.map(item => ({
-        ...item,
-        lote: item.lote || undefined, // Ensure empty strings are not saved
-        status: 'Pendiente de almacenar'
-    }));
+    // Add status to each item and handle optional lote field
+    const itemsWithStatus = values.items.map(item => {
+        const { lote, ...rest } = item;
+        const newItem: any = {
+            ...rest,
+            status: 'Pendiente de almacenar'
+        };
+        if (lote) {
+            newItem.lote = lote;
+        }
+        return newItem as Omit<PackagingReceptionItem, 'storageLocation' | 'storedAt'>;
+    });
 
 
     const receptionData = {

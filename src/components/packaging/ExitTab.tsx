@@ -124,17 +124,24 @@ export function ExitTab() {
     }
 
     try {
+        const movementItems = values.items.map(item => {
+            const newItem: any = {
+                packagingMasterId: item.packagingMasterId,
+                packagingMasterCode: item.packagingMasterCode,
+                packagingMasterName: item.packagingMasterName,
+                palletCount: item.palletCount,
+            };
+            if (loteFilter) { // Only add 'lote' if loteFilter is not empty
+                newItem.lote = loteFilter;
+            }
+            return newItem;
+        });
+
         const movementData = {
             type: 'salida' as const,
             clientId: values.clientId,
             document: values.document || '',
-            items: values.items.map(item => ({
-                lote: loteFilter || undefined,
-                packagingMasterId: item.packagingMasterId,
-                packagingMasterCode: item.packagingMasterCode,
-                packagingMasterName: item.packagingMasterName,
-                palletCount: item.palletCount
-            })),
+            items: movementItems,
             status: 'Pendiente de Picking' as const,
             createdAt: serverTimestamp(),
         };
@@ -327,5 +334,3 @@ export function ExitTab() {
     </>
   );
 }
-
-    
