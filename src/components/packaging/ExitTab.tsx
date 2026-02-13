@@ -42,24 +42,18 @@ function AutomaticDispatchTab({ selectedClientId, document, clientMasters, clien
   });
   const { fields, append, remove } = useFieldArray({ control: form.control, name: "items" });
 
-  const handleCodeChange = (index: number, code: string) => {
+  const handleCodeBlur = (index: number) => {
+    const code = form.getValues(`items.${index}.code`);
+    if (!code) return;
     const master = clientMasters.find((m: PackagingMaster) => m.code === code);
     if (master) {
       form.setValue(`items.${index}.name`, master.name);
-      form.setValue(`items.${index}.code`, master.code);
       form.clearErrors(`items.${index}.code`);
     } else {
-      form.setValue(`items.${index}.name`, 'Código no encontrado');
+      form.setValue(`items.${index}.name`, '');
       form.setError(`items.${index}.code`, { message: 'Inválido' });
     }
   };
-
-  const uniqueClientMasters = React.useMemo(() => {
-    if (!clientMasters) return [];
-    // Deduplicate based on 'code' to prevent key errors in Select.
-    return Array.from(new Map(clientMasters.map((item: PackagingMaster) => [item.code, item])).values());
-  }, [clientMasters]);
-
 
   return (
     <Form {...form}>
@@ -74,12 +68,14 @@ function AutomaticDispatchTab({ selectedClientId, document, clientMasters, clien
                   render={({ field: itemField }) => (
                     <FormItem className="sm:col-span-2">
                       <FormLabel className={index > 0 ? 'sr-only' : ''}>Código</FormLabel>
-                      <Select onValueChange={(value) => handleCodeChange(index, value)} value={itemField.value}>
-                          <FormControl><SelectTrigger><SelectValue placeholder="Código..." /></SelectTrigger></FormControl>
-                          <SelectContent>
-                            {uniqueClientMasters.map((m: PackagingMaster) => <SelectItem key={m.id} value={m.code}>{m.code}</SelectItem>)}
-                          </SelectContent>
-                      </Select>
+                      <FormControl>
+                        <Input 
+                            {...itemField}
+                            onBlur={() => handleCodeBlur(index)}
+                            autoComplete="off"
+                            placeholder="Código..."
+                        />
+                      </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -181,8 +177,6 @@ export function ExitTab() {
     resolver: zodResolver(autoDispatchSchema),
     defaultValues: { items: [{ code: '', name: '', quantity: 0 }] },
   });
-
-  const { fields, append, remove } = useFieldArray({ control: autoDispatchForm.control, name: "items" });
   
   const packagingClients = React.useMemo(() => {
     return (allClients || []).filter(c => c.type.toLowerCase() === 'embalaje' && c.status !== 'inactivo');
@@ -236,18 +230,6 @@ export function ExitTab() {
     }
   };
   
-   const handleCodeChange = (index: number, code: string) => {
-    const master = clientMasters.find((m: PackagingMaster) => m.code === code);
-    if (master) {
-        autoDispatchForm.setValue(`items.${index}.name`, master.name);
-        autoDispatchForm.setValue(`items.${index}.code`, master.code);
-        autoDispatchForm.clearErrors(`items.${index}.code`);
-    } else {
-        autoDispatchForm.setValue(`items.${index}.name`, 'Código no encontrado');
-        autoDispatchForm.setError(`items.${index}.code`, { message: 'Inválido' });
-    }
-  };
-
   const onSubmit = async (values: AutoDispatchFormValues | null, type: 'automatico' | 'manual') => {
     setIsSubmitting(true);
     const itemsByCode = new Map<string, PackagingMovementItem>();
@@ -391,55 +373,13 @@ export function ExitTab() {
                   <Card>
                     <CardHeader><CardTitle className="text-base">Añadir productos a despachar</CardTitle></CardHeader>
                     <CardContent>
-                       <Form {...autoDispatchForm}>
-                          <form className="space-y-4">
-                            <div className="space-y-2">
-                              {fields.map((field, index) => (
-                                <div key={field.id} className="flex items-start gap-2">
-                                  <div className="flex-1 grid grid-cols-1 sm:grid-cols-10 gap-4 items-start">
-                                    <FormField
-                                      control={autoDispatchForm.control}
-                                      name={`items.${index}.code`}
-                                      render={({ field: itemField }) => (
-                                        <FormItem className="sm:col-span-2">
-                                          <FormLabel className={index > 0 ? 'sr-only' : ''}>Código</FormLabel>
-                                          <Select onValueChange={(value) => handleCodeChange(index, value)} value={itemField.value}>
-                                              <FormControl><SelectTrigger><SelectValue placeholder="Código..." /></SelectTrigger></FormControl>
-                                              <SelectContent>
-                                                {clientMasters.map((m: PackagingMaster) => <SelectItem key={m.id} value={m.code}>{m.code}</SelectItem>)}
-                                              </SelectContent>
-                                          </Select>
-                                          <FormMessage />
-                                        </FormItem>
-                                      )}
-                                    />
-                                    <div className="sm:col-span-5">
-                                        <Label className={index > 0 ? 'sr-only' : ''}>Descripción</Label>
-                                        <p className="font-medium text-sm h-10 flex items-center">{autoDispatchForm.watch(`items.${index}.name`) || <span className="text-muted-foreground">--</span>}</p>
-                                    </div>
-                                     <FormField
-                                        control={autoDispatchForm.control}
-                                        name={`items.${index}.quantity`}
-                                        render={({ field: itemField }) => (
-                                            <FormItem className="sm:col-span-3">
-                                                <FormLabel className={index > 0 ? 'sr-only' : ''}>Cantidad Pallets</FormLabel>
-                                                <FormControl><Input type="number" {...itemField} value={itemField.value || ''} autoComplete="off" min="1" /></FormControl>
-                                                <FormMessage />
-                                            </FormItem>
-                                        )}
-                                    />
-                                  </div>
-                                  <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)} className="mt-6">
-                                    <Trash2 className="h-4 w-4 text-destructive"/>
-                                  </Button>
-                                </div>
-                              ))}
-                            </div>
-                            <Button type="button" variant="outline" size="sm" onClick={() => append({ code: '', name: '', quantity: 0 })}>
-                              <PlusCircle className="mr-2 h-4 w-4" /> Agregar Producto
-                            </Button>
-                          </form>
-                        </Form>
+                       <AutomaticDispatchTab
+                            selectedClientId={selectedClientId}
+                            document={document}
+                            clientMasters={clientMasters}
+                            clientStock={clientStock}
+                            onSubmit={onSubmit}
+                        />
                     </CardContent>
                   </Card>
               </TabsContent>
