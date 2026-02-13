@@ -18,6 +18,9 @@ import { PackagingPickingDialog } from '../packaging/PackagingPickingDialog';
 import { packagingExitSchema } from '@/lib/schemas';
 import { z } from 'zod';
 import { DispatchPickingDialog } from '../dispatch/DispatchPickingDialog';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
+import { FileText } from 'lucide-react';
 
 type ExitFormValues = z.infer<typeof packagingExitSchema>;
 
@@ -64,6 +67,51 @@ export function OtherFruitPickingTab() {
     setPickingMovement(movement);
   };
   
+  const handleGeneratePdfForPackaging = (mov: PackagingMovement) => {
+    const clientName = clientMap[mov.clientId] || mov.clientId;
+    const totalPallets = mov.items.reduce((sum, item) => sum + item.palletCount, 0);
+    const flatItems = mov.items.flatMap(item => 
+        (item.locations || []).map(loc => ({
+            ...loc,
+            itemCode: item.packagingMasterCode,
+            itemName: item.packagingMasterName,
+            compositeKey: `${item.packagingMasterCode}_${loc.locationKey}`
+        }))
+    ).filter(item => item.palletsToWithdraw > 0);
+
+    const doc = new jsPDF();
+    
+    doc.setFontSize(18);
+    doc.text(`Picking de Salida de Embalaje: ${clientName}`, 14, 22);
+
+    doc.setFontSize(11);
+    doc.setTextColor(100);
+    doc.text(`Confirme la recolección física de cada artículo y ubicación.`, 14, 30);
+
+    const tableData = flatItems.map(item => [
+      item.itemName,
+      item.itemCode,
+      item.locationString,
+      item.palletsToWithdraw,
+    ]);
+    
+    const tableHeaders = [['Artículo', 'Código', 'Ubicación', 'Pallets a Retirar']];
+
+    (doc as any).autoTable({
+      startY: 35,
+      head: tableHeaders,
+      body: tableData,
+      theme: 'grid',
+      headStyles: { fillColor: [22, 163, 74] },
+    });
+
+    const finalY = (doc as any).lastAutoTable.finalY;
+    doc.setFontSize(12);
+    doc.text(`Total a Retirar: ${totalPallets} pallets`, 14, finalY + 10);
+    
+    doc.output('dataurlnewwindow');
+  };
+
   const handleConfirmFruitExit = async (confirmedMovement: OtherFruitMovement) => {
     if (!firestore || !confirmedMovement) return;
     setIsConfirming(true);
@@ -250,7 +298,15 @@ export function OtherFruitPickingTab() {
                                           <p className="font-semibold text-lg mt-1">{quantity}</p>
                                       </div>
                                   </div>
-                                  <Button size="lg" onClick={() => handleStartPicking(mov)}>Hacer Picking</Button>
+                                  <div className="flex flex-col gap-2 items-end">
+                                    {mov.taskType === 'packaging' && (
+                                        <Button variant="outline" size="sm" onClick={() => handleGeneratePdfForPackaging(mov as PackagingMovement)}>
+                                            <FileText className="mr-2 h-4 w-4" />
+                                            PDF
+                                        </Button>
+                                    )}
+                                    <Button size="lg" onClick={() => handleStartPicking(mov)}>Hacer Picking</Button>
+                                  </div>
                               </div>
                           </Card>
                       )
@@ -297,7 +353,15 @@ export function OtherFruitPickingTab() {
                           <TableCell>{quantity}</TableCell>
                           <TableCell><Badge variant="secondary">{mov.status}</Badge></TableCell>
                           <TableCell className="text-right">
-                            <Button size="sm" onClick={() => handleStartPicking(mov)}>Hacer Picking</Button>
+                            <div className="flex items-center justify-end gap-2">
+                                {mov.taskType === 'packaging' && (
+                                    <Button variant="outline" size="sm" onClick={() => handleGeneratePdfForPackaging(mov as PackagingMovement)}>
+                                        <FileText className="mr-2 h-4 w-4" />
+                                        PDF
+                                    </Button>
+                                )}
+                                <Button size="sm" onClick={() => handleStartPicking(mov)}>Hacer Picking</Button>
+                            </div>
                           </TableCell>
                         </TableRow>
                      )
