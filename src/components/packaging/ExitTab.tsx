@@ -21,6 +21,14 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { PlusCircle, Trash2 } from 'lucide-react';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 
 // --- Schemas ---
 const autoDispatchItemSchema = z.object({
@@ -66,8 +74,8 @@ function AutomaticDispatchTab({ selectedClientId, document, clientMasters, clien
                   control={form.control}
                   name={`items.${index}.code`}
                   render={({ field: itemField }) => (
-                    <FormItem className="sm:col-span-2">
-                      <FormLabel className={index > 0 ? 'sr-only' : ''}>Código</FormLabel>
+                    <FormItem className="sm:col-span-3">
+                      <FormLabel className={index > 0 ? 'sr-only' : ''}>Código Artículo</FormLabel>
                       <FormControl>
                         <Input 
                             {...itemField}
@@ -80,10 +88,17 @@ function AutomaticDispatchTab({ selectedClientId, document, clientMasters, clien
                     </FormItem>
                   )}
                 />
-                <div className="sm:col-span-5">
-                    <Label className={index > 0 ? 'sr-only' : ''}>Descripción</Label>
-                    <p className="font-medium text-sm h-10 flex items-center">{form.watch(`items.${index}.name`) || <span className="text-muted-foreground">--</span>}</p>
-                </div>
+                 <FormField
+                  control={form.control}
+                  name={`items.${index}.name`}
+                  render={({ field: itemField }) => (
+                    <FormItem className="sm:col-span-4">
+                      <FormLabel className={index > 0 ? 'sr-only' : ''}>Descripción</FormLabel>
+                      <FormControl><Input {...itemField} readOnly placeholder="--" /></FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
                  <FormField
                     control={form.control}
                     name={`items.${index}.quantity`}
@@ -111,52 +126,104 @@ function AutomaticDispatchTab({ selectedClientId, document, clientMasters, clien
 }
 
 function ManualDispatchTab({ clientStock, dispatchQuantities, handleQuantityChange }: any) {
-  return (
-    <div className="pt-4">
-        <div className="rounded-md border max-h-[50vh] overflow-y-auto">
-            <Table>
-                <TableHeader>
-                    <TableRow>
-                        <TableHead>Artículo</TableHead>
-                        <TableHead>Código</TableHead>
-                        <TableHead>Lote</TableHead>
-                        <TableHead>Ubicación</TableHead>
-                        <TableHead>Disponible</TableHead>
-                        <TableHead className="w-40">A Despachar</TableHead>
-                    </TableRow>
-                </TableHeader>
-                <TableBody>
-                    {clientStock.length > 0 ? (
-                        clientStock.map((stockItem: any) => (
-                            <TableRow key={stockItem.key}>
-                                <TableCell>{stockItem.name}</TableCell>
-                                <TableCell className="font-mono">{stockItem.code}</TableCell>
-                                <TableCell>{stockItem.lote}</TableCell>
-                                <TableCell>{stockItem.location}</TableCell>
-                                <TableCell>{stockItem.available}</TableCell>
-                                <TableCell>
-                                    <Input
-                                        type="number"
-                                        min="0"
-                                        max={stockItem.available}
-                                        value={dispatchQuantities[stockItem.key] || ''}
-                                        onChange={e => handleQuantityChange(stockItem.key, stockItem.available, e.target.value)}
-                                        placeholder="0"
-                                        className="h-8"
-                                    />
+    const [selectedCodes, setSelectedCodes] = React.useState<string[]>([]);
+
+    const availableCodes = React.useMemo(() => {
+        return [...new Set(clientStock.map((item: any) => item.code))].sort();
+    }, [clientStock]);
+
+    const filteredStock = React.useMemo(() => {
+        if (selectedCodes.length === 0) {
+            return clientStock;
+        }
+        return clientStock.filter((item: any) => selectedCodes.includes(item.code));
+    }, [clientStock, selectedCodes]);
+    
+    const handleCodeSelectionChange = (code: string, checked: boolean) => {
+        setSelectedCodes(prev => 
+            checked ? [...prev, code] : prev.filter(c => c !== code)
+        );
+    };
+
+    return (
+        <div className="pt-4 space-y-4">
+            <div className="flex justify-end">
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Button variant="outline">
+                            Filtrar por Código
+                            {selectedCodes.length > 0 && <span className="ml-2 rounded-full bg-secondary px-2 text-xs">{selectedCodes.length}</span>}
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent className="w-64 max-h-72 overflow-y-auto">
+                        <DropdownMenuLabel>Códigos de Producto</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuCheckboxItem
+                            checked={selectedCodes.length === 0}
+                            onCheckedChange={() => setSelectedCodes([])}
+                        >
+                            Mostrar Todos
+                        </DropdownMenuCheckboxItem>
+                        <DropdownMenuSeparator />
+                        {availableCodes.map((code: string) => (
+                            <DropdownMenuCheckboxItem
+                                key={code}
+                                checked={selectedCodes.includes(code)}
+                                onCheckedChange={(checked) => handleCodeSelectionChange(code, !!checked)}
+                            >
+                                {code}
+                            </DropdownMenuCheckboxItem>
+                        ))}
+                    </DropdownMenuContent>
+                </DropdownMenu>
+            </div>
+
+            <div className="rounded-md border max-h-[50vh] overflow-y-auto">
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>Artículo</TableHead>
+                            <TableHead>Código</TableHead>
+                            <TableHead>Lote</TableHead>
+                            <TableHead>Ubicación</TableHead>
+                            <TableHead>Disponible</TableHead>
+                            <TableHead className="w-40">A Despachar</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {filteredStock.length > 0 ? (
+                            filteredStock.map((stockItem: any) => (
+                                <TableRow key={stockItem.key}>
+                                    <TableCell>{stockItem.name}</TableCell>
+                                    <TableCell className="font-mono">{stockItem.code}</TableCell>
+                                    <TableCell>{stockItem.lote}</TableCell>
+                                    <TableCell>{stockItem.location}</TableCell>
+                                    <TableCell>{stockItem.available}</TableCell>
+                                    <TableCell>
+                                        <Input
+                                            type="number"
+                                            min="0"
+                                            max={stockItem.available}
+                                            value={dispatchQuantities[stockItem.key] || ''}
+                                            onChange={e => handleQuantityChange(stockItem.key, stockItem.available, e.target.value)}
+                                            placeholder="0"
+                                            className="h-8"
+                                        />
+                                    </TableCell>
+                                </TableRow>
+                            ))
+                        ) : (
+                            <TableRow>
+                                <TableCell colSpan={6} className="h-24 text-center">
+                                    {clientStock.length > 0 ? 'No hay items que coincidan con el filtro.' : 'No hay stock disponible para este cliente.'}
                                 </TableCell>
                             </TableRow>
-                        ))
-                    ) : (
-                        <TableRow>
-                            <TableCell colSpan={6} className="h-24 text-center">No hay stock disponible para este cliente.</TableCell>
-                        </TableRow>
-                    )}
-                </TableBody>
-            </Table>
+                        )}
+                    </TableBody>
+                </Table>
+            </div>
         </div>
-    </div>
-  );
+    );
 }
 
 
@@ -184,7 +251,15 @@ export function ExitTab() {
 
   const clientMasters = React.useMemo(() => {
      if (!selectedClientId || !allPackagingMasters) return [];
-     return allPackagingMasters.filter(m => m.clientId === selectedClientId);
+     const uniqueMasters = new Map<string, PackagingMaster>();
+      allPackagingMasters
+        .filter(m => m.clientId === selectedClientId)
+        .forEach(m => {
+            if (!uniqueMasters.has(m.code)) {
+                uniqueMasters.set(m.code, m);
+            }
+        });
+    return Array.from(uniqueMasters.values());
   }, [selectedClientId, allPackagingMasters]);
   
   const clientStock = React.useMemo(() => {
