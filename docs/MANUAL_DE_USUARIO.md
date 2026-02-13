@@ -100,21 +100,32 @@ Gestiona la salida de fruta para los clientes.
 
 ### 4.7. Embalajes y Socios Comerciales
 
-Estos módulos funcionan de manera similar para gestionar la recepción, almacenamiento y despacho de pallets de embalaje y fruta de otros clientes.
+Estos módulos, aunque separados en el menú, funcionan con una lógica muy similar para gestionar productos que no son de productores de cereza (pallets de embalajes, fruta de otros clientes, etc.).
 
-- **Recepción**: Registra la entrada.
-- **Almacenamiento / Pendientes**: Muestra lo que está pendiente de ubicar y permite asignarle una bodega/pasillo (Embalajes) o cámara/coordenada (Socios Comerciales).
-- **Despacho/Salidas**: Crea una solicitud de salida.
-- **Picking**: Confirma la salida física de los materiales/fruta, rebajando el stock. La pestaña de "Picking" mostrará un indicador numérico con la cantidad de tareas pendientes. Desde aquí puede **generar un PDF** para la recolección física.
-- **Stock**: Permite ver el inventario actual y reubicarlo.
+#### 4.7.1. Flujo General
 
-#### 4.7.1. Portal Fall Creek (Despacho Manual Especial)
-Este módulo ofrece una interfaz visual para el despacho de productos de Fall Creek.
-- **Vista de Cámaras**: Muestra una grilla con la ocupación de las cámaras, permitiendo seleccionar coordenadas específicas para el despacho.
-- **Selección Múltiple**: Puede hacer clic y arrastrar para seleccionar varias coordenadas a la vez.
-- **Resumen de Pre-Despacho**: Una ventana emergente muestra el resumen de los productos seleccionados. Esta ventana **es movible**, permitiéndole arrastrarla para despejar la vista y seleccionar más lotes.
-- **Generación de Solicitud**: Una vez completada la selección y los datos del despacho, se crea una solicitud que aparecerá en la pestaña de "Picking" del módulo de "Socios Comerciales".
+El flujo de trabajo para ambos módulos es el siguiente:
 
+1.  **Recepción**: En la pestaña **Recepción**, se registra el ingreso de la mercadería. Se especifica el cliente, el documento de entrada (guía de despacho), y se detallan los artículos y cantidades. Para los embalajes, se puede crear un nuevo producto directamente si no existe. Para la fruta, se puede registrar la temperatura y el lote del cliente.
+2.  **Almacenamiento**: Una vez recepcionada, la mercadería aparece en la pestaña **Almacenamiento** (o "Pendientes"). Desde aquí, el operador de bodega debe asignarle una ubicación física:
+    *   **Embalajes**: Se asigna un **Almacén** y un **Pasillo**.
+    *   **Fruta de Socios Comerciales**: Se asigna una **Cámara** y una **Coordenada**, de forma similar a la fruta de productor.
+3.  **Despacho/Salidas**: En la pestaña **Despacho** (o "Salidas"), se crea una solicitud para retirar mercadería. Se puede seleccionar el cliente y los artículos a despachar, ya sea de forma automática (FIFO) o manual, seleccionando lotes específicos.
+4.  **Picking**: La solicitud creada aparece en la pestaña **Picking**. Esta es una tarea para el operador de bodega.
+    *   La pestaña mostrará un **indicador numérico** con la cantidad de tareas de picking pendientes.
+    *   Al entrar a una tarea, se muestra una lista detallada de los productos y sus ubicaciones.
+    *   El operador puede **generar un PDF** para imprimir una hoja de trabajo que facilite la recolección física.
+    *   Una vez recolectados los productos, el operador debe marcar cada ítem y **Confirmar la Salida**. Esta acción descuenta el stock de forma definitiva y marca la solicitud como "Completada".
+5.  **Stock**: Esta pestaña ofrece una vista general del inventario actual. Permite consultar qué hay en cada ubicación y ofrece la opción de **Reubicar** pallets o bins de una ubicación a otra.
+
+#### 4.7.2. Portal Fall Creek (Despacho Manual Especial)
+
+Este módulo es una versión especializada del despacho manual, diseñada específicamente para Fall Creek, y se accede desde el menú principal.
+
+-   **Vista de Cámaras**: Muestra una grilla visual de las cámaras que contienen productos de Fall Creek.
+-   **Selección Múltiple**: El operador puede hacer clic y arrastrar el mouse sobre las coordenadas para seleccionar múltiples ubicaciones de forma rápida y visual.
+-   **Resumen de Pre-Despacho**: Una ventana emergente, que **se puede mover por la pantalla**, muestra un resumen de los productos seleccionados. Esto permite al usuario seguir seleccionando coordenadas sin que la ventana de resumen obstaculice la vista.
+-   **Generación de Solicitud**: Al completar la selección y los datos del despacho (documento, cliente destino, etc.), se genera una solicitud. Esta solicitud **no se procesa aquí**, sino que aparece en la pestaña de **"Picking"** del módulo de "Socios Comerciales" para que el bodeguero realice la confirmación final.
 
 ### 4.8. Reportes
 
