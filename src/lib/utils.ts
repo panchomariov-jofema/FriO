@@ -27,11 +27,9 @@ export const getSortedCoordinates = (chamberConfig: Chamber, strategy?: 'secuenc
   const rowNumbers = chamberConfig.rows;
 
   if (strategy === 'fifo') {
-    // Vertical Snake pattern for FIFO
+    // Vertical Snake pattern for FIFO storage logic
     colLetters.forEach((letter, letterIndex) => {
-      // Check if the column index is odd or even
       const isOddColumn = letterIndex % 2 !== 0; 
-      // If it's an odd column (B, D, F...), reverse the rows to go from bottom to top
       const rowsToIterate = isOddColumn ? [...rowNumbers].reverse() : rowNumbers;
       
       rowsToIterate.forEach(number => {
@@ -42,7 +40,8 @@ export const getSortedCoordinates = (chamberConfig: Chamber, strategy?: 'secuenc
       });
     });
   } else {
-    // Default sequential layout, VERTICAL (column by column, top to bottom)
+    // Default sequential layout for VISUALS, HORIZONTAL scan
+    // A1, A2, A3... then B1, B2, B3...
     colLetters.forEach(letter => {
       rowNumbers.forEach(number => {
         const coord = `${letter}${number}`;

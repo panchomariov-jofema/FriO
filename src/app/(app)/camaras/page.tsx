@@ -648,7 +648,7 @@ export default function CamarasPage() {
                             </div>
                             <div className="p-2 sm:p-4 bg-muted/50 rounded-b-lg border border-t-0 overflow-x-auto">
                                 <div className="grid gap-1 min-w-[600px] sm:min-w-[800px]" style={{ gridTemplateColumns: `repeat(${config.columns.length}, minmax(0, 1fr))` }}>
-                                {getSortedCoordinates(config, chamberStrategies[chamberId]).map(coord => {
+                                {getSortedCoordinates(config, 'secuencial').map(coord => {
                                       const itemsInCoord = storedItemsByChamber[chamberId]?.[coord] || [];
                                       const isOccupied = itemsInCoord.length > 0;
                                     
