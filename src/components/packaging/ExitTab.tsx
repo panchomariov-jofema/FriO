@@ -21,14 +21,6 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { PlusCircle, Trash2 } from 'lucide-react';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import {
-  DropdownMenu,
-  DropdownMenuCheckboxItem,
-  DropdownMenuContent,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
 
 // --- Schemas ---
 const autoDispatchItemSchema = z.object({
@@ -126,56 +118,27 @@ function AutomaticDispatchTab({ selectedClientId, document, clientMasters, clien
 }
 
 function ManualDispatchTab({ clientStock, dispatchQuantities, handleQuantityChange }: any) {
-    const [selectedCodes, setSelectedCodes] = React.useState<string[]>([]);
-
-    const availableCodes = React.useMemo(() => {
-        return [...new Set(clientStock.map((item: any) => item.code))].sort();
-    }, [clientStock]);
+    const [codeFilter, setCodeFilter] = React.useState('');
 
     const filteredStock = React.useMemo(() => {
-        if (selectedCodes.length === 0) {
+        const filters = codeFilter.split(',').map(f => f.trim().toLowerCase()).filter(Boolean);
+        if (filters.length === 0) {
             return clientStock;
         }
-        return clientStock.filter((item: any) => selectedCodes.includes(item.code));
-    }, [clientStock, selectedCodes]);
-    
-    const handleCodeSelectionChange = (code: string, checked: boolean) => {
-        setSelectedCodes(prev => 
-            checked ? [...prev, code] : prev.filter(c => c !== code)
+        return clientStock.filter((item: any) => 
+            filters.some(filter => item.code.toLowerCase().includes(filter))
         );
-    };
+    }, [clientStock, codeFilter]);
 
     return (
         <div className="pt-4 space-y-4">
             <div className="flex justify-end">
-                <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                        <Button variant="outline">
-                            Filtrar por Código
-                            {selectedCodes.length > 0 && <span className="ml-2 rounded-full bg-secondary px-2 text-xs">{selectedCodes.length}</span>}
-                        </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent className="w-64 max-h-72 overflow-y-auto">
-                        <DropdownMenuLabel>Códigos de Producto</DropdownMenuLabel>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuCheckboxItem
-                            checked={selectedCodes.length === 0}
-                            onCheckedChange={() => setSelectedCodes([])}
-                        >
-                            Mostrar Todos
-                        </DropdownMenuCheckboxItem>
-                        <DropdownMenuSeparator />
-                        {availableCodes.map((code: string) => (
-                            <DropdownMenuCheckboxItem
-                                key={code}
-                                checked={selectedCodes.includes(code)}
-                                onCheckedChange={(checked) => handleCodeSelectionChange(code, !!checked)}
-                            >
-                                {code}
-                            </DropdownMenuCheckboxItem>
-                        ))}
-                    </DropdownMenuContent>
-                </DropdownMenu>
+                 <Input
+                    placeholder="Filtrar por código(s)..."
+                    value={codeFilter}
+                    onChange={(e) => setCodeFilter(e.target.value)}
+                    className="max-w-sm"
+                />
             </div>
 
             <div className="rounded-md border max-h-[50vh] overflow-y-auto">
