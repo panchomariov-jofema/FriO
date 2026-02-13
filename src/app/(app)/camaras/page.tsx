@@ -656,17 +656,17 @@ export default function CamarasPage() {
                                           return <div key={visualCoord} className="h-12 w-full rounded border-2 bg-gray-200 dark:bg-gray-700 relative"><div className="absolute inset-0 bg-repeat bg-[length:10px_10px]" style={{backgroundImage: "repeating-linear-gradient(-45deg, hsl(var(--muted-foreground)/0.3), hsl(var(--muted-foreground)/0.3) 1px, transparent 1px, transparent 5px)"}} /></div>;
                                       }
                                       
-                                      let dataCoord = visualCoord;
                                       const strategy = chamberStrategies[chamberId] || 'secuencial';
                                       const isEvenColumn = colIndex % 2 !== 0;
+                                      let dataCoord = visualCoord;
                                       
                                       if (strategy === 'fifo' && isEvenColumn) {
                                           const unblockedRows = config.rows.filter(r => !config.blocked?.includes(`${col.name}${r}`));
-                                          const reversedUnblockedRows = [...unblockedRows].reverse();
-                                          const unblockedIndex = unblockedRows.indexOf(row);
-                                          
-                                          if (unblockedIndex !== -1) {
-                                              dataCoord = `${col.name}${reversedUnblockedRows[unblockedIndex]}`;
+                                          const maxRow = Math.max(...unblockedRows);
+                                          const minRow = Math.min(...unblockedRows);
+                                          const dataRow = (maxRow + minRow) - row;
+                                          if (unblockedRows.includes(dataRow)) {
+                                              dataCoord = `${col.name}${dataRow}`;
                                           }
                                       }
 
@@ -696,7 +696,7 @@ export default function CamarasPage() {
                                               } as React.CSSProperties}
                                               >
                                               <div className="absolute bottom-0 left-0 top-0 bg-[var(--lot-color-progress)]" style={{ right: `${100 - occupancyPercentage}%` }} />
-                                              <span className="relative z-10 font-semibold">{dataCoord}</span>
+                                              <span className="relative z-10 font-semibold">{visualCoord}</span>
                                               </div>
                                           </PopoverTrigger>
                                           {isOccupied && firstItem && (
