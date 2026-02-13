@@ -23,28 +23,26 @@ export const naturalSort = (a: string, b: string) => {
 // Generates coordinates for chamber display, handling sequential and snake (FIFO) layouts.
 export const getSortedCoordinates = (chamberConfig: Chamber, strategy?: 'secuencial' | 'fifo'): string[] => {
   const coords: string[] = [];
-  const rowLabels = chamberConfig.columns.map(c => c.name); // e.g., ['A', 'B', 'C']
-  const colLabels = chamberConfig.rows;   // e.g., [1, 2, 3...]
+  const colLetters = chamberConfig.columns.map(c => c.name);
+  const rowNumbers = chamberConfig.rows;
 
   if (strategy === 'fifo') {
-    // Snake pattern for FIFO
-    rowLabels.forEach((letter, letterIndex) => {
-      // Determine direction based on row index (A=0, B=1, etc.)
-      const isOddRow = letterIndex % 2 !== 0; 
-      const colsToIterate = isOddRow ? [...colLabels].reverse() : colLabels;
+    // Snake pattern for FIFO, VERTICAL
+    rowNumbers.forEach((number, numberIndex) => {
+      const isOddCol = numberIndex % 2 !== 0; 
+      const lettersToIterate = isOddCol ? [...colLetters].reverse() : colLetters;
       
-      colsToIterate.forEach(number => {
+      lettersToIterate.forEach(letter => {
         const coord = `${letter}${number}`;
-        // Ensure coordinate is not in the blocked list before adding
         if (!chamberConfig.blocked?.includes(coord)) {
           coords.push(coord);
         }
       });
     });
   } else {
-    // Default sequential layout
-    rowLabels.forEach(letter => {
-      colLabels.forEach(number => {
+    // Default sequential layout, VERTICAL
+    rowNumbers.forEach(number => {
+      colLetters.forEach(letter => {
         const coord = `${letter}${number}`;
         if (!chamberConfig.blocked?.includes(coord)) {
           coords.push(coord);
