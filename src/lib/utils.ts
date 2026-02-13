@@ -20,29 +20,40 @@ export const naturalSort = (a: string, b: string) => {
   return aNum - bNum;
 };
 
-// Sequential or "Snake" (FIFO) layout.
+// Generates coordinates for chamber display, handling sequential and snake (FIFO) layouts.
 export const getSortedCoordinates = (chamberConfig: Chamber, strategy?: 'secuencial' | 'fifo'): string[] => {
-  if (strategy === 'fifo') {
-    const coords: string[] = [];
-    chamberConfig.columns.forEach((col, colIndex) => {
-      const isOddColumn = colIndex % 2 !== 0;
-      
-      const unblockedRows = chamberConfig.rows.filter(row => !chamberConfig.blocked?.includes(`${col.name}${row}`));
-      
-      const rowsToIterate = isOddColumn ? [...unblockedRows].reverse() : unblockedRows;
+  const coords: string[] = [];
+  const rowLabels = chamberConfig.columns.map(c => c.name); // e.g., ['A', 'B', 'C']
+  const colLabels = chamberConfig.rows;   // e.g., [1, 2, 3...]
 
-      rowsToIterate.forEach(row => {
-        coords.push(`${col.name}${row}`);
+  if (strategy === 'fifo') {
+    // Snake pattern for FIFO
+    rowLabels.forEach((letter, letterIndex) => {
+      // Determine direction based on row index (A=0, B=1, etc.)
+      const isOddRow = letterIndex % 2 !== 0; 
+      const colsToIterate = isOddRow ? [...colLabels].reverse() : colLabels;
+      
+      colsToIterate.forEach(number => {
+        const coord = `${letter}${number}`;
+        // Ensure coordinate is not in the blocked list before adding
+        if (!chamberConfig.blocked?.includes(coord)) {
+          coords.push(coord);
+        }
       });
     });
-    return coords;
+  } else {
+    // Default sequential layout
+    rowLabels.forEach(letter => {
+      colLabels.forEach(number => {
+        const coord = `${letter}${number}`;
+        if (!chamberConfig.blocked?.includes(coord)) {
+          coords.push(coord);
+        }
+      });
+    });
   }
-  
-  // Default to sequential column-by-column sort
-  return chamberConfig.columns
-    .flatMap(col => chamberConfig.rows.map(row => `${col.name}${row}`))
-    .filter(coord => !chamberConfig.blocked?.includes(coord))
-    .sort(naturalSort);
+
+  return coords;
 };
 
 // Paired / Z-pattern layout for Fall Creek

@@ -589,7 +589,7 @@ export default function CamarasPage() {
                     <div className="text-right">
                         <p className="text-sm text-muted-foreground">Peso Neto Total</p>
                         <div className="text-xl sm:text-2xl font-bold">
-                            {loading ? <Skeleton className="h-8 w-32" /> : `${totalNetWeightInStock.toLocaleString('es-CL', {maximumFractionDigits: 0})} kg`}
+                            {loading ? <Skeleton className="h-8 w-32" /> : `\${totalNetWeightInStock.toLocaleString('es-CL', {maximumFractionDigits: 0})} kg`}
                         </div>
                     </div>
                     {process.env.NODE_ENV === 'development' && (
@@ -674,7 +674,7 @@ export default function CamarasPage() {
                                                 '--lot-color-progress': firstItem ? getColorForLot(`${firstItem.type}-${firstItem.lotIdForColor}`).replace(')', ', 0.3)') : 'transparent',
                                               } as React.CSSProperties}
                                               >
-                                              <div className="absolute bottom-0 left-0 top-0 bg-[var(--lot-color-progress)]" style={{ right: `${100 - occupancyPercentage}%` }} />
+                                              <div className="absolute bottom-0 left-0 top-0 bg-[var(--lot-color-progress)]" style={{ right: `\${100 - occupancyPercentage}%` }} />
                                               <span className="relative z-10 font-semibold">{coord}</span>
                                               </div>
                                           </PopoverTrigger>
@@ -702,7 +702,7 @@ export default function CamarasPage() {
                                           )}
                                           </Popover>
                                       );
-                                    })}
+                                })}
                                 </div>
                             </div>
                         </AccordionContent>
