@@ -702,8 +702,7 @@ export default function CamarasPage() {
                                           )}
                                           </Popover>
                                       );
-                                    })
-                                )}
+                                    })}
                                 </div>
                             </div>
                         </AccordionContent>
