@@ -27,12 +27,14 @@ export const getSortedCoordinates = (chamberConfig: Chamber, strategy?: 'secuenc
   const rowNumbers = chamberConfig.rows;
 
   if (strategy === 'fifo') {
-    // Snake pattern for FIFO, VERTICAL
-    rowNumbers.forEach((number, numberIndex) => {
-      const isOddCol = numberIndex % 2 !== 0; 
-      const lettersToIterate = isOddCol ? [...colLetters].reverse() : colLetters;
+    // Vertical Snake pattern for FIFO
+    colLetters.forEach((letter, letterIndex) => {
+      // Check if the column index is odd or even
+      const isOddColumn = letterIndex % 2 !== 0; 
+      // If it's an odd column (B, D, F...), reverse the rows to go from bottom to top
+      const rowsToIterate = isOddColumn ? [...rowNumbers].reverse() : rowNumbers;
       
-      lettersToIterate.forEach(letter => {
+      rowsToIterate.forEach(number => {
         const coord = `${letter}${number}`;
         if (!chamberConfig.blocked?.includes(coord)) {
           coords.push(coord);
@@ -40,9 +42,9 @@ export const getSortedCoordinates = (chamberConfig: Chamber, strategy?: 'secuenc
       });
     });
   } else {
-    // Default sequential layout, VERTICAL
-    rowNumbers.forEach(number => {
-      colLetters.forEach(letter => {
+    // Default sequential layout, VERTICAL (column by column, top to bottom)
+    colLetters.forEach(letter => {
+      rowNumbers.forEach(number => {
         const coord = `${letter}${number}`;
         if (!chamberConfig.blocked?.includes(coord)) {
           coords.push(coord);
