@@ -15,19 +15,149 @@ import { FirestorePermissionError } from '@/firebase/errors';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
 import { Skeleton } from '../ui/skeleton';
 import { Label } from '../ui/label';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useForm, useFieldArray } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import { PlusCircle, Trash2 } from 'lucide-react';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 
-const getLocationKey = (receptionId: string, itemIndex: number) => `${receptionId}_${itemIndex}`;
+// --- Schemas ---
+const autoDispatchItemSchema = z.object({
+  code: z.string().min(1, 'El código es obligatorio.'),
+  name: z.string(),
+  quantity: z.coerce.number().positive('La cantidad debe ser mayor a 0.'),
+});
+const autoDispatchSchema = z.object({
+  items: z.array(autoDispatchItemSchema).min(1, "Debe agregar al menos un artículo."),
+});
+type AutoDispatchFormValues = z.infer<typeof autoDispatchSchema>;
 
-interface FlatStockItem {
-    key: string;
-    receptionId: string;
-    itemIndex: number;
-    code: string;
-    name: string;
-    lote: string;
-    location: string;
-    available: number;
+// --- Helper Components ---
+
+function AutomaticDispatchTab({ selectedClientId, document, clientMasters, clientStock, onSubmit }: any) {
+  const form = useForm<AutoDispatchFormValues>({
+    resolver: zodResolver(autoDispatchSchema),
+    defaultValues: { items: [{ code: '', name: '', quantity: 0 }] },
+  });
+  const { fields, append, remove } = useFieldArray({ control: form.control, name: "items" });
+
+  const handleCodeChange = (index: number, code: string) => {
+    const master = clientMasters.find((m: PackagingMaster) => m.code === code);
+    if (master) {
+      form.setValue(`items.${index}.name`, master.name);
+      form.setValue(`items.${index}.code`, master.code);
+      form.clearErrors(`items.${index}.code`);
+    } else {
+      form.setValue(`items.${index}.name`, 'Código no encontrado');
+      form.setError(`items.${index}.code`, { message: 'Inválido' });
+    }
+  };
+
+  return (
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit((values) => onSubmit(values, 'automatico'))} className="space-y-4 pt-4">
+        <div className="space-y-2">
+          {fields.map((field, index) => (
+            <div key={field.id} className="flex items-start gap-2">
+              <div className="flex-1 grid grid-cols-1 sm:grid-cols-10 gap-4 items-start">
+                <FormField
+                  control={form.control}
+                  name={`items.${index}.code`}
+                  render={({ field: itemField }) => (
+                    <FormItem className="sm:col-span-2">
+                      <FormLabel className={index > 0 ? 'sr-only' : ''}>Código</FormLabel>
+                      <Select onValueChange={(value) => handleCodeChange(index, value)} value={itemField.value}>
+                          <FormControl>
+                              <SelectTrigger><SelectValue placeholder="Seleccione..." /></SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {clientMasters.map((m: PackagingMaster) => <SelectItem key={m.id} value={m.code}>{m.code}</SelectItem>)}
+                          </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <div className="sm:col-span-5">
+                    <Label className={index > 0 ? 'sr-only' : ''}>Descripción</Label>
+                    <p className="font-medium text-sm h-10 flex items-center">{form.watch(`items.${index}.name`) || <span className="text-muted-foreground">--</span>}</p>
+                </div>
+                 <FormField
+                    control={form.control}
+                    name={`items.${index}.quantity`}
+                    render={({ field: itemField }) => (
+                        <FormItem className="sm:col-span-3">
+                            <FormLabel className={index > 0 ? 'sr-only' : ''}>Cantidad Pallets</FormLabel>
+                            <FormControl><Input type="number" {...itemField} value={itemField.value || ''} autoComplete="off" min="1" /></FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    )}
+                />
+              </div>
+              <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)} className="mt-6">
+                <Trash2 className="h-4 w-4 text-destructive"/>
+              </Button>
+            </div>
+          ))}
+        </div>
+        <Button type="button" variant="outline" size="sm" onClick={() => append({ code: '', name: '', quantity: 0 })}>
+          <PlusCircle className="mr-2 h-4 w-4" /> Agregar Producto
+        </Button>
+      </form>
+    </Form>
+  );
 }
+
+function ManualDispatchTab({ clientStock, dispatchQuantities, handleQuantityChange }: any) {
+  return (
+    <div className="pt-4">
+        <div className="rounded-md border max-h-[50vh] overflow-y-auto">
+            <Table>
+                <TableHeader>
+                    <TableRow>
+                        <TableHead>Artículo</TableHead>
+                        <TableHead>Código</TableHead>
+                        <TableHead>Lote</TableHead>
+                        <TableHead>Ubicación</TableHead>
+                        <TableHead>Disponible</TableHead>
+                        <TableHead className="w-40">A Despachar</TableHead>
+                    </TableRow>
+                </TableHeader>
+                <TableBody>
+                    {clientStock.length > 0 ? (
+                        clientStock.map((stockItem: any) => (
+                            <TableRow key={stockItem.key}>
+                                <TableCell>{stockItem.name}</TableCell>
+                                <TableCell className="font-mono">{stockItem.code}</TableCell>
+                                <TableCell>{stockItem.lote}</TableCell>
+                                <TableCell>{stockItem.location}</TableCell>
+                                <TableCell>{stockItem.available}</TableCell>
+                                <TableCell>
+                                    <Input
+                                        type="number"
+                                        min="0"
+                                        max={stockItem.available}
+                                        value={dispatchQuantities[stockItem.key] || ''}
+                                        onChange={e => handleQuantityChange(stockItem.key, stockItem.available, e.target.value)}
+                                        placeholder="0"
+                                        className="h-8"
+                                    />
+                                </TableCell>
+                            </TableRow>
+                        ))
+                    ) : (
+                        <TableRow>
+                            <TableCell colSpan={6} className="h-24 text-center">No hay stock disponible para este cliente.</TableCell>
+                        </TableRow>
+                    )}
+                </TableBody>
+            </Table>
+        </div>
+    </div>
+  );
+}
+
 
 export function ExitTab() {
   const { data: allClients, loading: loadingClients } = useFirestoreCollection<OtherClient>('otherClients');
@@ -38,139 +168,201 @@ export function ExitTab() {
 
   const [selectedClientId, setSelectedClientId] = React.useState<string>('');
   const [document, setDocument] = React.useState('');
-  const [dispatchQuantities, setDispatchQuantities] = React.useState<Record<string, number>>({});
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [dispatchQuantities, setDispatchQuantities] = React.useState<Record<string, number>>({});
+  const [activeTab, setActiveTab] = React.useState('automatico');
 
+  const autoDispatchForm = useForm<AutoDispatchFormValues>({
+    resolver: zodResolver(autoDispatchSchema),
+    defaultValues: { items: [{ code: '', name: '', quantity: 0 }] },
+  });
+
+  const { fields, append, remove } = useFieldArray({ control: autoDispatchForm.control, name: "items" });
+  
   const packagingClients = React.useMemo(() => {
     return (allClients || []).filter(c => c.type.toLowerCase() === 'embalaje' && c.status !== 'inactivo');
   }, [allClients]);
 
-  const flatStock = React.useMemo<FlatStockItem[]>(() => {
-    if (!selectedClientId || !allReceptions) return [];
-    return allReceptions
+  const clientMasters = React.useMemo(() => {
+     if (!selectedClientId || !allPackagingMasters) return [];
+     return allPackagingMasters.filter(m => m.clientId === selectedClientId);
+  }, [selectedClientId, allPackagingMasters]);
+  
+  const clientStock = React.useMemo(() => {
+     if (!selectedClientId || !allReceptions) return [];
+     return allReceptions
         .filter(r => r.clientId === selectedClientId)
         .flatMap(reception =>
             reception.items.map((item, index) => ({ item, index, reception }))
         )
         .filter(({ item }) => item.status === 'Almacenado' && item.palletCount > 0 && item.storageLocation)
         .map(({ item, index, reception }) => ({
-            key: getLocationKey(reception.id, index),
+            key: `${reception.id}_${index}`,
             receptionId: reception.id,
             itemIndex: index,
             code: item.packagingMasterCode,
             name: item.packagingMasterName,
             lote: item.lote || '-',
             location: `${item.storageLocation!.warehouse} / ${item.storageLocation!.aisle}`,
-            available: item.palletCount
+            available: item.palletCount,
+            storedAt: item.storedAt,
         }));
   }, [selectedClientId, allReceptions]);
 
+  const handleClientChange = (value: string) => {
+    setSelectedClientId(value);
+    setDocument('');
+    setDispatchQuantities({});
+    autoDispatchForm.reset({ items: [{ code: '', name: '', quantity: 0 }] });
+  };
+  
   const handleQuantityChange = (key: string, available: number, value: string) => {
     const numValue = parseInt(value, 10);
     if (value === '' || (numValue >= 0 && !isNaN(numValue))) {
+        const finalValue = Math.min(numValue, available);
         if (numValue > available) {
-            toast({
+             toast({
                 title: "Cantidad inválida",
                 description: `La cantidad no puede superar los ${available} pallets disponibles.`,
                 variant: "destructive",
             });
-            setDispatchQuantities(prev => ({ ...prev, [key]: available }));
-        } else {
-            setDispatchQuantities(prev => ({ ...prev, [key]: numValue || 0 }));
         }
+        setDispatchQuantities(prev => ({ ...prev, [key]: finalValue || 0 }));
+    }
+  };
+  
+   const handleCodeChange = (index: number, code: string) => {
+    const master = clientMasters.find((m: PackagingMaster) => m.code === code);
+    if (master) {
+        autoDispatchForm.setValue(`items.${index}.name`, master.name);
+        autoDispatchForm.setValue(`items.${index}.code`, master.code);
+        autoDispatchForm.clearErrors(`items.${index}.code`);
+    } else {
+        autoDispatchForm.setValue(`items.${index}.name`, 'Código no encontrado');
+        autoDispatchForm.setError(`items.${index}.code`, { message: 'Inválido' });
     }
   };
 
-  const onSubmit = async () => {
+  const onSubmit = async (values: AutoDispatchFormValues | null, type: 'automatico' | 'manual') => {
     setIsSubmitting(true);
-    const itemsToDispatch = Object.entries(dispatchQuantities).filter(([, qty]) => qty > 0);
-    
-    if (itemsToDispatch.length === 0) {
-        toast({ variant: 'destructive', title: 'Sin ítems', description: 'Debe ingresar una cantidad para al menos una ubicación.' });
+    const itemsByCode = new Map<string, PackagingMovementItem>();
+
+    if (type === 'automatico' && values) {
+      for (const requestedItem of values.items) {
+          let quantityNeeded = requestedItem.quantity;
+          const availableStockForCode = clientStock
+              .filter(s => s.code === requestedItem.code)
+              .sort((a, b) => ((a.storedAt as any)?.toMillis?.() ?? 0) - ((b.storedAt as any)?.toMillis?.() ?? 0));
+
+          if (!itemsByCode.has(requestedItem.code)) {
+              const master = clientMasters.find(m => m.code === requestedItem.code);
+              itemsByCode.set(requestedItem.code, {
+                  packagingMasterId: master?.id || '',
+                  packagingMasterCode: requestedItem.code,
+                  packagingMasterName: master?.name || 'Desconocido',
+                  palletCount: 0,
+                  locations: [],
+              });
+          }
+          const movementItem = itemsByCode.get(requestedItem.code)!;
+          
+          for (const stockLocation of availableStockForCode) {
+              if (quantityNeeded <= 0) break;
+              
+              const quantityToTake = Math.min(quantityNeeded, stockLocation.available);
+              movementItem.palletCount += quantityToTake;
+              movementItem.locations!.push({
+                  locationKey: stockLocation.key,
+                  receptionId: stockLocation.receptionId,
+                  itemIndex: stockLocation.itemIndex,
+                  palletsToWithdraw: quantityToTake,
+                  locationString: stockLocation.location,
+                  available: stockLocation.available,
+              });
+              quantityNeeded -= quantityToTake;
+          }
+          if (quantityNeeded > 0) {
+               toast({ variant: 'destructive', title: 'Stock Insuficiente', description: `Faltan ${quantityNeeded} pallets de ${requestedItem.name} para completar la solicitud.` });
+               setIsSubmitting(false);
+               return;
+          }
+      }
+    } else if (type === 'manual') {
+        const itemsToDispatch = Object.entries(dispatchQuantities).filter(([, qty]) => qty > 0);
+        if (itemsToDispatch.length === 0) {
+            toast({ variant: 'destructive', title: 'Sin ítems', description: 'Debe ingresar una cantidad.' });
+            setIsSubmitting(false);
+            return;
+        }
+
+        for (const [locationKey, quantity] of itemsToDispatch) {
+            if (quantity <= 0) continue;
+            const stockItem = clientStock.find(s => s.key === locationKey);
+            if (!stockItem) continue;
+
+            if (!itemsByCode.has(stockItem.code)) {
+                const master = clientMasters.find(m => m.code === stockItem.code);
+                itemsByCode.set(stockItem.code, {
+                    packagingMasterId: master?.id || '',
+                    packagingMasterCode: stockItem.code,
+                    packagingMasterName: stockItem.name,
+                    palletCount: 0,
+                    locations: [],
+                });
+            }
+            
+            const movementItem = itemsByCode.get(stockItem.code)!;
+            movementItem.palletCount += quantity;
+            movementItem.locations!.push({
+                locationKey: stockItem.key,
+                receptionId: stockItem.receptionId,
+                itemIndex: stockItem.itemIndex,
+                palletsToWithdraw: quantity,
+                locationString: stockItem.location,
+                available: stockItem.available,
+            });
+        }
+    }
+
+    if (itemsByCode.size === 0) {
+        toast({ variant: 'destructive', title: 'Sin ítems', description: 'No se seleccionaron artículos para despachar.' });
         setIsSubmitting(false);
         return;
     }
-    
-    const itemsByCode = new Map<string, PackagingMovementItem>();
-
-    for (const [locationKey, quantity] of itemsToDispatch) {
-        if (quantity <= 0) continue;
-        
-        const stockItem = flatStock.find(s => s.key === locationKey);
-        if (!stockItem) continue;
-
-        if (!itemsByCode.has(stockItem.code)) {
-            itemsByCode.set(stockItem.code, {
-                packagingMasterId: allPackagingMasters?.find(m => m.code === stockItem.code)?.id || '',
-                packagingMasterCode: stockItem.code,
-                packagingMasterName: stockItem.name,
-                palletCount: 0,
-                locations: [],
-            });
-        }
-        
-        const movementItem = itemsByCode.get(stockItem.code)!;
-        movementItem.palletCount += quantity;
-        movementItem.locations!.push({
-            locationKey: stockItem.key,
-            receptionId: stockItem.receptionId,
-            itemIndex: stockItem.itemIndex,
-            palletsToWithdraw: quantity,
-            locationString: stockItem.location,
-            available: stockItem.available,
-        });
-    }
-
-    const newMovementItems = Array.from(itemsByCode.values());
 
     try {
-        const movementData = {
-            type: 'salida' as const,
-            clientId: selectedClientId,
-            document: document || '',
-            items: newMovementItems,
-            status: 'Pendiente de Picking' as const,
-            createdAt: serverTimestamp(),
-        };
-
-        await addDoc(collection(firestore, 'packagingMovements'), movementData);
-        
-        toast({ title: 'Solicitud Creada', description: 'La solicitud de salida ha sido creada y está pendiente de picking.' });
-        setDispatchQuantities({});
-        setDocument('');
-
+      const movementData = {
+          type: 'salida' as const,
+          clientId: selectedClientId,
+          document: document || '',
+          items: Array.from(itemsByCode.values()),
+          status: 'Pendiente de Picking' as const,
+          createdAt: serverTimestamp(),
+      };
+      await addDoc(collection(firestore, 'packagingMovements'), movementData);
+      toast({ title: 'Solicitud Creada', description: 'La solicitud está pendiente de picking.' });
+      setDispatchQuantities({});
+      autoDispatchForm.reset({ items: [{ code: '', name: '', quantity: 0 }] });
+      setDocument('');
     } catch (error) {
-        console.error("Error creating packaging exit request:", error);
-        toast({ variant: 'destructive', title: 'Error', description: 'No se pudo crear la solicitud de salida.' });
-        errorEmitter.emit('permission-error', new FirestorePermissionError({
-            path: 'packagingMovements',
-            operation: 'create'
-        }));
+      console.error("Error creating packaging exit request:", error);
+      toast({ variant: 'destructive', title: 'Error', description: 'No se pudo crear la solicitud.' });
+      errorEmitter.emit('permission-error', new FirestorePermissionError({ path: 'packagingMovements', operation: 'create' }));
     } finally {
-        setIsSubmitting(false);
+      setIsSubmitting(false);
     }
   };
-
-  const handleClientChange = (value: string) => {
-    setSelectedClientId(value);
-    setDispatchQuantities({});
-    setDocument('');
-  };
-
-  const totalSelectedPallets = React.useMemo(() => {
-    return Object.values(dispatchQuantities).reduce((sum, qty) => sum + (qty || 0), 0);
-  }, [dispatchQuantities]);
-
+  
   const isLoading = loadingClients || loadingMasters || loadingReceptions;
+  const totalSelectedPallets = Object.values(dispatchQuantities).reduce((sum, qty) => sum + (qty || 0), 0);
 
   return (
-    <>
-      <Card>
-        <CardHeader>
-          <CardTitle>Crear Solicitud de Despacho</CardTitle>
-          <CardDescription>Seleccione un cliente y luego elija el stock específico a despachar desde las ubicaciones disponibles.</CardDescription>
-        </CardHeader>
-        <CardContent>
+    <Card>
+      <CardHeader>
+        <CardTitle>Crear Solicitud de Despacho</CardTitle>
+        <CardDescription>Seleccione un cliente y elija el método de despacho.</CardDescription>
+      </CardHeader>
+      <CardContent>
           <div className="grid md:grid-cols-2 gap-4 mb-6">
             <div className="space-y-2">
               <Label>Cliente de Embalaje</Label>
@@ -184,71 +376,84 @@ export function ExitTab() {
               <Input value={document} onChange={(e) => setDocument(e.target.value)} autoComplete="off" />
             </div>
           </div>
-        </CardContent>
-      </Card>
-      
-      {selectedClientId && (
-        <Card className="mt-6">
-            <CardHeader>
-                <CardTitle>Pre-Orden de Picking</CardTitle>
-                <CardDescription>Seleccione los pallets a despachar desde las ubicaciones de stock disponibles.</CardDescription>
-            </CardHeader>
-            <CardContent>
-                <div className="rounded-md border max-h-[50vh] overflow-y-auto">
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>Artículo</TableHead>
-                                <TableHead>Código</TableHead>
-                                <TableHead>Lote</TableHead>
-                                <TableHead>Ubicación</TableHead>
-                                <TableHead>Disponible</TableHead>
-                                <TableHead className="w-40">A Despachar</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {isLoading ? (
-                                Array.from({length: 3}).map((_, i) => <TableRow key={i}><TableCell colSpan={6}><Skeleton className="h-4 w-full" /></TableCell></TableRow>)
-                            ) : flatStock.length > 0 ? (
-                                flatStock.map(stockItem => (
-                                    <TableRow key={stockItem.key}>
-                                        <TableCell>{stockItem.name}</TableCell>
-                                        <TableCell className="font-mono">{stockItem.code}</TableCell>
-                                        <TableCell>{stockItem.lote}</TableCell>
-                                        <TableCell>{stockItem.location}</TableCell>
-                                        <TableCell>{stockItem.available}</TableCell>
-                                        <TableCell>
-                                            <Input
-                                                type="number"
-                                                min="0"
-                                                max={stockItem.available}
-                                                value={dispatchQuantities[stockItem.key] || ''}
-                                                onChange={e => handleQuantityChange(stockItem.key, stockItem.available, e.target.value)}
-                                                placeholder="0"
-                                                className="h-8"
-                                            />
-                                        </TableCell>
-                                    </TableRow>
-                                ))
-                            ) : (
-                                <TableRow>
-                                    <TableCell colSpan={6} className="h-24 text-center">No hay stock disponible para este cliente.</TableCell>
-                                </TableRow>
-                            )}
-                        </TableBody>
-                    </Table>
-                </div>
-                 <div className="flex justify-between items-center mt-4">
-                    <div className="font-semibold">
-                        Total a Despachar: {totalSelectedPallets} pallets
-                    </div>
-                    <Button onClick={onSubmit} disabled={isSubmitting || totalSelectedPallets === 0}>
-                        {isSubmitting ? 'Creando Solicitud...' : 'Crear Solicitud de Despacho'}
-                    </Button>
-                </div>
-            </CardContent>
-        </Card>
-      )}
-    </>
+
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
+              <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="automatico">Despacho Automático (FIFO)</TabsTrigger>
+                  <TabsTrigger value="manual">Despacho Manual</TabsTrigger>
+              </TabsList>
+              <TabsContent value="automatico" className="mt-4">
+                  <Card>
+                    <CardHeader><CardTitle className="text-base">Añadir productos a despachar</CardTitle></CardHeader>
+                    <CardContent>
+                       <Form {...autoDispatchForm}>
+                          <form className="space-y-4">
+                            <div className="space-y-2">
+                              {fields.map((field, index) => (
+                                <div key={field.id} className="flex items-start gap-2">
+                                  <div className="flex-1 grid grid-cols-1 sm:grid-cols-10 gap-4 items-start">
+                                    <FormField
+                                      control={autoDispatchForm.control}
+                                      name={`items.${index}.code`}
+                                      render={({ field: itemField }) => (
+                                        <FormItem className="sm:col-span-2">
+                                          <FormLabel className={index > 0 ? 'sr-only' : ''}>Código</FormLabel>
+                                          <Select onValueChange={(value) => handleCodeChange(index, value)} value={itemField.value}>
+                                              <FormControl><SelectTrigger><SelectValue placeholder="Código..." /></SelectTrigger></FormControl>
+                                              <SelectContent>
+                                                {clientMasters.map((m: PackagingMaster) => <SelectItem key={m.id} value={m.code}>{m.code}</SelectItem>)}
+                                              </SelectContent>
+                                          </Select>
+                                          <FormMessage />
+                                        </FormItem>
+                                      )}
+                                    />
+                                    <div className="sm:col-span-5">
+                                        <Label className={index > 0 ? 'sr-only' : ''}>Descripción</Label>
+                                        <p className="font-medium text-sm h-10 flex items-center">{autoDispatchForm.watch(`items.${index}.name`) || <span className="text-muted-foreground">--</span>}</p>
+                                    </div>
+                                     <FormField
+                                        control={autoDispatchForm.control}
+                                        name={`items.${index}.quantity`}
+                                        render={({ field: itemField }) => (
+                                            <FormItem className="sm:col-span-3">
+                                                <FormLabel className={index > 0 ? 'sr-only' : ''}>Cantidad Pallets</FormLabel>
+                                                <FormControl><Input type="number" {...itemField} value={itemField.value || ''} autoComplete="off" min="1" /></FormControl>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+                                  </div>
+                                  <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)} className="mt-6">
+                                    <Trash2 className="h-4 w-4 text-destructive"/>
+                                  </Button>
+                                </div>
+                              ))}
+                            </div>
+                            <Button type="button" variant="outline" size="sm" onClick={() => append({ code: '', name: '', quantity: 0 })}>
+                              <PlusCircle className="mr-2 h-4 w-4" /> Agregar Producto
+                            </Button>
+                          </form>
+                        </Form>
+                    </CardContent>
+                  </Card>
+              </TabsContent>
+              <TabsContent value="manual" className="mt-4">
+                  <ManualDispatchTab clientStock={clientStock} dispatchQuantities={dispatchQuantities} handleQuantityChange={handleQuantityChange} />
+              </TabsContent>
+          </Tabs>
+          <div className="flex justify-between items-center mt-4">
+            <div className="font-semibold text-sm">
+                Total a Despachar: {activeTab === 'manual' ? totalSelectedPallets : autoDispatchForm.getValues('items').reduce((sum, i) => sum + (i.quantity || 0), 0)} pallets
+            </div>
+            <Button 
+              onClick={activeTab === 'automatico' ? autoDispatchForm.handleSubmit((values) => onSubmit(values, 'automatico')) : () => onSubmit(null, 'manual')} 
+              disabled={isSubmitting || !selectedClientId}
+            >
+                {isSubmitting ? 'Creando Solicitud...' : 'Crear Solicitud de Despacho'}
+            </Button>
+          </div>
+      </CardContent>
+    </Card>
   );
 }
