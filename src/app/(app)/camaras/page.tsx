@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -647,7 +648,7 @@ export default function CamarasPage() {
                                 <Label htmlFor={`fifo-switch-${chamberId}`}>Activar Layout FIFO (Serpiente)</Label>
                             </div>
                             <div className="p-2 sm:p-4 bg-muted/50 rounded-b-lg border border-t-0 overflow-x-auto">
-                                <div className="grid gap-1" style={{ gridAutoFlow: 'column', gridTemplateRows: `repeat(${config.columns.length}, minmax(0, 1fr))` }}>
+                                <div className="grid gap-1" style={{ gridAutoFlow: 'column', gridTemplateRows: `repeat(${config.rows.length}, minmax(0, 1fr))` }}>
                                 {config.columns.map(col => {
                                       return config.rows.map(row => {
                                       const coord = `${col.name}${row}`;
@@ -763,3 +764,5 @@ export default function CamarasPage() {
     </div>
   );
 }
+
+    
