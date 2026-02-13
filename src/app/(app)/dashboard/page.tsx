@@ -302,8 +302,7 @@ export default function DashboardPage() {
         const collRef = collection(firestore, 'chamberLots');
         if (!dateRange?.from) return query(collRef);
         const toDate = dateRange.to ? addDays(dateRange.to, 1) : addDays(new Date(), 1);
-        // This is a compromise: we filter by `storedAt` for some calcs, but still need all stored lots for total occupancy.
-        // A better approach might be a separate query for occupancy, but for now we fetch a wider range.
+        // This is a compromise: we filter by `storedAt` for some calcs, but for now we fetch a wider range.
         return query(collRef);
     }, [firestore]);
 
@@ -829,14 +828,14 @@ export default function DashboardPage() {
                             {loading ? (
                                 <Skeleton className="h-8 w-1/2" />
                             ) : (
-                                <div className="text-4xl font-bold">{kpi.value.toLocaleString('es-CL')}</div>
+                                <div className="text-3xl md:text-4xl font-bold">{kpi.value.toLocaleString('es-CL')}</div>
                             )}
                         </CardContent>
                     </Card>
                 ))}
             </div>
             
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-4">
                 {Object.values(chambersConfig).map(chamber => {
                     const latestTemp = latestTemperatures[chamber.id];
                     return (
