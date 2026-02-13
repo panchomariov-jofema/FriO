@@ -26,30 +26,25 @@ export const getSortedCoordinates = (chamberConfig: Chamber, strategy: 'secuenci
   const columns = chamberConfig.columns.map(c => c.name);
   const rows = chamberConfig.rows;
 
-  if (strategy === 'fifo') {
-    // Vertical Snake pattern for FIFO storage logic
-    columns.forEach((col, colIndex) => {
-      const isEvenColumn = colIndex % 2 !== 0; // colIndex 0 (A) is odd, 1 (B) is even.
-      const rowsToIterate = isEvenColumn ? [...rows].reverse() : rows;
-      
-      rowsToIterate.forEach(row => {
-        const coord = `${col}${row}`;
-        if (!chamberConfig.blocked?.includes(coord)) {
-          coords.push(coord);
-        }
-      });
+  columns.forEach((col, colIndex) => {
+    let rowsToIterate: number[];
+
+    // When in FIFO mode, odd columns (A, C, etc.) go down, even columns (B, D, etc.) go up.
+    if (strategy === 'fifo') {
+      const isEvenColumn = colIndex % 2 === 1; // A=0, B=1, C=2...
+      rowsToIterate = isEvenColumn ? [...rows].reverse() : rows;
+    } else {
+      // In sequential mode, all columns go down.
+      rowsToIterate = rows;
+    }
+
+    rowsToIterate.forEach(row => {
+      const coord = `${col}${row}`;
+      if (!chamberConfig.blocked?.includes(coord)) {
+        coords.push(coord);
+      }
     });
-  } else {
-    // Default sequential layout for storage logic: A1-A12, B1-B12, etc.
-    columns.forEach(col => {
-      rows.forEach(row => {
-        const coord = `${col}${row}`;
-        if (!chamberConfig.blocked?.includes(coord)) {
-          coords.push(coord);
-        }
-      });
-    });
-  }
+  });
 
   return coords;
 };
