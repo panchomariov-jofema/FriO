@@ -21,19 +21,19 @@ export const naturalSort = (a: string, b: string) => {
 };
 
 // Generates coordinates for chamber display, handling sequential and snake (FIFO) layouts.
-export const getSortedCoordinates = (chamberConfig: Chamber, strategy?: 'secuencial' | 'fifo'): string[] => {
+export const getSortedCoordinates = (chamberConfig: Chamber, strategy: 'secuencial' | 'fifo'): string[] => {
   const coords: string[] = [];
-  const colLetters = chamberConfig.columns.map(c => c.name);
-  const rowNumbers = chamberConfig.rows;
+  const columns = chamberConfig.columns.map(c => c.name);
+  const rows = chamberConfig.rows;
 
   if (strategy === 'fifo') {
     // Vertical Snake pattern for FIFO storage logic
-    colLetters.forEach((letter, letterIndex) => {
-      const isOddColumn = letterIndex % 2 !== 0; 
-      const rowsToIterate = isOddColumn ? [...rowNumbers].reverse() : rowNumbers;
+    columns.forEach((col, colIndex) => {
+      const isEvenColumn = colIndex % 2 !== 0; // colIndex 0 (A) is odd, 1 (B) is even.
+      const rowsToIterate = isEvenColumn ? [...rows].reverse() : rows;
       
-      rowsToIterate.forEach(number => {
-        const coord = `${letter}${number}`;
+      rowsToIterate.forEach(row => {
+        const coord = `${col}${row}`;
         if (!chamberConfig.blocked?.includes(coord)) {
           coords.push(coord);
         }
@@ -41,9 +41,9 @@ export const getSortedCoordinates = (chamberConfig: Chamber, strategy?: 'secuenc
     });
   } else {
     // Default sequential layout for storage logic: A1-A12, B1-B12, etc.
-    colLetters.forEach(letter => {
-      rowNumbers.forEach(number => {
-        const coord = `${letter}${number}`;
+    columns.forEach(col => {
+      rows.forEach(row => {
+        const coord = `${col}${row}`;
         if (!chamberConfig.blocked?.includes(coord)) {
           coords.push(coord);
         }

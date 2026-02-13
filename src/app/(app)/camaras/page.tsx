@@ -237,8 +237,8 @@ export default function CamarasPage() {
     const chamberConfig = chambersConfig[chamberId];
     const strategy = chamberStrategies[chamberId] || 'secuencial';
   
+    // 1. Get a fresh snapshot of all occupied coordinates
     const occupiedCoordinates = new Map<string, { displayLotId: string; binCount: number }[]>();
-
     (allLotsInChambers || [])
       .filter(l => l.chamberId === chamberId && l.coordinate)
       .forEach(l => {
@@ -247,26 +247,25 @@ export default function CamarasPage() {
           }
           occupiedCoordinates.get(l.coordinate!)!.push({ displayLotId: l.displayLotId, binCount: l.binCount });
       });
-    
     (otherFruitReceptions || []).forEach(reception => {
         reception.items.forEach(item => {
             if (item.status === 'Almacenado' && item.storageLocation?.chamberId === chamberId && item.storageLocation.coordinate) {
                  if (!occupiedCoordinates.has(item.storageLocation.coordinate)) {
                     occupiedCoordinates.set(item.storageLocation.coordinate, []);
                 }
+                // Mark as full to prevent mixing different products
                 occupiedCoordinates.get(item.storageLocation.coordinate)!.push({ displayLotId: `other_${reception.id}`, binCount: BINS_PER_COORDINATE });
             }
         });
     });
     
-    const allPossibleCoordinates = getSortedCoordinates(chamberConfig, strategy);
-    const allEmptyCoordinates = allPossibleCoordinates.filter(coord => !occupiedCoordinates.has(coord));
-
     let binsToStore = lotToStore.binCount;
     const batch = writeBatch(firestore);
     
-    // --- PASS 1: Fill partially filled coordinates of the same lot ANYWHERE in the chamber ---
-    for (const coord of allPossibleCoordinates) {
+    // 2. PASS 1: Fill partially filled coordinates that contain the SAME lot ID.
+    // This prioritizes grouping same lots together. This is independent of FIFO/sequential strategy.
+    const allPossibleCoordsSequentially = getSortedCoordinates(chamberConfig, 'secuencial');
+    for (const coord of allPossibleCoordsSequentially) {
         if (binsToStore === 0) break;
 
         const lotsInCoord = occupiedCoordinates.get(coord);
@@ -291,23 +290,31 @@ export default function CamarasPage() {
                     });
                     binsToStore -= binsToAdd;
                     
+                    // Update our in-memory map to reflect this change for the next step
                     lotsInCoord.push({displayLotId: lotToStore.displayLotId, binCount: binsToAdd});
                 }
             }
         }
     }
     
-    // --- PASS 2: Store sequentially starting from the user's selected coordinate ---
+    // 3. PASS 2: Store remaining bins in empty coordinates based on the selected strategy.
     if (binsToStore > 0) {
-        if (!allEmptyCoordinates.includes(startCoordinate)) {
+        // Get all available coordinates, ordered by the selected strategy
+        const strategyPath = getSortedCoordinates(chamberConfig, strategy);
+        const availableCoordsInStrategyOrder = strategyPath.filter(coord => !occupiedCoordinates.has(coord));
+
+        // The user selected a startCoordinate. Find its index in our strategy-ordered list.
+        const startIndex = availableCoordsInStrategyOrder.indexOf(startCoordinate);
+        
+        if (startIndex === -1) {
             toast({ variant: 'destructive', title: 'Error de ubicación', description: `La coordenada de inicio (${startCoordinate}) no es válida o ya está ocupada.` });
             return;
         }
 
-        const startIndex = allEmptyCoordinates.indexOf(startCoordinate);
-        const coordinatesToSearch = allEmptyCoordinates.slice(startIndex);
+        // The coordinates to fill are from the start index onwards in the strategy-ordered list.
+        const coordinatesToFill = availableCoordsInStrategyOrder.slice(startIndex);
 
-        for (const coord of coordinatesToSearch) {
+        for (const coord of coordinatesToFill) {
             if (binsToStore === 0) break;
             
             const binsToAdd = Math.min(binsToStore, BINS_PER_COORDINATE);
@@ -331,6 +338,7 @@ export default function CamarasPage() {
         return;
     }
 
+    // 4. Delete the original "Pendiente" lot
     const originalLotRef = doc(firestore, 'chamberLots', lotToStore.id);
     batch.delete(originalLotRef);
 
@@ -543,7 +551,7 @@ export default function CamarasPage() {
                 ) : (sortedPendingLots || []).length > 0 ? (
                   sortedPendingLots.map((lot) => (
                     <TableRow key={lot.id}>
-                      <TableCell className="hidden sm:table-cell">{lot.receptionDate?.toDate().toLocaleString('es-CL', { year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute:'2-digit' })}</TableCell>
+                      <TableCell className="text-sm">{lot.receptionDate?.toDate().toLocaleString('es-CL', { year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute:'2-digit' })}</TableCell>
                       <TableCell className="font-medium">{lot.displayLotId}</TableCell>
                       <TableCell className="hidden md:table-cell">{lot.producerShortName}</TableCell>
                       <TableCell>{lot.binCount}</TableCell>
@@ -648,7 +656,7 @@ export default function CamarasPage() {
                                 <Label htmlFor={`fifo-switch-${chamberId}`}>Activar Layout FIFO (Serpiente)</Label>
                             </div>
                             <div className="p-2 sm:p-4 bg-muted/50 rounded-b-lg border border-t-0 overflow-x-auto">
-                                <div className="grid gap-1" style={{ gridAutoFlow: 'column', gridTemplateRows: `repeat(${config.rows.length}, minmax(0, 1fr))` }}>
+                                <div className="grid gap-1" style={{ gridTemplateColumns: `repeat(${config.columns.length}, minmax(0, 1fr))`, gridTemplateRows: `repeat(${config.rows.length}, minmax(0, 1fr))` }}>
                                 {config.columns.map(col => {
                                       return config.rows.map(row => {
                                       const coord = `${col.name}${row}`;
@@ -764,5 +772,3 @@ export default function CamarasPage() {
     </div>
   );
 }
-
-    

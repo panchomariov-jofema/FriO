@@ -50,42 +50,36 @@ export function StoreInChamberDialog({ lot, open, onOpenChange, onStore, allCham
       return { availableCoordinatesForNewLots: [], suggestion: null };
     }
 
-    const occupancyMap = new Map<string, { lots: {displayLotId: string, binCount: number }[] }>();
-
-    // Populate occupancy map from producer lots
+    // Get all occupied coordinates
+    const occupiedCoords = new Set<string>();
     allChamberLots.forEach(l => {
-      if (l.status === 'Almacenado' && l.chamberId === selectedChamberId && l.coordinate) {
-        if (!occupancyMap.has(l.coordinate)) {
-          occupancyMap.set(l.coordinate, { lots: [] });
+        if (l.status === 'Almacenado' && l.chamberId === selectedChamberId && l.coordinate) {
+            occupiedCoords.add(l.coordinate);
         }
-        occupancyMap.get(l.coordinate)!.lots.push({ displayLotId: l.displayLotId, binCount: l.binCount });
-      }
     });
-
-    // Populate occupancy map from other fruit receptions
     allOtherFruitReceptions.forEach(r => {
-      r.items.forEach(item => {
-        if (item.status === 'Almacenado' && item.storageLocation?.chamberId === selectedChamberId && item.storageLocation.coordinate) {
-            const lotId = `other_${r.id}_${item.productCode}`;
-            if (!occupancyMap.has(item.storageLocation.coordinate)) {
-                occupancyMap.set(item.storageLocation.coordinate, { lots: [] });
+        r.items.forEach(item => {
+            if (item.status === 'Almacenado' && item.storageLocation?.chamberId === selectedChamberId && item.storageLocation.coordinate) {
+                occupiedCoords.add(item.storageLocation.coordinate);
             }
-            // Mark as full to prevent mixing lot types
-            occupancyMap.get(item.storageLocation.coordinate)!.lots.push({ displayLotId: lotId, binCount: 9 });
-        }
-      });
+        });
     });
 
+    // Determine strategy to find the SUGGESTION
     const strategy = chamberStrategies[selectedChamberId] || 'secuencial';
-    const allPossibleCoords = getSortedCoordinates(chamberConfig, strategy);
-    
-    // Suggestion logic should only suggest empty coordinates.
-    // The actual storage logic will handle filling partial coordinates first.
-    const emptyCoords = allPossibleCoords.filter(coord => !occupancyMap.has(coord));
-    const currentSuggestion = emptyCoords.length > 0 ? emptyCoords[0] : null;
-    
-    return { availableCoordinatesForNewLots: emptyCoords, suggestion: currentSuggestion };
 
+    // Get the full sorted list based on the strategy to find the first available spot
+    const strategyPath = getSortedCoordinates(chamberConfig, strategy);
+    const firstAvailable = strategyPath.find(coord => !occupiedCoords.has(coord)) || null;
+
+    // For the dropdown, always show a simple sequential list of what's empty.
+    const allEmptyCoordinatesSequentially = getSortedCoordinates(chamberConfig, 'secuencial')
+        .filter(coord => !occupiedCoords.has(coord));
+    
+    return {
+        availableCoordinatesForNewLots: allEmptyCoordinatesSequentially,
+        suggestion: firstAvailable
+    };
   }, [selectedChamberId, lot, allChamberLots, allOtherFruitReceptions, chamberStrategies]);
 
 
