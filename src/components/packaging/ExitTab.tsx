@@ -1,17 +1,12 @@
 'use client';
 
 import * as React from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
 import type { OtherClient, PackagingReception, PackagingMaster, PackagingMovementItem } from '@/lib/types';
-import { packagingExitSchema } from '@/lib/schemas';
 import { useFirestore } from '@/firebase';
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
@@ -19,8 +14,7 @@ import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
 import { Skeleton } from '../ui/skeleton';
-
-type ExitFormValues = z.infer<typeof packagingExitSchema>;
+import { Label } from '../ui/label';
 
 const getLocationKey = (receptionId: string, itemIndex: number) => `${receptionId}_${itemIndex}`;
 
@@ -178,17 +172,17 @@ export function ExitTab() {
         </CardHeader>
         <CardContent>
           <div className="grid md:grid-cols-2 gap-4 mb-6">
-            <FormItem>
-              <FormLabel>Cliente de Embalaje</FormLabel>
+            <div className="space-y-2">
+              <Label>Cliente de Embalaje</Label>
               <Select onValueChange={handleClientChange} value={selectedClientId} disabled={isLoading}>
                 <SelectTrigger><SelectValue placeholder="Seleccione un cliente..." /></SelectTrigger>
                 <SelectContent>{packagingClients.map(c => <SelectItem key={c.id} value={c.clientId}>{c.name}</SelectItem>)}</SelectContent>
               </Select>
-            </FormItem>
-            <FormItem>
-              <FormLabel>Documento de Salida (Opcional)</FormLabel>
+            </div>
+            <div className="space-y-2">
+              <Label>Documento de Salida (Opcional)</Label>
               <Input value={document} onChange={(e) => setDocument(e.target.value)} autoComplete="off" />
-            </FormItem>
+            </div>
           </div>
         </CardContent>
       </Card>
