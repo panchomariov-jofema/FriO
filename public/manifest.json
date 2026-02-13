@@ -1,7 +1,8 @@
 {
-  "name": "FrigoManager",
-  "short_name": "FrigoManager",
-  "start_url": ".",
+  "name": "FriO Manager",
+  "short_name": "FriO",
+  "description": "Aplicación para la gestión de frigoríficos.",
+  "start_url": "/dashboard",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#ffffff",
@@ -9,19 +10,21 @@
   "icons": [
     {
       "src": "/logo.svg",
-      "sizes": "any",
+      "sizes": "192x192",
       "type": "image/svg+xml",
       "purpose": "any"
     },
     {
-      "src": "/icon-192x192.png",
-      "type": "image/png",
-      "sizes": "192x192"
+      "src": "/logo.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any"
     },
     {
-      "src": "/icon-512x512.png",
-      "type": "image/png",
-      "sizes": "512x512"
+      "src": "/logo.svg",
+      "sizes": "180x180",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
     }
   ]
 }
