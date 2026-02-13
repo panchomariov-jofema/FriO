@@ -56,9 +56,10 @@ function AutomaticDispatchTab({ selectedClientId, document, clientMasters, clien
 
   const uniqueClientMasters = React.useMemo(() => {
     if (!clientMasters) return [];
-    // Deduplicate based on 'id'. This is a safeguard against potential data issues.
-    return Array.from(new Map(clientMasters.map((item: PackagingMaster) => [item.id, item])).values());
+    // Deduplicate based on 'code' to prevent key errors in Select.
+    return Array.from(new Map(clientMasters.map((item: PackagingMaster) => [item.code, item])).values());
   }, [clientMasters]);
+
 
   return (
     <Form {...form}>
