@@ -40,8 +40,7 @@ export const getSortedCoordinates = (chamberConfig: Chamber, strategy?: 'secuenc
       });
     });
   } else {
-    // Default sequential layout for VISUALS, HORIZONTAL scan
-    // A1, A2, A3... then B1, B2, B3...
+    // Default sequential layout for storage logic: A1-A12, B1-B12, etc.
     colLetters.forEach(letter => {
       rowNumbers.forEach(number => {
         const coord = `${letter}${number}`;

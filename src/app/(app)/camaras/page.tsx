@@ -589,7 +589,7 @@ export default function CamarasPage() {
                     <div className="text-right">
                         <p className="text-sm text-muted-foreground">Peso Neto Total</p>
                         <div className="text-xl sm:text-2xl font-bold">
-                            {loading ? <Skeleton className="h-8 w-32" /> : `\${totalNetWeightInStock.toLocaleString('es-CL', {maximumFractionDigits: 0})} kg`}
+                            {loading ? <Skeleton className="h-8 w-32" /> : `${totalNetWeightInStock.toLocaleString('es-CL', {maximumFractionDigits: 0})} kg`}
                         </div>
                     </div>
                     {process.env.NODE_ENV === 'development' && (
@@ -647,8 +647,13 @@ export default function CamarasPage() {
                                 <Label htmlFor={`fifo-switch-${chamberId}`}>Activar Layout FIFO (Serpiente)</Label>
                             </div>
                             <div className="p-2 sm:p-4 bg-muted/50 rounded-b-lg border border-t-0 overflow-x-auto">
-                                <div className="grid gap-1 min-w-[600px] sm:min-w-[800px]" style={{ gridTemplateColumns: `repeat(${config.columns.length}, minmax(0, 1fr))` }}>
-                                {getSortedCoordinates(config, 'secuencial').map(coord => {
+                                <div className="grid gap-1 min-w-[600px] sm:min-w-[800px]" style={{ gridTemplateColumns: `repeat(${config.rows.length}, minmax(0, 1fr))` }}>
+                                {config.columns.map(col => {
+                                      return config.rows.map(row => {
+                                      const coord = `${col.name}${row}`;
+                                      if (config.blocked?.includes(coord)) {
+                                          return <div key={coord} className="h-12 w-full rounded border-2 bg-gray-200 dark:bg-gray-700 relative"><div className="absolute inset-0 bg-repeat bg-[length:10px_10px]" style={{backgroundImage: "repeating-linear-gradient(-45deg, #a0aec0, #a0aec0 1px, transparent 1px, transparent 5px)"}} /></div>;
+                                      }
                                       const itemsInCoord = storedItemsByChamber[chamberId]?.[coord] || [];
                                       const isOccupied = itemsInCoord.length > 0;
                                     
@@ -657,7 +662,7 @@ export default function CamarasPage() {
                                       const totalNetWeight = itemsInCoord.reduce((sum, i) => sum + (i.quantity * (i.netWeightPerBin || 0)), 0);
                                       const clientLotIds = Array.from(new Set(itemsInCoord.map(i => i.clientLotId).filter(Boolean)));
                                     
-                                      const occupancyPercentage = isOccupied ? (totalBins + totalPallets * 2) / 6 * 100 : 0; // Approx. 1 pallet = 2 bins
+                                      const occupancyPercentage = isOccupied ? (totalBins + totalPallets) / 6 * 100 : 0;
                                       const firstItem = isOccupied ? itemsInCoord[0] : null;
 
                                       return (
@@ -674,7 +679,7 @@ export default function CamarasPage() {
                                                 '--lot-color-progress': firstItem ? getColorForLot(`${firstItem.type}-${firstItem.lotIdForColor}`).replace(')', ', 0.3)') : 'transparent',
                                               } as React.CSSProperties}
                                               >
-                                              <div className="absolute bottom-0 left-0 top-0 bg-[var(--lot-color-progress)]" style={{ right: `\${100 - occupancyPercentage}%` }} />
+                                              <div className="absolute bottom-0 left-0 top-0 bg-[var(--lot-color-progress)]" style={{ right: `${100 - occupancyPercentage}%` }} />
                                               <span className="relative z-10 font-semibold">{coord}</span>
                                               </div>
                                           </PopoverTrigger>
@@ -702,6 +707,7 @@ export default function CamarasPage() {
                                           )}
                                           </Popover>
                                       );
+                                    })
                                 })}
                                 </div>
                             </div>
