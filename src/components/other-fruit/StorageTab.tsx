@@ -351,10 +351,10 @@ export function OtherFruitStorageTab({ clientId: fixedClientId }: { clientId?: s
                                   <CardTitle className="text-lg">{item.type === 'fruit' ? item.productName : item.packagingMasterName}</CardTitle>
                                   <CardDescription>{item.clientName} / Doc: {item.document}</CardDescription>
                                   <div className="mt-2">
-                                      <Badge variant={item.type === 'fruit' ? 'outline' : 'default'}>
-                                          {item.type === 'fruit' ? 'Fruta' : 'Embalaje'}
-                                      </Badge>
-                                      <p className="font-semibold text-lg mt-1">{(item as any).quantity || (item as any).palletCount} {item.unit}</p>
+                                    <p className="font-mono text-sm text-muted-foreground">
+                                        {item.type === 'fruit' ? item.productCode : item.packagingMasterCode}
+                                    </p>
+                                    <p className="font-semibold text-lg mt-1">{(item as any).quantity || (item as any).palletCount} {item.unit}</p>
                                   </div>
                               </div>
                               <Button size="lg" onClick={() => handleStoreClick(item)}>Almacenar</Button>
@@ -372,7 +372,7 @@ export function OtherFruitStorageTab({ clientId: fixedClientId }: { clientId?: s
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Tipo</TableHead>
+                  <TableHead>Código</TableHead>
                   <TableHead>Cliente</TableHead>
                   <TableHead>Producto/Artículo</TableHead>
                   <TableHead>Cantidad Pendiente</TableHead>
@@ -385,10 +385,8 @@ export function OtherFruitStorageTab({ clientId: fixedClientId }: { clientId?: s
                 ) : pendingItems.length > 0 ? (
                   pendingItems.map((item) => (
                     <TableRow key={`${item.receptionId}-${item.itemIndex}`}>
-                        <TableCell>
-                            <Badge variant={item.type === 'fruit' ? 'outline' : 'default'}>
-                                {item.type === 'fruit' ? 'Fruta' : 'Embalaje'}
-                            </Badge>
+                        <TableCell className="font-mono">
+                            {item.type === 'fruit' ? item.productCode : item.packagingMasterCode}
                         </TableCell>
                         <TableCell>{item.clientName}</TableCell>
                         <TableCell className="font-medium">{item.type === 'fruit' ? item.productName : item.packagingMasterName}</TableCell>
