@@ -14,10 +14,6 @@ import { doc, writeBatch, serverTimestamp } from 'firebase/firestore';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { PackagingPickingDialog } from './PackagingPickingDialog';
-import { packagingExitSchema } from '@/lib/schemas';
-import { z } from 'zod';
-
-type ExitFormValues = z.infer<typeof packagingExitSchema>;
 
 export function PendingPickingTab() {
   const { data: allMovements, loading: loadingMovements } = useFirestoreCollection<PackagingMovement>('packagingMovements');
@@ -46,43 +42,44 @@ export function PendingPickingTab() {
     setPickingMovement(movement);
   };
   
-  const handleConfirmExit = async (confirmedPayload: ExitFormValues) => {
-    if (!firestore || !pickingMovement) return;
+  const handleConfirmExit = async (confirmedMovement: PackagingMovement) => {
+    if (!firestore || !confirmedMovement) return;
     setIsConfirming(true);
-
+    
     try {
         const batch = writeBatch(firestore);
-        
-        // 1. Update the status of the PackagingMovement document
-        const movementRef = doc(firestore, 'packagingMovements', pickingMovement.id);
+        const movementRef = doc(firestore, 'packagingMovements', confirmedMovement.id);
         batch.update(movementRef, { status: 'Completado' });
-
-        // 2. Update the stock in the PackagingReception documents
-        for(const item of confirmedPayload.items) {
-            for(const loc of item.locations) {
+        
+        for(const item of confirmedMovement.items) {
+            if (item.locations) {
+              for(const loc of item.locations) {
                 if (loc.palletsToWithdraw > 0) {
                     const receptionDoc = allReceptions.find(r => r.id === loc.receptionId);
                     if (receptionDoc) {
                         const receptionRef = doc(firestore, 'packagingReceptions', loc.receptionId);
-                        const newItems = [...receptionDoc.items];
+                        const newItems = JSON.parse(JSON.stringify(receptionDoc.items));
                         const itemToUpdate = newItems[loc.itemIndex];
 
                         if (itemToUpdate && itemToUpdate.palletCount >= loc.palletsToWithdraw) {
                             itemToUpdate.palletCount -= loc.palletsToWithdraw;
+                        } else {
+                            // This should ideally not happen if the creation logic is correct
+                            throw new Error(`Stock insuficiente en la ubicación para ${item.packagingMasterCode}.`);
                         }
                         batch.update(receptionRef, { items: newItems, updatedAt: serverTimestamp() });
                     }
                 }
+              }
             }
         }
         
         await batch.commit();
         toast({ title: 'Éxito', description: 'Salida de embalaje confirmada y stock actualizado.' });
         setPickingMovement(null);
-
-    } catch (error) {
+    } catch (error: any) {
         console.error("Error confirming packaging exit:", error);
-        toast({ variant: 'destructive', title: 'Error', description: 'No se pudo confirmar la salida.' });
+        toast({ variant: 'destructive', title: 'Error', description: error.message || 'No se pudo confirmar la salida.' });
         errorEmitter.emit('permission-error', new FirestorePermissionError({
             path: 'packagingMovements or packagingReceptions',
             operation: 'write'

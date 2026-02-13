@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { useForm, useFieldArray } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -10,28 +10,30 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
-import type { OtherClient, PackagingReception, PackagingMaster, PackagingMovementItem, PackagingExitItemLocation } from '@/lib/types';
+import type { OtherClient, PackagingReception, PackagingMaster, PackagingMovementItem } from '@/lib/types';
 import { packagingExitSchema } from '@/lib/schemas';
-import { PlusCircle, Trash2, ScanLine } from 'lucide-react';
 import { useFirestore } from '@/firebase';
-import { addDoc, collection, serverTimestamp, Timestamp } from 'firebase/firestore';
+import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
-import { BarcodeScanner } from '../BarcodeScanner';
-import { Label } from '../ui/label';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
+import { Skeleton } from '../ui/skeleton';
 
 type ExitFormValues = z.infer<typeof packagingExitSchema>;
 
-const defaultItem = {
-    packagingMasterId: '',
-    packagingMasterCode: '',
-    packagingMasterName: '',
-    palletCount: 1,
-};
-
 const getLocationKey = (receptionId: string, itemIndex: number) => `${receptionId}_${itemIndex}`;
 
+interface FlatStockItem {
+    key: string;
+    receptionId: string;
+    itemIndex: number;
+    code: string;
+    name: string;
+    lote: string;
+    location: string;
+    available: number;
+}
 
 export function ExitTab() {
   const { data: allClients, loading: loadingClients } = useFirestoreCollection<OtherClient>('otherClients');
@@ -39,158 +41,99 @@ export function ExitTab() {
   const { data: allReceptions, loading: loadingReceptions } = useFirestoreCollection<PackagingReception>('packagingReceptions');
   const firestore = useFirestore();
   const { toast } = useToast();
-  
-  const [loteFilter, setLoteFilter] = React.useState('');
 
-  const form = useForm<ExitFormValues>({
-    resolver: zodResolver(packagingExitSchema),
-    defaultValues: {
-      clientId: '',
-      document: '',
-      items: [defaultItem],
-    },
-  });
-
-  const { fields, append, remove } = useFieldArray({
-    control: form.control,
-    name: 'items',
-  });
-
-  const selectedClientId = form.watch('clientId');
-  
-  // Scanner state
-  const [scanningIndex, setScanningIndex] = React.useState<number | null>(null);
+  const [selectedClientId, setSelectedClientId] = React.useState<string>('');
+  const [document, setDocument] = React.useState('');
+  const [dispatchQuantities, setDispatchQuantities] = React.useState<Record<string, number>>({});
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
 
   const packagingClients = React.useMemo(() => {
-    return [...new Map((allClients || []).filter(c => c.type.toLowerCase() === 'embalaje' && c.status !== 'inactivo').map(item => [item.clientId, item])).values()];
+    return (allClients || []).filter(c => c.type.toLowerCase() === 'embalaje' && c.status !== 'inactivo');
   }, [allClients]);
 
-  const { inStockMasterCodes, stockByCodeAndLote } = React.useMemo(() => {
-    const codes = new Set<string>();
-    const stockMap = new Map<string, Map<string, number>>();
-
-    if (selectedClientId && allReceptions) {
-        allReceptions.forEach(reception => {
-            if (reception.clientId === selectedClientId) {
-                reception.items.forEach(item => {
-                    if (item.status === 'Almacenado' && item.palletCount > 0) {
-                        const lotMatch = !loteFilter || (item.lote && item.lote.toLowerCase().includes(loteFilter.toLowerCase()));
-                        if (lotMatch) {
-                            codes.add(item.packagingMasterCode);
-                            const lote = item.lote || '';
-                            if (!stockMap.has(item.packagingMasterCode)) {
-                                stockMap.set(item.packagingMasterCode, new Map<string, number>());
-                            }
-                            const loteMap = stockMap.get(item.packagingMasterCode)!;
-                            const currentStock = loteMap.get(lote) || 0;
-                            loteMap.set(lote, currentStock + item.palletCount);
-                        }
-                    }
-                });
-            }
-        });
-    }
-    return { inStockMasterCodes: codes, stockByCodeAndLote: stockMap };
-  }, [selectedClientId, allReceptions, loteFilter]);
-  
-  const clientPackagingMasters = React.useMemo(() => {
-      if (!selectedClientId) return [];
-      const mastersForClient = (allPackagingMasters || []).filter(m => m.clientId === selectedClientId);
-      const inStockMasters = mastersForClient.filter(m => inStockMasterCodes.has(m.code));
-      return [...new Map(inStockMasters.map(item => [item.code, item])).values()];
-  }, [selectedClientId, allPackagingMasters, inStockMasterCodes]);
-
-
-  const onSubmit = async (values: ExitFormValues) => {
-    if (!firestore) return;
-
-    // Build available stock locations, sorted by FIFO
-    const availableStockLocations: {
-        receptionId: string;
-        itemIndex: number;
-        available: number;
-        locationString: string;
-        lote?: string;
-        createdAt: Timestamp;
-        packagingMasterCode: string;
-    }[] = (allReceptions || [])
-        .filter(r => r.clientId === values.clientId && (r.status === 'Almacenado' || r.status === 'Parcialmente Almacenado'))
-        .flatMap(reception => 
+  const flatStock = React.useMemo<FlatStockItem[]>(() => {
+    if (!selectedClientId || !allReceptions) return [];
+    return allReceptions
+        .filter(r => r.clientId === selectedClientId)
+        .flatMap(reception =>
             reception.items.map((item, index) => ({ item, index, reception }))
         )
         .filter(({ item }) => item.status === 'Almacenado' && item.palletCount > 0 && item.storageLocation)
         .map(({ item, index, reception }) => ({
+            key: getLocationKey(reception.id, index),
             receptionId: reception.id,
             itemIndex: index,
-            available: item.palletCount,
-            locationString: `${item.storageLocation!.warehouse} / ${item.storageLocation!.aisle}`,
-            lote: item.lote,
-            createdAt: reception.createdAt,
-            packagingMasterCode: item.packagingMasterCode,
-        }))
-        .sort((a,b) => a.createdAt.toMillis() - b.createdAt.toMillis());
+            code: item.packagingMasterCode,
+            name: item.packagingMasterName,
+            lote: item.lote || '-',
+            location: `${item.storageLocation!.warehouse} / ${item.storageLocation!.aisle}`,
+            available: item.palletCount
+        }));
+  }, [selectedClientId, allReceptions]);
 
-    const errors: string[] = [];
-    const newMovementItems: PackagingMovementItem[] = [];
-
-    for (const requestedItem of values.items) {
-        if (requestedItem.palletCount <= 0) continue;
-
-        let needed = requestedItem.palletCount;
-        const locationsToWithdraw: PackagingExitItemLocation[] = [];
-
-        const relevantStock = availableStockLocations.filter(loc => 
-            loc.packagingMasterCode === requestedItem.packagingMasterCode &&
-            (!loteFilter || (loc.lote || '').toLowerCase() === loteFilter.toLowerCase())
-        );
-
-        for (const stockLocation of relevantStock) {
-            if (needed === 0) break;
-
-            const canWithdraw = Math.min(needed, stockLocation.available);
-            
-            locationsToWithdraw.push({
-                locationKey: getLocationKey(stockLocation.receptionId, stockLocation.itemIndex),
-                receptionId: stockLocation.receptionId,
-                itemIndex: stockLocation.itemIndex,
-                palletsToWithdraw: canWithdraw,
-                locationString: stockLocation.locationString,
-                available: stockLocation.available,
+  const handleQuantityChange = (key: string, available: number, value: string) => {
+    const numValue = parseInt(value, 10);
+    if (value === '' || (numValue >= 0 && !isNaN(numValue))) {
+        if (numValue > available) {
+            toast({
+                title: "Cantidad inválida",
+                description: `La cantidad no puede superar los ${available} pallets disponibles.`,
+                variant: "destructive",
             });
-            
-            needed -= canWithdraw;
-            stockLocation.available -= canWithdraw; // "consume" stock for subsequent items
-        }
-
-        if (needed > 0) {
-            errors.push(`Stock insuficiente para "${requestedItem.packagingMasterName}" ${loteFilter ? `en el lote "${loteFilter}"` : ''}. Faltan: ${needed}`);
+            setDispatchQuantities(prev => ({ ...prev, [key]: available }));
         } else {
-            const newItem: PackagingMovementItem = {
-                ...requestedItem,
-                palletCount: requestedItem.palletCount,
-                locations: locationsToWithdraw,
-            };
-            if (loteFilter) {
-                newItem.lote = loteFilter;
-            }
-            newMovementItems.push(newItem);
+            setDispatchQuantities(prev => ({ ...prev, [key]: numValue || 0 }));
         }
     }
-     if (errors.length > 0) {
-        toast({ variant: 'destructive', title: 'Error de Stock', description: errors.join('\n') });
+  };
+
+  const onSubmit = async () => {
+    setIsSubmitting(true);
+    const itemsToDispatch = Object.entries(dispatchQuantities).filter(([, qty]) => qty > 0);
+    
+    if (itemsToDispatch.length === 0) {
+        toast({ variant: 'destructive', title: 'Sin ítems', description: 'Debe ingresar una cantidad para al menos una ubicación.' });
+        setIsSubmitting(false);
         return;
+    }
+    
+    const itemsByCode = new Map<string, PackagingMovementItem>();
+
+    for (const [locationKey, quantity] of itemsToDispatch) {
+        if (quantity <= 0) continue;
+        
+        const stockItem = flatStock.find(s => s.key === locationKey);
+        if (!stockItem) continue;
+
+        if (!itemsByCode.has(stockItem.code)) {
+            itemsByCode.set(stockItem.code, {
+                packagingMasterId: allPackagingMasters?.find(m => m.code === stockItem.code)?.id || '',
+                packagingMasterCode: stockItem.code,
+                packagingMasterName: stockItem.name,
+                palletCount: 0,
+                locations: [],
+            });
+        }
+        
+        const movementItem = itemsByCode.get(stockItem.code)!;
+        movementItem.palletCount += quantity;
+        movementItem.locations!.push({
+            locationKey: stockItem.key,
+            receptionId: stockItem.receptionId,
+            itemIndex: stockItem.itemIndex,
+            palletsToWithdraw: quantity,
+            locationString: stockItem.location,
+            available: stockItem.available,
+        });
     }
 
-    if (newMovementItems.length === 0) {
-        toast({ variant: 'destructive', title: 'Sin ítems', description: 'Debe ingresar una cantidad para al menos un artículo.' });
-        return;
-    }
+    const newMovementItems = Array.from(itemsByCode.values());
 
     try {
         const movementData = {
             type: 'salida' as const,
-            clientId: values.clientId,
-            document: values.document || '',
+            clientId: selectedClientId,
+            document: document || '',
             items: newMovementItems,
             status: 'Pendiente de Picking' as const,
             createdAt: serverTimestamp(),
@@ -199,8 +142,8 @@ export function ExitTab() {
         await addDoc(collection(firestore, 'packagingMovements'), movementData);
         
         toast({ title: 'Solicitud Creada', description: 'La solicitud de salida ha sido creada y está pendiente de picking.' });
-        form.reset({ clientId: values.clientId, document: '', items: [defaultItem] });
-        setLoteFilter('');
+        setDispatchQuantities({});
+        setDocument('');
 
     } catch (error) {
         console.error("Error creating packaging exit request:", error);
@@ -209,43 +152,20 @@ export function ExitTab() {
             path: 'packagingMovements',
             operation: 'create'
         }));
+    } finally {
+        setIsSubmitting(false);
     }
   };
-  
+
   const handleClientChange = (value: string) => {
-    form.reset({ clientId: value, document: '', items: [defaultItem] });
-    setLoteFilter('');
-  };
-  
-  const handleCodeBlur = (index: number) => {
-    const code = form.getValues(`items.${index}.packagingMasterCode`);
-    if (!code) {
-      form.setValue(`items.${index}.packagingMasterId`, '');
-      form.setValue(`items.${index}.packagingMasterName`, '');
-      return;
-    }
-    
-    const foundMaster = allPackagingMasters.find(m => m.clientId === selectedClientId && m.code === code);
-    
-    if (foundMaster) {
-      form.setValue(`items.${index}.packagingMasterId`, foundMaster.id || '', { shouldValidate: true });
-      form.setValue(`items.${index}.packagingMasterName`, foundMaster.name);
-      form.clearErrors(`items.${index}.packagingMasterCode`);
-    } else {
-      form.setValue(`items.${index}.packagingMasterId`, '');
-      form.setValue(`items.${index}.packagingMasterName`, '');
-      form.setError(`items.${index}.packagingMasterCode`, { message: 'Código no encontrado.' });
-    }
+    setSelectedClientId(value);
+    setDispatchQuantities({});
+    setDocument('');
   };
 
-  const handleScanConfirm = (scannedValue: string) => {
-    if (scanningIndex !== null) {
-        form.setValue(`items.${scanningIndex}.packagingMasterCode`, scannedValue);
-        handleCodeBlur(scanningIndex); // Trigger blur logic to find product
-        setScanningIndex(null);
-    }
-  };
-
+  const totalSelectedPallets = React.useMemo(() => {
+    return Object.values(dispatchQuantities).reduce((sum, qty) => sum + (qty || 0), 0);
+  }, [dispatchQuantities]);
 
   const isLoading = loadingClients || loadingMasters || loadingReceptions;
 
@@ -254,138 +174,87 @@ export function ExitTab() {
       <Card>
         <CardHeader>
           <CardTitle>Crear Solicitud de Despacho</CardTitle>
-          <CardDescription>Seleccione un cliente y los artículos a retirar. Esto creará una tarea en la pestaña de "Picking".</CardDescription>
+          <CardDescription>Seleccione un cliente y luego elija el stock específico a despachar desde las ubicaciones disponibles.</CardDescription>
         </CardHeader>
         <CardContent>
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-              <div className="grid md:grid-cols-3 gap-4 items-end">
-                <FormField
-                  control={form.control}
-                  name="clientId"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Cliente de Embalaje</FormLabel>
-                      <Select onValueChange={handleClientChange} value={field.value} disabled={isLoading}>
-                        <FormControl><SelectTrigger><SelectValue placeholder="Seleccione un cliente..." /></SelectTrigger></FormControl>
-                        <SelectContent>{packagingClients.map(c => <SelectItem key={c.id} value={c.clientId}>{c.name}</SelectItem>)}</SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                 <div className="space-y-2">
-                    <Label>Filtrar por Lote (Opcional)</Label>
-                    <Input
-                        value={loteFilter}
-                        onChange={(e) => setLoteFilter(e.target.value)}
-                        placeholder="Ingrese un lote..."
-                        disabled={!selectedClientId}
-                    />
-                </div>
-                <FormField
-                  control={form.control}
-                  name="document"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Documento de Salida (Opcional)</FormLabel>
-                      <FormControl><Input {...field} autoComplete="off" /></FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-              
-              <div className="space-y-4">
-                <FormLabel>Ítems Solicitados</FormLabel>
-                {fields.map((field, index) => {
-                    const currentCode = form.watch(`items.${index}.packagingMasterCode`);
-                    const stockForCode = stockByCodeAndLote.get(currentCode);
-                    const totalStock = stockForCode ? Array.from(stockForCode.values()).reduce((a, b) => a + b, 0) : 0;
-                    
-                    return (
-                      <div key={field.id} className="flex items-end gap-2 p-3 border rounded-md">
-                        <div className="flex-1 grid grid-cols-1 sm:grid-cols-10 gap-4 items-start">
-                           <FormField
-                                control={form.control}
-                                name={`items.${index}.packagingMasterCode`}
-                                render={({ field: itemField }) => (
-                                  <FormItem className="sm:col-span-3">
-                                    <FormLabel>Código de Artículo</FormLabel>
-                                    <div className="flex items-center gap-2">
-                                      <FormControl>
-                                         <Input 
-                                            {...itemField} 
-                                            onBlur={() => handleCodeBlur(index)} 
-                                            autoComplete="off" 
-                                            disabled={!selectedClientId || loadingMasters}
-                                            placeholder={!selectedClientId ? "Seleccione cliente" : "Ingrese código..."}
-                                        />
-                                      </FormControl>
-                                      <Button type="button" variant="outline" size="icon" className="shrink-0" onClick={() => setScanningIndex(index)}>
-                                        <ScanLine className="h-4 w-4" />
-                                        <span className="sr-only">Escanear código</span>
-                                      </Button>
-                                    </div>
-                                    <FormMessage />
-                                  </FormItem>
-                                )}
-                              />
-                            <div className="space-y-2 sm:col-span-5">
-                                <FormLabel>Descripción</FormLabel>
-                                <div className="font-medium text-sm h-10 flex items-center p-2 border border-input bg-background rounded-md">
-                                    {form.watch(`items.${index}.packagingMasterName`) || <span className="text-muted-foreground">--</span>}
-                                </div>
-                            </div>
-                            <FormField
-                                control={form.control}
-                                name={`items.${index}.palletCount`}
-                                render={({ field: itemField }) => (
-                                    <FormItem className="sm:col-span-2">
-                                        <FormLabel>Cant. Pallets</FormLabel>
-                                        <FormControl>
-                                            <Input type="number" {...itemField} value={itemField.value ?? ''} autoComplete="off" min="1" className="w-full sm:w-auto"/>
-                                        </FormControl>
-                                        <p className="text-xs text-muted-foreground pt-1">
-                                            Stock Disponible: {totalStock}
-                                        </p>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-                        </div>
-                        <Button type="button" variant="destructive" size="icon" onClick={() => remove(index)} disabled={fields.length <= 1}>
-                            <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    )
-                })}
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => append(defaultItem)}
-                  disabled={!selectedClientId}
-                >
-                  <PlusCircle className="mr-2 h-4 w-4" />
-                  Agregar Artículo
-                </Button>
-              </div>
-
-              <div className="flex justify-end">
-                <Button type="submit" disabled={form.formState.isSubmitting || isLoading}>
-                  {form.formState.isSubmitting ? 'Creando Solicitud...' : 'Crear Solicitud de Despacho'}
-                </Button>
-              </div>
-            </form>
-          </Form>
+          <div className="grid md:grid-cols-2 gap-4 mb-6">
+            <FormItem>
+              <FormLabel>Cliente de Embalaje</FormLabel>
+              <Select onValueChange={handleClientChange} value={selectedClientId} disabled={isLoading}>
+                <SelectTrigger><SelectValue placeholder="Seleccione un cliente..." /></SelectTrigger>
+                <SelectContent>{packagingClients.map(c => <SelectItem key={c.id} value={c.clientId}>{c.name}</SelectItem>)}</SelectContent>
+              </Select>
+            </FormItem>
+            <FormItem>
+              <FormLabel>Documento de Salida (Opcional)</FormLabel>
+              <Input value={document} onChange={(e) => setDocument(e.target.value)} autoComplete="off" />
+            </FormItem>
+          </div>
         </CardContent>
       </Card>
-      <BarcodeScanner
-        open={scanningIndex !== null}
-        onOpenChange={(isOpen) => !isOpen && setScanningIndex(null)}
-        onScan={handleScanConfirm}
-      />
+      
+      {selectedClientId && (
+        <Card className="mt-6">
+            <CardHeader>
+                <CardTitle>Pre-Orden de Picking</CardTitle>
+                <CardDescription>Seleccione los pallets a despachar desde las ubicaciones de stock disponibles.</CardDescription>
+            </CardHeader>
+            <CardContent>
+                <div className="rounded-md border max-h-[50vh] overflow-y-auto">
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Artículo</TableHead>
+                                <TableHead>Código</TableHead>
+                                <TableHead>Lote</TableHead>
+                                <TableHead>Ubicación</TableHead>
+                                <TableHead>Disponible</TableHead>
+                                <TableHead className="w-40">A Despachar</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {isLoading ? (
+                                Array.from({length: 3}).map((_, i) => <TableRow key={i}><TableCell colSpan={6}><Skeleton className="h-4 w-full" /></TableCell></TableRow>)
+                            ) : flatStock.length > 0 ? (
+                                flatStock.map(stockItem => (
+                                    <TableRow key={stockItem.key}>
+                                        <TableCell>{stockItem.name}</TableCell>
+                                        <TableCell className="font-mono">{stockItem.code}</TableCell>
+                                        <TableCell>{stockItem.lote}</TableCell>
+                                        <TableCell>{stockItem.location}</TableCell>
+                                        <TableCell>{stockItem.available}</TableCell>
+                                        <TableCell>
+                                            <Input
+                                                type="number"
+                                                min="0"
+                                                max={stockItem.available}
+                                                value={dispatchQuantities[stockItem.key] || ''}
+                                                onChange={e => handleQuantityChange(stockItem.key, stockItem.available, e.target.value)}
+                                                placeholder="0"
+                                                className="h-8"
+                                            />
+                                        </TableCell>
+                                    </TableRow>
+                                ))
+                            ) : (
+                                <TableRow>
+                                    <TableCell colSpan={6} className="h-24 text-center">No hay stock disponible para este cliente.</TableCell>
+                                </TableRow>
+                            )}
+                        </TableBody>
+                    </Table>
+                </div>
+                 <div className="flex justify-between items-center mt-4">
+                    <div className="font-semibold">
+                        Total a Despachar: {totalSelectedPallets} pallets
+                    </div>
+                    <Button onClick={onSubmit} disabled={isSubmitting || totalSelectedPallets === 0}>
+                        {isSubmitting ? 'Creando Solicitud...' : 'Crear Solicitud de Despacho'}
+                    </Button>
+                </div>
+            </CardContent>
+        </Card>
+      )}
     </>
   );
 }

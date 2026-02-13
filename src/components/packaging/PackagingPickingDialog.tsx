@@ -15,147 +15,26 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '../ui/scroll-area';
 import { FileText, Building } from 'lucide-react';
-import { z } from 'zod';
-import { packagingExitSchema } from '@/lib/schemas';
-import { Input } from '../ui/input';
-import { PackagingMovement, PackagingReception, PackagingExitItemLocation } from '@/lib/types';
-import { useToast } from '@/hooks/use-toast';
+import { PackagingMovement } from '@/lib/types';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 
-
-type ExitFormValues = z.infer<typeof packagingExitSchema>;
 
 interface PackagingPickingDialogProps {
   movement: PackagingMovement | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onConfirmExit: (payload: ExitFormValues) => void;
+  onConfirmExit: (movement: PackagingMovement) => void;
   isConfirming: boolean;
   clientName: string;
-  allReceptions: PackagingReception[];
-  loadingReceptions: boolean;
 }
 
-// Helper to get a unique key for a location
-const getLocationKey = (receptionId: string, itemIndex: number) => `${receptionId}_${itemIndex}`;
-
-
-export function PackagingPickingDialog({ movement, open, onOpenChange, onConfirmExit, isConfirming, clientName, allReceptions, loadingReceptions }: PackagingPickingDialogProps) {
-  const { toast } = useToast();
-  const [confirmedPayload, setConfirmedPayload] = React.useState<ExitFormValues | null>(null);
+export function PackagingPickingDialog({ movement, open, onOpenChange, onConfirmExit, isConfirming, clientName }: PackagingPickingDialogProps) {
   const [pickedItems, setPickedItems] = React.useState<Record<string, boolean>>({});
-  const [quantities, setQuantities] = React.useState<Record<string, number>>({});
-
-  React.useEffect(() => {
-    if (movement) {
-        // NEW: If the movement already has detailed locations, use them directly.
-        const hasPrecalculatedLocations = movement.items.every(
-            (item) => Array.isArray(item.locations) && item.locations.length > 0
-        );
-
-        if (hasPrecalculatedLocations) {
-            const payload: ExitFormValues = {
-                clientId: movement.clientId,
-                document: movement.document,
-                items: movement.items.map(item => ({
-                    ...item,
-                    locations: item.locations!, 
-                })),
-            };
-            setConfirmedPayload(payload);
-            setPickedItems({});
-            return; // Exit early
-        }
-
-        // FALLBACK: Old logic to recalculate locations if not present.
-        if (allReceptions.length > 0) {
-            const stockMap: Record<string, { name: string, locations: { locationKey: string, locationString: string, available: number, receptionId: string, itemIndex: number }[] }> = {};
-
-            allReceptions
-                .filter(r => r.clientId === movement.clientId && (r.status === 'Almacenado' || r.status === 'Parcialmente Almacenado'))
-                .forEach(reception => {
-                    reception.items.forEach((item, index) => {
-                        if (item.status === 'Almacenado' && item.palletCount > 0 && item.storageLocation) {
-                            if (!stockMap[item.packagingMasterCode]) {
-                                stockMap[item.packagingMasterCode] = { name: item.packagingMasterName, locations: [] };
-                            }
-                            const locationKey = getLocationKey(reception.id, index);
-                            stockMap[item.packagingMasterCode].locations.push({
-                                locationKey,
-                                locationString: `${item.storageLocation.warehouse} / ${item.storageLocation.aisle}`,
-                                available: item.palletCount,
-                                receptionId: reception.id,
-                                itemIndex: index,
-                            });
-                        }
-                    });
-                });
-
-            const payload: ExitFormValues = {
-                clientId: movement.clientId,
-                document: movement.document,
-                items: [],
-            };
-
-            const errors: string[] = [];
-
-            for(const requestedItem of movement.items) {
-                const itemStock = stockMap[requestedItem.packagingMasterCode];
-                if (!itemStock) {
-                    errors.push(`No hay stock para el artículo ${requestedItem.packagingMasterCode}.`);
-                    continue;
-                }
-                
-                let needed = requestedItem.palletCount;
-                const newItem: z.infer<typeof packagingExitSchema.shape.items.element> = {
-                    ...requestedItem,
-                    palletCount: 0,
-                    locations: [],
-                };
-
-                // FIFO: Sort locations by reception date
-                itemStock.locations.sort((a,b) => {
-                    const receptionA = allReceptions.find(r => r.id === a.receptionId)!.createdAt.toMillis();
-                    const receptionB = allReceptions.find(r => r.id === b.receptionId)!.createdAt.toMillis();
-                    return receptionA - receptionB;
-                });
-
-                for (const loc of itemStock.locations) {
-                    if (needed > 0) {
-                        const toWithdraw = Math.min(needed, loc.available);
-                        newItem.locations!.push({
-                            ...loc,
-                            palletsToWithdraw: toWithdraw,
-                        });
-                        newItem.palletCount += toWithdraw;
-                        needed -= toWithdraw;
-                    } else {
-                        break;
-                    }
-                }
-
-                if (needed > 0) {
-                    errors.push(`Stock insuficiente para ${requestedItem.packagingMasterCode}. Solicitado: ${requestedItem.palletCount}, Disponible: ${requestedItem.palletCount - needed}`);
-                }
-                payload.items.push(newItem);
-            }
-
-            if (errors.length > 0) {
-                toast({ title: 'Error de Stock', description: errors.join(' '), variant: 'destructive'});
-                onOpenChange(false);
-                return;
-            }
-
-            setConfirmedPayload(payload);
-            setPickedItems({});
-        }
-    }
-  }, [movement, allReceptions, toast, onOpenChange]);
 
   const flatItems = React.useMemo(() => {
-    if (!confirmedPayload) return [];
-    return confirmedPayload.items.flatMap(item => 
+    if (!movement?.items) return [];
+    return movement.items.flatMap(item => 
         (item.locations || []).map(loc => ({
             ...loc,
             itemCode: item.packagingMasterCode,
@@ -163,36 +42,15 @@ export function PackagingPickingDialog({ movement, open, onOpenChange, onConfirm
             compositeKey: `${item.packagingMasterCode}_${loc.locationKey}`
         }))
     ).filter(item => item.palletsToWithdraw > 0);
-  }, [confirmedPayload]);
+  }, [movement]);
 
   React.useEffect(() => {
-    if (flatItems) {
-        const initialQuantities = flatItems.reduce((acc, item) => {
-            acc[item.compositeKey] = item.palletsToWithdraw;
-            return acc;
-        }, {} as Record<string, number>);
-        setQuantities(initialQuantities);
+    if (movement) {
+        setPickedItems({});
     }
-  }, [flatItems]);
+  }, [movement]);
 
-
-  if (!movement || !confirmedPayload) return null; // Or a loading state
-
-  const handleQuantityChange = (compositeKey: string, originalCount: number, newCountStr: string) => {
-    let newCount = parseInt(newCountStr, 10);
-    if (isNaN(newCount) || newCount < 0) {
-        newCount = 0;
-    }
-    if (newCount > originalCount) {
-        newCount = originalCount;
-        toast({
-            title: 'Cantidad excede lo solicitado',
-            description: `No puede recoger más de ${originalCount} pallets para esta ubicación.`,
-            variant: 'destructive',
-        });
-    }
-    setQuantities(prev => ({ ...prev, [compositeKey]: newCount }));
-  };
+  if (!movement) return null;
 
   const handleSelectAll = (checked: boolean | 'indeterminate') => {
     const newPickedItems: Record<string, boolean> = {};
@@ -217,38 +75,7 @@ export function PackagingPickingDialog({ movement, open, onOpenChange, onConfirm
   };
 
   const handleConfirm = () => {
-    if (!confirmedPayload) return;
-
-    const newPayload: ExitFormValues = JSON.parse(JSON.stringify(confirmedPayload));
-    
-    let totalPalletsOverall = 0;
-
-    newPayload.items.forEach(item => {
-        let itemTotalPallets = 0;
-        if (item.locations) {
-            item.locations.forEach(loc => {
-                const compositeKey = `${item.packagingMasterCode}_${getLocationKey(loc.receptionId, loc.itemIndex)}`;
-                const pickedQty = quantities[compositeKey] ?? 0;
-                loc.palletsToWithdraw = pickedQty;
-                itemTotalPallets += pickedQty;
-            });
-        }
-        item.palletCount = itemTotalPallets;
-        totalPalletsOverall += itemTotalPallets;
-    });
-
-    newPayload.items = newPayload.items.filter(item => item.palletCount > 0);
-
-    if (totalPalletsOverall === 0) {
-        toast({
-            variant: 'destructive',
-            title: 'Nada para confirmar',
-            description: 'Debe ingresar una cantidad mayor a 0 para al menos un ítem.',
-        });
-        return;
-    }
-
-    onConfirmExit(newPayload);
+    onConfirmExit(movement);
   };
   
   const checkedCount = Object.keys(pickedItems).length;
@@ -256,7 +83,7 @@ export function PackagingPickingDialog({ movement, open, onOpenChange, onConfirm
   const selectAllState = checkedCount === allItemsCount && allItemsCount > 0 ? true : checkedCount === 0 ? false : 'indeterminate';
   const allItemsPicked = allItemsCount > 0 && checkedCount === allItemsCount;
 
-  const totalPallets = Object.values(quantities).reduce((sum, qty) => sum + qty, 0);
+  const totalPallets = movement.items.reduce((sum, item) => sum + item.palletCount, 0);
 
   const handleGeneratePDF = () => {
     if (!movement) return;
@@ -274,7 +101,7 @@ export function PackagingPickingDialog({ movement, open, onOpenChange, onConfirm
       item.itemName,
       item.itemCode,
       item.locationString,
-      quantities[item.compositeKey] ?? item.palletsToWithdraw,
+      item.palletsToWithdraw,
     ]);
     
     const tableHeaders = [['Artículo', 'Código', 'Ubicación', 'Pallets a Retirar']];
@@ -334,7 +161,7 @@ export function PackagingPickingDialog({ movement, open, onOpenChange, onConfirm
       item.itemName,
       item.itemCode,
       item.locationString,
-      quantities[item.compositeKey] ?? item.palletsToWithdraw,
+      item.palletsToWithdraw,
     ]);
     
     const tableHeaders = [['Artículo', 'Código', 'Ubicación', 'Pallets a Retirar']];
@@ -401,15 +228,8 @@ export function PackagingPickingDialog({ movement, open, onOpenChange, onConfirm
                         <div className="text-sm text-muted-foreground">{item.itemCode}</div>
                     </TableCell>
                     <TableCell>{item.locationString}</TableCell>
-                    <TableCell className="text-right">
-                       <Input
-                            type="number"
-                            value={quantities[item.compositeKey] ?? ''}
-                            onChange={(e) => handleQuantityChange(item.compositeKey, item.palletsToWithdraw, e.target.value)}
-                            max={item.palletsToWithdraw}
-                            min={0}
-                            className="h-8 w-24 ml-auto text-right"
-                        />
+                    <TableCell className="text-right font-semibold">
+                       {item.palletsToWithdraw}
                     </TableCell>
                   </TableRow>
                 ))}
