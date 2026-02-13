@@ -54,6 +54,12 @@ function AutomaticDispatchTab({ selectedClientId, document, clientMasters, clien
     }
   };
 
+  const uniqueClientMasters = React.useMemo(() => {
+    if (!clientMasters) return [];
+    // Deduplicate based on 'id'. This is a safeguard against potential data issues.
+    return Array.from(new Map(clientMasters.map((item: PackagingMaster) => [item.id, item])).values());
+  }, [clientMasters]);
+
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit((values) => onSubmit(values, 'automatico'))} className="space-y-4 pt-4">
@@ -68,11 +74,9 @@ function AutomaticDispatchTab({ selectedClientId, document, clientMasters, clien
                     <FormItem className="sm:col-span-2">
                       <FormLabel className={index > 0 ? 'sr-only' : ''}>Código</FormLabel>
                       <Select onValueChange={(value) => handleCodeChange(index, value)} value={itemField.value}>
-                          <FormControl>
-                              <SelectTrigger><SelectValue placeholder="Seleccione..." /></SelectTrigger>
-                          </FormControl>
+                          <FormControl><SelectTrigger><SelectValue placeholder="Código..." /></SelectTrigger></FormControl>
                           <SelectContent>
-                            {clientMasters.map((m: PackagingMaster) => <SelectItem key={m.id} value={m.code}>{m.code}</SelectItem>)}
+                            {uniqueClientMasters.map((m: PackagingMaster) => <SelectItem key={m.id} value={m.code}>{m.code}</SelectItem>)}
                           </SelectContent>
                       </Select>
                       <FormMessage />
