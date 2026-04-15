@@ -54,6 +54,26 @@ const ExporterForm = ({ form }: { form: any }) => (
     <FormField control={form.control} name="type" render={({ field }) => (
       <FormItem><FormLabel>Tipo</FormLabel><FormControl><Input {...field} placeholder="Ej: exportador, productor_exportador" autoComplete="off" /></FormControl><FormMessage /></FormItem>
     )} />
+    <FormField
+        control={form.control}
+        name="status"
+        render={({ field }) => (
+          <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
+            <div className="space-y-0.5">
+              <FormLabel>Estado</FormLabel>
+              <FormDescription>
+                Pausa la operación de este exportador.
+              </FormDescription>
+            </div>
+            <FormControl>
+              <Switch
+                checked={field.value !== 'inactivo'}
+                onCheckedChange={(checked) => field.onChange(checked ? 'activo' : 'inactivo')}
+              />
+            </FormControl>
+          </FormItem>
+        )}
+      />
   </>
 );
 
@@ -219,7 +239,7 @@ const PackingForm = ({ form, exporters }: { form: any; exporters: Exporter[] }) 
         </Select><FormMessage /></FormItem>
       )} />
       <FormField control={form.control} name="name" render={({ field }) => (
-        <FormItem><FormLabel>Nombre</FormLabel><FormControl><Input {...field} autoComplete="off" /></FormControl><FormMessage /></FormItem>
+        <FormItem><FormLabel>Nombre</FormLabel><FormControl><Input {...field} autoComplete="off" /></FormControl><FormMessage /></FormMessage></FormItem>
       )} />
     </>
   )
@@ -439,10 +459,15 @@ export default function DatosMaestrosPage() {
               title="Exportadores"
               collectionName="exporters"
               schema={exporterSchema}
-              columns={[{key: 'exporterId', header: 'ID'}, {key: 'name', header: 'Nombre'}, {key: 'type', header: 'Tipo'}]}
+              columns={[
+                {key: 'exporterId', header: 'ID'}, 
+                {key: 'name', header: 'Nombre'}, 
+                {key: 'type', header: 'Tipo'},
+                {key: 'status', header: 'Estado'}
+              ]}
               RenderFormComponent={ExporterForm}
               docNameField="name"
-              csvHeaders={['exporterId', 'name', 'type']}
+              csvHeaders={['exporterId', 'name', 'type', 'status']}
               csvTemplateFileName="plantilla_exportadores.csv"
               formProps={{}}
             />

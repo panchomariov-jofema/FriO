@@ -4,6 +4,7 @@ export const exporterSchema = z.object({
   exporterId: z.string().min(1, 'El ID de exportador es obligatorio'),
   name: z.string().min(1, 'El nombre es obligatorio'),
   type: z.string().min(1, 'El tipo es obligatorio'),
+  status: z.enum(['activo', 'inactivo']).default('activo'),
 });
 
 export const producerSchema = z.object({

@@ -7,6 +7,7 @@ export interface Exporter {
   exporterId: string;
   name: string;
   type: string;
+  status?: 'activo' | 'inactivo';
 }
 
 export interface Producer {
