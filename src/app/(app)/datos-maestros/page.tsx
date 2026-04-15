@@ -239,7 +239,7 @@ const PackingForm = ({ form, exporters }: { form: any; exporters: Exporter[] }) 
         </Select><FormMessage /></FormItem>
       )} />
       <FormField control={form.control} name="name" render={({ field }) => (
-        <FormItem><FormLabel>Nombre</FormLabel><FormControl><Input {...field} autoComplete="off" /></FormControl><FormMessage /></FormMessage></FormItem>
+        <FormItem><FormLabel>Nombre</FormLabel><FormControl><Input {...field} autoComplete="off" /></FormControl><FormMessage /></FormItem>
       )} />
     </>
   )
