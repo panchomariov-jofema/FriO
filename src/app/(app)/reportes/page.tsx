@@ -8,8 +8,13 @@ import { ChevronRight } from 'lucide-react';
 const reportList = [
     { 
         title: 'Stock de Bins y Materiales', 
-        description: 'Inventario actual de todos los bins y materiales.',
+        description: 'Inventario actual de todos los bins y materiales en planta.',
         href: '/reportes/stock-bins-materiales'
+    },
+    {
+        title: "Saldo por Exp/Productor",
+        description: "Consolidado de materiales entregados y devueltos por productor.",
+        href: "/reportes/saldo-por-productor"
     },
     { 
         title: 'Stock de Embalajes', 
@@ -18,7 +23,7 @@ const reportList = [
     },
     { 
         title: 'Kardex de Movimientos de Bins y Materiales', 
-        description: 'Historial de entradas y salidas.',
+        description: 'Historial detallado de entradas y salidas de materiales.',
         href: '/reportes/kardex-bins-materiales'
     },
     { 
