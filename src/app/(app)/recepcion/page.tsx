@@ -27,7 +27,12 @@ type LotFormValues = z.infer<typeof receptionLotSchema>;
 
 export default function RecepcionPage() {
   const [selectedExporter, setSelectedExporter] = React.useState<string | null>(null);
-  const { data: exporters, loading: loadingExporters } = useFirestoreCollection<Exporter>('exporters');
+  const { data: allExporters, loading: loadingExporters } = useFirestoreCollection<Exporter>('exporters');
+  
+  const exporters = React.useMemo(() => {
+    return allExporters.filter(e => e.status !== 'inactivo');
+  }, [allExporters]);
+
   const { data: producers, loading: loadingProducers } = useProducersByExporter(selectedExporter);
   const firestore = useFirestore();
   const { toast } = useToast();
@@ -77,7 +82,7 @@ export default function RecepcionPage() {
     
     const producer = producers.find(p => p.producerId === selectedProducerId);
     if (!producer) {
-        toast({ variant: 'destructive', title: 'Error', description: 'No se pudo encontrar el productor seleccionado.' });
+        toast({ variant: 'destructive', title: 'Error', description: 'No se pudo encontrar el productor seleccionado o está inactivo.' });
         return;
     }
 

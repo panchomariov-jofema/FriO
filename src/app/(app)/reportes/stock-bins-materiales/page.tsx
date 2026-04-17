@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
-import type { BinMaterialStock } from '@/lib/types';
+import type { BinMaterialStock, Exporter } from '@/lib/types';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ReportHeader } from '@/components/reports/ReportHeader';
@@ -41,11 +41,20 @@ function downloadCSV(csvString: string, filename: string) {
 }
 
 export default function BinMaterialStockReportPage() {
-    const { data, loading } = useFirestoreCollection<BinMaterialStock>('binMaterialStock');
+    const { data: allStock, loading: loadingStock } = useFirestoreCollection<BinMaterialStock>('binMaterialStock');
+    const { data: allExporters, loading: loadingExporters } = useFirestoreCollection<Exporter>('exporters');
+
+    const loading = loadingStock || loadingExporters;
+
+    const filteredData = React.useMemo(() => {
+        if (loading) return [];
+        const activeExporterIds = new Set(allExporters.filter(e => e.status !== 'inactivo').map(e => e.exporterId));
+        return allStock.filter(item => activeExporterIds.has(item.exporterId));
+    }, [allStock, allExporters, loading]);
 
     const handleExport = () => {
         const headers = ['binMaterialCode', 'binMaterialName', 'quantity', 'exporterId'];
-        const csv = convertToCSV(data, headers);
+        const csv = convertToCSV(filteredData, headers);
         downloadCSV(csv, 'reporte_stock_bins.csv');
     };
 
@@ -55,7 +64,7 @@ export default function BinMaterialStockReportPage() {
                 title="Stock de Bins y Materiales"
                 description="Inventario actual de todos los bins y materiales."
                 onExport={handleExport}
-                isExportDisabled={loading || !data || data.length === 0}
+                isExportDisabled={loading || !filteredData || filteredData.length === 0}
             />
             <Card>
                 <CardContent className="pt-6">
@@ -72,8 +81,8 @@ export default function BinMaterialStockReportPage() {
                             <TableBody>
                                 {loading ? (
                                     Array.from({ length: 5 }).map((_, i) => <TableRow key={i}><TableCell colSpan={4}><Skeleton className="h-4 w-full" /></TableCell></TableRow>)
-                                ) : data && data.length > 0 ? (
-                                    data.map(item => (
+                                ) : filteredData && filteredData.length > 0 ? (
+                                    filteredData.map(item => (
                                         <TableRow key={item.id}>
                                             <TableCell>{item.binMaterialCode}</TableCell>
                                             <TableCell>{item.binMaterialName}</TableCell>
@@ -82,7 +91,7 @@ export default function BinMaterialStockReportPage() {
                                         </TableRow>
                                     ))
                                 ) : (
-                                    <TableRow><TableCell colSpan={4} className="h-24 text-center">No hay datos de stock.</TableCell></TableRow>
+                                    <TableRow><TableCell colSpan={4} className="h-24 text-center">No hay datos de stock para entidades activas.</TableCell></TableRow>
                                 )}
                             </TableBody>
                         </Table>

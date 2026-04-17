@@ -22,12 +22,12 @@ function convertToCSV(data: any[], headers: {key: string, label: string}[]) {
 
 function downloadCSV(csvString: string, filename: string) {
     const blob = new Blob([`\uFEFF${csvString}`], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
+    const link = document.createElement("a");
     if (link.download !== undefined) {
         const url = URL.createObjectURL(blob);
-        link.setAttribute('href', url);
-        link.setAttribute('download', filename);
-        link.style.visibility = 'hidden';
+        link.setAttribute("href", url);
+        link.setAttribute("download", filename);
+        link.style.visibility = "hidden";
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -36,16 +36,21 @@ function downloadCSV(csvString: string, filename: string) {
 
 export default function ProducerBalanceReportPage() {
     const { data: movements, loading: loadingMovements } = useFirestoreCollection<BinMaterialMovement>('binMaterialMovements');
-    const { data: exporters, loading: loadingExporters } = useFirestoreCollection<Exporter>('exporters');
-    const { data: producers, loading: loadingProducers } = useFirestoreCollection<Producer>('producers');
+    const { data: allExporters, loading: loadingExporters } = useFirestoreCollection<Exporter>('exporters');
+    const { data: allProducers, loading: loadingProducers } = useFirestoreCollection<Producer>('producers');
 
     const loading = loadingMovements || loadingExporters || loadingProducers;
 
     const balanceData = React.useMemo(() => {
         if (loading) return [];
 
-        const exporterMap = new Map((exporters || []).map(e => [e.exporterId, e.name]));
-        const producerMap = new Map((producers || []).map(p => [p.producerId, p.shortName]));
+        const activeExporters = allExporters.filter(e => e.status !== 'inactivo');
+        const activeExporterIds = new Set(activeExporters.map(e => e.exporterId));
+        const activeProducers = allProducers.filter(p => p.status !== 'inactivo');
+        const activeProducerIds = new Set(activeProducers.map(p => p.producerId));
+
+        const exporterMap = new Map(activeExporters.map(e => [e.exporterId, e.name]));
+        const producerMap = new Map(activeProducers.map(p => [p.producerId, p.shortName]));
 
         const aggregation: Record<string, {
             exporterName: string;
@@ -57,6 +62,9 @@ export default function ProducerBalanceReportPage() {
         }> = {};
 
         (movements || []).forEach(mov => {
+            // Only aggregate for currently active exporters and producers
+            if (!activeExporterIds.has(mov.exporterId) || !activeProducerIds.has(mov.producerId)) return;
+
             const expName = exporterMap.get(mov.exporterId) || mov.exporterId;
             const prodName = producerMap.get(mov.producerId) || mov.producerId;
 
@@ -88,7 +96,7 @@ export default function ProducerBalanceReportPage() {
             }))
             .filter(item => item.entradas !== 0 || item.salidas !== 0)
             .sort((a, b) => a.exporterName.localeCompare(b.exporterName) || a.producerName.localeCompare(b.producerName));
-    }, [loading, movements, exporters, producers]);
+    }, [loading, movements, allExporters, allProducers]);
 
     const handleExport = () => {
         const headers = [

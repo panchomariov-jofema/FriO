@@ -279,10 +279,12 @@ export default function DashboardPage() {
 
     const { data: users, loading: loadingUsers } = useFirestoreCollection<UserMaster>('usersMaster');
     const { data: profiles, loading: loadingProfiles } = useFirestoreCollection<Profile>('profiles');
-    const { data: exporters, loading: loadingExporters } = useFirestoreCollection<Exporter>('exporters');
+    const { data: allExporters, loading: loadingExporters } = useFirestoreCollection<Exporter>('exporters');
     const { data: otherClients, loading: loadingOtherClients } = useFirestoreCollection<OtherClient>('otherClients');
     const { data: binMaterialStock, loading: loadingBinStock } = useFirestoreCollection<BinMaterialStock>('binMaterialStock');
     
+    const exporters = React.useMemo(() => allExporters.filter(e => e.status !== 'inactivo'), [allExporters]);
+
     // Optimized Queries
     const baseQueryDeps = [firestore, dateRange];
 
@@ -988,7 +990,7 @@ export default function DashboardPage() {
                             <TableBody>
                                 {loading ? (
                                     Array.from({ length: 5 }).map((_, i) => <TableRow key={i}><TableCell colSpan={6}><Skeleton className="h-4 w-full" /></TableCell></TableRow>)
-                                ) : (latestReceptions || []).length > 0 ? (
+                                ) : latestReceptions.length > 0 ? (
                                     latestReceptions.map(lot => (
                                         <TableRow key={lot.id}>
                                             <TableCell>{lot.createdAt?.toDate().toLocaleString()}</TableCell>

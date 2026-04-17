@@ -74,10 +74,13 @@ type DispatchFormValues = z.infer<typeof dispatchSchema>;
 
 
 function DespachosPageContent() {
-  const { data: exporters, loading: loadingExporters } = useFirestoreCollection<Exporter>('exporters');
+  const { data: allExporters, loading: loadingExporters } = useFirestoreCollection<Exporter>('exporters');
   const { data: chamberLots, loading: loadingChamberLots } = useFirestoreCollection<ChamberLot>('chamberLots');
-  const { data: producers, loading: loadingProducers } = useFirestoreCollection<Producer>('producers');
+  const { data: allProducers, loading: loadingProducers } = useFirestoreCollection<Producer>('producers');
   const { data: otherFruitReceptions, loading: loadingOtherFruit } = useFirestoreCollection<OtherFruitReception>('otherFruitReceptions');
+
+  const exporters = React.useMemo(() => allExporters.filter(e => e.status !== 'inactivo'), [allExporters]);
+  const producers = React.useMemo(() => allProducers.filter(p => p.status !== 'inactivo'), [allProducers]);
 
   const { user } = useUser();
   const firestore = useFirestore();
@@ -121,11 +124,20 @@ function DespachosPageContent() {
   };
 
   const { binsPerChamber, binsPerExporter, binsPerProducer } = React.useMemo(() => {
-    const storedLots = (chamberLots || []).filter(lot => lot.status === 'Almacenado');
+    const activeExporterIds = new Set(exporters.map(e => e.exporterId));
+    const activeProducerNames = new Set(producers.map(p => p.shortName));
+
+    const storedLots = (chamberLots || [])
+        .filter(lot => lot.status === 'Almacenado' && activeExporterIds.has(lot.exporterId));
 
     const storedOtherFruit = showCherryOnly ? [] : (otherFruitReceptions || [])
         .flatMap(r => r.items.map(item => ({ ...item, reception: r })))
-        .filter((item) => item.status === 'Almacenado' && item.quantity > 0 && item.storageLocation?.chamberId);
+        .filter((item) => 
+            item.status === 'Almacenado' && 
+            item.quantity > 0 && 
+            item.storageLocation?.chamberId &&
+            activeExporterIds.has(item.reception.clientId)
+        );
 
 
     // Bins per Chamber
@@ -159,21 +171,21 @@ function DespachosPageContent() {
     // Bins per Producer
     const perProducer = storedLots.reduce((acc, lot) => {
       const producerName = lot.producerShortName;
-      if (producerName) {
+      if (producerName && activeProducerNames.has(producerName)) {
           acc[producerName] = (acc[producerName] || 0) + lot.binCount;
       }
       return acc;
     }, {} as Record<string, number>);
 
     return { binsPerChamber: perChamber, binsPerExporter: perExporter, binsPerProducer: perProducer };
-  }, [chamberLots, otherFruitReceptions, showCherryOnly]);
+  }, [chamberLots, otherFruitReceptions, showCherryOnly, exporters, producers]);
 
   const onSubmit = async (values: DispatchFormValues) => {
     if (!firestore || !exporters || !chamberLots) return;
   
     const selectedExporter = exporters.find(e => e.exporterId === values.exporterId);
     if (!selectedExporter) {
-        toast({ variant: 'destructive', title: 'Error', description: 'Cliente no encontrado.' });
+        toast({ variant: 'destructive', title: 'Error', description: 'Cliente no encontrado o inactivo.' });
         return;
     }
   
@@ -303,7 +315,7 @@ function DespachosPageContent() {
     <div className="space-y-6">
       <div className="flex justify-end">
         <div className="flex items-center space-x-2">
-          <Switch id="cherry-filter" checked={showCherryOnly} onCheckedChange={setShowCherryOnly} />
+          <Switch id="cherry-filter" checked={showCherryOnly} onChange={() => setShowCherryOnly(!showCherryOnly)} />
           <Label htmlFor="cherry-filter">Solo Cereza</Label>
         </div>
       </div>

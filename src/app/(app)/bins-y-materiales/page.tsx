@@ -23,7 +23,12 @@ export default function BinsYMaterialesPage() {
   const [selectedProducerId, setSelectedProducerId] = React.useState<string | null>(null);
   const [isDirectDispatch, setIsDirectDispatch] = React.useState(false);
 
-  const { data: exporters, loading: loadingExporters } = useFirestoreCollection<Exporter>('exporters');
+  const { data: allExporters, loading: loadingExporters } = useFirestoreCollection<Exporter>('exporters');
+  
+  const exporters = React.useMemo(() => {
+    return allExporters.filter(e => e.status !== 'inactivo');
+  }, [allExporters]);
+
   const { data: producers, loading: loadingProducers } = useProducersByExporter(selectedExporterId);
   const firestore = useFirestore();
   const { permissions } = usePermissions();
