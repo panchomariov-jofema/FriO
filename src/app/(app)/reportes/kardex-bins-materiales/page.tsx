@@ -1,15 +1,22 @@
+
 'use client';
 
 import * as React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
-import type { BinMaterialMovement, ChamberLot, Dispatch, Exporter, Producer, ReceptionLot } from '@/lib/types';
+import type { BinMaterialMovement, ChamberLot, Dispatch, Exporter, Producer, ReceptionLot, BinMaterial, BinMaterialStock } from '@/lib/types';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ReportHeader } from '@/components/reports/ReportHeader';
 import { Badge } from '@/components/ui/badge';
-import { Timestamp } from 'firebase/firestore';
+import { Timestamp, collection, doc, writeBatch, query, where, getDocs, serverTimestamp } from 'firebase/firestore';
+import { Button } from '@/components/ui/button';
+import { Upload, Download } from 'lucide-react';
+import { useFirestore, useUser } from '@/firebase';
+import { useToast } from '@/hooks/use-toast';
+import { parse } from 'date-fns';
 
+const IMPORT_HEADERS = ['fecha', 'tipo', 'documento', 'driverName', 'driverRUT', 'exporterId', 'producerId', 'binMaterialCode', 'cantidad'];
 
 function convertToCSV(data: any[], headers: {key: string, label: string}[]) {
     const headerRow = headers.map(h => h.label).join(';');
@@ -57,18 +64,24 @@ interface KardexItem {
 
 
 export default function BinMaterialKardexReportPage() {
+    const firestore = useFirestore();
+    const { user } = useUser();
+    const { toast } = useToast();
+    const fileInputRef = React.useRef<HTMLInputElement>(null);
+
     const { data: movements, loading: loadingMovements } = useFirestoreCollection<BinMaterialMovement>('binMaterialMovements');
     const { data: chamberLots, loading: loadingChamberLots } = useFirestoreCollection<ChamberLot>('chamberLots');
     const { data: dispatches, loading: loadingDispatches } = useFirestoreCollection<Dispatch>('dispatches');
     const { data: exporters, loading: loadingExporters } = useFirestoreCollection<Exporter>('exporters');
     const { data: producers, loading: loadingProducers } = useFirestoreCollection<Producer>('producers');
     const { data: receptionLots, loading: loadingReceptions } = useFirestoreCollection<ReceptionLot>('receptionLots');
+    const { data: allMaterials } = useFirestoreCollection<BinMaterial>('binMaterials');
 
     const loading = loadingMovements || loadingChamberLots || loadingDispatches || loadingExporters || loadingProducers || loadingReceptions;
 
     const { exporterMap, producerMap, receptionLotMap } = React.useMemo(() => {
         const expMap = new Map((exporters || []).map(e => [e.exporterId, e.name]));
-        const prodMap = new Map((producers || []).map(p => [p.producerId, p.name]));
+        const prodMap = new Map((producers || []).map(p => [p.producerId, p.shortName]));
         const recLotMap = new Map((receptionLots || []).map(l => [l.displayLotId, l]));
         return { exporterMap: expMap, producerMap: prodMap, receptionLotMap: recLotMap };
     }, [exporters, producers, receptionLots]);
@@ -105,7 +118,7 @@ export default function BinMaterialKardexReportPage() {
                     fecha: lot.storedAt,
                     exportador: exporterMap.get(lot.exporterId) || lot.exporterId,
                     productor: lot.producerShortName,
-                    codigoProducto: 'FRUTA', // Generic code for fruit bins
+                    codigoProducto: 'FRUTA',
                     nombreProducto: lot.variety,
                     cantidad: lot.binCount,
                     movimiento: 'Almacenamiento Cámara',
@@ -157,6 +170,123 @@ export default function BinMaterialKardexReportPage() {
         downloadCSV(csv, 'kardex_bins_y_materiales.csv');
     };
 
+    const handleDownloadTemplate = () => {
+        const csvContent = "data:text/csv;charset=utf-8," + IMPORT_HEADERS.join(',');
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", "plantilla_historico_kardex.csv");
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
+    const handleFileImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file || !firestore) return;
+
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+            const text = e.target?.result as string;
+            const lines = text.split('\n').filter(line => line.trim() !== '');
+            if (lines.length <= 1) {
+                toast({ title: 'Error', description: 'El archivo está vacío.', variant: 'destructive' });
+                return;
+            }
+
+            const headers = lines[0].split(',').map(h => h.trim());
+            if (!IMPORT_HEADERS.every(h => headers.includes(h))) {
+                toast({ title: 'Formato inválido', description: 'Las cabeceras no coinciden.', variant: 'destructive' });
+                return;
+            }
+
+            const batch = writeBatch(firestore);
+            const materialMap = new Map(allMaterials.map(m => [`${m.code}_${m.exporterId}`, m]));
+            const errors: string[] = [];
+            let processed = 0;
+
+            for (let i = 1; i < lines.length; i++) {
+                const values = lines[i].split(',').map(v => v.trim());
+                const row = Object.fromEntries(headers.map((h, idx) => [h, values[idx]]));
+
+                const { fecha, tipo, documento, driverName, driverRUT, exporterId, producerId, binMaterialCode, cantidad } = row;
+                const qty = parseInt(cantidad, 10);
+                const type = tipo.toLowerCase() as 'entrada' | 'salida';
+
+                const material = materialMap.get(`${binMaterialCode}_${exporterId}`);
+                if (!material) {
+                    errors.push(`Línea ${i + 1}: Material ${binMaterialCode} no existe para exportador ${exporterId}`);
+                    continue;
+                }
+
+                let parsedDate = parse(fecha, 'yyyy-MM-dd HH:mm', new Date());
+                if (isNaN(parsedDate.getTime())) {
+                    errors.push(`Línea ${i + 1}: Fecha inválida. Use YYYY-MM-DD HH:mm`);
+                    continue;
+                }
+
+                // 1. Create movement
+                const movementRef = doc(collection(firestore, 'binMaterialMovements'));
+                batch.set(movementRef, {
+                    type,
+                    documento,
+                    driverName,
+                    driverRUT,
+                    exporterId,
+                    producerId,
+                    items: [{
+                        binMaterialId: material.id,
+                        binMaterialCode: material.code,
+                        binMaterialName: material.name,
+                        quantity: qty
+                    }],
+                    createdAt: Timestamp.fromDate(parsedDate),
+                    userName: user?.email || 'Sistema (Importación)',
+                    userId: user?.uid,
+                    observation: 'Carga Histórica'
+                });
+
+                // 2. Update stock
+                const stockQuery = query(
+                    collection(firestore, 'binMaterialStock'),
+                    where('exporterId', '==', exporterId),
+                    where('binMaterialId', '==', material.id)
+                );
+                const stockSnap = await getDocs(stockQuery);
+                const adjustment = type === 'entrada' ? qty : -qty;
+
+                if (stockSnap.empty) {
+                    const newStockRef = doc(collection(firestore, 'binMaterialStock'));
+                    batch.set(newStockRef, {
+                        binMaterialId: material.id,
+                        binMaterialCode: material.code,
+                        binMaterialName: material.name,
+                        exporterId,
+                        quantity: adjustment,
+                        lastUpdatedAt: serverTimestamp()
+                    });
+                } else {
+                    const stockDoc = stockSnap.docs[0];
+                    const currentQty = stockDoc.data().quantity || 0;
+                    batch.update(stockDoc.ref, {
+                        quantity: currentQty + adjustment,
+                        lastUpdatedAt: serverTimestamp()
+                    });
+                }
+                processed++;
+            }
+
+            if (processed > 0) {
+                await batch.commit();
+                toast({ title: 'Éxito', description: `${processed} movimientos cargados y stock actualizado.` });
+            }
+            if (errors.length > 0) {
+                toast({ title: 'Errores', description: `Se saltaron ${errors.length} líneas por errores.`, variant: 'destructive' });
+            }
+        };
+        reader.readAsText(file);
+    };
+
     const getBadgeVariant = (type: string): 'default' | 'destructive' => {
         switch(type) {
             case 'Entrada':
@@ -175,7 +305,19 @@ export default function BinMaterialKardexReportPage() {
                 description="Historial de todos los movimientos de bins (fruta y vacíos) y materiales."
                 onExport={handleExport}
                 isExportDisabled={loading || kardexData.length === 0}
-            />
+            >
+                <div className="flex gap-2">
+                    <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} disabled={loading}>
+                        <Upload className="mr-2 h-4 w-4" />
+                        Importar Histórico
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={handleDownloadTemplate}>
+                        <Download className="mr-2 h-4 w-4" />
+                        Plantilla Histórica
+                    </Button>
+                    <input type="file" ref={fileInputRef} className="hidden" accept=".csv" onChange={handleFileImport} />
+                </div>
+            </ReportHeader>
             <Card>
                 <CardContent className="pt-6">
                     <div className="rounded-md border">
