@@ -15,7 +15,7 @@ export interface Producer {
   producerId: string;
   shortName: string;
   name: string;
-  exporterId: string;
+  exporterId: string | string[];
   rut?: string;
   giro?: string;
   direccion?: string;
@@ -453,5 +453,3 @@ export interface Aisle {
 }
 
 export type MasterData = Exporter | Producer | BinMaterial | OtherClient | PackagingMaster | UserMaster | Profile | Packing | Hidrocooler | BusinessEntity | Warehouse | Aisle;
-
-    

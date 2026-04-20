@@ -42,6 +42,11 @@ import { ModulePermissionsSelector } from '@/components/master-data/ModulePermis
 import { Switch } from '@/components/ui/switch';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Badge } from '@/components/ui/badge';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { ChevronDown } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 const ExporterForm = ({ form }: { form: any }) => (
   <>
@@ -78,6 +83,11 @@ const ExporterForm = ({ form }: { form: any }) => (
 );
 
 const ProducerForm = ({ form, exporters }: { form: any; exporters: Exporter[] }) => {
+  const selectedExporterIds = form.watch('exporterId') || [];
+  const exporterIdArray = React.useMemo(() => {
+    return Array.isArray(selectedExporterIds) ? selectedExporterIds : (selectedExporterIds ? [selectedExporterIds] : []);
+  }, [selectedExporterIds]);
+
   return (
     <>
       <FormField control={form.control} name="producerId" render={({ field }) => (
@@ -89,12 +99,76 @@ const ProducerForm = ({ form, exporters }: { form: any; exporters: Exporter[] })
       <FormField control={form.control} name="name" render={({ field }) => (
         <FormItem><FormLabel>Nombre</FormLabel><FormControl><Input {...field} value={field.value ?? ''} autoComplete="off" /></FormControl><FormMessage /></FormItem>
       )} />
-      <FormField control={form.control} name="exporterId" render={({ field }) => (
-        <FormItem><FormLabel>Exportador</FormLabel><Select onValueChange={field.onChange} value={field.value}>
-          <FormControl><SelectTrigger><SelectValue placeholder="Seleccione un exportador" /></SelectTrigger></FormControl>
-          <SelectContent>{exporters?.map(e => <SelectItem key={e.id} value={e.exporterId}>{e.name}</SelectItem>)}</SelectContent>
-        </Select><FormMessage /></FormItem>
-      )} />
+      
+      <FormField
+        control={form.control}
+        name="exporterId"
+        render={({ field }) => (
+          <FormItem>
+            <FormLabel>Exportador / Dueño (Seleccione uno o más)</FormLabel>
+            <Popover>
+              <PopoverTrigger asChild>
+                <FormControl>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    className={cn(
+                      "w-full justify-between h-auto min-h-10 text-left font-normal",
+                      !exporterIdArray.length && "text-muted-foreground"
+                    )}
+                  >
+                    <div className="flex flex-wrap gap-1">
+                      {exporterIdArray.length > 0 ? (
+                        exporterIdArray.map((id: string) => (
+                          <Badge key={id} variant="secondary" className="font-normal">
+                            {exporters.find(e => e.exporterId === id)?.name || id}
+                          </Badge>
+                        ))
+                      ) : (
+                        "Seleccione exportadores..."
+                      )}
+                    </div>
+                    <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </FormControl>
+              </PopoverTrigger>
+              <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                <ScrollArea className="h-60">
+                  <div className="p-2 space-y-1">
+                    {exporters.filter(e => e.status !== 'inactivo').map((exporter) => (
+                      <div
+                        key={exporter.exporterId}
+                        className={cn(
+                          "flex items-center space-x-2 rounded-sm px-2 py-1.5 cursor-pointer hover:bg-accent hover:text-accent-foreground",
+                          exporterIdArray.includes(exporter.exporterId) && "bg-accent/50"
+                        )}
+                        onClick={() => {
+                          const current = [...exporterIdArray];
+                          const index = current.indexOf(exporter.exporterId);
+                          if (index > -1) {
+                            current.splice(index, 1);
+                          } else {
+                            current.push(exporter.exporterId);
+                          }
+                          field.onChange(current);
+                        }}
+                      >
+                        <Checkbox
+                          checked={exporterIdArray.includes(exporter.exporterId)}
+                          onCheckedChange={() => {}} // handled by parent div click
+                        />
+                        <span className="flex-1 truncate text-sm">{exporter.name}</span>
+                      </div>
+                    ))}
+                  </div>
+                </ScrollArea>
+              </PopoverContent>
+            </Popover>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
+
        <FormField control={form.control} name="rut" render={({ field }) => (
         <FormItem><FormLabel>RUT</FormLabel><FormControl><Input {...field} value={field.value ?? ''} autoComplete="off" /></FormControl><FormMessage /></FormItem>
       )} />
@@ -173,7 +247,7 @@ const BinMaterialForm = ({ form, exporters, binMaterials }: { form: any, exporte
         </Select><FormMessage /></FormItem>
       )} />
       <FormField control={form.control} name="type" render={({ field }) => (
-        <FormItem><FormLabel>Tipo</FormLabel><FormControl><Input {...field} placeholder="Ej: bin, material" autoComplete="off" /></FormControl><FormMessage /></FormItem>
+        <FormItem><FormLabel>Tipo</FormLabel><FormControl><Input {...field} placeholder="Ej: bin, material" autoComplete="off" /></FormControl><FormMessage /></FormMessage></FormItem>
       )} />
     </>
   )
@@ -506,7 +580,16 @@ export default function DatosMaestrosPage() {
                 {key: 'shortName', header: 'Nombre Corto'}, 
                 {key: 'name', header: 'Nombre'}, 
                 {key: 'status', header: 'Estado'},
-                {key: 'exporterId', header: 'ID Exportador'},
+                {
+                    key: 'exporterId', 
+                    header: 'ID Exportador',
+                    render: (item: Producer) => {
+                        if (Array.isArray(item.exporterId)) {
+                            return item.exporterId.join(', ');
+                        }
+                        return item.exporterId || '—';
+                    }
+                },
                 {key: 'rut', header: 'RUT'},
                 {key: 'giro', header: 'Giro'},
                 {key: 'direccion', header: 'Dirección'},

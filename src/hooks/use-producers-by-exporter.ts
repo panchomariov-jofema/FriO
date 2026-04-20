@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { collection, onSnapshot, query, where, DocumentData } from 'firebase/firestore';
+import { collection, onSnapshot, query, DocumentData } from 'firebase/firestore';
 import { useFirestore } from '@/firebase';
 import type { Producer } from '@/lib/types';
 
@@ -20,14 +20,21 @@ export function useProducersByExporter(exporterId: string | null) {
     setLoading(true);
     
     const producersRef = collection(firestore, 'producers');
-    const q = query(producersRef, where('exporterId', '==', exporterId));
+    // Fetch all and filter in memory to support both single string and array exporterId
+    const q = query(producersRef);
     
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
       const items: Producer[] = [];
       querySnapshot.forEach((doc) => {
         const producer = { id: doc.id, ...doc.data() } as Producer;
-        // Only include active producers or those without a status property yet
-        if (producer.status !== 'inactivo') {
+        
+        // Check if the producer belongs to the selected exporter
+        const belongsToExporter = Array.isArray(producer.exporterId)
+            ? producer.exporterId.includes(exporterId)
+            : producer.exporterId === exporterId;
+
+        // Only include if associated with exporter and is active
+        if (belongsToExporter && producer.status !== 'inactivo') {
             items.push(producer);
         }
       });
@@ -35,7 +42,6 @@ export function useProducersByExporter(exporterId: string | null) {
       setLoading(false);
     }, (error) => {
       console.error(`Error fetching producers for exporter ${exporterId}:`, error);
-      // Aquí podrías emitir un error global o mostrar un toast si lo prefieres
       setData([]);
       setLoading(false);
     });
