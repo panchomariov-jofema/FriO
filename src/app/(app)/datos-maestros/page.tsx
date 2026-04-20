@@ -134,11 +134,34 @@ const ProducerForm = ({ form, exporters }: { form: any; exporters: Exporter[] })
   )
 };
 
-const BinMaterialForm = ({ form, exporters }: { form: any, exporters: Exporter[] }) => {
+const BinMaterialForm = ({ form, exporters, binMaterials }: { form: any, exporters: Exporter[], binMaterials: BinMaterial[] }) => {
+    const nextCode = React.useMemo(() => {
+        if (!binMaterials || binMaterials.length === 0) return '10016';
+        const numericCodes = binMaterials
+            .map(m => parseInt(m.code, 10))
+            .filter(c => !isNaN(c));
+        const maxCode = numericCodes.length > 0 ? Math.max(...numericCodes) : 10015;
+        return String(Math.max(10015, maxCode) + 1);
+    }, [binMaterials]);
+
+    const currentCode = form.watch('code');
+
+    React.useEffect(() => {
+        if (!currentCode) {
+            form.setValue('code', nextCode);
+        }
+    }, [nextCode, currentCode, form]);
+
     return (
     <>
       <FormField control={form.control} name="code" render={({ field }) => (
-        <FormItem><FormLabel>Código</FormLabel><FormControl><Input {...field} autoComplete="off" /></FormControl><FormMessage /></FormItem>
+        <FormItem>
+          <FormLabel>Código</FormLabel>
+          <FormControl>
+            <Input {...field} readOnly className="bg-muted font-bold" autoComplete="off" />
+          </FormControl>
+          <FormMessage />
+        </FormItem>
       )} />
       <FormField control={form.control} name="name" render={({ field }) => (
         <FormItem><FormLabel>Nombre</FormLabel><FormControl><Input {...field} autoComplete="off" /></FormControl><FormMessage /></FormItem>
@@ -418,6 +441,7 @@ export default function DatosMaestrosPage() {
   const { data: otherClients, loading: loadingOtherClients } = useFirestoreCollection<OtherClient>('otherClients');
   const { data: profiles, loading: loadingProfiles } = useFirestoreCollection<Profile>('profiles');
   const { data: warehouses, loading: loadingWarehouses } = useFirestoreCollection<Warehouse>('warehouses');
+  const { data: binMaterials, loading: loadingBinMaterials } = useFirestoreCollection<BinMaterial>('binMaterials');
 
   const warehouseMap = React.useMemo(() => {
     if (loadingWarehouses || !warehouses) return new Map<string, string>();
@@ -506,7 +530,10 @@ export default function DatosMaestrosPage() {
               docNameField="name"
               csvHeaders={['code', 'name', 'exporterId', 'type']}
               csvTemplateFileName="plantilla_bins_y_materiales.csv"
-              formProps={{ exporters: loadingExporters ? [] : exporters }}
+              formProps={{ 
+                exporters: loadingExporters ? [] : exporters,
+                binMaterials: loadingBinMaterials ? [] : binMaterials
+              }}
             />
           </TabsContent>
           <TabsContent value="otherClients" className="mt-4">
