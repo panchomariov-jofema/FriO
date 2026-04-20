@@ -5,9 +5,25 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useFirestore } from '@/firebase';
 import type { BinMaterialStock, Exporter } from '@/lib/types';
-import { collection, onSnapshot, query, where, Query } from 'firebase/firestore';
+import { collection, onSnapshot, query, where, Query, getDocs, writeBatch } from 'firebase/firestore';
 import { Skeleton } from '../ui/skeleton';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
+import { Button } from '../ui/button';
+import { Trash2 } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError } from '@/firebase/errors';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 
 interface StockTabProps {
   exporterId: string | null;
@@ -18,6 +34,7 @@ export function StockTab({ exporterId }: StockTabProps) {
   const [stock, setStock] = React.useState<BinMaterialStock[]>([]);
   const [loading, setLoading] = React.useState(true);
   const { data: exporters, loading: loadingExporters } = useFirestoreCollection<Exporter>('exporters');
+  const { toast } = useToast();
 
   const exporterMap = React.useMemo(() => {
     return exporters.reduce((acc, exporter) => {
@@ -54,18 +71,71 @@ export function StockTab({ exporterId }: StockTabProps) {
     return () => unsubscribe();
   }, [firestore, exporterId]);
 
+  const handleClearStock = async () => {
+    if (!firestore) return;
+
+    try {
+      const stockRef = collection(firestore, 'binMaterialStock');
+      const querySnapshot = await getDocs(stockRef);
+      
+      if (querySnapshot.empty) {
+        toast({ title: 'Sin Stock', description: 'No hay registros de stock para eliminar.' });
+        return;
+      }
+
+      const batch = writeBatch(firestore);
+      querySnapshot.forEach((doc) => {
+        batch.delete(doc.ref);
+      });
+
+      await batch.commit();
+      toast({ title: 'Éxito', description: 'Todo el stock de bins y materiales ha sido eliminado para la nueva temporada.' });
+    } catch (e: any) {
+      console.error("Error al limpiar el stock: ", e);
+      toast({ variant: 'destructive', title: 'Error', description: 'Ocurrió un error al limpiar el stock.' });
+      errorEmitter.emit('permission-error', new FirestorePermissionError({
+          path: 'binMaterialStock',
+          operation: 'delete'
+      }));
+    }
+  };
+
   const isLoading = loading || loadingExporters;
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle>Stock Actual</CardTitle>
-        <CardDescription>
-          {exporterId 
-            ? 'Saldos de bins y materiales para el exportador seleccionado.'
-            : 'Saldos de bins y materiales para todos los exportadores.'
-          }
-        </CardDescription>
+      <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div>
+          <CardTitle>Stock Actual</CardTitle>
+          <CardDescription>
+            {exporterId 
+              ? 'Saldos de bins y materiales para el exportador seleccionado.'
+              : 'Saldos de bins y materiales para todos los exportadores.'
+            }
+          </CardDescription>
+        </div>
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button variant="destructive" size="sm">
+              <Trash2 className="mr-2 h-4 w-4" />
+              Limpiar Stock General
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>¿Está seguro de limpiar TODO el stock?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Esta acción eliminará permanentemente todos los registros de stock de bins y materiales (de todos los exportadores). Use esta opción solo para iniciar una nueva temporada.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction onClick={handleClearStock} className="bg-destructive hover:bg-destructive/90">
+                Sí, Limpiar Todo
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </CardHeader>
       <CardContent>
         {/* Mobile View */}
