@@ -435,13 +435,16 @@ export default function BinMaterialKardexReportPage() {
                     <code className="text-xs font-mono bg-muted p-1 block rounded mb-2">
                         {FRIENDLY_HEADERS.join(',')}
                     </code>
-                    <ul className="list-disc list-inside space-y-1">
-                        <li><strong>Fecha:</strong> Formato AAAA-MM-DD (ej: 2026-03-01).</li>
-                        <li><strong>Tipo:</strong> Escriba "entrada" o "salida".</li>
-                        <li><strong>ID Exportador:</strong> Use el código corto definido en Datos Maestros (ej: SUBSOLE).</li>
-                        <li><strong>ID Productor:</strong> Use el código corto del productor (ej: PROD-01).</li>
-                        <li><strong>Código Material:</strong> Debe existir en el maestro para ese exportador.</li>
-                    </ul>
+                    <div className="space-y-1 text-sm">
+                        <p><strong>Ejemplo Saldo Inicial:</strong> <code className="bg-muted px-1">2026-03-01,entrada,SALDO-INICIAL,SISTEMA,0,SUBSOLE,PROD-01,10016,500</code></p>
+                        <ul className="list-disc list-inside space-y-1 mt-2">
+                            <li><strong>Fecha:</strong> Formato AAAA-MM-DD (ej: 2026-03-01).</li>
+                            <li><strong>Tipo:</strong> Escriba "entrada" o "salida".</li>
+                            <li><strong>ID Exportador:</strong> Use el código corto definido en Datos Maestros (ej: SUBSOLE).</li>
+                            <li><strong>ID Productor:</strong> Use el código corto del productor (ej: PROD-01).</li>
+                            <li><strong>Código Material:</strong> Debe existir en el maestro para ese exportador (ej: 10016).</li>
+                        </ul>
+                    </div>
                 </AlertDescription>
             </Alert>
 
