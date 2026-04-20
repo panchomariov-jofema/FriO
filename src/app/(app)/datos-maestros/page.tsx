@@ -247,7 +247,7 @@ const BinMaterialForm = ({ form, exporters, binMaterials }: { form: any, exporte
         </Select><FormMessage /></FormItem>
       )} />
       <FormField control={form.control} name="type" render={({ field }) => (
-        <FormItem><FormLabel>Tipo</FormLabel><FormControl><Input {...field} placeholder="Ej: bin, material" autoComplete="off" /></FormControl><FormMessage /></FormMessage></FormItem>
+        <FormItem><FormLabel>Tipo</FormLabel><FormControl><Input {...field} placeholder="Ej: bin, material" autoComplete="off" /></FormControl><FormMessage /></FormItem>
       )} />
     </>
   )
