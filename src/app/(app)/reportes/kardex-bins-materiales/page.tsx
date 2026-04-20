@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -11,10 +10,21 @@ import { ReportHeader } from '@/components/reports/ReportHeader';
 import { Badge } from '@/components/ui/badge';
 import { Timestamp, collection, doc, writeBatch, query, where, getDocs, serverTimestamp } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
-import { Upload, Download } from 'lucide-react';
+import { Upload, Download, Trash2 } from 'lucide-react';
 import { useFirestore, useUser } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { parse } from 'date-fns';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 
 const IMPORT_HEADERS = ['fecha', 'tipo', 'documento', 'driverName', 'driverRUT', 'exporterId', 'producerId', 'binMaterialCode', 'cantidad'];
 
@@ -229,7 +239,7 @@ export default function BinMaterialKardexReportPage() {
                 const movementRef = doc(collection(firestore, 'binMaterialMovements'));
                 batch.set(movementRef, {
                     type,
-                    documento,
+                    document: documento,
                     driverName,
                     driverRUT,
                     exporterId,
@@ -287,6 +297,26 @@ export default function BinMaterialKardexReportPage() {
         reader.readAsText(file);
     };
 
+    const handleClearMovements = async () => {
+        if (!firestore) return;
+        try {
+            const collRef = collection(firestore, 'binMaterialMovements');
+            const snap = await getDocs(collRef);
+            if (snap.empty) {
+                toast({ title: 'Sin registros', description: 'No hay movimientos para eliminar.' });
+                return;
+            }
+
+            const batch = writeBatch(firestore);
+            snap.docs.forEach(d => batch.delete(d.ref));
+            await batch.commit();
+            toast({ title: 'Éxito', description: 'Se han eliminado todos los movimientos de bins y materiales.' });
+        } catch (e) {
+            console.error(e);
+            toast({ title: 'Error', description: 'No se pudieron eliminar los registros.', variant: 'destructive' });
+        }
+    };
+
     const getBadgeVariant = (type: string): 'default' | 'destructive' => {
         switch(type) {
             case 'Entrada':
@@ -306,7 +336,7 @@ export default function BinMaterialKardexReportPage() {
                 onExport={handleExport}
                 isExportDisabled={loading || kardexData.length === 0}
             >
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                     <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} disabled={loading}>
                         <Upload className="mr-2 h-4 w-4" />
                         Importar Histórico
@@ -315,6 +345,30 @@ export default function BinMaterialKardexReportPage() {
                         <Download className="mr-2 h-4 w-4" />
                         Plantilla Histórica
                     </Button>
+                    <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                            <Button variant="destructive" size="sm" disabled={loading}>
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                Limpiar Historial
+                            </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                            <AlertDialogHeader>
+                                <AlertDialogTitle>¿Está seguro de eliminar TODO el historial?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                    Esta acción eliminará permanentemente todos los registros de movimientos de bins y materiales. 
+                                    Esto es útil para reiniciar el sistema después de las pruebas. 
+                                    Nota: Esto no afectará los saldos de stock actuales.
+                                </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                <AlertDialogAction onClick={handleClearMovements} className="bg-destructive hover:bg-destructive/90">
+                                    Sí, Eliminar Todo
+                                </AlertDialogAction>
+                            </AlertDialogFooter>
+                        </AlertDialogContent>
+                    </AlertDialog>
                     <input type="file" ref={fileInputRef} className="hidden" accept=".csv" onChange={handleFileImport} />
                 </div>
             </ReportHeader>
