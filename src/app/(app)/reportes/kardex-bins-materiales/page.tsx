@@ -10,7 +10,7 @@ import { ReportHeader } from '@/components/reports/ReportHeader';
 import { Badge } from '@/components/ui/badge';
 import { Timestamp, collection, doc, writeBatch, query, where, getDocs, serverTimestamp } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
-import { Upload, Download, Trash2 } from 'lucide-react';
+import { Upload, Download, Trash2, Info } from 'lucide-react';
 import { useFirestore, useUser } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { parse } from 'date-fns';
@@ -25,6 +25,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 const IMPORT_HEADERS = ['fecha', 'tipo', 'documento', 'driverName', 'driverRUT', 'exporterId', 'producerId', 'binMaterialCode', 'cantidad'];
 
@@ -108,7 +109,7 @@ export default function BinMaterialKardexReportPage() {
                     codigoProducto: item.binMaterialCode,
                     nombreProducto: item.binMaterialName,
                     cantidad: item.quantity,
-                    movimiento: isDirectDispatch ? 'Despacho Directo' : 'Bins y Materiales',
+                    movimiento: mov.observation || (isDirectDispatch ? 'Despacho Directo' : 'Bins y Materiales'),
                     tipo: (mov.type === 'entrada' && !isDirectDispatch) ? 'Entrada' : 'Salida',
                     userName: mov.userName,
                 });
@@ -223,9 +224,14 @@ export default function BinMaterialKardexReportPage() {
                     continue;
                 }
 
+                // Try both standard formats
                 let parsedDate = parse(fecha, 'yyyy-MM-dd HH:mm', new Date());
                 if (isNaN(parsedDate.getTime())) {
-                    errors.push(`Línea ${i + 1}: Fecha inválida. Use YYYY-MM-DD HH:mm`);
+                    parsedDate = parse(fecha, 'yyyy-MM-dd', new Date());
+                }
+
+                if (isNaN(parsedDate.getTime())) {
+                    errors.push(`Línea ${i + 1}: Fecha inválida. Use YYYY-MM-DD`);
                     continue;
                 }
 
@@ -249,7 +255,7 @@ export default function BinMaterialKardexReportPage() {
                     createdAt: Timestamp.fromDate(parsedDate),
                     userName: user?.email || 'Sistema (Importación)',
                     userId: user?.uid,
-                    observation: 'Carga Histórica'
+                    observation: 'Carga Histórica / Saldo Inicial'
                 });
 
                 // 2. Update stock
@@ -285,7 +291,7 @@ export default function BinMaterialKardexReportPage() {
             }
 
             if (processed > 0) {
-                toast({ title: 'Éxito', description: `${processed} movimientos cargados y stock actualizado.` });
+                toast({ title: 'Éxito', description: `${processed} registros cargados y stock actualizado.` });
             }
             if (errors.length > 0) {
                 toast({ title: 'Errores', description: `Se saltaron ${errors.length} líneas por errores.`, variant: 'destructive' });
@@ -348,7 +354,7 @@ export default function BinMaterialKardexReportPage() {
         <div className="space-y-6">
             <ReportHeader
                 title="Kardex de Movimientos de Bins y Materiales"
-                description="Historial de todos los movimientos de bins (fruta y vacíos) y materiales."
+                description="Historial consolidado. Use 'Importar Histórico' para cargar Saldos Iniciales (Ej: al 01/03/2026)."
                 onExport={handleExport}
                 isExportDisabled={loading || kardexData.length === 0}
             >
@@ -387,6 +393,15 @@ export default function BinMaterialKardexReportPage() {
                     <input type="file" ref={fileInputRef} className="hidden" accept=".csv" onChange={handleFileImport} />
                 </div>
             </ReportHeader>
+
+            <Alert>
+                <Info className="h-4 w-4" />
+                <AlertTitle>Nota sobre Saldos Iniciales</AlertTitle>
+                <AlertDescription>
+                    Para cargar los bins en arriendo u otros materiales al inicio de la temporada (ej. 01/03/26), utilice la herramienta de importación masiva con el tipo "entrada" y la fecha deseada.
+                </AlertDescription>
+            </Alert>
+
             <Card>
                 <CardContent className="pt-6">
                     <div className="rounded-md border">

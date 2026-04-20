@@ -23,7 +23,7 @@ const reportList = [
     },
     { 
         title: 'Kardex de Movimientos de Bins y Materiales', 
-        description: 'Historial detallado de entradas y salidas de materiales.',
+        description: 'Historial detallado de entradas, salidas y saldos iniciales históricos.',
         href: '/reportes/kardex-bins-materiales'
     },
     { 
