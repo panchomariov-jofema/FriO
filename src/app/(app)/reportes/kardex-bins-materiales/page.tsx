@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
-import type { BinMaterialMovement, ChamberLot, Dispatch, Exporter, Producer, ReceptionLot, BinMaterial, BinMaterialStock } from '@/lib/types';
+import type { BinMaterialMovement, ChamberLot, Dispatch, Exporter, Producer, ReceptionLot, BinMaterial } from '@/lib/types';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ReportHeader } from '@/components/reports/ReportHeader';
@@ -35,8 +35,8 @@ function convertToCSV(data: any[], headers: {key: string, label: string}[]) {
             let value = row[header.key];
              if (value instanceof Date) {
                 value = value.toLocaleString('es-CL');
-            } else if (typeof value === 'object' && value !== null && value.toDate) {
-                value = value.toDate().toLocaleString('es-CL');
+            } else if (typeof value === 'object' && value !== null && (value as any).toDate) {
+                value = (value as any).toDate().toLocaleString('es-CL');
             }
             const stringValue = String(value ?? '');
             return `"${stringValue.replace(/"/g, '""')}"`;
@@ -47,16 +47,11 @@ function convertToCSV(data: any[], headers: {key: string, label: string}[]) {
 
 function downloadCSV(csvString: string, filename: string) {
     const blob = new Blob([`\uFEFF${csvString}`], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    if (link.download !== undefined) {
-        const url = URL.createObjectURL(blob);
-        link.setAttribute('href', url);
-        link.setAttribute('download', filename);
-        link.style.visibility = 'hidden';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-    }
+    const link = document.body.appendChild(document.createElement('a'));
+    link.href = URL.createObjectURL(blob);
+    link.download = filename;
+    link.click();
+    document.body.removeChild(link);
 }
 
 interface KardexItem {
@@ -210,7 +205,6 @@ export default function BinMaterialKardexReportPage() {
                 return;
             }
 
-            const batch = writeBatch(firestore);
             const materialMap = new Map(allMaterials.map(m => [`${m.code}_${m.exporterId}`, m]));
             const errors: string[] = [];
             let processed = 0;
@@ -234,6 +228,8 @@ export default function BinMaterialKardexReportPage() {
                     errors.push(`Línea ${i + 1}: Fecha inválida. Use YYYY-MM-DD HH:mm`);
                     continue;
                 }
+
+                const batch = writeBatch(firestore);
 
                 // 1. Create movement
                 const movementRef = doc(collection(firestore, 'binMaterialMovements'));
@@ -283,11 +279,12 @@ export default function BinMaterialKardexReportPage() {
                         lastUpdatedAt: serverTimestamp()
                     });
                 }
+                
+                await batch.commit();
                 processed++;
             }
 
             if (processed > 0) {
-                await batch.commit();
                 toast({ title: 'Éxito', description: `${processed} movimientos cargados y stock actualizado.` });
             }
             if (errors.length > 0) {
@@ -307,9 +304,19 @@ export default function BinMaterialKardexReportPage() {
                 return;
             }
 
-            const batch = writeBatch(firestore);
-            snap.docs.forEach(d => batch.delete(d.ref));
-            await batch.commit();
+            // Delete in batches of 500
+            const docs = snap.docs;
+            const chunks = [];
+            for (let i = 0; i < docs.length; i += 500) {
+              chunks.push(docs.slice(i, i + 500));
+            }
+
+            for (const chunk of chunks) {
+              const batch = writeBatch(firestore);
+              chunk.forEach((d) => batch.delete(d.ref));
+              await batch.commit();
+            }
+
             toast({ title: 'Éxito', description: 'Se han eliminado todos los movimientos de bins y materiales.' });
         } catch (e) {
             console.error(e);
@@ -356,7 +363,7 @@ export default function BinMaterialKardexReportPage() {
                             <AlertDialogHeader>
                                 <AlertDialogTitle>¿Está seguro de eliminar TODO el historial?</AlertDialogTitle>
                                 <AlertDialogDescription>
-                                    Esta acción eliminará permanentemente todos los registros de movimientos de bins y materiales. 
+                                    Esta acción eliminará permanentemente todos los registros de movimientos de la colección binMaterialMovements. 
                                     Esto es útil para reiniciar el sistema después de las pruebas. 
                                     Nota: Esto no afectará los saldos de stock actuales.
                                 </AlertDialogDescription>
