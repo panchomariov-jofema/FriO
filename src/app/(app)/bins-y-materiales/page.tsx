@@ -97,7 +97,7 @@ export default function BinsYMaterialesPage() {
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="exporter-select">Exportador</Label>
+              <Label htmlFor="exporter-select">Exportador / Dueño</Label>
               <Select
                 value={selectedExporterId ?? ''}
                 onValueChange={(value) => {
@@ -119,7 +119,7 @@ export default function BinsYMaterialesPage() {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="producer-select">Productor</Label>
+              <Label htmlFor="producer-select">Productor / Arrendatario</Label>
               <Select
                 value={selectedProducerId ?? ''}
                 onValueChange={(value) => setSelectedProducerId(value)}
