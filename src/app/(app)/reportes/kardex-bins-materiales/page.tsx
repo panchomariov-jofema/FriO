@@ -297,27 +297,36 @@ export default function BinMaterialKardexReportPage() {
     const handleClearMovements = async () => {
         if (!firestore) return;
         try {
-            const collRef = collection(firestore, 'binMaterialMovements');
-            const snap = await getDocs(collRef);
-            if (snap.empty) {
-                toast({ title: 'Sin registros', description: 'No hay movimientos para eliminar.' });
-                return;
+            const collectionsToClear = ['binMaterialMovements', 'chamberLots', 'dispatches'];
+            let totalDeleted = 0;
+
+            for (const collName of collectionsToClear) {
+                const collRef = collection(firestore, collName);
+                const snap = await getDocs(collRef);
+                
+                if (!snap.empty) {
+                    const docs = snap.docs;
+                    const chunks = [];
+                    for (let i = 0; i < docs.length; i += 500) {
+                      chunks.push(docs.slice(i, i + 500));
+                    }
+
+                    for (const chunk of chunks) {
+                      const batch = writeBatch(firestore);
+                      chunk.forEach((d) => {
+                        batch.delete(d.ref);
+                        totalDeleted++;
+                      });
+                      await batch.commit();
+                    }
+                }
             }
 
-            // Delete in batches of 500
-            const docs = snap.docs;
-            const chunks = [];
-            for (let i = 0; i < docs.length; i += 500) {
-              chunks.push(docs.slice(i, i + 500));
+            if (totalDeleted === 0) {
+                toast({ title: 'Sin registros', description: 'No hay datos en el Kardex para eliminar.' });
+            } else {
+                toast({ title: 'Éxito', description: `Se han eliminado ${totalDeleted} registros para reiniciar el Kardex por completo.` });
             }
-
-            for (const chunk of chunks) {
-              const batch = writeBatch(firestore);
-              chunk.forEach((d) => batch.delete(d.ref));
-              await batch.commit();
-            }
-
-            toast({ title: 'Éxito', description: 'Se han eliminado todos los movimientos de bins y materiales.' });
         } catch (e) {
             console.error(e);
             toast({ title: 'Error', description: 'No se pudieron eliminar los registros.', variant: 'destructive' });
@@ -363,9 +372,8 @@ export default function BinMaterialKardexReportPage() {
                             <AlertDialogHeader>
                                 <AlertDialogTitle>¿Está seguro de eliminar TODO el historial?</AlertDialogTitle>
                                 <AlertDialogDescription>
-                                    Esta acción eliminará permanentemente todos los registros de movimientos de la colección binMaterialMovements. 
-                                    Esto es útil para reiniciar el sistema después de las pruebas. 
-                                    Nota: Esto no afectará los saldos de stock actuales.
+                                    Esta acción eliminará permanentemente todos los registros del reporte, incluyendo movimientos de materiales, ingresos a cámara y despachos de fruta.
+                                    Úselo solo para reiniciar el sistema por completo.
                                 </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>
