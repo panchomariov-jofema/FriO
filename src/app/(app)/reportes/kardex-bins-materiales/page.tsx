@@ -28,7 +28,7 @@ import {
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 const IMPORT_HEADER_MAP: Record<string, string> = {
-  'Fecha (AAAA-MM-DD)': 'fecha',
+  'Fecha (DD-MM-YYYY)': 'fecha',
   'Tipo (entrada/salida)': 'tipo',
   'Documento': 'documento',
   'Nombre Conductor': 'driverName',
@@ -103,6 +103,12 @@ export default function BinMaterialKardexReportPage() {
         return { exporterMap: expMap, producerMap: prodMap, receptionLotMap: recLotMap };
     }, [exporters, producers, receptionLots]);
 
+    const formatUserName = (name?: string) => {
+        if (!name) return 'N/A';
+        if (name === 'francisco.villarreal@outlook.es') return 'ADMINISTRADOR';
+        return name;
+    };
+
     const kardexData = React.useMemo(() => {
         if (loading) return [];
         
@@ -122,7 +128,7 @@ export default function BinMaterialKardexReportPage() {
                     cantidad: item.quantity,
                     movimiento: mov.observation || (isDirectDispatch ? 'Despacho Directo' : 'Bins y Materiales'),
                     tipo: (mov.type === 'entrada' && !isDirectDispatch) ? 'Entrada' : 'Salida',
-                    userName: mov.userName,
+                    userName: formatUserName(mov.userName),
                 });
             });
         });
@@ -140,7 +146,7 @@ export default function BinMaterialKardexReportPage() {
                     cantidad: lot.binCount,
                     movimiento: 'Almacenamiento Cámara',
                     tipo: 'Entrada',
-                    userName: lot.userName,
+                    userName: formatUserName(lot.userName),
                 });
             }
         });
@@ -160,7 +166,7 @@ export default function BinMaterialKardexReportPage() {
                         cantidad: bin.binCount,
                         movimiento: 'Despacho',
                         tipo: 'Salida',
-                        userName: dispatch.userName,
+                        userName: formatUserName(dispatch.userName),
                     });
                 });
             }
@@ -255,13 +261,13 @@ export default function BinMaterialKardexReportPage() {
                     continue;
                 }
 
-                let parsedDate = parse(fecha, 'yyyy-MM-dd HH:mm', new Date());
+                let parsedDate = parse(fecha, 'dd-MM-yyyy HH:mm', new Date());
                 if (isNaN(parsedDate.getTime())) {
-                    parsedDate = parse(fecha, 'yyyy-MM-dd', new Date());
+                    parsedDate = parse(fecha, 'dd-MM-yyyy', new Date());
                 }
 
                 if (isNaN(parsedDate.getTime())) {
-                    errors.push(`Línea ${i + 1}: Fecha inválida (${fecha}). Use YYYY-MM-DD`);
+                    errors.push(`Línea ${i + 1}: Fecha inválida (${fecha}). Use DD-MM-YYYY`);
                     continue;
                 }
 
@@ -336,6 +342,7 @@ export default function BinMaterialKardexReportPage() {
     const handleClearMovements = async () => {
         if (!firestore) return;
         try {
+            // Eliminar solo los movimientos manuales/importados
             const collectionsToClear = ['binMaterialMovements'];
             let totalDeleted = 0;
 
@@ -362,7 +369,7 @@ export default function BinMaterialKardexReportPage() {
             }
 
             if (totalDeleted === 0) {
-                toast({ title: 'Sin registros', description: 'No hay datos en el Kardex para eliminar.' });
+                toast({ title: 'Sin registros', description: 'No hay datos de movimientos manuales para eliminar.' });
             } else {
                 toast({ title: 'Éxito', description: `Se han eliminado ${totalDeleted} registros del historial de movimientos.` });
             }
@@ -387,7 +394,7 @@ export default function BinMaterialKardexReportPage() {
         <div className="space-y-6">
             <ReportHeader
                 title="Kardex de Movimientos de Bins y Materiales"
-                description="Historial consolidado. Use 'Importar Histórico' para cargar Saldos Iniciales (Ej: al 01/03/2026)."
+                description="Historial consolidado. Use 'Importar Histórico' para cargar Saldos Iniciales (Ej: al 01-03-2026)."
                 onExport={handleExport}
                 isExportDisabled={loading || kardexData.length === 0}
             >
@@ -428,24 +435,28 @@ export default function BinMaterialKardexReportPage() {
             </ReportHeader>
 
             <Alert>
-                <Info className="h-4 w-4" />
-                <AlertTitle>Instrucciones de Importación</AlertTitle>
-                <AlertDescription>
-                    <p className="mb-2">El archivo debe contener las siguientes columnas exactas (admite coma o punto y coma):</p>
-                    <code className="text-xs font-mono bg-muted p-1 block rounded mb-2">
-                        {FRIENDLY_HEADERS.join(',')}
-                    </code>
-                    <div className="space-y-1 text-sm">
-                        <p><strong>Ejemplo Saldo Inicial:</strong> <code className="bg-muted px-1">2026-03-01,entrada,SALDO-INICIAL,SISTEMA,0,SUBSOLE,PROD-01,10016,500</code></p>
-                        <ul className="list-disc list-inside space-y-1 mt-2">
-                            <li><strong>Fecha:</strong> Formato AAAA-MM-DD (ej: 2026-03-01).</li>
-                            <li><strong>Tipo:</strong> Escriba "entrada" o "salida".</li>
-                            <li><strong>ID Exportador:</strong> Use el código corto definido en Datos Maestros (ej: SUBSOLE).</li>
-                            <li><strong>ID Productor:</strong> Use el código corto del productor (ej: PROD-01).</li>
-                            <li><strong>Código Material:</strong> Debe existir en el maestro para ese exportador (ej: 10016).</li>
-                        </ul>
+                <div className="flex gap-2">
+                    <Info className="h-4 w-4 shrink-0" />
+                    <div>
+                        <AlertTitle>Instrucciones de Importación</AlertTitle>
+                        <AlertDescription>
+                            <p className="mb-2">El archivo debe contener las siguientes columnas exactas (admite coma o punto y coma):</p>
+                            <code className="text-xs font-mono bg-muted p-1 block rounded mb-2">
+                                {FRIENDLY_HEADERS.join(',')}
+                            </code>
+                            <div className="space-y-1 text-sm">
+                                <p><strong>Ejemplo Saldo Inicial:</strong> <code className="bg-muted px-1">01-03-2026,entrada,SALDO-INICIAL,SISTEMA,0,SUBSOLE,PROD-01,10016,500</code></p>
+                                <ul className="list-disc list-inside space-y-1 mt-2">
+                                    <li><strong>Fecha:</strong> Formato DD-MM-YYYY (ej: 01-03-2026).</li>
+                                    <li><strong>Tipo:</strong> Escriba "entrada" o "salida".</li>
+                                    <li><strong>ID Exportador:</strong> Use el código corto definido en Datos Maestros (ej: SUBSOLE).</li>
+                                    <li><strong>ID Productor:</strong> Use el código corto del productor (ej: PROD-01).</li>
+                                    <li><strong>Código Material:</strong> Debe existir en el maestro para ese exportador (ej: 10016).</li>
+                                </ul>
+                            </div>
+                        </AlertDescription>
                     </div>
-                </AlertDescription>
+                </div>
             </Alert>
 
             <Card>
