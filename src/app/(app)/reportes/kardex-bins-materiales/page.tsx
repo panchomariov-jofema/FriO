@@ -205,15 +205,23 @@ export default function BinMaterialKardexReportPage() {
         const reader = new FileReader();
         reader.onload = async (e) => {
             const text = e.target?.result as string;
-            const lines = text.split('\n').filter(line => line.trim() !== '');
+            const lines = text.split(/\r?\n/).filter(line => line.trim() !== '');
             if (lines.length <= 1) {
                 toast({ title: 'Error', description: 'El archivo está vacío.', variant: 'destructive' });
                 return;
             }
 
-            const fileHeaders = lines[0].split(',').map(h => h.trim());
+            // Chile/Excel fix: determine delimiter
+            const firstLine = lines[0];
+            const delimiter = firstLine.includes(';') ? ';' : ',';
+
+            const fileHeaders = firstLine.split(delimiter).map(h => h.trim().replace(/"/g, ''));
             if (!FRIENDLY_HEADERS.every(h => fileHeaders.includes(h))) {
-                toast({ title: 'Formato inválido', description: 'Las cabeceras no coinciden con la plantilla.', variant: 'destructive' });
+                toast({ 
+                  title: 'Formato inválido', 
+                  description: `Las cabeceras no coinciden. Se espera: ${FRIENDLY_HEADERS.join(', ')}`, 
+                  variant: 'destructive' 
+                });
                 return;
             }
 
@@ -222,7 +230,7 @@ export default function BinMaterialKardexReportPage() {
             let processed = 0;
 
             for (let i = 1; i < lines.length; i++) {
-                const values = lines[i].split(',').map(v => v.trim());
+                const values = lines[i].split(delimiter).map(v => v.trim().replace(/"/g, ''));
                 const rowData: Record<string, string> = {};
                 
                 fileHeaders.forEach((h, idx) => {
@@ -236,9 +244,14 @@ export default function BinMaterialKardexReportPage() {
                 const qty = parseInt(cantidad, 10);
                 const type = tipo?.toLowerCase() as 'entrada' | 'salida';
 
+                if (isNaN(qty)) {
+                  errors.push(`Línea ${i + 1}: Cantidad no es un número.`);
+                  continue;
+                }
+
                 const material = materialMap.get(`${binMaterialCode}_${exporterId}`);
                 if (!material) {
-                    errors.push(`Línea ${i + 1}: Material ${binMaterialCode} no existe para exportador ${exporterId}`);
+                    errors.push(`Línea ${i + 1}: Material ${binMaterialCode} no existe para exportador ${exporterId}. Verifique el ID de Exportador (no el nombre).`);
                     continue;
                 }
 
@@ -248,7 +261,7 @@ export default function BinMaterialKardexReportPage() {
                 }
 
                 if (isNaN(parsedDate.getTime())) {
-                    errors.push(`Línea ${i + 1}: Fecha inválida. Use YYYY-MM-DD`);
+                    errors.push(`Línea ${i + 1}: Fecha inválida (${fecha}). Use YYYY-MM-DD`);
                     continue;
                 }
 
@@ -257,9 +270,9 @@ export default function BinMaterialKardexReportPage() {
                 const movementRef = doc(collection(firestore, 'binMaterialMovements'));
                 batch.set(movementRef, {
                     type,
-                    document: documento,
-                    driverName,
-                    driverRUT,
+                    document: documento || '',
+                    driverName: driverName || '',
+                    driverRUT: driverRUT || '',
                     exporterId,
                     producerId,
                     items: [{
@@ -309,7 +322,12 @@ export default function BinMaterialKardexReportPage() {
                 toast({ title: 'Éxito', description: `${processed} registros cargados y stock actualizado.` });
             }
             if (errors.length > 0) {
-                toast({ title: 'Errores', description: `Se saltaron ${errors.length} líneas por errores.`, variant: 'destructive' });
+                toast({ 
+                  title: 'Importación con advertencias', 
+                  description: <div className="max-h-40 overflow-y-auto">{errors.map((e, idx) => <p key={idx}>{e}</p>)}</div>, 
+                  variant: 'destructive',
+                  duration: 8000
+                });
             }
         };
         reader.readAsText(file);
@@ -318,7 +336,7 @@ export default function BinMaterialKardexReportPage() {
     const handleClearMovements = async () => {
         if (!firestore) return;
         try {
-            const collectionsToClear = ['binMaterialMovements', 'chamberLots', 'dispatches'];
+            const collectionsToClear = ['binMaterialMovements'];
             let totalDeleted = 0;
 
             for (const collName of collectionsToClear) {
@@ -346,7 +364,7 @@ export default function BinMaterialKardexReportPage() {
             if (totalDeleted === 0) {
                 toast({ title: 'Sin registros', description: 'No hay datos en el Kardex para eliminar.' });
             } else {
-                toast({ title: 'Éxito', description: `Se han eliminado ${totalDeleted} registros para reiniciar el Kardex por completo.` });
+                toast({ title: 'Éxito', description: `Se han eliminado ${totalDeleted} registros del historial de movimientos.` });
             }
         } catch (e) {
             console.error(e);
@@ -391,16 +409,16 @@ export default function BinMaterialKardexReportPage() {
                         </AlertDialogTrigger>
                         <AlertDialogContent>
                             <AlertDialogHeader>
-                                <AlertDialogTitle>¿Está seguro de eliminar TODO el historial?</AlertDialogTitle>
+                                <AlertDialogTitle>¿Está seguro de eliminar los movimientos registrados?</AlertDialogTitle>
                                 <AlertDialogDescription>
-                                    Esta acción eliminará permanentemente todos los registros del reporte, incluyendo movimientos de materiales, ingresos a cámara y despachos de fruta.
-                                    Úselo solo para reiniciar el sistema por completo.
+                                    Esta acción eliminará permanentemente todos los registros de la colección de movimientos (manuales e importados). 
+                                    Los registros automáticos de ingreso a cámara y despachos de fruta seguirán visibles mientras existan sus documentos de origen.
                                 </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>
                                 <AlertDialogCancel>Cancelar</AlertDialogCancel>
                                 <AlertDialogAction onClick={handleClearMovements} className="bg-destructive hover:bg-destructive/90">
-                                    Sí, Eliminar Todo
+                                    Sí, Eliminar Movimientos
                                 </AlertDialogAction>
                             </AlertDialogFooter>
                         </AlertDialogContent>
@@ -411,9 +429,19 @@ export default function BinMaterialKardexReportPage() {
 
             <Alert>
                 <Info className="h-4 w-4" />
-                <AlertTitle>Nota sobre Saldos Iniciales</AlertTitle>
+                <AlertTitle>Instrucciones de Importación</AlertTitle>
                 <AlertDescription>
-                    Para cargar los bins en arriendo u otros materiales al inicio de la temporada (ej. 01/03/26), utilice la herramienta de importación masiva con el tipo "entrada" y la fecha deseada.
+                    <p className="mb-2">El archivo debe contener las siguientes columnas exactas (admite coma o punto y coma):</p>
+                    <code className="text-xs font-mono bg-muted p-1 block rounded mb-2">
+                        {FRIENDLY_HEADERS.join(',')}
+                    </code>
+                    <ul className="list-disc list-inside space-y-1">
+                        <li><strong>Fecha:</strong> Formato AAAA-MM-DD (ej: 2026-03-01).</li>
+                        <li><strong>Tipo:</strong> Escriba "entrada" o "salida".</li>
+                        <li><strong>ID Exportador:</strong> Use el código corto definido en Datos Maestros (ej: SUBSOLE).</li>
+                        <li><strong>ID Productor:</strong> Use el código corto del productor (ej: PROD-01).</li>
+                        <li><strong>Código Material:</strong> Debe existir en el maestro para ese exportador.</li>
+                    </ul>
                 </AlertDescription>
             </Alert>
 
