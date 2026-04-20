@@ -27,7 +27,18 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
-const IMPORT_HEADERS = ['fecha', 'tipo', 'documento', 'driverName', 'driverRUT', 'exporterId', 'producerId', 'binMaterialCode', 'cantidad'];
+const IMPORT_HEADER_MAP: Record<string, string> = {
+  'Fecha (AAAA-MM-DD)': 'fecha',
+  'Tipo (entrada/salida)': 'tipo',
+  'Documento': 'documento',
+  'Nombre Conductor': 'driverName',
+  'RUT Conductor': 'driverRUT',
+  'ID Exportador': 'exporterId',
+  'ID Productor': 'producerId',
+  'Codigo Material': 'binMaterialCode',
+  'Cantidad': 'cantidad'
+};
+const FRIENDLY_HEADERS = Object.keys(IMPORT_HEADER_MAP);
 
 function convertToCSV(data: any[], headers: {key: string, label: string}[]) {
     const headerRow = headers.map(h => h.label).join(';');
@@ -177,7 +188,7 @@ export default function BinMaterialKardexReportPage() {
     };
 
     const handleDownloadTemplate = () => {
-        const csvContent = "data:text/csv;charset=utf-8," + IMPORT_HEADERS.join(',');
+        const csvContent = "data:text/csv;charset=utf-8," + FRIENDLY_HEADERS.join(',');
         const encodedUri = encodeURI(csvContent);
         const link = document.createElement("a");
         link.setAttribute("href", encodedUri);
@@ -200,9 +211,9 @@ export default function BinMaterialKardexReportPage() {
                 return;
             }
 
-            const headers = lines[0].split(',').map(h => h.trim());
-            if (!IMPORT_HEADERS.every(h => headers.includes(h))) {
-                toast({ title: 'Formato inválido', description: 'Las cabeceras no coinciden.', variant: 'destructive' });
+            const fileHeaders = lines[0].split(',').map(h => h.trim());
+            if (!FRIENDLY_HEADERS.every(h => fileHeaders.includes(h))) {
+                toast({ title: 'Formato inválido', description: 'Las cabeceras no coinciden con la plantilla.', variant: 'destructive' });
                 return;
             }
 
@@ -212,11 +223,18 @@ export default function BinMaterialKardexReportPage() {
 
             for (let i = 1; i < lines.length; i++) {
                 const values = lines[i].split(',').map(v => v.trim());
-                const row = Object.fromEntries(headers.map((h, idx) => [h, values[idx]]));
+                const rowData: Record<string, string> = {};
+                
+                fileHeaders.forEach((h, idx) => {
+                    const internalKey = IMPORT_HEADER_MAP[h];
+                    if (internalKey) {
+                        rowData[internalKey] = values[idx];
+                    }
+                });
 
-                const { fecha, tipo, documento, driverName, driverRUT, exporterId, producerId, binMaterialCode, cantidad } = row;
+                const { fecha, tipo, documento, driverName, driverRUT, exporterId, producerId, binMaterialCode, cantidad } = rowData;
                 const qty = parseInt(cantidad, 10);
-                const type = tipo.toLowerCase() as 'entrada' | 'salida';
+                const type = tipo?.toLowerCase() as 'entrada' | 'salida';
 
                 const material = materialMap.get(`${binMaterialCode}_${exporterId}`);
                 if (!material) {
@@ -224,7 +242,6 @@ export default function BinMaterialKardexReportPage() {
                     continue;
                 }
 
-                // Try both standard formats
                 let parsedDate = parse(fecha, 'yyyy-MM-dd HH:mm', new Date());
                 if (isNaN(parsedDate.getTime())) {
                     parsedDate = parse(fecha, 'yyyy-MM-dd', new Date());
@@ -237,7 +254,6 @@ export default function BinMaterialKardexReportPage() {
 
                 const batch = writeBatch(firestore);
 
-                // 1. Create movement
                 const movementRef = doc(collection(firestore, 'binMaterialMovements'));
                 batch.set(movementRef, {
                     type,
@@ -258,7 +274,6 @@ export default function BinMaterialKardexReportPage() {
                     observation: 'Carga Histórica / Saldo Inicial'
                 });
 
-                // 2. Update stock
                 const stockQuery = query(
                     collection(firestore, 'binMaterialStock'),
                     where('exporterId', '==', exporterId),
@@ -363,9 +378,9 @@ export default function BinMaterialKardexReportPage() {
                         <Upload className="mr-2 h-4 w-4" />
                         Importar Histórico
                     </Button>
-                    <Button variant="outline" size="sm" onClick={handleDownloadTemplate}>
+                    <Button variant="outline" size="sm" onClick={handleDownloadTemplate} disabled={loading}>
                         <Download className="mr-2 h-4 w-4" />
-                        Plantilla Histórica
+                        Descargar Plantilla
                     </Button>
                     <AlertDialog>
                         <AlertDialogTrigger asChild>
