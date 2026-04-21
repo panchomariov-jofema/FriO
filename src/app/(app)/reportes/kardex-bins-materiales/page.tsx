@@ -86,6 +86,8 @@ export default function BinMaterialKardexReportPage() {
     const { toast } = useToast();
     const fileInputRef = React.useRef<HTMLInputElement>(null);
 
+    const isAdmin = user?.email === 'francisco.villarreal@outlook.es';
+
     const { data: movements, loading: loadingMovements } = useFirestoreCollection<BinMaterialMovement>('binMaterialMovements');
     const { data: chamberLots, loading: loadingChamberLots } = useFirestoreCollection<ChamberLot>('chamberLots');
     const { data: dispatches, loading: loadingDispatches } = useFirestoreCollection<Dispatch>('dispatches');
@@ -394,70 +396,74 @@ export default function BinMaterialKardexReportPage() {
         <div className="space-y-6">
             <ReportHeader
                 title="Kardex de Movimientos de Bins y Materiales"
-                description="Historial consolidado. Use 'Importar Histórico' para cargar Saldos Iniciales (Ej: al 01-03-2026)."
+                description="Historial consolidado."
                 onExport={handleExport}
                 isExportDisabled={loading || kardexData.length === 0}
             >
-                <div className="flex flex-wrap gap-2">
-                    <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} disabled={loading}>
-                        <Upload className="mr-2 h-4 w-4" />
-                        Importar Histórico
-                    </Button>
-                    <Button variant="outline" size="sm" onClick={handleDownloadTemplate} disabled={loading}>
-                        <Download className="mr-2 h-4 w-4" />
-                        Descargar Plantilla
-                    </Button>
-                    <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                            <Button variant="destructive" size="sm" disabled={loading}>
-                                <Trash2 className="mr-2 h-4 w-4" />
-                                Limpiar Historial
-                            </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                            <AlertDialogHeader>
-                                <AlertDialogTitle>¿Está seguro de eliminar los movimientos registrados?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                    Esta acción eliminará permanentemente todos los registros de la colección de movimientos (manuales e importados). 
-                                    Los registros automáticos de ingreso a cámara y despachos de fruta seguirán visibles mientras existan sus documentos de origen.
-                                </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                <AlertDialogAction onClick={handleClearMovements} className="bg-destructive hover:bg-destructive/90">
-                                    Sí, Eliminar Movimientos
-                                </AlertDialogAction>
-                            </AlertDialogFooter>
-                        </AlertDialogContent>
-                    </AlertDialog>
-                    <input type="file" ref={fileInputRef} className="hidden" accept=".csv" onChange={handleFileImport} />
-                </div>
+                {isAdmin && (
+                    <div className="flex flex-wrap gap-2">
+                        <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} disabled={loading}>
+                            <Upload className="mr-2 h-4 w-4" />
+                            Importar Histórico
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={handleDownloadTemplate} disabled={loading}>
+                            <Download className="mr-2 h-4 w-4" />
+                            Descargar Plantilla
+                        </Button>
+                        <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                                <Button variant="destructive" size="sm" disabled={loading}>
+                                    <Trash2 className="mr-2 h-4 w-4" />
+                                    Limpiar Historial
+                                </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                                <AlertDialogHeader>
+                                    <AlertDialogTitle>¿Está seguro de eliminar los movimientos registrados?</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                        Esta acción eliminará permanentemente todos los registros de la colección de movimientos (manuales e importados). 
+                                        Los registros automáticos de ingreso a cámara y despachos de fruta seguirán visibles mientras existan sus documentos de origen.
+                                    </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                    <AlertDialogAction onClick={handleClearMovements} className="bg-destructive hover:bg-destructive/90">
+                                        Sí, Eliminar Movimientos
+                                    </AlertDialogAction>
+                                </AlertDialogFooter>
+                            </AlertDialogContent>
+                        </AlertDialog>
+                        <input type="file" ref={fileInputRef} className="hidden" accept=".csv" onChange={handleFileImport} />
+                    </div>
+                )}
             </ReportHeader>
 
-            <Alert>
-                <div className="flex gap-2">
-                    <Info className="h-4 w-4 shrink-0" />
-                    <div>
-                        <AlertTitle>Instrucciones de Importación</AlertTitle>
-                        <AlertDescription>
-                            <p className="mb-2">El archivo debe contener las siguientes columnas exactas (admite coma o punto y coma):</p>
-                            <code className="text-xs font-mono bg-muted p-1 block rounded mb-2">
-                                {FRIENDLY_HEADERS.join(',')}
-                            </code>
-                            <div className="space-y-1 text-sm">
-                                <p><strong>Ejemplo Saldo Inicial:</strong> <code className="bg-muted px-1">01-03-2026,entrada,SALDO-INICIAL,SISTEMA,0,SUBSOLE,PROD-01,10016,500</code></p>
-                                <ul className="list-disc list-inside space-y-1 mt-2">
-                                    <li><strong>Fecha:</strong> Formato DD-MM-YYYY (ej: 01-03-2026).</li>
-                                    <li><strong>Tipo:</strong> Escriba "entrada" o "salida".</li>
-                                    <li><strong>ID Exportador:</strong> Use el código corto definido en Datos Maestros (ej: SUBSOLE).</li>
-                                    <li><strong>ID Productor:</strong> Use el código corto del productor (ej: PROD-01).</li>
-                                    <li><strong>Código Material:</strong> Debe existir en el maestro para ese exportador (ej: 10016).</li>
-                                </ul>
-                            </div>
-                        </AlertDescription>
+            {isAdmin && (
+                <Alert>
+                    <div className="flex gap-2">
+                        <Info className="h-4 w-4 shrink-0" />
+                        <div>
+                            <AlertTitle>Instrucciones de Importación (Solo Administrador)</AlertTitle>
+                            <AlertDescription>
+                                <p className="mb-2">El archivo debe contener las siguientes columnas exactas (admite coma o punto y coma):</p>
+                                <code className="text-xs font-mono bg-muted p-1 block rounded mb-2">
+                                    {FRIENDLY_HEADERS.join(',')}
+                                </code>
+                                <div className="space-y-1 text-sm">
+                                    <p><strong>Ejemplo Saldo Inicial:</strong> <code className="bg-muted px-1">01-03-2026,entrada,SALDO-INICIAL,SISTEMA,0,SUBSOLE,PROD-01,10016,500</code></p>
+                                    <ul className="list-disc list-inside space-y-1 mt-2">
+                                        <li><strong>Fecha:</strong> Formato DD-MM-YYYY (ej: 01-03-2026).</li>
+                                        <li><strong>Tipo:</strong> Escriba "entrada" o "salida".</li>
+                                        <li><strong>ID Exportador:</strong> Use el código corto definido en Datos Maestros (ej: SUBSOLE).</li>
+                                        <li><strong>ID Productor:</strong> Use el código corto del productor (ej: PROD-01).</li>
+                                        <li><strong>Código Material:</strong> Debe existir en el maestro para ese exportador (ej: 10016).</li>
+                                    </ul>
+                                </div>
+                            </AlertDescription>
+                        </div>
                     </div>
-                </div>
-            </Alert>
+                </Alert>
+            )}
 
             <Card>
                 <CardContent className="pt-6">
