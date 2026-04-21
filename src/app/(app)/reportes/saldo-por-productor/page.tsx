@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
-import type { BinMaterialMovement, Exporter, Producer } from '@/lib/types';
+import type { BinMaterialMovement, Exporter, Producer, BinMaterial } from '@/lib/types';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ReportHeader } from '@/components/reports/ReportHeader';
@@ -45,8 +45,9 @@ export default function ProducerBalanceReportPage() {
     const { data: movements, loading: loadingMovements } = useFirestoreCollection<BinMaterialMovement>('binMaterialMovements');
     const { data: allExporters, loading: loadingExporters } = useFirestoreCollection<Exporter>('exporters');
     const { data: allProducers, loading: loadingProducers } = useFirestoreCollection<Producer>('producers');
+    const { data: allMaterials, loading: loadingMaterials } = useFirestoreCollection<BinMaterial>('binMaterials');
 
-    const loading = loadingMovements || loadingExporters || loadingProducers;
+    const loading = loadingMovements || loadingExporters || loadingProducers || loadingMaterials;
 
     const balanceData = React.useMemo(() => {
         if (loading) return [];
@@ -58,12 +59,14 @@ export default function ProducerBalanceReportPage() {
 
         const exporterMap = new Map(activeExporters.map(e => [e.exporterId, e.name]));
         const producerMap = new Map(activeProducers.map(p => [p.producerId, p.shortName]));
+        const materialMap = new Map(allMaterials.map(m => [m.id, m]));
 
         const aggregation: Record<string, {
             exporterName: string;
             producerName: string;
             materialName: string;
             materialCode: string;
+            materialType: string;
             entradas: number;
             salidas: number;
         }> = {};
@@ -77,11 +80,13 @@ export default function ProducerBalanceReportPage() {
             mov.items.forEach(item => {
                 const key = `${mov.exporterId}_${mov.producerId}_${item.binMaterialId}`;
                 if (!aggregation[key]) {
+                    const m = materialMap.get(item.binMaterialId);
                     aggregation[key] = {
                         exporterName: expName,
                         producerName: prodName,
                         materialName: item.binMaterialName,
                         materialCode: item.binMaterialCode,
+                        materialType: m?.type || 'material',
                         entradas: 0,
                         salidas: 0,
                     };
@@ -102,13 +107,14 @@ export default function ProducerBalanceReportPage() {
             }))
             .filter(item => item.entradas !== 0 || item.salidas !== 0)
             .sort((a, b) => a.exporterName.localeCompare(b.exporterName) || a.producerName.localeCompare(b.producerName));
-    }, [loading, movements, allExporters, allProducers]);
+    }, [loading, movements, allExporters, allProducers, allMaterials]);
 
     const groupedBalance = React.useMemo(() => {
         const groups: Record<string, {
             exporterName: string;
             producerName: string;
             items: typeof balanceData;
+            summary: string;
         }> = {};
 
         balanceData.forEach(item => {
@@ -117,13 +123,25 @@ export default function ProducerBalanceReportPage() {
                 groups[groupKey] = {
                     exporterName: item.exporterName,
                     producerName: item.producerName,
-                    items: []
+                    items: [],
+                    summary: '',
                 };
             }
             groups[groupKey].items.push(item);
         });
 
-        return Object.values(groups).sort((a, b) => a.exporterName.localeCompare(b.exporterName) || a.producerName.localeCompare(b.producerName));
+        return Object.values(groups).map(group => {
+            const totalsByType: Record<string, number> = {};
+            group.items.forEach(item => {
+                const typeLabel = item.materialType === 'bin' ? 'Bins' : 'Materiales';
+                totalsByType[typeLabel] = (totalsByType[typeLabel] || 0) + item.saldo;
+            });
+            
+            const summaryParts = Object.entries(totalsByType).map(([label, total]) => `${total} ${label}`);
+            group.summary = summaryParts.join(', ');
+            
+            return group;
+        }).sort((a, b) => a.exporterName.localeCompare(b.exporterName) || a.producerName.localeCompare(b.producerName));
     }, [balanceData]);
 
     const globalTotals = React.useMemo(() => {
@@ -182,7 +200,10 @@ export default function ProducerBalanceReportPage() {
                                                         <p className="text-sm font-bold text-primary">{group.producerName}</p>
                                                     </div>
                                                 </div>
-                                                <div className="hidden sm:flex items-center">
+                                                <div className="hidden sm:flex items-center gap-2">
+                                                    <Badge variant="outline" className="font-bold text-primary border-primary/20 bg-primary/5">
+                                                        {group.summary}
+                                                    </Badge>
                                                     <Badge variant="secondary" className="font-mono">
                                                         {group.items.length} {group.items.length === 1 ? 'Producto' : 'Productos'}
                                                     </Badge>
