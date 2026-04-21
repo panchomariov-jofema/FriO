@@ -7,6 +7,13 @@ import type { BinMaterialMovement, Exporter, Producer } from '@/lib/types';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ReportHeader } from '@/components/reports/ReportHeader';
+import {
+    Accordion,
+    AccordionContent,
+    AccordionItem,
+    AccordionTrigger,
+} from "@/components/ui/accordion";
+import { Badge } from '@/components/ui/badge';
 
 function convertToCSV(data: any[], headers: {key: string, label: string}[]) {
     const headerRow = headers.map(h => h.label).join(';');
@@ -98,6 +105,28 @@ export default function ProducerBalanceReportPage() {
             .sort((a, b) => a.exporterName.localeCompare(b.exporterName) || a.producerName.localeCompare(b.producerName));
     }, [loading, movements, allExporters, allProducers]);
 
+    const groupedBalance = React.useMemo(() => {
+        const groups: Record<string, {
+            exporterName: string;
+            producerName: string;
+            items: typeof balanceData;
+        }> = {};
+
+        balanceData.forEach(item => {
+            const groupKey = `${item.exporterName}_${item.producerName}`;
+            if (!groups[groupKey]) {
+                groups[groupKey] = {
+                    exporterName: item.exporterName,
+                    producerName: item.producerName,
+                    items: []
+                };
+            }
+            groups[groupKey].items.push(item);
+        });
+
+        return Object.values(groups).sort((a, b) => a.exporterName.localeCompare(b.exporterName) || a.producerName.localeCompare(b.producerName));
+    }, [balanceData]);
+
     const handleExport = () => {
         const headers = [
             { key: 'exporterName', label: 'Exportador' },
@@ -122,42 +151,71 @@ export default function ProducerBalanceReportPage() {
             />
             <Card>
                 <CardContent className="pt-6">
-                    <div className="rounded-md border">
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Exportador</TableHead>
-                                    <TableHead>Productor</TableHead>
-                                    <TableHead>Cód. Material</TableHead>
-                                    <TableHead>Material</TableHead>
-                                    <TableHead className="text-right">Entradas</TableHead>
-                                    <TableHead className="text-right">Salidas</TableHead>
-                                    <TableHead className="text-right font-bold">Saldo</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {loading ? (
-                                    Array.from({ length: 10 }).map((_, i) => <TableRow key={i}><TableCell colSpan={7}><Skeleton className="h-4 w-full" /></TableCell></TableRow>)
-                                ) : balanceData.length > 0 ? (
-                                    balanceData.map((item, idx) => (
-                                        <TableRow key={idx}>
-                                            <TableCell>{item.exporterName}</TableCell>
-                                            <TableCell>{item.producerName}</TableCell>
-                                            <TableCell className="font-mono text-xs">{item.materialCode}</TableCell>
-                                            <TableCell>{item.materialName}</TableCell>
-                                            <TableCell className="text-right text-muted-foreground">{item.entradas}</TableCell>
-                                            <TableCell className="text-right text-muted-foreground">{item.salidas}</TableCell>
-                                            <TableCell className={`text-right font-bold ${item.saldo > 0 ? 'text-orange-600' : 'text-green-600'}`}>
-                                                {item.saldo}
-                                            </TableCell>
-                                        </TableRow>
-                                    ))
-                                ) : (
-                                    <TableRow><TableCell colSpan={7} className="h-24 text-center">No hay movimientos registrados para consolidar saldos.</TableCell></TableRow>
-                                )}
-                            </TableBody>
-                        </Table>
-                    </div>
+                    {loading ? (
+                        <div className="space-y-2">
+                             <Skeleton className="h-12 w-full" />
+                             <Skeleton className="h-12 w-full" />
+                             <Skeleton className="h-12 w-full" />
+                        </div>
+                    ) : groupedBalance.length > 0 ? (
+                        <Accordion type="multiple" className="w-full">
+                            {groupedBalance.map((group, idx) => (
+                                <AccordionItem key={idx} value={`item-${idx}`} className="border-b last:border-b-0">
+                                    <AccordionTrigger className="hover:no-underline py-4 px-4">
+                                        <div className="flex justify-between w-full pr-4 text-left">
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-12 gap-y-1">
+                                                <div>
+                                                    <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">Exportador</p>
+                                                    <p className="text-sm font-medium">{group.exporterName}</p>
+                                                </div>
+                                                <div>
+                                                    <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">Productor</p>
+                                                    <p className="text-sm font-bold text-primary">{group.producerName}</p>
+                                                </div>
+                                            </div>
+                                            <div className="hidden sm:flex items-center">
+                                                <Badge variant="secondary" className="font-mono">
+                                                    {group.items.length} {group.items.length === 1 ? 'Producto' : 'Productos'}
+                                                </Badge>
+                                            </div>
+                                        </div>
+                                    </AccordionTrigger>
+                                    <AccordionContent className="bg-muted/20 px-0 pb-4">
+                                        <div className="rounded-md border mx-4 mt-2 overflow-hidden bg-background">
+                                            <Table>
+                                                <TableHeader className="bg-muted/50">
+                                                    <TableRow>
+                                                        <TableHead className="h-10 text-xs">Cód. Material</TableHead>
+                                                        <TableHead className="h-10 text-xs">Material</TableHead>
+                                                        <TableHead className="h-10 text-xs text-right">Entradas</TableHead>
+                                                        <TableHead className="h-10 text-xs text-right">Salidas</TableHead>
+                                                        <TableHead className="h-10 text-xs text-right font-bold">Saldo</TableHead>
+                                                    </TableRow>
+                                                </TableHeader>
+                                                <TableBody>
+                                                    {group.items.map((item, i) => (
+                                                        <TableRow key={i} className="hover:bg-transparent">
+                                                            <TableCell className="py-2 font-mono text-xs">{item.materialCode}</TableCell>
+                                                            <TableCell className="py-2 text-xs">{item.materialName}</TableCell>
+                                                            <TableCell className="py-2 text-right text-xs text-muted-foreground">{item.entradas}</TableCell>
+                                                            <TableCell className="py-2 text-right text-xs text-muted-foreground">{item.salidas}</TableCell>
+                                                            <TableCell className={`py-2 text-right text-xs font-bold ${item.saldo > 0 ? 'text-orange-600' : 'text-green-600'}`}>
+                                                                {item.saldo}
+                                                            </TableCell>
+                                                        </TableRow>
+                                                    ))}
+                                                </TableBody>
+                                            </Table>
+                                        </div>
+                                    </AccordionContent>
+                                </AccordionItem>
+                            ))}
+                        </Accordion>
+                    ) : (
+                        <div className="h-24 flex items-center justify-center border rounded-md border-dashed">
+                             <p className="text-muted-foreground">No hay movimientos registrados para consolidar saldos.</p>
+                        </div>
+                    )}
                 </CardContent>
             </Card>
         </div>
