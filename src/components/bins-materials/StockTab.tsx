@@ -1,9 +1,10 @@
+
 'use client';
 
 import * as React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { useFirestore } from '@/firebase';
+import { useFirestore, useUser } from '@/firebase';
 import type { BinMaterialStock, Exporter, BinMaterial } from '@/lib/types';
 import { collection, onSnapshot, query, where, Query, getDocs, writeBatch, doc, serverTimestamp } from 'firebase/firestore';
 import { Skeleton } from '../ui/skeleton';
@@ -47,12 +48,15 @@ function downloadCSV(csvString: string, filename: string) {
 
 export function StockTab({ exporterId }: StockTabProps) {
   const firestore = useFirestore();
+  const { user } = useUser();
   const [stock, setStock] = React.useState<BinMaterialStock[]>([]);
   const [loading, setLoading] = React.useState(true);
   const { data: exporters, loading: loadingExporters } = useFirestoreCollection<Exporter>('exporters');
   const { data: allMaterials, loading: loadingMaterials } = useFirestoreCollection<BinMaterial>('binMaterials');
   const { toast } = useToast();
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  const isAdmin = user?.email === 'francisco.villarreal@outlook.es';
 
   const exporterMap = React.useMemo(() => {
     return exporters.reduce((acc, exporter) => {
@@ -139,7 +143,7 @@ export function StockTab({ exporterId }: StockTabProps) {
       const lines = text.split('\n').filter(line => line.trim() !== '');
       
       if (lines.length <= 1) {
-        toast({ title: 'Error', description: 'El archivo está vacío.', variant: 'destructive' });
+        toast({ title: 'Error de archivo', description: 'El archivo CSV está vacío o solo contiene la cabecera.', variant: 'destructive' });
         return;
       }
 
@@ -244,45 +248,47 @@ export function StockTab({ exporterId }: StockTabProps) {
             }
           </CardDescription>
         </div>
-        <div className="flex flex-wrap gap-2">
-            <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} disabled={isLoading}>
-                <Upload className="mr-2 h-4 w-4" />
-                Importar Saldos
-            </Button>
-            <Button variant="outline" size="sm" onClick={handleDownloadTemplate}>
-                <Download className="mr-2 h-4 w-4" />
-                Plantilla
-            </Button>
-            <AlertDialog>
-                <AlertDialogTrigger asChild>
-                    <Button variant="destructive" size="sm">
-                    <Trash2 className="mr-2 h-4 w-4" />
-                    Limpiar Stock General
-                    </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                    <AlertDialogTitle>¿Está seguro de limpiar TODO el stock?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                        Esta acción eliminará permanentemente todos los registros de stock de bins y materiales (de todos los exportadores). Use esta opción solo para iniciar una nueva temporada.
-                    </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleClearStock} className="bg-destructive hover:bg-destructive/90">
-                        Sí, Limpiar Todo
-                    </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
-            <input
-                type="file"
-                ref={fileInputRef}
-                className="hidden"
-                accept=".csv"
-                onChange={handleFileImport}
-            />
-        </div>
+        {isAdmin && (
+          <div className="flex flex-wrap gap-2">
+              <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} disabled={isLoading}>
+                  <Upload className="mr-2 h-4 w-4" />
+                  Importar Saldos
+              </Button>
+              <Button variant="outline" size="sm" onClick={handleDownloadTemplate}>
+                  <Download className="mr-2 h-4 w-4" />
+                  Plantilla
+              </Button>
+              <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                      <Button variant="destructive" size="sm">
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Limpiar Stock General
+                      </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                      <AlertDialogHeader>
+                      <AlertDialogTitle>¿Está seguro de limpiar TODO el stock?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                          Esta acción eliminará permanentemente todos los registros de stock de bins y materiales (de todos los exportadores). Use esta opción solo para iniciar una nueva temporada.
+                      </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                      <AlertDialogAction onClick={handleClearStock} className="bg-destructive hover:bg-destructive/90">
+                          Sí, Limpiar Todo
+                      </AlertDialogAction>
+                      </AlertDialogFooter>
+                  </AlertDialogContent>
+              </AlertDialog>
+              <input
+                  type="file"
+                  ref={fileInputRef}
+                  className="hidden"
+                  accept=".csv"
+                  onChange={handleFileImport}
+              />
+          </div>
+        )}
       </CardHeader>
       <CardContent>
         {/* Mobile View */}
