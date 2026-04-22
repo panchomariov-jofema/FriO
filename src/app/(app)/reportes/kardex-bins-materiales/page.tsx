@@ -77,6 +77,7 @@ interface KardexItem {
     movimiento: string;
     tipo: 'Entrada' | 'Salida';
     userName?: string;
+    documento?: string;
 }
 
 
@@ -131,6 +132,7 @@ export default function BinMaterialKardexReportPage() {
                     movimiento: mov.observation || (isDirectDispatch ? 'Despacho Directo' : 'Bins y Materiales'),
                     tipo: (mov.type === 'entrada' && !isDirectDispatch) ? 'Entrada' : 'Salida',
                     userName: formatUserName(mov.userName),
+                    documento: mov.document,
                 });
             });
         });
@@ -149,6 +151,7 @@ export default function BinMaterialKardexReportPage() {
                     movimiento: 'Almacenamiento Cámara',
                     tipo: 'Entrada',
                     userName: formatUserName(lot.userName),
+                    documento: lot.displayLotId,
                 });
             }
         });
@@ -169,6 +172,7 @@ export default function BinMaterialKardexReportPage() {
                         movimiento: 'Despacho',
                         tipo: 'Salida',
                         userName: formatUserName(dispatch.userName),
+                        documento: bin.displayLotId,
                     });
                 });
             }
@@ -181,6 +185,7 @@ export default function BinMaterialKardexReportPage() {
     const handleExport = () => {
         const headers = [
             { key: 'fecha', label: 'Fecha' },
+            { key: 'documento', label: 'Documento' },
             { key: 'exportador', label: 'Exportador' },
             { key: 'productor', label: 'Productor' },
             { key: 'codigoProducto', label: 'Codigo del Producto' },
@@ -344,37 +349,22 @@ export default function BinMaterialKardexReportPage() {
     const handleClearMovements = async () => {
         if (!firestore) return;
         try {
-            // Eliminar solo los movimientos manuales/importados
-            const collectionsToClear = ['binMaterialMovements'];
-            let totalDeleted = 0;
+            const batch = writeBatch(firestore);
+            
+            // 1. Eliminar movimientos manuales/importados
+            const movementsSnap = await getDocs(collection(firestore, 'binMaterialMovements'));
+            movementsSnap.forEach(d => batch.delete(d.ref));
 
-            for (const collName of collectionsToClear) {
-                const collRef = collection(firestore, collName);
-                const snap = await getDocs(collRef);
-                
-                if (!snap.empty) {
-                    const docs = snap.docs;
-                    const chunks = [];
-                    for (let i = 0; i < docs.length; i += 500) {
-                      chunks.push(docs.slice(i, i + 500));
-                    }
+            // 2. Eliminar ingresos a cámara (Origen del registro automático de entrada en Kardex)
+            const chamberSnap = await getDocs(collection(firestore, 'chamberLots'));
+            chamberSnap.forEach(d => batch.delete(d.ref));
 
-                    for (const chunk of chunks) {
-                      const batch = writeBatch(firestore);
-                      chunk.forEach((d) => {
-                        batch.delete(d.ref);
-                        totalDeleted++;
-                      });
-                      await batch.commit();
-                    }
-                }
-            }
+            // 3. Eliminar despachos (Origen del registro automático de salida en Kardex)
+            const dispatchSnap = await getDocs(collection(firestore, 'dispatches'));
+            dispatchSnap.forEach(d => batch.delete(d.ref));
 
-            if (totalDeleted === 0) {
-                toast({ title: 'Sin registros', description: 'No hay datos de movimientos manuales para eliminar.' });
-            } else {
-                toast({ title: 'Éxito', description: `Se han eliminado ${totalDeleted} registros del historial de movimientos.` });
-            }
+            await batch.commit();
+            toast({ title: 'Éxito', description: 'Todo el historial de movimientos ha sido eliminado.' });
         } catch (e) {
             console.error(e);
             toast({ title: 'Error', description: 'No se pudieron eliminar los registros.', variant: 'destructive' });
@@ -396,7 +386,7 @@ export default function BinMaterialKardexReportPage() {
         <div className="space-y-6">
             <ReportHeader
                 title="Kardex de Movimientos de Bins y Materiales"
-                description="Historial consolidado."
+                description="Historial consolidado de movimientos, ingresos a cámara y despachos."
                 onExport={handleExport}
                 isExportDisabled={loading || kardexData.length === 0}
             >
@@ -419,16 +409,15 @@ export default function BinMaterialKardexReportPage() {
                             </AlertDialogTrigger>
                             <AlertDialogContent>
                                 <AlertDialogHeader>
-                                    <AlertDialogTitle>¿Está seguro de eliminar los movimientos registrados?</AlertDialogTitle>
+                                    <AlertDialogTitle>¿Está seguro de eliminar TODOS los movimientos registrados?</AlertDialogTitle>
                                     <AlertDialogDescription>
-                                        Esta acción eliminará permanentemente todos los registros de la colección de movimientos (manuales e importados). 
-                                        Los registros automáticos de ingreso a cámara y despachos de fruta seguirán visibles mientras existan sus documentos de origen.
+                                        Esta acción eliminará permanentemente todos los registros del Kardex (manuales, importados, ingresos a cámara y despachos). Esta acción no se puede deshacer.
                                     </AlertDialogDescription>
                                 </AlertDialogHeader>
                                 <AlertDialogFooter>
                                     <AlertDialogCancel>Cancelar</AlertDialogCancel>
                                     <AlertDialogAction onClick={handleClearMovements} className="bg-destructive hover:bg-destructive/90">
-                                        Sí, Eliminar Movimientos
+                                        Sí, Eliminar Todo el Historial
                                     </AlertDialogAction>
                                 </AlertDialogFooter>
                             </AlertDialogContent>
@@ -472,6 +461,7 @@ export default function BinMaterialKardexReportPage() {
                             <TableHeader>
                                 <TableRow>
                                     <TableHead>Fecha</TableHead>
+                                    <TableHead>Documento</TableHead>
                                     <TableHead>Exportador</TableHead>
                                     <TableHead>Productor</TableHead>
                                     <TableHead>Cód. Producto</TableHead>
@@ -484,11 +474,12 @@ export default function BinMaterialKardexReportPage() {
                             </TableHeader>
                             <TableBody>
                                 {loading ? (
-                                    Array.from({ length: 10 }).map((_, i) => <TableRow key={i}><TableCell colSpan={9}><Skeleton className="h-4 w-full" /></TableCell></TableRow>)
+                                    Array.from({ length: 10 }).map((_, i) => <TableRow key={i}><TableCell colSpan={10}><Skeleton className="h-4 w-full" /></TableCell></TableRow>)
                                 ) : kardexData.length > 0 ? (
                                     kardexData.map(item => (
                                         <TableRow key={item.key}>
                                             <TableCell>{item.fecha?.toDate().toLocaleString()}</TableCell>
+                                            <TableCell className="font-mono text-xs">{item.documento || '-'}</TableCell>
                                             <TableCell>{item.exportador}</TableCell>
                                             <TableCell>{item.productor}</TableCell>
                                             <TableCell>{item.codigoProducto}</TableCell>
@@ -506,7 +497,7 @@ export default function BinMaterialKardexReportPage() {
                                         </TableRow>
                                     ))
                                 ) : (
-                                    <TableRow><TableCell colSpan={9} className="h-24 text-center">No hay movimientos registrados.</TableCell></TableRow>
+                                    <TableRow><TableCell colSpan={10} className="h-24 text-center">No hay movimientos registrados.</TableCell></TableRow>
                                 )}
                             </TableBody>
                         </Table>

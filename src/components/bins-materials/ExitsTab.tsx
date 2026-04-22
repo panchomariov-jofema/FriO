@@ -28,7 +28,7 @@ const movementItemSchema = z.object({
 });
 
 const movementSchema = z.object({
-  document: z.string().min(1, 'El documento es obligatorio.'),
+  document: z.string().min(1, 'El número de documento es obligatorio.'),
   driverName: z.string().min(1, 'El nombre del conductor es obligatorio.'),
   driverRUT: z.string().min(1, 'El RUT del conductor es obligatorio.'),
   patente_vehiculo: z.string().min(1, 'La patente es obligatoria.'),
@@ -76,21 +76,6 @@ export function ExitsTab({ exporterId, exporterName, producerId }: ExitsTabProps
     }
     return '';
   };
-
-  const nextExitNumber = React.useMemo(() => {
-    if (!movements) return 1;
-    const exitMovements = movements.filter(m => m.type === 'salida' && m.document && !isNaN(parseInt(m.document, 10)));
-    if (exitMovements.length === 0) return 1;
-    const maxNumber = exitMovements.reduce((max, mov) => {
-        const docNum = parseInt(mov.document, 10);
-        return docNum > max ? docNum : max;
-    }, 0);
-    return maxNumber + 1;
-  }, [movements]);
-
-  React.useEffect(() => {
-    form.setValue('document', String(nextExitNumber));
-  }, [nextExitNumber, form]);
 
   // Effect for automatic quantity calculation
   React.useEffect(() => {
@@ -142,7 +127,7 @@ export function ExitsTab({ exporterId, exporterName, producerId }: ExitsTabProps
   React.useEffect(() => {
     if (materials.length > 0) {
       form.reset({
-        document: String(nextExitNumber),
+        document: '',
         driverName: '',
         driverRUT: '',
         patente_vehiculo: '',
@@ -155,7 +140,7 @@ export function ExitsTab({ exporterId, exporterName, producerId }: ExitsTabProps
         })),
       });
     }
-  }, [materials, form, nextExitNumber]);
+  }, [materials, form]);
 
   const onSubmit = async (values: MovementFormValues) => {
     if (!firestore || !businessEntities) return;
@@ -221,7 +206,7 @@ export function ExitsTab({ exporterId, exporterName, producerId }: ExitsTabProps
         const dteData: Omit<DTEGuiaDespacho, 'id' | 'createdAt'> = {
             idDoc: {
                 tipoDTE: 52,
-                folio: parseInt(values.document, 10),
+                folio: parseInt(values.document, 10) || 0,
                 fchEmis: new Date().toISOString().split('T')[0],
             },
             emisor: {
@@ -301,7 +286,7 @@ export function ExitsTab({ exporterId, exporterName, producerId }: ExitsTabProps
         binMaterialName: m.name,
         quantity: 0
       }));
-      form.reset({ document: String(nextExitNumber + 1), driverName: '', driverRUT: '', patente_vehiculo: '', observaciones: '', items: resetItems });
+      form.reset({ document: '', driverName: '', driverRUT: '', patente_vehiculo: '', observaciones: '', items: resetItems });
 
     } catch (error: any) {
       console.error('Error processing exit:', error);
@@ -331,8 +316,8 @@ export function ExitsTab({ exporterId, exporterName, producerId }: ExitsTabProps
                 name="document"
                 render={({ field }) => (
                     <FormItem>
-                    <FormLabel>N° de Salida</FormLabel>
-                    <FormControl><Input {...field} readOnly className="font-bold text-lg bg-muted" /></FormControl>
+                    <FormLabel>N° Documento</FormLabel>
+                    <FormControl><Input {...field} autoComplete="off" placeholder="Ej: 1234" /></FormControl>
                     <FormMessage />
                     </FormItem>
                 )}
