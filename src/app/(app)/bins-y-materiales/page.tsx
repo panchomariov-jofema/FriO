@@ -4,7 +4,7 @@ import * as React from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
-import type { Exporter, PendingDocument } from '@/lib/types';
+import type { Exporter } from '@/lib/types';
 import { Label } from '@/components/ui/label';
 import { useProducersByExporter } from '@/hooks/use-producers-by-exporter';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -12,10 +12,6 @@ import { EntriesTab } from '@/components/bins-materials/EntriesTab';
 import { ExitsTab } from '@/components/bins-materials/ExitsTab';
 import { StockTab } from '@/components/bins-materials/StockTab';
 import { Checkbox } from '@/components/ui/checkbox';
-import { PendingDocsTab } from '@/components/bins-materials/PendingDocsTab';
-import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection, query, where } from 'firebase/firestore';
-import { Badge } from '@/components/ui/badge';
 import { usePermissions } from '@/contexts/PermissionsContext';
 
 export default function BinsYMaterialesPage() {
@@ -30,25 +26,16 @@ export default function BinsYMaterialesPage() {
   }, [allExporters]);
 
   const { data: producers, loading: loadingProducers } = useProducersByExporter(selectedExporterId);
-  const firestore = useFirestore();
   const { permissions } = usePermissions();
 
-  const pendingDocsQuery = useMemoFirebase(() => {
-    if (!firestore) return null;
-    return query(collection(firestore, 'documentosPendientes'), where('estado', '==', 'PENDIENTE'));
-  }, [firestore]);
-
-  const { data: pendingDocs } = useCollection<PendingDocument>(pendingDocsQuery);
-
-  const pendingDocsCount = pendingDocs?.length || 0;
-  
   const allowedTabs = React.useMemo(() => {
     const permission = permissions.find(p => typeof p === 'object' && p !== null && 'name' in p && p.name === 'Bins y Materiales');
     if (!permission || typeof permission === 'string') {
-        return ['entradas', 'salidas', 'documentos_pendientes', 'stock'];
+        return ['entradas', 'salidas', 'stock'];
     }
     if (typeof permission === 'object' && 'allowedTabs' in permission && permission.allowedTabs) {
-        return permission.allowedTabs;
+        // Filter out documentos_pendientes even if it exists in permissions
+        return permission.allowedTabs.filter(t => t !== 'documentos_pendientes');
     }
     return [];
   }, [permissions]);
@@ -56,7 +43,6 @@ export default function BinsYMaterialesPage() {
   const tabsConfig = [
     { value: 'entradas', label: 'Entradas' },
     { value: 'salidas', label: 'Salidas' },
-    { value: 'documentos_pendientes', label: 'Documentos Pendientes', badge: pendingDocsCount },
     { value: 'stock', label: 'Stock' },
   ];
 
@@ -169,9 +155,6 @@ export default function BinsYMaterialesPage() {
                   className="flex items-center gap-2"
                 >
                   {tab.label}
-                  {tab.badge !== undefined && tab.badge > 0 && (
-                    <Badge className="h-5 w-5 p-0 flex items-center justify-center">{tab.badge}</Badge>
-                  )}
                 </TabsTrigger>
               ))}
             </TabsList>
@@ -211,12 +194,6 @@ export default function BinsYMaterialesPage() {
                       </CardContent>
                   </Card>
               )}
-            </TabsContent>
-          )}
-
-          {allowedTabs.includes('documentos_pendientes') && (
-            <TabsContent value="documentos_pendientes" className="mt-4">
-              <PendingDocsTab />
             </TabsContent>
           )}
           
