@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -42,7 +41,7 @@ const reportList = [
     },
     {
         id: 'saldo-productor',
-        title: "Saldo de Bins y Mat. Entregado",
+        title: "Saldo de Bins y Mat. Entregados",
         description: "Revise la cuenta de cada productor: cuántos materiales se llevaron al campo y cuántos han devuelto a la planta hasta hoy.",
         href: "/reportes/saldo-por-productor",
         icon: Calculator,

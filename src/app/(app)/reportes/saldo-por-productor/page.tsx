@@ -170,7 +170,7 @@ export default function ProducerBalanceReportPage() {
     return (
         <div className="space-y-6">
             <ReportHeader
-                title="Saldo de Bins y Mat. Entregado"
+                title="Saldo de Bins y Mat. Entregados"
                 description="Consolidado de materiales entregados y devueltos por productor (Basado en módulo Bins y Materiales)."
                 onExport={handleExport}
                 isExportDisabled={loading || balanceData.length === 0}
