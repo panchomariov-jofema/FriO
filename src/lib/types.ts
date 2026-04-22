@@ -1,3 +1,4 @@
+
 'use client';
 
 import type { Timestamp } from "firebase/firestore";
@@ -450,6 +451,12 @@ export interface Aisle {
   id: string;
   name: string;
   warehouseIds: string[];
+}
+
+export interface ReportSetting {
+  id: string;
+  reportId: string;
+  hidden: boolean;
 }
 
 export type MasterData = Exporter | Producer | BinMaterial | OtherClient | PackagingMaster | UserMaster | Profile | Packing | Hidrocooler | BusinessEntity | Warehouse | Aisle;
