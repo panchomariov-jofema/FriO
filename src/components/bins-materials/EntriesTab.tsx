@@ -247,8 +247,8 @@ export function EntriesTab({ exporterId, exporterName, producerId, isDirectDispa
                 name="document"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Documento de Entrada</FormLabel>
-                    <FormControl><Input {...field} placeholder="Ej: Guía de Despacho 123" autoComplete="off" inputMode="numeric" /></FormControl>
+                    <FormLabel>N° Documento</FormLabel>
+                    <FormControl><Input {...field} placeholder="Ej: 1234" autoComplete="off" inputMode="numeric" /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
