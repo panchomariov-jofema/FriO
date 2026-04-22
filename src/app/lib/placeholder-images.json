@@ -48,6 +48,12 @@
       "description": "Imagen referencial para permanencia de tiempo",
       "imageUrl": "https://picsum.photos/seed/108/600/400",
       "imageHint": "clock time"
+    },
+    {
+      "id": "fall-creek-logo",
+      "description": "Logo corporativo de Fall Creek",
+      "imageUrl": "https://picsum.photos/seed/fallcreek-logo/400/120",
+      "imageHint": "blueberry plant"
     }
   ]
 }

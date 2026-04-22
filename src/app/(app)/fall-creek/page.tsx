@@ -1,6 +1,8 @@
+
 'use client';
 
 import * as React from 'react';
+import Image from 'next/image';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
 import type { OtherClient, OtherFruitReception, OtherFruitMovement, StoredItem, ChamberLot, OtherFruitMovementLocation } from '@/lib/types';
@@ -18,25 +20,22 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { cn } from '@/lib/utils';
 import { chambersConfig } from '@/lib/chambers-config';
 import { CheckCircle2, CircleDot, Eye, Pencil, Trash2, X, Move } from 'lucide-react';
-import { Timestamp } from 'firebase/firestore';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
+import { PlaceHolderImages } from '@/lib/placeholder-images';
 
 
 const FALL_CREEK_CLIENT_NAME = 'FALL CREEK';
 
-// --- Color Palette Logic (Moved outside component to persist state) ---
 const lotColorPalette = [
-  'hsl(221, 83%, 53%)', // Blue
-  'hsl(0, 72%, 51%)',   // Red
-  'hsl(48, 96%, 53%)',  // Yellow
-  'hsl(262, 83%, 60%)', // Violet
-  'hsl(170, 75%, 41%)', // Cyan
-  'hsl(350, 75%, 55%)', // Pink
-  'hsl(25, 85%, 50%)',  // Orange
-  'hsl(120, 50%, 50%)', // Green
+  '#004b8d', // Corporate Blue
+  '#7aba28', // Corporate Green
+  '#f29100', // Accent Orange
+  '#00a9e0', // Sky Blue
+  '#5c068c', // Deep Purple
+  '#e31c79', // Pink
 ];
 
 const lotColorMap = new Map<string, string>();
@@ -76,12 +75,12 @@ export default function FallCreekPage() {
     const isEditing = editingMovement !== null;
     const [showOnlyPending, setShowOnlyPending] = React.useState(true);
     
-    // State for dragging the summary card
     const [isDragging, setIsDragging] = React.useState(false);
     const [cardPosition, setCardPosition] = React.useState({ x: 0, y: 0 });
     const dragStartPos = React.useRef({ x: 0, y: 0 });
     const initialCardPos = React.useRef({ x: 0, y: 0 });
 
+    const fallCreekLogo = PlaceHolderImages.find(img => img.id === 'fall-creek-logo');
 
     const fallCreekClient = React.useMemo(() => {
         if (!allClients) return null;
@@ -468,13 +467,30 @@ export default function FallCreekPage() {
     return (
         <div className="min-h-[calc(100vh-10rem)] pb-52">
             <div className="space-y-6">
-                <Card>
-                    <CardHeader className="flex flex-row items-start justify-between">
-                        <div>
-                            <CardTitle>Portal Cliente: {fallCreekClient.name}</CardTitle>
-                            <CardDescription>Visualice su stock y genere solicitudes de pre-despacho.</CardDescription>
+                <Card className="border-t-4 border-t-[#004b8d]">
+                    <CardHeader className="flex flex-col md:flex-row items-center justify-between gap-4">
+                        <div className="flex items-center gap-6">
+                            {fallCreekLogo && (
+                                <div className="relative w-40 h-16 shrink-0 bg-white p-2 rounded-md shadow-sm border">
+                                    <Image
+                                        src={fallCreekLogo.imageUrl}
+                                        alt={fallCreekLogo.description}
+                                        fill
+                                        className="object-contain"
+                                        data-ai-hint={fallCreekLogo.imageHint}
+                                    />
+                                </div>
+                            )}
+                            <div>
+                                <CardTitle className="text-2xl text-[#004b8d]">Portal de Autoservicio: {fallCreekClient.name}</CardTitle>
+                                <CardDescription>Gestión de stock y generación de pre-despachos para plantas.</CardDescription>
+                            </div>
                         </div>
-                        <Button onClick={handleToggleSelectionMode} variant={selectionMode ? "destructive" : "default"}>
+                        <Button 
+                            onClick={handleToggleSelectionMode} 
+                            variant={selectionMode ? "destructive" : "default"}
+                            className={cn(!selectionMode && "bg-[#7aba28] hover:bg-[#6aa423] text-white")}
+                        >
                             {selectionMode ? <X className="mr-2 h-4 w-4"/> : <CircleDot className="mr-2 h-4 w-4"/>}
                             {selectionMode ? (isEditing ? 'Cancelar Edición' : 'Cancelar Selección') : 'Iniciar Selección de Despacho'}
                         </Button>
@@ -485,17 +501,19 @@ export default function FallCreekPage() {
                                 const config = chambersConfig[chamberId];
                                 const occupancy = chamberOccupancy[chamberId];
                                 return (
-                                    <AccordionItem value={chamberId} key={chamberId}>
-                                        <AccordionTrigger>
+                                    <AccordionItem value={chamberId} key={chamberId} className="border rounded-lg mb-2 px-4">
+                                        <AccordionTrigger className="hover:no-underline py-4">
                                             <div className="flex w-full items-center justify-between pr-4">
-                                                <span className="text-lg font-semibold">{config.name}</span>
+                                                <span className="text-lg font-bold text-[#004b8d]">{config.name}</span>
                                                 <div className="text-right">
-                                                    <p className="font-mono font-semibold">{occupancy?.occupied ?? 0} {fallCreekClient.unit}</p>
+                                                    <Badge variant="secondary" className="font-mono text-sm px-3 py-1 bg-muted">
+                                                        {occupancy?.occupied ?? 0} {fallCreekClient.unit} Almacenados
+                                                    </Badge>
                                                 </div>
                                             </div>
                                         </AccordionTrigger>
                                         <AccordionContent>
-                                            <div className="p-4 bg-muted/50 rounded-lg border overflow-x-auto" onMouseDown={(e) => e.preventDefault()}>
+                                            <div className="p-4 bg-muted/30 rounded-lg border overflow-x-auto" onMouseDown={(e) => e.preventDefault()}>
                                                 <div className="grid gap-1 min-w-[800px]" style={{ gridTemplateColumns: `repeat(${config.columns.length}, minmax(0, 1fr))` }}>
                                                     {config.rows.map(row =>
                                                         config.columns.map(col => {
@@ -513,7 +531,7 @@ export default function FallCreekPage() {
                                                             const lotColor = isOccupied ? getColorForLot(itemsInCoord[0].lotIdForColor) : 'transparent';
                                                             const cellStyle = { 
                                                                 '--lot-color': lotColor,
-                                                                '--lot-color-bg': lotColor.replace(')', ', 0.2)'),
+                                                                '--lot-color-bg': lotColor.replace(')', ', 0.15)'),
                                                             } as React.CSSProperties;
 
                                                             return (
@@ -527,20 +545,20 @@ export default function FallCreekPage() {
                                                                         handleMouseEnter(chamberId, coord);
                                                                     }}
                                                                     className={cn(
-                                                                        "h-12 w-full rounded border-2 flex items-center justify-center text-xs font-mono relative overflow-hidden",
-                                                                        isOccupied && "bg-[var(--lot-color-bg)]",
+                                                                        "h-12 w-full rounded border-2 flex items-center justify-center text-xs font-mono relative overflow-hidden transition-all",
+                                                                        isOccupied && "bg-[var(--lot-color-bg)] border-[var(--lot-color)]",
                                                                         !isOccupied && "bg-background border-dashed",
-                                                                        selectionMode && isOccupied && !isReserved && "cursor-pointer hover:border-primary",
+                                                                        selectionMode && isOccupied && !isReserved && "cursor-pointer hover:ring-2 hover:ring-primary",
                                                                         isReserved && "cursor-not-allowed",
-                                                                        isSelected && "ring-2 ring-primary ring-offset-2"
+                                                                        isSelected && "ring-4 ring-[#7aba28] ring-offset-2 z-10"
                                                                     )}
                                                                     style={cellStyle}
                                                                 >
-                                                                    <span className={cn("relative z-10 font-semibold", isReserved && "opacity-50")}>{coord}</span>
-                                                                    {isSelected && <div className="absolute inset-0 bg-primary/30 flex items-center justify-center"><CheckCircle2 className="h-6 w-6 text-primary" /></div>}
+                                                                    <span className={cn("relative z-10 font-bold", isReserved && "opacity-40")}>{coord}</span>
+                                                                    {isSelected && <div className="absolute inset-0 bg-[#7aba28]/40 flex items-center justify-center"><CheckCircle2 className="h-6 w-6 text-white" /></div>}
                                                                     {isReserved && (
                                                                         <div className="absolute inset-0 bg-destructive/10">
-                                                                           <div className="absolute inset-0 bg-repeat bg-[length:10px_10px]" style={{backgroundImage: "repeating-linear-gradient(-45deg, hsl(var(--destructive)/0.3), hsl(var(--destructive)/0.3) 1px, transparent 1px, transparent 5px)"}} />
+                                                                           <div className="absolute inset-0 bg-repeat bg-[length:10px_10px]" style={{backgroundImage: "repeating-linear-gradient(-45deg, hsl(var(--destructive)/0.2), hsl(var(--destructive)/0.2) 1px, transparent 1px, transparent 5px)"}} />
                                                                         </div>
                                                                     )}
                                                                 </div>
@@ -560,10 +578,13 @@ export default function FallCreekPage() {
                 <Card>
                     <CardHeader>
                         <div className="flex justify-between items-center">
-                            <CardTitle>Historial de Solicitudes</CardTitle>
+                            <div>
+                                <CardTitle className="text-xl">Historial de Solicitudes</CardTitle>
+                                <CardDescription>Consulte el estado de sus pedidos de despacho.</CardDescription>
+                            </div>
                             <div className="flex items-center space-x-2">
                                 <Checkbox id="show-pending" checked={showOnlyPending} onCheckedChange={(checked) => setShowOnlyPending(!!checked)} />
-                                <Label htmlFor="show-pending">Solo Solicitudes Pendientes</Label>
+                                <Label htmlFor="show-pending">Ver solo pendientes</Label>
                             </div>
                         </div>
                     </CardHeader>
@@ -571,11 +592,11 @@ export default function FallCreekPage() {
                         <div className="rounded-md border max-h-96 overflow-y-auto">
                             <Table>
                                 <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Fecha</TableHead>
-                                        <TableHead>Documento</TableHead>
-                                        <TableHead>Lotes Involucrados</TableHead>
-                                        <TableHead>Cantidad Total</TableHead>
+                                    <TableRow className="bg-muted/50">
+                                        <TableHead>Fecha Solicitud</TableHead>
+                                        <TableHead>Referencia Doc.</TableHead>
+                                        <TableHead>Lotes Cliente</TableHead>
+                                        <TableHead>Cant. Total</TableHead>
                                         <TableHead>Estado</TableHead>
                                         <TableHead className="text-right">Acciones</TableHead>
                                     </TableRow>
@@ -585,12 +606,12 @@ export default function FallCreekPage() {
                                     const status = mov.status === 'Completado' ? 'Completado' : 'En Proceso';
                                     return (
                                         <TableRow key={mov.id}>
-                                            <TableCell>{mov.createdAt?.toDate().toLocaleString()}</TableCell>
-                                            <TableCell className="font-mono">{mov.document}</TableCell>
-                                            <TableCell className="font-mono text-xs">{mov.lotes}</TableCell>
-                                            <TableCell>{mov.totalQuantity} {mov.unit}</TableCell>
+                                            <TableCell>{mov.createdAt?.toDate().toLocaleString('es-CL')}</TableCell>
+                                            <TableCell className="font-mono font-bold">{mov.document || '-'}</TableCell>
+                                            <TableCell className="font-mono text-xs max-w-[200px] truncate">{mov.lotes}</TableCell>
+                                            <TableCell className="font-semibold">{mov.totalQuantity} {mov.unit}</TableCell>
                                             <TableCell>
-                                                <Badge variant={status === 'Completado' ? 'default' : 'secondary'}>
+                                                <Badge variant={status === 'Completado' ? 'default' : 'secondary'} className={cn(status !== 'Completado' && "bg-orange-100 text-orange-800")}>
                                                     {status}
                                                 </Badge>
                                             </TableCell>
@@ -612,14 +633,14 @@ export default function FallCreekPage() {
                                                                 </AlertDialogTrigger>
                                                                 <AlertDialogContent>
                                                                     <AlertDialogHeader>
-                                                                        <AlertDialogTitle>¿Eliminar Solicitud?</AlertDialogTitle>
+                                                                        <AlertDialogTitle>¿Desea eliminar esta solicitud?</AlertDialogTitle>
                                                                         <AlertDialogDescription>
-                                                                            Esta acción eliminará la solicitud de pre-despacho. No se puede deshacer.
+                                                                            Esta acción cancelará la solicitud de pre-despacho y liberará los productos reservados.
                                                                         </AlertDialogDescription>
                                                                     </AlertDialogHeader>
                                                                     <AlertDialogFooter>
-                                                                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                                                        <AlertDialogAction onClick={() => handleDeleteMovement(mov)} className="bg-destructive hover:bg-destructive/90">Eliminar</AlertDialogAction>
+                                                                        <AlertDialogCancel>Volver</AlertDialogCancel>
+                                                                        <AlertDialogAction onClick={() => handleDeleteMovement(mov)} className="bg-destructive hover:bg-destructive/90">Confirmar Eliminación</AlertDialogAction>
                                                                     </AlertDialogFooter>
                                                                 </AlertDialogContent>
                                                             </AlertDialog>
@@ -629,7 +650,7 @@ export default function FallCreekPage() {
                                             </TableCell>
                                         </TableRow>
                                     );
-                                }) : <TableRow><TableCell colSpan={6} className="h-24 text-center">No hay solicitudes que coincidan con el filtro.</TableCell></TableRow>}
+                                }) : <TableRow><TableCell colSpan={6} className="h-24 text-center">No se encontraron solicitudes.</TableCell></TableRow>}
                                 </TableBody>
                             </Table>
                         </div>
@@ -642,55 +663,68 @@ export default function FallCreekPage() {
                     className="fixed z-20"
                     style={{
                         left: '50%',
-                        bottom: '1rem',
+                        bottom: '1.5rem',
                         transform: `translateX(-50%) translate(${cardPosition.x}px, ${cardPosition.y}px)`,
                         width: 'calc(100% - 2rem)',
-                        maxWidth: '64rem',
+                        maxWidth: '60rem',
                     }}
                 >
-                    <Card className="shadow-2xl bg-card/95 backdrop-blur-sm max-w-5xl mx-auto">
+                    <Card className="shadow-2xl bg-card/98 border-2 border-[#004b8d] max-w-5xl mx-auto">
                          <CardHeader 
                             onMouseDown={handleDragStart}
-                            className="cursor-move flex flex-row justify-between items-center"
+                            className="cursor-move flex flex-row justify-between items-center bg-[#004b8d] text-white rounded-t-sm"
                          >
-                            <CardTitle>{isEditing ? 'Editar Solicitud de Pre-Despacho' : 'Resumen de Pre-Despacho'}</CardTitle>
-                            <Move className="h-5 w-5 text-muted-foreground" />
+                            <div className="flex flex-col">
+                                <CardTitle className="text-lg">{isEditing ? 'Edición de Solicitud' : 'Resumen de Pre-Despacho'}</CardTitle>
+                                <span className="text-xs opacity-80">Arrastre para mover esta ventana</span>
+                            </div>
+                            <Move className="h-5 w-5 opacity-50" />
                         </CardHeader>
-                        <CardContent className="space-y-4">
+                        <CardContent className="space-y-4 pt-6">
                             <div className="grid md:grid-cols-2 gap-4">
-                                <div className="rounded-md border p-4 space-y-2">
-                                <h4 className="font-semibold">Productos Seleccionados</h4>
-                                {selectedSummary.products.length > 0 ? (
-                                    <ul>{selectedSummary.products.map(([name, qty]) => <li key={name}>{qty} {selectedSummary.unit} de {name}</li>)}</ul>
-                                ) : (
-                                    <p className="text-sm text-muted-foreground">Ningún producto seleccionado.</p>
-                                )}
+                                <div className="rounded-md border p-4 bg-muted/10">
+                                    <h4 className="font-bold text-[#004b8d] mb-2 uppercase text-xs tracking-wider">Productos en Selección</h4>
+                                    {selectedSummary.products.length > 0 ? (
+                                        <ul className="space-y-1">{selectedSummary.products.map(([name, qty]) => (
+                                            <li key={name} className="flex justify-between border-b border-dashed py-1">
+                                                <span className="text-sm">{name}</span>
+                                                <span className="font-bold">{qty} {selectedSummary.unit}</span>
+                                            </li>
+                                        ))}</ul>
+                                    ) : (
+                                        <p className="text-sm text-muted-foreground italic">No hay productos seleccionados en el mapa.</p>
+                                    )}
                                 </div>
-                                <div className="rounded-md border p-4 space-y-2 flex flex-col justify-center">
-                                    <p className="text-sm text-muted-foreground">Total a Despachar</p>
-                                    <p className="text-3xl font-bold">{selectedSummary.totalQuantity} <span className="text-xl font-normal text-muted-foreground">{selectedSummary.unit}</span></p>
-                                </div>
-                            </div>
-                             <div className="grid sm:grid-cols-3 gap-4 pt-4">
-                                <div className="space-y-1">
-                                    <Label htmlFor="dispatch-doc">Documento Despacho</Label>
-                                    <Input id="dispatch-doc" value={documentoDespacho} onChange={e => setDocumentoDespacho(e.target.value)} placeholder="Opcional. Ej: OC-123" />
-                                </div>
-                                <div className="space-y-1">
-                                    <Label htmlFor="dispatch-client">Nombre Cliente Destino</Label>
-                                    <Input id="dispatch-client" value={clienteDestino} onChange={e => setClienteDestino(e.target.value)} placeholder="Ingrese nombre" />
-                                </div>
-                                <div className="space-y-1">
-                                    <Label htmlFor="dispatch-rut">RUT Cliente Destino</Label>
-                                    <Input id="dispatch-rut" value={rutDestino} onChange={e => setRutDestino(e.target.value)} placeholder="Ingrese RUT" />
+                                <div className="rounded-md border p-4 flex flex-col justify-center items-center bg-[#fdfdfd]">
+                                    <p className="text-xs font-bold uppercase text-muted-foreground mb-1">Total a Despachar</p>
+                                    <p className="text-4xl font-black text-[#7aba28]">{selectedSummary.totalQuantity} <span className="text-lg font-normal text-muted-foreground">{selectedSummary.unit}</span></p>
                                 </div>
                             </div>
-                            <div className="flex justify-end gap-2 pt-4">
-                                <Button onClick={handleToggleSelectionMode} variant="outline" size="lg" className="w-full sm:w-auto">
-                                    {isEditing ? 'Cancelar Edición' : 'Cancelar Selección'}
+                             <div className="grid sm:grid-cols-3 gap-4 pt-2">
+                                <div className="space-y-1">
+                                    <Label htmlFor="dispatch-doc" className="text-[#004b8d]">N° Documento Interno</Label>
+                                    <Input id="dispatch-doc" value={documentoDespacho} onChange={e => setDocumentoDespacho(e.target.value)} placeholder="Ej: OC-9982" className="border-[#004b8d]/20" />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label htmlFor="dispatch-client" className="text-[#004b8d]">Nombre del Destinatario</Label>
+                                    <Input id="dispatch-client" value={clienteDestino} onChange={e => setClienteDestino(e.target.value)} placeholder="¿A quién se envía?" className="border-[#004b8d]/20" />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label htmlFor="dispatch-rut" className="text-[#004b8d]">RUT del Destinatario</Label>
+                                    <Input id="dispatch-rut" value={rutDestino} onChange={e => setRutDestino(e.target.value)} placeholder="XX.XXX.XXX-X" className="border-[#004b8d]/20" />
+                                </div>
+                            </div>
+                            <div className="flex justify-end gap-3 pt-4">
+                                <Button onClick={handleToggleSelectionMode} variant="outline" size="lg" className="w-full sm:w-auto border-[#004b8d] text-[#004b8d]">
+                                    {isEditing ? 'Cancelar' : 'Cerrar Ventana'}
                                 </Button>
-                                <Button onClick={handleSubmitPreDispatch} disabled={isSubmitting || selectedSummary.totalQuantity === 0} size="lg" className="w-full sm:w-auto">
-                                    {isSubmitting ? (isEditing ? 'Guardando...' : 'Creando Solicitud...') : (isEditing ? 'Guardar Cambios' : 'Crear Solicitud de Pre-Despacho')}
+                                <Button 
+                                    onClick={handleSubmitPreDispatch} 
+                                    disabled={isSubmitting || selectedSummary.totalQuantity === 0} 
+                                    size="lg" 
+                                    className="w-full sm:w-auto bg-[#7aba28] hover:bg-[#6aa423] text-white font-bold"
+                                >
+                                    {isSubmitting ? 'Procesando...' : (isEditing ? 'Guardar Cambios' : 'Enviar Solicitud de Picking')}
                                 </Button>
                             </div>
                         </CardContent>
@@ -701,9 +735,9 @@ export default function FallCreekPage() {
                 <Dialog open={!!movementToView} onOpenChange={(isOpen) => !isOpen && setMovementToView(null)}>
                     <DialogContent className="max-w-2xl">
                         <DialogHeader>
-                            <DialogTitle>Detalle de Solicitud</DialogTitle>
+                            <DialogTitle className="text-[#004b8d]">Detalle de Solicitud de Picking</DialogTitle>
                             <DialogDescription>
-                                Cliente: {movementToView.clientName} - Documento: {movementToView.document || 'N/A'}
+                                Cliente: {movementToView.clientName} - Referencia: {movementToView.document || 'N/A'}
                             </DialogDescription>
                         </DialogHeader>
                         <div className="max-h-96 overflow-y-auto">
@@ -712,17 +746,17 @@ export default function FallCreekPage() {
                                     <TableRow>
                                         <TableHead>Producto</TableHead>
                                         <TableHead>Lote Cliente</TableHead>
-                                        <TableHead>Ubicación</TableHead>
+                                        <TableHead>Cámara / Coord.</TableHead>
                                         <TableHead className="text-right">Cantidad</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
                                     {movementToView.locations?.map((loc, index) => (
                                         <TableRow key={index}>
-                                            <TableCell>{loc.productName}</TableCell>
+                                            <TableCell className="font-medium">{loc.productName}</TableCell>
                                             <TableCell className="font-mono">{loc.clientLotId || 'N/A'}</TableCell>
-                                            <TableCell className="font-mono">{chambersConfig[loc.location.chamberId]?.name} / {loc.location.coordinate}</TableCell>
-                                            <TableCell className="text-right">{loc.quantity} {loc.unit}</TableCell>
+                                            <TableCell className="font-mono text-xs">{chambersConfig[loc.location.chamberId]?.name} / {loc.location.coordinate}</TableCell>
+                                            <TableCell className="text-right font-bold">{loc.quantity} {loc.unit}</TableCell>
                                         </TableRow>
                                     ))}
                                 </TableBody>
@@ -730,7 +764,7 @@ export default function FallCreekPage() {
                         </div>
                         <DialogFooter>
                             <DialogClose asChild>
-                                <Button type="button" variant="secondary">Cerrar</Button>
+                                <Button type="button" variant="secondary">Cerrar Detalle</Button>
                             </DialogClose>
                         </DialogFooter>
                     </DialogContent>
@@ -739,5 +773,3 @@ export default function FallCreekPage() {
         </div>
     );
 }
-
-    
