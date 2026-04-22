@@ -51,9 +51,9 @@
     },
     {
       "id": "fall-creek-logo",
-      "description": "Logo corporativo de Fall Creek",
-      "imageUrl": "https://picsum.photos/seed/fallcreek-logo/400/120",
-      "imageHint": "blueberry plant"
+      "description": "Logo corporativo oficial de Fall Creek",
+      "imageUrl": "https://www.fallcreeknursery.com/assets/images/logo.png",
+      "imageHint": "fall creek logo"
     }
   ]
 }

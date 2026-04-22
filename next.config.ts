@@ -28,6 +28,12 @@ const nextConfig: NextConfig = {
         port: '',
         pathname: '/**',
       },
+      {
+        protocol: 'https',
+        hostname: 'www.fallcreeknursery.com',
+        port: '',
+        pathname: '/**',
+      },
     ],
   },
 };
