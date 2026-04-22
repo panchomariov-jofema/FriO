@@ -9,6 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { ReportHeader } from '@/components/reports/ReportHeader';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { chambersConfig } from '@/lib/chambers-config';
 
 function convertToCSV(data: any[], headers: string[]) {
     const headerRow = headers.join(';');
@@ -54,11 +55,15 @@ export default function OtherFruitStockReportPage() {
                 .map((item, index) => ({
                     id: `${reception.id}-${index}`,
                     clientName: reception.clientName,
+                    document: reception.document,
+                    clientLotId: item.clientLotId || '-',
                     productCode: item.productCode,
                     productName: item.productName,
                     unit: reception.unit,
                     quantity: item.quantity,
-                    location: `${item.storageLocation!.chamberId} / ${item.storageLocation!.coordinate}`,
+                    chamberId: item.storageLocation!.chamberId,
+                    coordinate: item.storageLocation!.coordinate,
+                    chamberName: chambersConfig[item.storageLocation!.chamberId]?.name || item.storageLocation!.chamberId,
                     receptionDate: reception.createdAt,
                 }))
         );
@@ -77,13 +82,16 @@ export default function OtherFruitStockReportPage() {
     }, [stockData]);
 
     const handleExport = () => {
-        const headers = ["Fecha Recepción", "Cliente", "Codigo Producto", "Nombre Producto", "Ubicacion", "Cantidad", "Unidad"];
+        const headers = ["Fecha Recepción", "Cliente", "Documento Entrada", "Lote", "Codigo Producto", "Nombre Producto", "Cámara", "Ubicación", "Cantidad", "Unidad"];
         const dataToExport = filteredData.map(item => ({
             "Fecha Recepción": item.receptionDate?.toDate(),
             "Cliente": item.clientName,
+            "Documento Entrada": item.document,
+            "Lote": item.clientLotId,
             "Codigo Producto": item.productCode,
             "Nombre Producto": item.productName,
-            "Ubicacion": item.location,
+            "Cámara": item.chamberName,
+            "Ubicación": item.coordinate,
             "Cantidad": item.quantity,
             "Unidad": item.unit,
         }));
@@ -123,8 +131,11 @@ export default function OtherFruitStockReportPage() {
                                 <TableRow>
                                     <TableHead>Fecha Recepción</TableHead>
                                     <TableHead>Cliente</TableHead>
+                                    <TableHead>Doc. Entrada</TableHead>
+                                    <TableHead>Lote</TableHead>
                                     <TableHead>Cód. Producto</TableHead>
                                     <TableHead>Producto</TableHead>
+                                    <TableHead>Cámara</TableHead>
                                     <TableHead>Ubicación</TableHead>
                                     <TableHead>Cantidad</TableHead>
                                     <TableHead>Unidad</TableHead>
@@ -132,21 +143,24 @@ export default function OtherFruitStockReportPage() {
                             </TableHeader>
                             <TableBody>
                                 {loadingReceptions ? (
-                                    Array.from({ length: 5 }).map((_, i) => <TableRow key={i}><TableCell colSpan={7}><Skeleton className="h-4 w-full" /></TableCell></TableRow>)
+                                    Array.from({ length: 5 }).map((_, i) => <TableRow key={i}><TableCell colSpan={10}><Skeleton className="h-4 w-full" /></TableCell></TableRow>)
                                 ) : filteredData.length > 0 ? (
                                     filteredData.map(item => (
                                         <TableRow key={item.id}>
                                             <TableCell>{item.receptionDate?.toDate().toLocaleDateString()}</TableCell>
                                             <TableCell>{item.clientName}</TableCell>
+                                            <TableCell className="font-mono text-xs">{item.document}</TableCell>
+                                            <TableCell className="font-mono text-xs">{item.clientLotId}</TableCell>
                                             <TableCell>{item.productCode}</TableCell>
                                             <TableCell>{item.productName}</TableCell>
-                                            <TableCell>{item.location}</TableCell>
+                                            <TableCell className="font-medium">{item.chamberName}</TableCell>
+                                            <TableCell className="font-mono">{item.coordinate}</TableCell>
                                             <TableCell className="font-semibold">{item.quantity}</TableCell>
                                             <TableCell>{item.unit}</TableCell>
                                         </TableRow>
                                     ))
                                 ) : (
-                                    <TableRow><TableCell colSpan={7} className="h-24 text-center">No hay datos de stock para los filtros seleccionados.</TableCell></TableRow>
+                                    <TableRow><TableCell colSpan={10} className="h-24 text-center">No hay datos de stock para los filtros seleccionados.</TableCell></TableRow>
                                 )}
                             </TableBody>
                         </Table>
