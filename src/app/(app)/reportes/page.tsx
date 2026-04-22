@@ -69,7 +69,7 @@ const reportList = [
     { 
         id: 'stock-ubicacion-otros',
         title: 'Stock por Ubicación (Socios)', 
-        description: 'Mapa detallado de dónde se encuentra guardada la fruta de clientes externos, especificando la cámara y la coordenada exacta.',
+        description: 'Mapa detallado de dónde se encuentran almacenados los Bins de nuestros Clientes, especificando N° de Cámara y ubicación exacta.',
         href: '/reportes/stock-fruta-otros-clientes',
         icon: MapPin,
         color: 'text-rose-500',
