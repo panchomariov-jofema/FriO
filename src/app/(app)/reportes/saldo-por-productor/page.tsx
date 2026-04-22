@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/accordion";
 import { Badge } from '@/components/ui/badge';
 
-function convertToCSV(data: any[], headers: {key: string, label: string}[]) {
+function convertToCSV(data: any[], headers: {key: string; label: string}[]) {
     const headerRow = headers.map(h => h.label).join(';');
     const rows = data.map(row => 
         headers.map(header => {
@@ -170,7 +170,7 @@ export default function ProducerBalanceReportPage() {
     return (
         <div className="space-y-6">
             <ReportHeader
-                title="Saldo por Exp/Productor"
+                title="Saldo de Bins y Mat. Entregado"
                 description="Consolidado de materiales entregados y devueltos por productor (Basado en módulo Bins y Materiales)."
                 onExport={handleExport}
                 isExportDisabled={loading || balanceData.length === 0}

@@ -88,7 +88,7 @@ Reporte maestro que consolida:
 - Despachos confirmados a packing (Salidas).
 - *Nota: El Administrador puede cargar saldos iniciales históricos en formato DD-MM-YYYY.*
 
-### 6.2. Saldo por Exp/Productor
+### 6.2. Saldo de Bins y Mat. Entregado
 Visualización agrupada y contraída.
 - Muestra el saldo total (ej: "500 Bins") en la cabecera.
 - Permite expandir para ver el detalle por código de producto.

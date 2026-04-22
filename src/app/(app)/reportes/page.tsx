@@ -21,7 +21,7 @@ const reportList = [
     },
     {
         id: 'saldo-productor',
-        title: "Saldo por Exp/Productor",
+        title: "Saldo de Bins y Mat. Entregado",
         description: "Consolidado de materiales entregados y devueltos por productor.",
         href: "/reportes/saldo-por-productor"
     },
