@@ -10,10 +10,10 @@ import { ReportHeader } from '@/components/reports/ReportHeader';
 import { Badge } from '@/components/ui/badge';
 import { Timestamp, collection, doc, writeBatch, query, where, getDocs, serverTimestamp } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
-import { Upload, Download, Trash2, Info } from 'lucide-react';
+import { Upload, Download, Trash2, Info, Search, X, Calendar as CalendarIcon } from 'lucide-react';
 import { useFirestore, useUser } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
-import { parse } from 'date-fns';
+import { parse, format, isWithinInterval, startOfDay, endOfDay } from 'date-fns';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -26,6 +26,12 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { cn } from '@/lib/utils';
+import { DateRange } from 'react-day-picker';
 
 const IMPORT_HEADER_MAP: Record<string, string> = {
   'Fecha (DD-MM-YYYY)': 'fecha',
@@ -89,6 +95,17 @@ export default function BinMaterialKardexReportPage() {
 
     const isAdmin = user?.email === 'francisco.villarreal@outlook.es';
 
+    // Filters State
+    const [dateRange, setDateRange] = React.useState<DateRange | undefined>(undefined);
+    const [docFilter, setDocFilter] = React.useState('');
+    const [expFilter, setExpFilter] = React.useState('');
+    const [prodFilter, setProdFilter] = React.useState('');
+    const [codeFilter, setCodeFilter] = React.useState('');
+    const [nameFilter, setNameFilter] = React.useState('');
+    const [userFilter, setUserFilter] = React.useState('');
+    const [movFilter, setMovFilter] = React.useState('');
+    const [typeFilter, setTypeFilter] = React.useState<'all' | 'Entrada' | 'Salida'>('all');
+
     const { data: movements, loading: loadingMovements } = useFirestoreCollection<BinMaterialMovement>('binMaterialMovements');
     const { data: chamberLots, loading: loadingChamberLots } = useFirestoreCollection<ChamberLot>('chamberLots');
     const { data: dispatches, loading: loadingDispatches } = useFirestoreCollection<Dispatch>('dispatches');
@@ -112,7 +129,7 @@ export default function BinMaterialKardexReportPage() {
         return name;
     };
 
-    const kardexData = React.useMemo(() => {
+    const rawKardexData = React.useMemo(() => {
         if (loading) return [];
         
         const allItems: KardexItem[] = [];
@@ -180,6 +197,32 @@ export default function BinMaterialKardexReportPage() {
 
         return allItems.sort((a, b) => b.fecha.toMillis() - a.fecha.toMillis());
     }, [loading, movements, chamberLots, dispatches, exporterMap, producerMap, receptionLotMap]);
+
+    const filteredKardexData = React.useMemo(() => {
+        return rawKardexData.filter(item => {
+            // Date Filter
+            if (dateRange?.from) {
+                const itemDate = item.fecha.toDate();
+                const start = startOfDay(dateRange.from);
+                const end = dateRange.to ? endOfDay(dateRange.to) : endOfDay(dateRange.from);
+                if (!isWithinInterval(itemDate, { start, end })) return false;
+            }
+
+            // Text Filters
+            if (docFilter && !item.documento?.toLowerCase().includes(docFilter.toLowerCase())) return false;
+            if (expFilter && !item.exportador.toLowerCase().includes(expFilter.toLowerCase())) return false;
+            if (prodFilter && !item.productor.toLowerCase().includes(prodFilter.toLowerCase())) return false;
+            if (codeFilter && !item.codigoProducto.toLowerCase().includes(codeFilter.toLowerCase())) return false;
+            if (nameFilter && !item.nombreProducto.toLowerCase().includes(nameFilter.toLowerCase())) return false;
+            if (userFilter && !item.userName?.toLowerCase().includes(userFilter.toLowerCase())) return false;
+            if (movFilter && !item.movimiento.toLowerCase().includes(movFilter.toLowerCase())) return false;
+
+            // Type Filter
+            if (typeFilter !== 'all' && item.tipo !== typeFilter) return false;
+
+            return true;
+        });
+    }, [rawKardexData, dateRange, docFilter, expFilter, prodFilter, codeFilter, nameFilter, userFilter, movFilter, typeFilter]);
     
 
     const handleExport = () => {
@@ -196,8 +239,8 @@ export default function BinMaterialKardexReportPage() {
             { key: 'userName', label: 'Usuario' },
         ];
         
-        const csv = convertToCSV(kardexData, headers);
-        downloadCSV(csv, 'kardex_bins_y_materiales.csv');
+        const csv = convertToCSV(filteredKardexData, headers);
+        downloadCSV(csv, 'kardex_bins_y_materiales_filtrado.csv');
     };
 
     const handleDownloadTemplate = () => {
@@ -224,7 +267,6 @@ export default function BinMaterialKardexReportPage() {
                 return;
             }
 
-            // Chile/Excel fix: determine delimiter
             const firstLine = lines[0];
             const delimiter = firstLine.includes(';') ? ';' : ',';
 
@@ -351,15 +393,12 @@ export default function BinMaterialKardexReportPage() {
         try {
             const batch = writeBatch(firestore);
             
-            // 1. Eliminar movimientos manuales/importados
             const movementsSnap = await getDocs(collection(firestore, 'binMaterialMovements'));
             movementsSnap.forEach(d => batch.delete(d.ref));
 
-            // 2. Eliminar ingresos a cámara (Origen del registro automático de entrada en Kardex)
             const chamberSnap = await getDocs(collection(firestore, 'chamberLots'));
             chamberSnap.forEach(d => batch.delete(d.ref));
 
-            // 3. Eliminar despachos (Origen del registro automático de salida en Kardex)
             const dispatchSnap = await getDocs(collection(firestore, 'dispatches'));
             dispatchSnap.forEach(d => batch.delete(d.ref));
 
@@ -381,6 +420,18 @@ export default function BinMaterialKardexReportPage() {
                 return 'default';
         }
     };
+
+    const clearFilters = () => {
+        setDateRange(undefined);
+        setDocFilter('');
+        setExpFilter('');
+        setProdFilter('');
+        setCodeFilter('');
+        setNameFilter('');
+        setUserFilter('');
+        setMovFilter('');
+        setTypeFilter('all');
+    };
     
     return (
         <div className="space-y-6">
@@ -388,7 +439,7 @@ export default function BinMaterialKardexReportPage() {
                 title="Kardex de Movimientos de Bins y Materiales"
                 description="Historial consolidado de movimientos, ingresos a cámara y despachos."
                 onExport={handleExport}
-                isExportDisabled={loading || kardexData.length === 0}
+                isExportDisabled={loading || filteredKardexData.length === 0}
             >
                 {isAdmin && (
                     <div className="flex flex-wrap gap-2">
@@ -440,13 +491,6 @@ export default function BinMaterialKardexReportPage() {
                                 </code>
                                 <div className="space-y-1 text-sm">
                                     <p><strong>Ejemplo Saldo Inicial:</strong> <code className="bg-muted px-1">01-03-2026,entrada,SALDO-INICIAL,SISTEMA,0,SUBSOLE,PROD-01,10016,500</code></p>
-                                    <ul className="list-disc list-inside space-y-1 mt-2">
-                                        <li><strong>Fecha:</strong> Formato DD-MM-YYYY (ej: 01-03-2026).</li>
-                                        <li><strong>Tipo:</strong> Escriba "entrada" o "salida".</li>
-                                        <li><strong>ID Exportador:</strong> Use el código corto definido en Datos Maestros (ej: SUBSOLE).</li>
-                                        <li><strong>ID Productor:</strong> Use el código corto del productor (ej: PROD-01).</li>
-                                        <li><strong>Código Material:</strong> Debe existir en el maestro para ese exportador (ej: 10016).</li>
-                                    </ul>
                                 </div>
                             </AlertDescription>
                         </div>
@@ -456,48 +500,177 @@ export default function BinMaterialKardexReportPage() {
 
             <Card>
                 <CardContent className="pt-6">
+                    <div className="mb-4 flex flex-wrap gap-4 items-end">
+                        <div className="flex-1 min-w-[200px]">
+                            <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Rango de Fecha</label>
+                            <Popover>
+                                <PopoverTrigger asChild>
+                                    <Button
+                                        variant={"outline"}
+                                        className={cn(
+                                            "w-full justify-start text-left font-normal",
+                                            !dateRange && "text-muted-foreground"
+                                        )}
+                                    >
+                                        <CalendarIcon className="mr-2 h-4 w-4" />
+                                        {dateRange?.from ? (
+                                            dateRange.to ? (
+                                                <>{format(dateRange.from, "dd/MM/yy")} - {format(dateRange.to, "dd/MM/yy")}</>
+                                            ) : (
+                                                format(dateRange.from, "dd/MM/yy")
+                                            )
+                                        ) : (
+                                            <span>Desde - Hasta</span>
+                                        )}
+                                    </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-auto p-0" align="start">
+                                    <Calendar
+                                        initialFocus
+                                        mode="range"
+                                        defaultMonth={dateRange?.from}
+                                        selected={dateRange}
+                                        onSelect={setDateRange}
+                                        numberOfMonths={2}
+                                    />
+                                </PopoverContent>
+                            </Popover>
+                        </div>
+                        <Button variant="ghost" size="sm" onClick={clearFilters} className="h-10">
+                            <X className="mr-2 h-4 w-4" /> Limpiar Filtros
+                        </Button>
+                    </div>
+
                     <div className="rounded-md border">
                         <Table>
-                            <TableHeader>
+                            <TableHeader className="bg-muted/50">
                                 <TableRow>
-                                    <TableHead>Fecha</TableHead>
-                                    <TableHead>Documento</TableHead>
-                                    <TableHead>Exportador</TableHead>
-                                    <TableHead>Productor</TableHead>
-                                    <TableHead>Cód. Producto</TableHead>
-                                    <TableHead>Producto</TableHead>
+                                    <TableHead className="min-w-[120px]">
+                                        <div className="space-y-2 py-2">
+                                            <span>Fecha</span>
+                                        </div>
+                                    </TableHead>
+                                    <TableHead>
+                                        <div className="space-y-2 py-2">
+                                            <span>Documento</span>
+                                            <Input 
+                                                className="h-7 text-xs" 
+                                                placeholder="Buscar..." 
+                                                value={docFilter}
+                                                onChange={e => setDocFilter(e.target.value)}
+                                            />
+                                        </div>
+                                    </TableHead>
+                                    <TableHead>
+                                        <div className="space-y-2 py-2">
+                                            <span>Exportador</span>
+                                            <Input 
+                                                className="h-7 text-xs" 
+                                                placeholder="Filtrar..." 
+                                                value={expFilter}
+                                                onChange={e => setExpFilter(e.target.value)}
+                                            />
+                                        </div>
+                                    </TableHead>
+                                    <TableHead>
+                                        <div className="space-y-2 py-2">
+                                            <span>Productor</span>
+                                            <Input 
+                                                className="h-7 text-xs" 
+                                                placeholder="Filtrar..." 
+                                                value={prodFilter}
+                                                onChange={e => setProdFilter(e.target.value)}
+                                            />
+                                        </div>
+                                    </TableHead>
+                                    <TableHead>
+                                        <div className="space-y-2 py-2">
+                                            <span>Cód. Prod.</span>
+                                            <Input 
+                                                className="h-7 text-xs" 
+                                                placeholder="Filtro..." 
+                                                value={codeFilter}
+                                                onChange={e => setCodeFilter(e.target.value)}
+                                            />
+                                        </div>
+                                    </TableHead>
+                                    <TableHead>
+                                        <div className="space-y-2 py-2">
+                                            <span>Producto</span>
+                                            <Input 
+                                                className="h-7 text-xs" 
+                                                placeholder="Filtro..." 
+                                                value={nameFilter}
+                                                onChange={e => setNameFilter(e.target.value)}
+                                            />
+                                        </div>
+                                    </TableHead>
                                     <TableHead>Cantidad</TableHead>
-                                    <TableHead>Usuario</TableHead>
-                                    <TableHead>Movimiento</TableHead>
-                                    <TableHead>Entrada/Salida</TableHead>
+                                    <TableHead>
+                                        <div className="space-y-2 py-2">
+                                            <span>Usuario</span>
+                                            <Input 
+                                                className="h-7 text-xs" 
+                                                placeholder="Filtro..." 
+                                                value={userFilter}
+                                                onChange={e => setUserFilter(e.target.value)}
+                                            />
+                                        </div>
+                                    </TableHead>
+                                    <TableHead>
+                                        <div className="space-y-2 py-2">
+                                            <span>Movimiento</span>
+                                            <Input 
+                                                className="h-7 text-xs" 
+                                                placeholder="Filtro..." 
+                                                value={movFilter}
+                                                onChange={e => setMovFilter(e.target.value)}
+                                            />
+                                        </div>
+                                    </TableHead>
+                                    <TableHead>
+                                        <div className="space-y-2 py-2">
+                                            <span>E/S</span>
+                                            <Select value={typeFilter} onValueChange={(val: any) => setTypeFilter(val)}>
+                                                <SelectTrigger className="h-7 text-xs w-[100px]">
+                                                    <SelectValue />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="all">Todos</SelectItem>
+                                                    <SelectItem value="Entrada">Entrada</SelectItem>
+                                                    <SelectItem value="Salida">Salida</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                    </TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
                                 {loading ? (
                                     Array.from({ length: 10 }).map((_, i) => <TableRow key={i}><TableCell colSpan={10}><Skeleton className="h-4 w-full" /></TableCell></TableRow>)
-                                ) : kardexData.length > 0 ? (
-                                    kardexData.map(item => (
+                                ) : filteredKardexData.length > 0 ? (
+                                    filteredKardexData.map(item => (
                                         <TableRow key={item.key}>
-                                            <TableCell>{item.fecha?.toDate().toLocaleString()}</TableCell>
+                                            <TableCell className="text-xs">{item.fecha?.toDate().toLocaleString('es-CL', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })}</TableCell>
                                             <TableCell className="font-mono text-xs">{item.documento || '-'}</TableCell>
-                                            <TableCell>{item.exportador}</TableCell>
-                                            <TableCell>{item.productor}</TableCell>
-                                            <TableCell>{item.codigoProducto}</TableCell>
-                                            <TableCell>{item.nombreProducto}</TableCell>
-                                            <TableCell className={`font-semibold ${item.tipo === 'Entrada' ? 'text-green-600' : 'text-red-600'}`}>
+                                            <TableCell className="text-xs">{item.exportador}</TableCell>
+                                            <TableCell className="text-xs">{item.productor}</TableCell>
+                                            <TableCell className="text-xs font-mono">{item.codigoProducto}</TableCell>
+                                            <TableCell className="text-xs">{item.nombreProducto}</TableCell>
+                                            <TableCell className={`font-semibold text-xs ${item.tipo === 'Entrada' ? 'text-green-600' : 'text-red-600'}`}>
                                                 {item.cantidad}
                                             </TableCell>
-                                            <TableCell>{item.userName || 'N/A'}</TableCell>
-                                            <TableCell>{item.movimiento}</TableCell>
+                                            <TableCell className="text-xs">{item.userName || 'N/A'}</TableCell>
+                                            <TableCell className="text-xs">{item.movimiento}</TableCell>
                                             <TableCell>
-                                                <Badge variant={getBadgeVariant(item.tipo)}>
+                                                <Badge variant={getBadgeVariant(item.tipo)} className="text-[10px] px-1.5 h-4">
                                                     {item.tipo}
                                                 </Badge>
                                             </TableCell>
                                         </TableRow>
                                     ))
                                 ) : (
-                                    <TableRow><TableCell colSpan={10} className="h-24 text-center">No hay movimientos registrados.</TableCell></TableRow>
+                                    <TableRow><TableCell colSpan={10} className="h-24 text-center">No hay registros que coincidan con los filtros.</TableCell></TableRow>
                                 )}
                             </TableBody>
                         </Table>
