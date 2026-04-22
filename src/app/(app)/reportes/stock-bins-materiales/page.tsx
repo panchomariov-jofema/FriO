@@ -61,7 +61,7 @@ export default function BinMaterialStockReportPage() {
     return (
         <div className="space-y-6">
             <ReportHeader 
-                title="Stock de Bins y Materiales"
+                title="Stock de Bins y Mat. En Planta"
                 description="Inventario actual de todos los bins y materiales."
                 onExport={handleExport}
                 isExportDisabled={loading || !filteredData || filteredData.length === 0}

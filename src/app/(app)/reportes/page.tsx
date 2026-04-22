@@ -7,7 +7,7 @@ import { ChevronRight } from 'lucide-react';
 
 const reportList = [
     { 
-        title: 'Stock de Bins y Materiales', 
+        title: 'Stock de Bins y Mat. En Planta', 
         description: 'Inventario actual de todos los bins y materiales en planta.',
         href: '/reportes/stock-bins-materiales'
     },
