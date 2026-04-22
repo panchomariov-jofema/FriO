@@ -3,7 +3,22 @@
 import * as React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import Link from 'next/link';
-import { ChevronRight, Settings, Eye, EyeOff } from 'lucide-react';
+import { 
+    ChevronRight, 
+    Settings, 
+    Eye, 
+    EyeOff,
+    Package,
+    Calculator,
+    Box,
+    Table2,
+    ClipboardList,
+    MapPin,
+    History,
+    Truck,
+    Thermometer,
+    Clock
+} from 'lucide-react';
 import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import type { ReportSetting } from '@/lib/types';
 import { collection, doc, setDoc } from 'firebase/firestore';
@@ -17,61 +32,81 @@ const reportList = [
         id: 'stock-bins',
         title: 'Stock de Bins y Mat. En Planta', 
         description: 'Inventario actual de todos los bins y materiales en planta.',
-        href: '/reportes/stock-bins-materiales'
+        href: '/reportes/stock-bins-materiales',
+        icon: Package,
+        color: 'text-blue-500'
     },
     {
         id: 'saldo-productor',
         title: "Saldo de Bins y Mat. Entregado",
         description: "Consolidado de materiales entregados y devueltos por productor.",
-        href: "/reportes/saldo-por-productor"
+        href: "/reportes/saldo-por-productor",
+        icon: Calculator,
+        color: 'text-green-500'
     },
     { 
         id: 'stock-embalajes',
         title: 'Stock de Embalajes', 
         description: 'Inventario de pallets de embalaje almacenados.',
-        href: '/reportes/stock-embalajes'
+        href: '/reportes/stock-embalajes',
+        icon: Box,
+        color: 'text-amber-500'
     },
     { 
         id: 'kardex-bins',
         title: 'Kardex de Movimientos de Bins y Materiales', 
         description: 'Historial detallado de entradas, salidas y saldos iniciales históricos.',
-        href: '/reportes/kardex-bins-materiales'
+        href: '/reportes/kardex-bins-materiales',
+        icon: Table2,
+        color: 'text-indigo-500'
     },
     { 
         id: 'recepcion-fruta',
         title: 'Registro de Recepción de Fruta', 
         description: 'Listado de todos los lotes ingresados.',
-        href: '/reportes/log-recepcion-fruta'
+        href: '/reportes/log-recepcion-fruta',
+        icon: ClipboardList,
+        color: 'text-emerald-500'
     },
     { 
         id: 'stock-ubicacion-otros',
         title: 'Reporte Stock por Ubicacion (Otros Clientes)', 
         description: 'Inventario de fruta de clientes externos detallado por ubicación.',
-        href: '/reportes/stock-fruta-otros-clientes'
+        href: '/reportes/stock-fruta-otros-clientes',
+        icon: MapPin,
+        color: 'text-rose-500'
     },
     { 
         id: 'kardex-fruta-otros',
         title: 'Kardex de Movimientos de Fruta (Otros Clientes)', 
         description: 'Historial de entradas y salidas de fruta de clientes externos.',
-        href: '/reportes/kardex-fruta-otros-clientes'
+        href: '/reportes/kardex-fruta-otros-clientes',
+        icon: History,
+        color: 'text-purple-500'
     },
     { 
         id: 'despachos-packing',
         title: 'Reporte de Despachos a Packing', 
         description: 'Listado de todos los despachos de fruta creados.',
-        href: '/reportes/despachos'
+        href: '/reportes/despachos',
+        icon: Truck,
+        color: 'text-orange-500'
     },
     { 
         id: 'registro-temperaturas',
         title: 'Registro de Temperaturas', 
         description: 'Historial de todas las temperaturas registradas en las cámaras.',
-        href: '/reportes/registro-temperaturas'
+        href: '/reportes/registro-temperaturas',
+        icon: Thermometer,
+        color: 'text-cyan-500'
     },
     {
         id: 'permanencia-stock',
         title: "Permanencia Stock (Otros Clientes)",
         description: "Calcula los días de permanencia del stock de fruta de otros clientes.",
-        href: "/reportes/permanencia-stock-otros-clientes"
+        href: "/reportes/permanencia-stock-otros-clientes",
+        icon: Clock,
+        color: 'text-slate-500'
     },
 ];
 
@@ -152,24 +187,32 @@ export default function ReportesPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {loadingSettings ? (
                     Array.from({ length: 6 }).map((_, i) => (
-                        <Skeleton key={i} className="h-32 w-full" />
+                        <Skeleton key={i} className="h-40 w-full" />
                     ))
                 ) : visibleReports.map(report => (
-                    <Link href={report.href} key={report.id} className="block">
-                        <Card className={`hover:border-primary/80 hover:shadow-md transition-all h-full ${hiddenReportIds.has(report.id) ? 'opacity-60 border-dashed' : ''}`}>
-                            <CardHeader>
+                    <Link href={report.href} key={report.id} className="block relative group">
+                        <Card className={`hover:border-primary/80 hover:shadow-lg transition-all h-full overflow-hidden border-2 ${hiddenReportIds.has(report.id) ? 'opacity-60 border-dashed bg-muted/30' : 'bg-card'}`}>
+                            {/* Decorative background icon */}
+                            <div className="absolute -right-4 -bottom-4 opacity-5 group-hover:opacity-10 transition-opacity pointer-events-none">
+                                <report.icon size={120} strokeWidth={1} />
+                            </div>
+                            
+                            <CardHeader className="relative z-10">
                                 <div className='flex justify-between items-start'>
-                                    <div className="space-y-1">
-                                        <CardTitle className="text-lg flex items-center gap-2">
+                                    <div className="space-y-3">
+                                        <div className={`p-2 rounded-lg bg-muted w-fit ${report.color}`}>
+                                            <report.icon size={24} />
+                                        </div>
+                                        <CardTitle className="text-lg leading-tight flex items-center gap-2">
                                             {report.title}
                                             {isAdmin && hiddenReportIds.has(report.id) && (
                                                 <Badge variant="secondary" className="text-[10px] h-4">Oculto</Badge>
                                             )}
                                         </CardTitle>
                                     </div>
-                                    <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                                    <ChevronRight className="h-5 w-5 text-muted-foreground group-hover:translate-x-1 transition-transform" />
                                 </div>
-                                <CardDescription className="pt-2">{report.description}</CardDescription>
+                                <CardDescription className="pt-2 text-sm font-medium">{report.description}</CardDescription>
                             </CardHeader>
                         </Card>
                     </Link>
