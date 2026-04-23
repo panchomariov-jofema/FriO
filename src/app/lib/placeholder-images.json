@@ -4,50 +4,50 @@
     {
       "id": "report-stock",
       "description": "Stock de materiales en bodega industrial",
-      "imageUrl": "https://picsum.photos/seed/industrial-1/600/400",
-      "imageHint": "warehouse pallets"
+      "imageUrl": "https://picsum.photos/seed/industrial-warehouse-bins/600/400",
+      "imageHint": "warehouse bins"
     },
     {
       "id": "report-accounting",
       "description": "Análisis de cuentas y saldos de inventario",
-      "imageUrl": "https://picsum.photos/seed/industrial-2/600/400",
-      "imageHint": "inventory management"
+      "imageUrl": "https://picsum.photos/seed/farm-logistics-truck/600/400",
+      "imageHint": "agriculture logistics"
     },
     {
       "id": "report-logistics",
       "description": "Control logístico y trazabilidad de movimientos",
-      "imageUrl": "https://picsum.photos/seed/industrial-3/600/400",
-      "imageHint": "logistics data"
+      "imageUrl": "https://picsum.photos/seed/logistics-inventory-data/600/400",
+      "imageHint": "inventory data"
     },
     {
       "id": "report-fruit",
       "description": "Recepción de fruta fresca en bins",
-      "imageUrl": "https://picsum.photos/seed/industrial-4/600/400",
-      "imageHint": "fruit bins"
+      "imageUrl": "https://picsum.photos/seed/fruit-industry-processing/600/400",
+      "imageHint": "fruit industry"
     },
     {
       "id": "report-chamber",
       "description": "Interior de cámara de frío industrial",
-      "imageUrl": "https://picsum.photos/seed/industrial-5/600/400",
-      "imageHint": "cold storage"
+      "imageUrl": "https://picsum.photos/seed/coldstorage-warehouse-interior/600/400",
+      "imageHint": "coldstorage warehouse"
     },
     {
       "id": "report-temp",
       "description": "Control de temperatura y cadena de frío",
-      "imageUrl": "https://picsum.photos/seed/industrial-6/600/400",
-      "imageHint": "industrial sensors"
+      "imageUrl": "https://picsum.photos/seed/industrial-temperature-sensor/600/400",
+      "imageHint": "temperature sensor"
     },
     {
       "id": "report-truck",
       "description": "Despacho de carga en camiones frigoríficos",
-      "imageUrl": "https://picsum.photos/seed/industrial-7/600/400",
-      "imageHint": "industrial truck"
+      "imageUrl": "https://picsum.photos/seed/cargo-truck-shipping/600/400",
+      "imageHint": "cargo truck"
     },
     {
       "id": "report-clock",
       "description": "Gestión de tiempos y permanencia en stock",
-      "imageUrl": "https://picsum.photos/seed/industrial-8/600/400",
-      "imageHint": "logistics timing"
+      "imageUrl": "https://picsum.photos/seed/logistics-time-management/600/400",
+      "imageHint": "logistics time"
     },
     {
       "id": "fall-creek-logo",
