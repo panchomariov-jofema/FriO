@@ -4,49 +4,49 @@
     {
       "id": "report-stock",
       "description": "Stock de materiales en bodega industrial",
-      "imageUrl": "https://picsum.photos/seed/industrial-warehouse-bins/600/400",
+      "imageUrl": "https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?q=80&w=600&auto=format&fit=crop",
       "imageHint": "warehouse bins"
     },
     {
       "id": "report-accounting",
-      "description": "Análisis de cuentas y saldos de inventario",
-      "imageUrl": "https://picsum.photos/seed/farm-logistics-truck/600/400",
+      "description": "Saldos de bins entregados",
+      "imageUrl": "https://images.unsplash.com/photo-1578575437130-527eed3abbec?q=80&w=600&auto=format&fit=crop",
       "imageHint": "agriculture logistics"
     },
     {
       "id": "report-logistics",
-      "description": "Control logístico y trazabilidad de movimientos",
-      "imageUrl": "https://picsum.photos/seed/logistics-inventory-data/600/400",
+      "description": "Kardex y control de movimientos",
+      "imageUrl": "https://images.unsplash.com/photo-1553413077-190dd305871c?q=80&w=600&auto=format&fit=crop",
       "imageHint": "inventory data"
     },
     {
-      "id": "report-fruit",
-      "description": "Recepción de fruta fresca en bins",
-      "imageUrl": "https://picsum.photos/seed/fruit-industry-processing/600/400",
-      "imageHint": "fruit industry"
-    },
-    {
       "id": "report-chamber",
-      "description": "Interior de cámara de frío industrial",
-      "imageUrl": "https://picsum.photos/seed/coldstorage-warehouse-interior/600/400",
+      "description": "Stock por ubicación en cámara",
+      "imageUrl": "https://images.unsplash.com/photo-1587293852726-70cdb56c2866?q=80&w=600&auto=format&fit=crop",
       "imageHint": "coldstorage warehouse"
     },
     {
+      "id": "report-fruit",
+      "description": "Recepción de fruta fresca",
+      "imageUrl": "https://images.unsplash.com/photo-1615485290382-441e4d0c9cb5?q=80&w=600&auto=format&fit=crop",
+      "imageHint": "fruit industry"
+    },
+    {
       "id": "report-temp",
-      "description": "Control de temperatura y cadena de frío",
-      "imageUrl": "https://picsum.photos/seed/industrial-temperature-sensor/600/400",
+      "description": "Control térmico industrial",
+      "imageUrl": "https://images.unsplash.com/photo-1581092160562-40aa08e78837?q=80&w=600&auto=format&fit=crop",
       "imageHint": "temperature sensor"
     },
     {
       "id": "report-truck",
-      "description": "Despacho de carga en camiones frigoríficos",
-      "imageUrl": "https://picsum.photos/seed/cargo-truck-shipping/600/400",
+      "description": "Logística de transporte",
+      "imageUrl": "https://images.unsplash.com/photo-1519003722824-194d4455a60c?q=80&w=600&auto=format&fit=crop",
       "imageHint": "cargo truck"
     },
     {
       "id": "report-clock",
-      "description": "Gestión de tiempos y permanencia en stock",
-      "imageUrl": "https://picsum.photos/seed/logistics-time-management/600/400",
+      "description": "Gestión de permanencia",
+      "imageUrl": "https://images.unsplash.com/photo-1506485334402-4a76ae7045ca?q=80&w=600&auto=format&fit=crop",
       "imageHint": "logistics time"
     },
     {

@@ -34,7 +34,7 @@ const reportList = [
     { 
         id: 'stock-bins',
         title: 'Stock de Bins y Mat. En Planta', 
-        description: 'Vea cuántos bins y materiales vacíos hay disponibles en el frigorífico ahora mismo. Útil para saber qué entregar a los productores.',
+        description: 'Vea cuántos bins y materiales vacíos hay disponibles en el frigorífico ahora mismo.',
         href: '/reportes/stock-bins-materiales',
         icon: Package,
         color: 'text-blue-500',
@@ -43,7 +43,7 @@ const reportList = [
     {
         id: 'saldo-productor',
         title: "Saldo de Bins y Mat. Entregados",
-        description: "Revise la cuenta de cada productor: cuántos materiales se llevaron al campo y cuántos han devuelto a la planta hasta hoy.",
+        description: "Revise la cuenta de cada productor: materiales llevados al campo y devueltos.",
         href: "/reportes/saldo-por-productor",
         icon: Calculator,
         color: 'text-green-500',
@@ -52,7 +52,7 @@ const reportList = [
     { 
         id: 'kardex-bins',
         title: 'Kardex de Movimientos de Bins', 
-        description: 'El historial completo de cada entrada y salida registrada. Es el libro de actas detallado de todos los movimientos de materiales.',
+        description: 'Historial detallado de cada entrada y salida registrada en el sistema.',
         href: '/reportes/kardex-bins-materiales',
         icon: Table2,
         color: 'text-indigo-500',
@@ -61,7 +61,7 @@ const reportList = [
     { 
         id: 'recepcion-fruta',
         title: 'Registro de Recepción de Fruta', 
-        description: 'Listado cronológico de todos los lotes de fruta que han ingresado por portería, incluyendo sus pesos y estados actuales.',
+        description: 'Listado cronológico de todos los lotes de fruta que han ingresado por portería.',
         href: '/reportes/log-recepcion-fruta',
         icon: ClipboardList,
         color: 'text-emerald-500',
@@ -70,7 +70,7 @@ const reportList = [
     { 
         id: 'stock-ubicacion-otros',
         title: 'Stock por Ubicación (Socios)', 
-        description: 'Mapa detallado de dónde se encuentran almacenados los Bins de nuestros Clientes, especificando N° de Cámara y ubicación exacta.',
+        description: 'Ubicación exacta de los Bins de Clientes, especificando la Cámara frigorífica.',
         href: '/reportes/stock-fruta-otros-clientes',
         icon: MapPin,
         color: 'text-rose-500',
@@ -79,7 +79,7 @@ const reportList = [
     { 
         id: 'kardex-fruta-otros',
         title: 'Movimientos de Fruta (Socios)', 
-        description: 'Historial de entradas y salidas de fruta de terceros. Permite ver cuándo llegó y cuándo se despachó cada artículo.',
+        description: 'Historial de entradas y salidas de fruta de terceros. Permite ver cuándo llegó cada artículo.',
         href: '/reportes/kardex-fruta-otros-clientes',
         icon: History,
         color: 'text-purple-500',
@@ -88,7 +88,7 @@ const reportList = [
     { 
         id: 'despachos-packing',
         title: 'Reporte de Despachos a Packing', 
-        description: 'Consulte todos los camiones que han salido cargados hacia el proceso de embalaje, con el detalle de kilos y lotes enviados.',
+        description: 'Consulte todos los camiones que han salido cargados hacia el proceso de embalaje.',
         href: '/reportes/despachos',
         icon: Truck,
         color: 'text-orange-500',
@@ -97,7 +97,7 @@ const reportList = [
     { 
         id: 'registro-temperaturas',
         title: 'Registro de Temperaturas', 
-        description: 'Bitácora histórica de las mediciones de frío realizadas en cada una de las cámaras para asegurar la cadena de frío.',
+        description: 'Bitácora histórica de las mediciones de frío realizadas en cada una de las cámaras.',
         href: '/reportes/registro-temperaturas',
         icon: Thermometer,
         color: 'text-cyan-500',
@@ -106,7 +106,7 @@ const reportList = [
     {
         id: 'permanencia-stock',
         title: "Días de Permanencia en Frío",
-        description: "Cálculo automático de cuántos días lleva la fruta de terceros en las cámaras. Herramienta fundamental para el cobro del servicio.",
+        description: "Cálculo automático de cuántos días lleva la fruta de terceros en las cámaras.",
         href: "/reportes/permanencia-stock-otros-clientes",
         icon: Clock,
         color: 'text-slate-500',
@@ -115,7 +115,7 @@ const reportList = [
     { 
         id: 'stock-embalajes',
         title: 'Inventario de Embalajes', 
-        description: 'Stock actual de pallets de materiales de embalaje (cajas, esquineros, láminas) almacenados en las bodegas secas.',
+        description: 'Stock actual de pallets de materiales de embalaje almacenados en las bodegas secas.',
         href: '/reportes/stock-embalajes',
         icon: Box,
         color: 'text-amber-500',
@@ -208,8 +208,7 @@ export default function ReportesPage() {
                     <Link href={report.href} key={report.id} className="block group">
                         <Card className={`overflow-hidden border-2 transition-all duration-300 hover:shadow-2xl hover:border-primary group-active:scale-[0.98] h-full flex flex-col ${hiddenReportIds.has(report.id) ? 'opacity-60 border-dashed bg-muted/30' : 'bg-card border-border'}`}>
                             
-                            {/* Image Header */}
-                            <div className="relative h-48 w-full overflow-hidden">
+                            <div className="relative h-56 w-full overflow-hidden">
                                 {report.image && (
                                     <Image 
                                         src={report.image.imageUrl} 
