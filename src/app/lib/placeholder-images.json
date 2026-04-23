@@ -3,51 +3,51 @@
   "placeholderImages": [
     {
       "id": "report-stock",
-      "description": "Imagen referencial para stock de almacén",
-      "imageUrl": "https://picsum.photos/seed/101/600/400",
-      "imageHint": "warehouse stock"
+      "description": "Stock de materiales en bodega industrial",
+      "imageUrl": "https://picsum.photos/seed/stock-wh/600/400",
+      "imageHint": "warehouse boxes"
     },
     {
       "id": "report-accounting",
-      "description": "Imagen referencial para saldos y contabilidad",
-      "imageUrl": "https://picsum.photos/seed/102/600/400",
-      "imageHint": "calculator accounting"
+      "description": "Análisis de cuentas y saldos de inventario",
+      "imageUrl": "https://picsum.photos/seed/accounting-data/600/400",
+      "imageHint": "accounting spreadsheet"
     },
     {
       "id": "report-logistics",
-      "description": "Imagen referencial para movimientos y logística",
-      "imageUrl": "https://picsum.photos/seed/103/600/400",
-      "imageHint": "logistics tracking"
+      "description": "Control logístico y trazabilidad de movimientos",
+      "imageUrl": "https://picsum.photos/seed/logistics-trace/600/400",
+      "imageHint": "logistics data"
     },
     {
       "id": "report-fruit",
-      "description": "Imagen referencial para recepción de fruta",
-      "imageUrl": "https://picsum.photos/seed/104/600/400",
-      "imageHint": "fresh fruit"
+      "description": "Recepción de fruta fresca en bins",
+      "imageUrl": "https://picsum.photos/seed/fruit-bins/600/400",
+      "imageHint": "cherries harvest"
     },
     {
       "id": "report-chamber",
-      "description": "Imagen referencial para cámaras de frío",
-      "imageUrl": "https://picsum.photos/seed/105/600/400",
-      "imageHint": "cold storage"
+      "description": "Interior de cámara de frío industrial",
+      "imageUrl": "https://picsum.photos/seed/cold-chamber/600/400",
+      "imageHint": "refrigerated warehouse"
     },
     {
       "id": "report-temp",
-      "description": "Imagen referencial para registro de temperatura",
-      "imageUrl": "https://picsum.photos/seed/106/600/400",
-      "imageHint": "thermometer temperature"
+      "description": "Control de temperatura y cadena de frío",
+      "imageUrl": "https://picsum.photos/seed/temp-control/600/400",
+      "imageHint": "industrial thermometer"
     },
     {
       "id": "report-truck",
-      "description": "Imagen referencial para despachos",
-      "imageUrl": "https://picsum.photos/seed/107/600/400",
-      "imageHint": "delivery truck"
+      "description": "Despacho de carga en camiones frigoríficos",
+      "imageUrl": "https://picsum.photos/seed/truck-dispatch/600/400",
+      "imageHint": "shipping truck"
     },
     {
       "id": "report-clock",
-      "description": "Imagen referencial para permanencia de tiempo",
-      "imageUrl": "https://picsum.photos/seed/108/600/400",
-      "imageHint": "clock time"
+      "description": "Gestión de tiempos y permanencia en stock",
+      "imageUrl": "https://picsum.photos/seed/inventory-time/600/400",
+      "imageHint": "inventory clock"
     },
     {
       "id": "fall-creek-logo",
