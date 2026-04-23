@@ -4,56 +4,56 @@
     {
       "id": "report-stock",
       "description": "Stock de materiales en bodega industrial",
-      "imageUrl": "https://picsum.photos/seed/stock-wh/600/400",
-      "imageHint": "warehouse boxes"
+      "imageUrl": "https://picsum.photos/seed/501/600/400",
+      "imageHint": "warehouse logistics"
     },
     {
       "id": "report-accounting",
       "description": "Análisis de cuentas y saldos de inventario",
-      "imageUrl": "https://picsum.photos/seed/accounting-data/600/400",
-      "imageHint": "accounting spreadsheet"
+      "imageUrl": "https://picsum.photos/seed/502/600/400",
+      "imageHint": "spreadsheet data"
     },
     {
       "id": "report-logistics",
       "description": "Control logístico y trazabilidad de movimientos",
-      "imageUrl": "https://picsum.photos/seed/logistics-trace/600/400",
-      "imageHint": "logistics data"
+      "imageUrl": "https://picsum.photos/seed/503/600/400",
+      "imageHint": "industrial warehouse"
     },
     {
       "id": "report-fruit",
       "description": "Recepción de fruta fresca en bins",
-      "imageUrl": "https://picsum.photos/seed/fruit-bins/600/400",
+      "imageUrl": "https://picsum.photos/seed/504/600/400",
       "imageHint": "cherries harvest"
     },
     {
       "id": "report-chamber",
       "description": "Interior de cámara de frío industrial",
-      "imageUrl": "https://picsum.photos/seed/cold-chamber/600/400",
-      "imageHint": "refrigerated warehouse"
+      "imageUrl": "https://picsum.photos/seed/505/600/400",
+      "imageHint": "cold storage"
     },
     {
       "id": "report-temp",
       "description": "Control de temperatura y cadena de frío",
-      "imageUrl": "https://picsum.photos/seed/temp-control/600/400",
+      "imageUrl": "https://picsum.photos/seed/506/600/400",
       "imageHint": "industrial thermometer"
     },
     {
       "id": "report-truck",
       "description": "Despacho de carga en camiones frigoríficos",
-      "imageUrl": "https://picsum.photos/seed/truck-dispatch/600/400",
-      "imageHint": "shipping truck"
+      "imageUrl": "https://picsum.photos/seed/507/600/400",
+      "imageHint": "cargo truck"
     },
     {
       "id": "report-clock",
       "description": "Gestión de tiempos y permanencia en stock",
-      "imageUrl": "https://picsum.photos/seed/inventory-time/600/400",
-      "imageHint": "inventory clock"
+      "imageUrl": "https://picsum.photos/seed/508/600/400",
+      "imageHint": "time management"
     },
     {
       "id": "fall-creek-logo",
       "description": "Logo corporativo oficial de Fall Creek",
       "imageUrl": "https://www.fallcreeknursery.com/assets/images/logo.png",
-      "imageHint": "fall creek logo"
+      "imageHint": "fall creek"
     }
   ]
 }
