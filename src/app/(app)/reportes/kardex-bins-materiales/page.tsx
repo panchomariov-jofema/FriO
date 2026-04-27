@@ -19,7 +19,6 @@ import {
   AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
-  AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
@@ -162,10 +161,10 @@ export default function BinMaterialKardexReportPage() {
             mov.items.forEach((item) => {
                 const groupKey = `${mov.document}_${item.binMaterialCode}_${typeLabel}`;
                 
-                // Lógica de corrección de productor para SALDO-INICIAL-2028 y producto 10017
+                // Lógica de corrección de productor para SALDO-INICIAL-2028 y producto 10017 -> PALOGIX
                 let currentProductor = producerMap.get(mov.producerId) || mov.producerId;
                 if (mov.document === 'SALDO-INICIAL-2028' && item.binMaterialCode === '10017') {
-                    currentProductor = 'PALOGIC';
+                    currentProductor = 'PALOGIX';
                 }
 
                 if (!groupedMovements[groupKey]) {

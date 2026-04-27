@@ -79,10 +79,10 @@ export default function ProducerBalanceReportPage() {
                 let effectiveProducerName = producerMap.get(mov.producerId) || mov.producerId;
                 let isException = false;
 
-                // Lógica de excepción para PALOGIC - Se identifica por el documento y código de producto
+                // Lógica de excepción para PALOGIX - Se identifica por el documento y código de producto
                 if (mov.document === 'SALDO-INICIAL-2028' && item.binMaterialCode === '10017') {
-                    effectiveProducerId = 'PALOGIC_EXC'; // ID virtual para agrupar esta excepción
-                    effectiveProducerName = 'PALOGIC';
+                    effectiveProducerId = '76754303-4'; // ID proporcionado para agrupar esta excepción
+                    effectiveProducerName = 'PALOGIX';
                     isException = true;
                 }
 
