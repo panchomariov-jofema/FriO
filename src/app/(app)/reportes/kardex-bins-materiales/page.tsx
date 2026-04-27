@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -134,25 +135,44 @@ export default function BinMaterialKardexReportPage() {
         
         const allItems: KardexItem[] = [];
 
-        // 1. Entradas y Salidas de Bins y Materiales
+        // 1. Entradas y Salidas de Bins y Materiales (Con Unificación por Documento)
+        const groupedMovements: Record<string, KardexItem> = {};
+
         (movements || []).forEach(mov => {
             const isDirectDispatch = mov.observation === 'Despacho Directo';
-            mov.items.forEach((item, index) => {
-                allItems.push({
-                    key: `mov-${mov.id}-${index}`,
-                    fecha: mov.createdAt,
-                    exportador: exporterMap.get(mov.exporterId) || mov.exporterId,
-                    productor: producerMap.get(mov.producerId) || mov.producerId,
-                    codigoProducto: item.binMaterialCode,
-                    nombreProducto: item.binMaterialName,
-                    cantidad: item.quantity,
-                    movimiento: mov.observation || (isDirectDispatch ? 'Despacho Directo' : 'Bins y Materiales'),
-                    tipo: (mov.type === 'entrada' && !isDirectDispatch) ? 'Entrada' : 'Salida',
-                    userName: formatUserName(mov.userName),
-                    documento: mov.document,
-                });
+            const typeLabel = (mov.type === 'entrada' && !isDirectDispatch) ? 'Entrada' : 'Salida';
+            
+            mov.items.forEach((item) => {
+                // Generar llave de agrupación: Documento + Código Producto + Tipo de Movimiento
+                const groupKey = `${mov.document}_${item.binMaterialCode}_${typeLabel}`;
+                
+                if (!groupedMovements[groupKey]) {
+                    groupedMovements[groupKey] = {
+                        key: groupKey,
+                        fecha: mov.createdAt,
+                        exportador: exporterMap.get(mov.exporterId) || mov.exporterId,
+                        productor: producerMap.get(mov.producerId) || mov.producerId,
+                        codigoProducto: item.binMaterialCode,
+                        nombreProducto: item.binMaterialName,
+                        cantidad: item.quantity,
+                        movimiento: mov.observation || (isDirectDispatch ? 'Despacho Directo' : 'Bins y Materiales'),
+                        tipo: typeLabel as 'Entrada' | 'Salida',
+                        userName: formatUserName(mov.userName),
+                        documento: mov.document,
+                    };
+                } else {
+                    // Sumar cantidades si ya existe la llave
+                    groupedMovements[groupKey].cantidad += item.quantity;
+                    // Mantener la fecha más reciente
+                    if (mov.createdAt.toMillis() > groupedMovements[groupKey].fecha.toMillis()) {
+                        groupedMovements[groupKey].fecha = mov.createdAt;
+                    }
+                }
             });
         });
+
+        // Pasar los movimientos agrupados a la lista final
+        Object.values(groupedMovements).forEach(item => allItems.push(item));
 
         // 2. Bins Almacenados en Cámaras (Entrada)
         (chamberLots || []).forEach(lot => {
