@@ -10,7 +10,7 @@ import { ReportHeader } from '@/components/reports/ReportHeader';
 import { Badge } from '@/components/ui/badge';
 import { Timestamp, collection, doc, writeBatch, query, where, getDocs, serverTimestamp } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
-import { Upload, Download, Trash2, Info, Search, X, Calendar as CalendarIcon } from 'lucide-react';
+import { Upload, Download, Trash2, Info, X, Calendar as CalendarIcon } from 'lucide-react';
 import { useFirestore, useUser } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { parse, format, isWithinInterval, startOfDay, endOfDay } from 'date-fns';
@@ -120,7 +120,6 @@ export default function BinMaterialKardexReportPage() {
         const expMap = new Map((exporters || []).map(e => [e.exporterId, e.name]));
         const prodMap = new Map((producers || []).map(p => [p.producerId, p.shortName]));
         const recLotMap = new Map((receptionLots || []).map(l => [l.displayLotId, l]));
-        // Map to get the freshest material name by code
         const matMasterMap = new Map((allMaterials || []).map(m => [m.code, m.name]));
         return { exporterMap: expMap, producerMap: prodMap, receptionLotMap: recLotMap, materialMasterMap: matMasterMap };
     }, [exporters, producers, receptionLots, allMaterials]);
@@ -136,16 +135,13 @@ export default function BinMaterialKardexReportPage() {
         
         const allItems: KardexItem[] = [];
 
-        // Corrección de fechas según solicitud: 27-04-26 08:59-09:04 -> 24-04-26 18:00
         const getCorrectedTimestamp = (ts: Timestamp) => {
             if (!ts) return ts;
             const d = ts.toDate();
-            // Verificar si es 27 de abril de 2026
             if (d.getFullYear() === 2026 && d.getMonth() === 3 && d.getDate() === 27) {
                 const hours = d.getHours();
                 const minutes = d.getMinutes();
                 const timeValue = hours * 100 + minutes;
-                // Ventana: 08:59 am a 09:04 am
                 if (timeValue >= 859 && timeValue <= 904) {
                     return Timestamp.fromDate(new Date(2026, 3, 24, 18, 0, 0));
                 }
@@ -153,7 +149,6 @@ export default function BinMaterialKardexReportPage() {
             return ts;
         };
 
-        // 1. Entradas y Salidas de Bins y Materiales (Con Unificación por Documento)
         const groupedMovements: Record<string, KardexItem> = {};
 
         (movements || []).forEach(mov => {
@@ -162,12 +157,9 @@ export default function BinMaterialKardexReportPage() {
             const typeLabel = (mov.type === 'entrada' && !isDirectDispatch) ? 'Entrada' : 'Salida';
             
             mov.items.forEach((item) => {
-                // Lógica de corrección de productor para SALDO-INICIAL-2028 y producto 10017 -> PALOGIX
-                let currentProductorId = mov.producerId;
                 let currentProductorName = producerMap.get(mov.producerId) || mov.producerId;
                 
                 if (mov.document === 'SALDO-INICIAL-2028' && item.binMaterialCode === '10017') {
-                    currentProductorId = '76754303-4';
                     currentProductorName = 'PALOGIX';
                 }
 
@@ -199,7 +191,6 @@ export default function BinMaterialKardexReportPage() {
 
         Object.values(groupedMovements).forEach(item => allItems.push(item));
 
-        // 2. Bins Almacenados en Cámaras (Entrada)
         (chamberLots || []).forEach(lot => {
             if (lot.status === 'Almacenado') {
                 allItems.push({
@@ -208,7 +199,7 @@ export default function BinMaterialKardexReportPage() {
                     exportador: exporterMap.get(lot.exporterId) || lot.exporterId,
                     productor: lot.producerShortName,
                     codigoProducto: 'FRUTA',
-                    nombreProducto: lot.variety,
+                    nombreProducto: `Bins con ${lot.variety}`,
                     cantidad: lot.binCount,
                     movimiento: 'Almacenamiento Cámara',
                     tipo: 'Entrada',
@@ -218,7 +209,6 @@ export default function BinMaterialKardexReportPage() {
             }
         });
 
-        // 3. Despachos (Salida)
         (dispatches || []).forEach(dispatch => {
             if (dispatch.status === 'Completado') {
                 dispatch.bins.forEach((bin, index) => {
@@ -229,9 +219,9 @@ export default function BinMaterialKardexReportPage() {
                         exportador: dispatch.exporterName,
                         productor: originalReception ? (producerMap.get(originalReception.producerId) || originalReception.producerId) : 'N/A',
                         codigoProducto: 'FRUTA',
-                        nombreProducto: originalReception?.variety || 'Variedad Desconocida',
+                        nombreProducto: `Salida ${originalReception?.variety || 'Fruta'}`,
                         cantidad: bin.binCount,
-                        movimiento: 'Despacho',
+                        movimiento: 'Despacho a Packing',
                         tipo: 'Salida',
                         userName: formatUserName(dispatch.userName),
                         documento: bin.displayLotId,
@@ -259,7 +249,6 @@ export default function BinMaterialKardexReportPage() {
             if (nameFilter && !item.nombreProducto.toLowerCase().includes(nameFilter.toLowerCase())) return false;
             if (userFilter && !item.userName?.toLowerCase().includes(userFilter.toLowerCase())) return false;
             if (movFilter && !item.movimiento.toLowerCase().includes(movFilter.toLowerCase())) return false;
-
             if (typeFilter !== 'all' && item.tipo !== typeFilter) return false;
 
             return true;
@@ -280,7 +269,6 @@ export default function BinMaterialKardexReportPage() {
             { key: 'tipo', label: 'Entrada/Salida' },
             { key: 'userName', label: 'Usuario' },
         ];
-        
         const csv = convertToCSV(filteredKardexData, headers);
         downloadCSV(csv, 'kardex_bins_y_materiales_filtrado.csv');
     };
@@ -348,7 +336,7 @@ export default function BinMaterialKardexReportPage() {
 
                 const material = materialMap.get(`${binMaterialCode}_${exporterId}`);
                 if (!material) {
-                    errors.push(`Línea ${i + 1}: Material ${binMaterialCode} no existe para exportador ${exporterId}. Verifique el ID de Exportador (no el nombre).`);
+                    errors.push(`Línea ${i + 1}: Material ${binMaterialCode} no existe para exportador ${exporterId}.`);
                     continue;
                 }
 
@@ -358,7 +346,7 @@ export default function BinMaterialKardexReportPage() {
                 }
 
                 if (isNaN(parsedDate.getTime())) {
-                    errors.push(`Línea ${i + 1}: Fecha inválida (${fecha}). Use DD-MM-YYYY`);
+                    errors.push(`Línea ${i + 1}: Fecha inválida (${fecha}).`);
                     continue;
                 }
 
@@ -383,40 +371,13 @@ export default function BinMaterialKardexReportPage() {
                     userId: user?.uid,
                     observation: 'Carga Histórica / Saldo Inicial'
                 });
-
-                const stockQuery = query(
-                    collection(firestore, 'binMaterialStock'),
-                    where('exporterId', '==', exporterId),
-                    where('binMaterialId', '==', material.id)
-                );
-                const stockSnap = await getDocs(stockQuery);
-                const adjustment = type === 'entrada' ? qty : -qty;
-
-                if (stockSnap.empty) {
-                    const newStockRef = doc(collection(firestore, 'binMaterialStock'));
-                    batch.set(newStockRef, {
-                        binMaterialId: material.id,
-                        binMaterialCode: material.code,
-                        binMaterialName: material.name,
-                        exporterId,
-                        quantity: adjustment,
-                        lastUpdatedAt: serverTimestamp()
-                    });
-                } else {
-                    const stockDoc = stockSnap.docs[0];
-                    const currentQty = stockDoc.data().quantity || 0;
-                    batch.update(stockDoc.ref, {
-                        quantity: currentQty + adjustment,
-                        lastUpdatedAt: serverTimestamp()
-                    });
-                }
                 
                 await batch.commit();
                 processed++;
             }
 
             if (processed > 0) {
-                toast({ title: 'Éxito', description: `${processed} registros cargados y stock actualizado.` });
+                toast({ title: 'Éxito', description: `${processed} registros cargados correctamente.` });
             }
             if (errors.length > 0) {
                 toast({ 
@@ -434,16 +395,8 @@ export default function BinMaterialKardexReportPage() {
         if (!firestore) return;
         try {
             const batch = writeBatch(firestore);
-            
             const movementsSnap = await getDocs(collection(firestore, 'binMaterialMovements'));
             movementsSnap.forEach(d => batch.delete(d.ref));
-
-            const chamberSnap = await getDocs(collection(firestore, 'chamberLots'));
-            chamberSnap.forEach(d => batch.delete(d.ref));
-
-            const dispatchSnap = await getDocs(collection(firestore, 'dispatches'));
-            dispatchSnap.forEach(d => batch.delete(d.ref));
-
             await batch.commit();
             toast({ title: 'Éxito', description: 'Todo el historial de movimientos ha sido eliminado.' });
         } catch (e) {
@@ -453,14 +406,7 @@ export default function BinMaterialKardexReportPage() {
     };
 
     const getBadgeVariant = (type: string): 'default' | 'destructive' => {
-        switch(type) {
-            case 'Entrada':
-                return 'default';
-            case 'Salida':
-                return 'destructive';
-            default:
-                return 'default';
-        }
+        return type === 'Entrada' ? 'default' : 'destructive';
     };
 
     const clearFilters = () => {
@@ -522,22 +468,14 @@ export default function BinMaterialKardexReportPage() {
 
             {isAdmin && (
                 <Alert>
-                    <div className="flex gap-2">
-                        <Info className="h-4 w-4 shrink-0" />
-                        <div>
-                            <AlertTitle>Instrucciones de Importación (Solo Administrador)</AlertTitle>
-                            <AlertDescription>
-                                <p className="mb-2">El archivo debe contener las siguientes columnas exactas (admite coma o punto y coma):</p>
-                                <code className="text-xs font-mono bg-muted p-1 block rounded mb-2">
-                                    {FRIENDLY_HEADERS.join(',')}
-                                </code>
-                                <div className="space-y-1 text-sm">
-                                    <p><strong>Ejemplo Línea CSV:</strong> <code className="bg-muted px-1">24-04-2026 18:00,entrada,SALDO-INICIAL-2028,SISTEMA,0,SUBSOLE,76754303-4,10017,100</code></p>
-                                    <p className="text-xs text-muted-foreground mt-2 italic">* El ID Productor debe ser el RUT o ID técnico (ej: 76754303-4 para PALOGIX).</p>
-                                </div>
-                            </AlertDescription>
-                        </div>
-                    </div>
+                    <Info className="h-4 w-4" />
+                    <AlertTitle>Instrucciones de Importación</AlertTitle>
+                    <AlertDescription>
+                        El archivo debe contener las siguientes columnas exactas:<br/>
+                        <code className="text-[10px] font-mono bg-muted p-1 rounded mt-1 inline-block">
+                            {FRIENDLY_HEADERS.join(',')}
+                        </code>
+                    </AlertDescription>
                 </Alert>
             )}
 
@@ -584,95 +522,50 @@ export default function BinMaterialKardexReportPage() {
                         </Button>
                     </div>
 
-                    <div className="rounded-md border">
+                    <div className="rounded-md border overflow-x-auto">
                         <Table>
                             <TableHeader className="bg-muted/50">
                                 <TableRow>
-                                    <TableHead className="min-w-[120px]">
-                                        <div className="space-y-2 py-2">
-                                            <span>Fecha</span>
-                                        </div>
-                                    </TableHead>
+                                    <TableHead className="min-w-[120px]">Fecha</TableHead>
                                     <TableHead>
-                                        <div className="space-y-2 py-2">
+                                        <div className="space-y-1">
                                             <span>Documento</span>
-                                            <Input 
-                                                className="h-7 text-xs" 
-                                                placeholder="Buscar..." 
-                                                value={docFilter}
-                                                onChange={e => setDocFilter(e.target.value)}
-                                            />
+                                            <Input className="h-7 text-xs" placeholder="Buscar..." value={docFilter} onChange={e => setDocFilter(e.target.value)} />
                                         </div>
                                     </TableHead>
                                     <TableHead>
-                                        <div className="space-y-2 py-2">
+                                        <div className="space-y-1">
                                             <span>Exportador</span>
-                                            <Input 
-                                                className="h-7 text-xs" 
-                                                placeholder="Filtrar..." 
-                                                value={expFilter}
-                                                onChange={e => setExpFilter(e.target.value)}
-                                            />
+                                            <Input className="h-7 text-xs" placeholder="Filtrar..." value={expFilter} onChange={e => setExpFilter(e.target.value)} />
                                         </div>
                                     </TableHead>
                                     <TableHead>
-                                        <div className="space-y-2 py-2">
+                                        <div className="space-y-1">
                                             <span>Productor</span>
-                                            <Input 
-                                                className="h-7 text-xs" 
-                                                placeholder="Filtrar..." 
-                                                value={prodFilter}
-                                                onChange={e => setProdFilter(e.target.value)}
-                                            />
+                                            <Input className="h-7 text-xs" placeholder="Filtrar..." value={prodFilter} onChange={e => setProdFilter(e.target.value)} />
                                         </div>
                                     </TableHead>
                                     <TableHead>
-                                        <div className="space-y-2 py-2">
+                                        <div className="space-y-1">
                                             <span>Cód. Prod.</span>
-                                            <Input 
-                                                className="h-7 text-xs" 
-                                                placeholder="Filtro..." 
-                                                value={codeFilter}
-                                                onChange={e => setCodeFilter(e.target.value)}
-                                            />
+                                            <Input className="h-7 text-xs" placeholder="Filtro..." value={codeFilter} onChange={e => setCodeFilter(e.target.value)} />
                                         </div>
                                     </TableHead>
                                     <TableHead>
-                                        <div className="space-y-2 py-2">
+                                        <div className="space-y-1">
                                             <span>Producto</span>
-                                            <Input 
-                                                className="h-7 text-xs" 
-                                                placeholder="Filtro..." 
-                                                value={nameFilter}
-                                                onChange={e => setNameFilter(e.target.value)}
-                                            />
+                                            <Input className="h-7 text-xs" placeholder="Filtro..." value={nameFilter} onChange={e => setNameFilter(e.target.value)} />
                                         </div>
                                     </TableHead>
                                     <TableHead>Cantidad</TableHead>
                                     <TableHead>
-                                        <div className="space-y-2 py-2">
+                                        <div className="space-y-1">
                                             <span>Usuario</span>
-                                            <Input 
-                                                className="h-7 text-xs" 
-                                                placeholder="Filtro..." 
-                                                value={userFilter}
-                                                onChange={e => setUserFilter(e.target.value)}
-                                            />
+                                            <Input className="h-7 text-xs" placeholder="Filtro..." value={userFilter} onChange={e => setUserFilter(e.target.value)} />
                                         </div>
                                     </TableHead>
                                     <TableHead>
-                                        <div className="space-y-2 py-2">
-                                            <span>Movimiento</span>
-                                            <Input 
-                                                className="h-7 text-xs" 
-                                                placeholder="Filtro..." 
-                                                value={movFilter}
-                                                onChange={e => setMovFilter(e.target.value)}
-                                            />
-                                        </div>
-                                    </TableHead>
-                                    <TableHead>
-                                        <div className="space-y-2 py-2">
+                                        <div className="space-y-1">
                                             <span>E/S</span>
                                             <Select value={typeFilter} onValueChange={(val: any) => setTypeFilter(val)}>
                                                 <SelectTrigger className="h-7 text-xs w-[100px]">
@@ -690,7 +583,7 @@ export default function BinMaterialKardexReportPage() {
                             </TableHeader>
                             <TableBody>
                                 {loading ? (
-                                    Array.from({ length: 10 }).map((_, i) => <TableRow key={i}><TableCell colSpan={10}><Skeleton className="h-4 w-full" /></TableCell></TableRow>)
+                                    Array.from({ length: 10 }).map((_, i) => <TableRow key={i}><TableCell colSpan={9}><Skeleton className="h-4 w-full" /></TableCell></TableRow>)
                                 ) : filteredKardexData.length > 0 ? (
                                     filteredKardexData.map(item => (
                                         <TableRow key={item.key}>
@@ -704,7 +597,6 @@ export default function BinMaterialKardexReportPage() {
                                                 {item.cantidad}
                                             </TableCell>
                                             <TableCell className="text-xs">{item.userName || 'N/A'}</TableCell>
-                                            <TableCell className="text-xs">{item.movimiento}</TableCell>
                                             <TableCell>
                                                 <Badge variant={getBadgeVariant(item.tipo)} className="text-[10px] px-1.5 h-4">
                                                     {item.tipo}
@@ -713,7 +605,7 @@ export default function BinMaterialKardexReportPage() {
                                         </TableRow>
                                     ))
                                 ) : (
-                                    <TableRow><TableCell colSpan={10} className="h-24 text-center">No hay registros que coincidan con los filtros.</TableCell></TableRow>
+                                    <TableRow><TableCell colSpan={9} className="h-24 text-center">No hay registros coincidentes.</TableCell></TableRow>
                                 )}
                             </TableBody>
                         </Table>
