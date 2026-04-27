@@ -162,12 +162,18 @@ export default function BinMaterialKardexReportPage() {
             mov.items.forEach((item) => {
                 const groupKey = `${mov.document}_${item.binMaterialCode}_${typeLabel}`;
                 
+                // Lógica de corrección de productor para SALDO-INICIAL-2028 y producto 10017
+                let currentProductor = producerMap.get(mov.producerId) || mov.producerId;
+                if (mov.document === 'SALDO-INICIAL-2028' && item.binMaterialCode === '10017') {
+                    currentProductor = 'PALOGIC';
+                }
+
                 if (!groupedMovements[groupKey]) {
                     groupedMovements[groupKey] = {
                         key: groupKey,
                         fecha: correctedDate,
                         exportador: exporterMap.get(mov.exporterId) || mov.exporterId,
-                        productor: producerMap.get(mov.producerId) || mov.producerId,
+                        productor: currentProductor,
                         codigoProducto: item.binMaterialCode,
                         nombreProducto: item.binMaterialName,
                         cantidad: item.quantity,
