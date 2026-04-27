@@ -116,12 +116,14 @@ export default function BinMaterialKardexReportPage() {
 
     const loading = loadingMovements || loadingChamberLots || loadingDispatches || loadingExporters || loadingProducers || loadingReceptions;
 
-    const { exporterMap, producerMap, receptionLotMap } = React.useMemo(() => {
+    const { exporterMap, producerMap, receptionLotMap, materialMasterMap } = React.useMemo(() => {
         const expMap = new Map((exporters || []).map(e => [e.exporterId, e.name]));
         const prodMap = new Map((producers || []).map(p => [p.producerId, p.shortName]));
         const recLotMap = new Map((receptionLots || []).map(l => [l.displayLotId, l]));
-        return { exporterMap: expMap, producerMap: prodMap, receptionLotMap: recLotMap };
-    }, [exporters, producers, receptionLots]);
+        // Map to get the freshest material name by code
+        const matMasterMap = new Map((allMaterials || []).map(m => [m.code, m.name]));
+        return { exporterMap: expMap, producerMap: prodMap, receptionLotMap: recLotMap, materialMasterMap: matMasterMap };
+    }, [exporters, producers, receptionLots, allMaterials]);
 
     const formatUserName = (name?: string) => {
         if (!name) return 'N/A';
@@ -168,6 +170,9 @@ export default function BinMaterialKardexReportPage() {
                     currentProductor = 'PALOGIX';
                 }
 
+                // Refrescar nombre de producto desde el maestro (ej: Bins_Palogix)
+                const currentMaterialName = materialMasterMap.get(item.binMaterialCode) || item.binMaterialName;
+
                 if (!groupedMovements[groupKey]) {
                     groupedMovements[groupKey] = {
                         key: groupKey,
@@ -175,7 +180,7 @@ export default function BinMaterialKardexReportPage() {
                         exportador: exporterMap.get(mov.exporterId) || mov.exporterId,
                         productor: currentProductor,
                         codigoProducto: item.binMaterialCode,
-                        nombreProducto: item.binMaterialName,
+                        nombreProducto: currentMaterialName,
                         cantidad: item.quantity,
                         movimiento: mov.observation || (isDirectDispatch ? 'Despacho Directo' : 'Bins y Materiales'),
                         tipo: typeLabel as 'Entrada' | 'Salida',
@@ -235,7 +240,7 @@ export default function BinMaterialKardexReportPage() {
         });
 
         return allItems.sort((a, b) => b.fecha.toMillis() - a.fecha.toMillis());
-    }, [loading, movements, chamberLots, dispatches, exporterMap, producerMap, receptionLotMap]);
+    }, [loading, movements, chamberLots, dispatches, exporterMap, producerMap, receptionLotMap, materialMasterMap]);
 
     const filteredKardexData = React.useMemo(() => {
         return rawKardexData.filter(item => {

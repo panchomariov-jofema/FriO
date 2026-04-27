@@ -59,7 +59,10 @@ export default function ProducerBalanceReportPage() {
 
         const exporterMap = new Map(activeExporters.map(e => [e.exporterId, e.name]));
         const producerMap = new Map(activeProducers.map(p => [p.producerId, p.shortName]));
-        const materialMap = new Map(allMaterials.map(m => [m.id, m]));
+        
+        // Fresher material maps by ID and Code
+        const materialIdMap = new Map(allMaterials.map(m => [m.id, m]));
+        const materialCodeMap = new Map(allMaterials.map(m => [m.code, m]));
 
         const aggregation: Record<string, {
             exporterName: string;
@@ -93,11 +96,13 @@ export default function ProducerBalanceReportPage() {
                 const key = `${mov.exporterId}_${effectiveProducerId}_${item.binMaterialId}`;
                 
                 if (!aggregation[key]) {
-                    const m = materialMap.get(item.binMaterialId);
+                    // Try to get fresh name from master data (e.g., Bins_Palogix)
+                    const m = materialIdMap.get(item.binMaterialId) || materialCodeMap.get(item.binMaterialCode);
+                    
                     aggregation[key] = {
                         exporterName: expName,
                         producerName: effectiveProducerName,
-                        materialName: item.binMaterialName,
+                        materialName: m?.name || item.binMaterialName,
                         materialCode: item.binMaterialCode,
                         materialType: m?.type || 'material',
                         entradas: 0,
