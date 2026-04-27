@@ -29,8 +29,8 @@ const movementItemSchema = z.object({
 
 const movementSchema = z.object({
   document: z.string().min(1, 'El número de documento es obligatorio.'),
-  driverName: z.string().min(1, 'El nombre del conductor es obligatorio.'),
-  driverRUT: z.string().min(1, 'El RUT del conductor es obligatorio.'),
+  driverName: z.string().optional(),
+  driverRUT: z.string().optional(),
   patente_vehiculo: z.string().min(1, 'La patente es obligatoria.'),
   observaciones: z.string().optional(),
   items: z.array(movementItemSchema),
@@ -189,8 +189,8 @@ export function ExitsTab({ exporterId, exporterName, producerId }: ExitsTabProps
         const movementData = {
           type: 'salida' as const,
           document: values.document,
-          driverName: values.driverName,
-          driverRUT: values.driverRUT,
+          driverName: values.driverName || '',
+          driverRUT: values.driverRUT || '',
           exporterId,
           producerId,
           items: itemsToProcess,
@@ -327,7 +327,7 @@ export function ExitsTab({ exporterId, exporterName, producerId }: ExitsTabProps
                 name="driverName"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Nombre Conductor</FormLabel>
+                    <FormLabel>Nombre Conductor (Opcional)</FormLabel>
                     <FormControl><Input {...field} autoComplete="off" /></FormControl>
                     <FormMessage />
                   </FormItem>
@@ -338,7 +338,7 @@ export function ExitsTab({ exporterId, exporterName, producerId }: ExitsTabProps
                 name="driverRUT"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Rut Conductor</FormLabel>
+                    <FormLabel>Rut Conductor (Opcional)</FormLabel>
                     <FormControl><Input {...field} autoComplete="off" inputMode="numeric" /></FormControl>
                     <FormMessage />
                   </FormItem>

@@ -29,8 +29,8 @@ const movementItemSchema = z.object({
 
 const movementSchema = z.object({
   document: z.string().min(1, 'El documento es obligatorio.'),
-  driverName: z.string().min(1, 'El nombre del conductor es obligatorio.'),
-  driverRUT: z.string().min(1, 'El RUT del conductor es obligatorio.'),
+  driverName: z.string().optional(),
+  driverRUT: z.string().optional(),
   packingId: z.string().optional(),
   items: z.array(movementItemSchema),
 });
@@ -151,8 +151,8 @@ export function EntriesTab({ exporterId, exporterName, producerId, isDirectDispa
         const movementData: Partial<BinMaterialMovement> & { createdAt: any, type: 'entrada', items: any[] } = {
           type: 'entrada' as const,
           document: values.document,
-          driverName: values.driverName,
-          driverRUT: values.driverRUT,
+          driverName: values.driverName || '',
+          driverRUT: values.driverRUT || '',
           packingId: values.packingId || null,
           exporterId,
           producerId,
@@ -258,7 +258,7 @@ export function EntriesTab({ exporterId, exporterName, producerId, isDirectDispa
                 name="driverName"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Nombre Conductor</FormLabel>
+                    <FormLabel>Nombre Conductor (Opcional)</FormLabel>
                     <FormControl><Input {...field} autoComplete="off" /></FormControl>
                     <FormMessage />
                   </FormItem>
@@ -269,7 +269,7 @@ export function EntriesTab({ exporterId, exporterName, producerId, isDirectDispa
                 name="driverRUT"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Rut Conductor</FormLabel>
+                    <FormLabel>Rut Conductor (Opcional)</FormLabel>
                     <FormControl><Input {...field} autoComplete="off" inputMode="numeric" /></FormControl>
                     <FormMessage />
                   </FormItem>
