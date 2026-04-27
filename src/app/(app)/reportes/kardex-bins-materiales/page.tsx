@@ -28,7 +28,7 @@ import {
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
 import { DateRange } from 'react-day-picker';
@@ -162,15 +162,16 @@ export default function BinMaterialKardexReportPage() {
             const typeLabel = (mov.type === 'entrada' && !isDirectDispatch) ? 'Entrada' : 'Salida';
             
             mov.items.forEach((item) => {
-                const groupKey = `${mov.document}_${item.binMaterialCode}_${typeLabel}`;
-                
                 // Lógica de corrección de productor para SALDO-INICIAL-2028 y producto 10017 -> PALOGIX
-                let currentProductor = producerMap.get(mov.producerId) || mov.producerId;
+                let currentProductorId = mov.producerId;
+                let currentProductorName = producerMap.get(mov.producerId) || mov.producerId;
+                
                 if (mov.document === 'SALDO-INICIAL-2028' && item.binMaterialCode === '10017') {
-                    currentProductor = 'PALOGIX';
+                    currentProductorId = '76754303-4';
+                    currentProductorName = 'PALOGIX';
                 }
 
-                // Refrescar nombre de producto desde el maestro (ej: Bins_Palogix)
+                const groupKey = `${mov.document}_${item.binMaterialCode}_${typeLabel}`;
                 const currentMaterialName = materialMasterMap.get(item.binMaterialCode) || item.binMaterialName;
 
                 if (!groupedMovements[groupKey]) {
@@ -178,7 +179,7 @@ export default function BinMaterialKardexReportPage() {
                         key: groupKey,
                         fecha: correctedDate,
                         exportador: exporterMap.get(mov.exporterId) || mov.exporterId,
-                        productor: currentProductor,
+                        productor: currentProductorName,
                         codigoProducto: item.binMaterialCode,
                         nombreProducto: currentMaterialName,
                         cantidad: item.quantity,
@@ -531,7 +532,8 @@ export default function BinMaterialKardexReportPage() {
                                     {FRIENDLY_HEADERS.join(',')}
                                 </code>
                                 <div className="space-y-1 text-sm">
-                                    <p><strong>Ejemplo Saldo Inicial:</strong> <code className="bg-muted px-1">01-03-2026,entrada,SALDO-INICIAL,SISTEMA,0,SUBSOLE,PROD-01,10016,500</code></p>
+                                    <p><strong>Ejemplo Línea CSV:</strong> <code className="bg-muted px-1">24-04-2026 18:00,entrada,SALDO-INICIAL-2028,SISTEMA,0,SUBSOLE,76754303-4,10017,100</code></p>
+                                    <p className="text-xs text-muted-foreground mt-2 italic">* El ID Productor debe ser el RUT o ID técnico (ej: 76754303-4 para PALOGIX).</p>
                                 </div>
                             </AlertDescription>
                         </div>
