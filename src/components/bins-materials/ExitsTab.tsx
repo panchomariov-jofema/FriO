@@ -31,7 +31,7 @@ const movementSchema = z.object({
   document: z.string().min(1, 'El número de documento es obligatorio.'),
   driverName: z.string().optional(),
   driverRUT: z.string().optional(),
-  patente_vehiculo: z.string().min(1, 'La patente es obligatoria.'),
+  patente_vehiculo: z.string().optional(),
   observaciones: z.string().optional(),
   items: z.array(movementItemSchema),
 });
@@ -226,7 +226,7 @@ export function ExitsTab({ exporterId, exporterName, producerId }: ExitsTabProps
                 CiudadRecep: producerData.ciudad || 'N/A',
             },
             transporte: {
-                Patente: values.patente_vehiculo,
+                Patente: values.patente_vehiculo || '',
                 DirDest: producerData.direccion || 'N/A',
                 CmnaDest: producerData.comuna || 'N/A',
                 CiudadDest: producerData.ciudad || 'N/A'
@@ -349,8 +349,8 @@ export function ExitsTab({ exporterId, exporterName, producerId }: ExitsTabProps
                 name="patente_vehiculo"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Patente Vehículo</FormLabel>
-                    <FormControl><Input {...field} autoComplete="off" /></FormControl>
+                    <FormLabel>Patente Vehículo (Opcional)</FormLabel>
+                    <FormControl><Input {...field} value={field.value || ''} autoComplete="off" /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
