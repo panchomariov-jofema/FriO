@@ -96,7 +96,7 @@ export default function ProducerBalanceReportPage() {
                 const key = `${mov.exporterId}_${effectiveProducerId}_${item.binMaterialId}`;
                 
                 if (!aggregation[key]) {
-                    // Try to get fresh name from master data (e.g., Bins_Palogix)
+                    // Try to get fresh name from master data
                     const m = materialIdMap.get(item.binMaterialId) || materialCodeMap.get(item.binMaterialCode);
                     
                     aggregation[key] = {
@@ -160,15 +160,6 @@ export default function ProducerBalanceReportPage() {
             
             return group;
         }).sort((a, b) => a.exporterName.localeCompare(b.exporterName) || a.producerName.localeCompare(b.producerName));
-    }, [balanceData]);
-
-    const globalTotals = React.useMemo(() => {
-        return balanceData.reduce((acc, item) => {
-            acc.entradas += item.entradas;
-            acc.salidas += item.salidas;
-            acc.saldo += item.saldo;
-            return acc;
-        }, { entradas: 0, salidas: 0, saldo: 0 });
     }, [balanceData]);
 
     const handleExport = () => {
@@ -259,28 +250,6 @@ export default function ProducerBalanceReportPage() {
                                     </AccordionItem>
                                 ))}
                             </Accordion>
-
-                            <div className="border rounded-md bg-muted/40 p-4 mt-8">
-                                <div className="flex justify-between items-center">
-                                    <h4 className="text-lg font-bold text-foreground">TOTAL GENERAL</h4>
-                                    <div className="grid grid-cols-3 gap-8 text-right">
-                                        <div>
-                                            <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">Total Entradas</p>
-                                            <p className="text-xl font-bold">{globalTotals.entradas.toLocaleString('es-CL')}</p>
-                                        </div>
-                                        <div>
-                                            <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">Total Salidas</p>
-                                            <p className="text-xl font-bold">{globalTotals.salidas.toLocaleString('es-CL')}</p>
-                                        </div>
-                                        <div>
-                                            <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">Saldo Global</p>
-                                            <p className={`text-xl font-black ${globalTotals.saldo > 0 ? 'text-orange-600' : 'text-green-600'}`}>
-                                                {globalTotals.saldo.toLocaleString('es-CL')}
-                                            </p>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
                         </div>
                     ) : (
                         <div className="h-24 flex items-center justify-center border rounded-md border-dashed">
