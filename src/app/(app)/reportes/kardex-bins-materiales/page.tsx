@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -135,21 +134,38 @@ export default function BinMaterialKardexReportPage() {
         
         const allItems: KardexItem[] = [];
 
+        // Corrección de fechas según solicitud: 27-04-26 08:59-09:04 -> 24-04-26 18:00
+        const getCorrectedTimestamp = (ts: Timestamp) => {
+            if (!ts) return ts;
+            const d = ts.toDate();
+            // Verificar si es 27 de abril de 2026
+            if (d.getFullYear() === 2026 && d.getMonth() === 3 && d.getDate() === 27) {
+                const hours = d.getHours();
+                const minutes = d.getMinutes();
+                const timeValue = hours * 100 + minutes;
+                // Ventana: 08:59 am a 09:04 am
+                if (timeValue >= 859 && timeValue <= 904) {
+                    return Timestamp.fromDate(new Date(2026, 3, 24, 18, 0, 0));
+                }
+            }
+            return ts;
+        };
+
         // 1. Entradas y Salidas de Bins y Materiales (Con Unificación por Documento)
         const groupedMovements: Record<string, KardexItem> = {};
 
         (movements || []).forEach(mov => {
+            const correctedDate = getCorrectedTimestamp(mov.createdAt);
             const isDirectDispatch = mov.observation === 'Despacho Directo';
             const typeLabel = (mov.type === 'entrada' && !isDirectDispatch) ? 'Entrada' : 'Salida';
             
             mov.items.forEach((item) => {
-                // Generar llave de agrupación: Documento + Código Producto + Tipo de Movimiento
                 const groupKey = `${mov.document}_${item.binMaterialCode}_${typeLabel}`;
                 
                 if (!groupedMovements[groupKey]) {
                     groupedMovements[groupKey] = {
                         key: groupKey,
-                        fecha: mov.createdAt,
+                        fecha: correctedDate,
                         exportador: exporterMap.get(mov.exporterId) || mov.exporterId,
                         productor: producerMap.get(mov.producerId) || mov.producerId,
                         codigoProducto: item.binMaterialCode,
@@ -161,17 +177,14 @@ export default function BinMaterialKardexReportPage() {
                         documento: mov.document,
                     };
                 } else {
-                    // Sumar cantidades si ya existe la llave
                     groupedMovements[groupKey].cantidad += item.quantity;
-                    // Mantener la fecha más reciente
-                    if (mov.createdAt.toMillis() > groupedMovements[groupKey].fecha.toMillis()) {
-                        groupedMovements[groupKey].fecha = mov.createdAt;
+                    if (correctedDate.toMillis() > groupedMovements[groupKey].fecha.toMillis()) {
+                        groupedMovements[groupKey].fecha = correctedDate;
                     }
                 }
             });
         });
 
-        // Pasar los movimientos agrupados a la lista final
         Object.values(groupedMovements).forEach(item => allItems.push(item));
 
         // 2. Bins Almacenados en Cámaras (Entrada)
@@ -179,7 +192,7 @@ export default function BinMaterialKardexReportPage() {
             if (lot.status === 'Almacenado') {
                 allItems.push({
                     key: `chamber-${lot.id}`,
-                    fecha: lot.storedAt,
+                    fecha: getCorrectedTimestamp(lot.storedAt),
                     exportador: exporterMap.get(lot.exporterId) || lot.exporterId,
                     productor: lot.producerShortName,
                     codigoProducto: 'FRUTA',
@@ -200,7 +213,7 @@ export default function BinMaterialKardexReportPage() {
                     const originalReception = receptionLotMap.get(bin.displayLotId);
                     allItems.push({
                         key: `disp-${dispatch.id}-${index}`,
-                        fecha: dispatch.createdAt,
+                        fecha: getCorrectedTimestamp(dispatch.createdAt),
                         exportador: dispatch.exporterName,
                         productor: originalReception ? (producerMap.get(originalReception.producerId) || originalReception.producerId) : 'N/A',
                         codigoProducto: 'FRUTA',
@@ -220,7 +233,6 @@ export default function BinMaterialKardexReportPage() {
 
     const filteredKardexData = React.useMemo(() => {
         return rawKardexData.filter(item => {
-            // Date Filter
             if (dateRange?.from) {
                 const itemDate = item.fecha.toDate();
                 const start = startOfDay(dateRange.from);
@@ -228,7 +240,6 @@ export default function BinMaterialKardexReportPage() {
                 if (!isWithinInterval(itemDate, { start, end })) return false;
             }
 
-            // Text Filters
             if (docFilter && !item.documento?.toLowerCase().includes(docFilter.toLowerCase())) return false;
             if (expFilter && !item.exportador.toLowerCase().includes(expFilter.toLowerCase())) return false;
             if (prodFilter && !item.productor.toLowerCase().includes(prodFilter.toLowerCase())) return false;
@@ -237,7 +248,6 @@ export default function BinMaterialKardexReportPage() {
             if (userFilter && !item.userName?.toLowerCase().includes(userFilter.toLowerCase())) return false;
             if (movFilter && !item.movimiento.toLowerCase().includes(movFilter.toLowerCase())) return false;
 
-            // Type Filter
             if (typeFilter !== 'all' && item.tipo !== typeFilter) return false;
 
             return true;
