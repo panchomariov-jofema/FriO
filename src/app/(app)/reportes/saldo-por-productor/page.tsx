@@ -72,18 +72,31 @@ export default function ProducerBalanceReportPage() {
         }> = {};
 
         (movements || []).forEach(mov => {
-            if (!activeExporterIds.has(mov.exporterId) || !activeProducerIds.has(mov.producerId)) return;
-
-            const expName = exporterMap.get(mov.exporterId) || mov.exporterId;
-            const prodName = producerMap.get(mov.producerId) || mov.producerId;
+            if (!activeExporterIds.has(mov.exporterId)) return;
 
             mov.items.forEach(item => {
-                const key = `${mov.exporterId}_${mov.producerId}_${item.binMaterialId}`;
+                let effectiveProducerId = mov.producerId;
+                let effectiveProducerName = producerMap.get(mov.producerId) || mov.producerId;
+                let isException = false;
+
+                // Lógica de excepción para PALOGIC - Se identifica por el documento y código de producto
+                if (mov.document === 'SALDO-INICIAL-2028' && item.binMaterialCode === '10017') {
+                    effectiveProducerId = 'PALOGIC_EXC'; // ID virtual para agrupar esta excepción
+                    effectiveProducerName = 'PALOGIC';
+                    isException = true;
+                }
+
+                // Si no es la excepción y el productor no es activo, ignorar para este reporte
+                if (!isException && !activeProducerIds.has(mov.producerId)) return;
+
+                const expName = exporterMap.get(mov.exporterId) || mov.exporterId;
+                const key = `${mov.exporterId}_${effectiveProducerId}_${item.binMaterialId}`;
+                
                 if (!aggregation[key]) {
                     const m = materialMap.get(item.binMaterialId);
                     aggregation[key] = {
                         exporterName: expName,
-                        producerName: prodName,
+                        producerName: effectiveProducerName,
                         materialName: item.binMaterialName,
                         materialCode: item.binMaterialCode,
                         materialType: m?.type || 'material',
