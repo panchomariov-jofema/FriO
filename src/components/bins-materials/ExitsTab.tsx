@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { useFirestore, useUser } from '@/firebase';
 import { collection, query, where, runTransaction, serverTimestamp, getDocs, doc } from 'firebase/firestore';
-import type { BinMaterialStock, BinMaterialMovement, Producer, BusinessEntity, DTEGuiaDespacho } from '@/lib/types';
+import type { BinMaterialMovement, Producer, BusinessEntity, DTEGuiaDespacho, ChamberLot, Dispatch, Exporter } from '@/lib/types';
 import { useBinMaterialsByExporter } from '@/hooks/use-bin-materials-by-exporter';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
 import { errorEmitter } from '@/firebase/error-emitter';
@@ -56,10 +56,13 @@ export function ExitsTab({ exporterId, exporterName, producerId }: ExitsTabProps
   const { toast } = useToast();
   const firestore = useFirestore();
   const { user } = useUser();
+  
   const { materials, loading: loadingMaterials } = useBinMaterialsByExporter(exporterId);
-  const { data: stockData, loading: loadingStock } = useFirestoreCollection<BinMaterialStock>('binMaterialStock');
   const { data: movements, loading: loadingMovements } = useFirestoreCollection<BinMaterialMovement>('binMaterialMovements');
   const { data: businessEntities, loading: loadingEntities } = useFirestoreCollection<BusinessEntity>('businessEntities');
+  const { data: chamberLots, loading: loadingChamberLots } = useFirestoreCollection<ChamberLot>('chamberLots');
+  const { data: dispatches, loading: loadingDispatches } = useFirestoreCollection<Dispatch>('dispatches');
+  const { data: exporters, loading: loadingExporters } = useFirestoreCollection<Exporter>('exporters');
 
   const form = useForm<MovementFormValues>({
     resolver: zodResolver(movementSchema),
@@ -76,6 +79,51 @@ export function ExitsTab({ exporterId, exporterName, producerId }: ExitsTabProps
     }
     return '';
   };
+
+  // --- Dynamic Stock Calculation Logic ---
+  const dynamicStock = React.useMemo(() => {
+    if (loadingExporters || loadingMovements || loadingChamberLots || loadingDispatches || loadingMaterials) {
+        return new Map<string, number>();
+    }
+
+    const stockMap = new Map<string, number>();
+    const activeExporterIds = new Set(exporters.filter(e => e.status !== 'inactivo').map(e => e.exporterId));
+    
+    if (!activeExporterIds.has(exporterId)) return stockMap;
+
+    // 1. Manual Movements from Kardex
+    (movements || []).forEach(mov => {
+        if (mov.exporterId !== exporterId || mov.observation === 'Despacho Directo') return;
+        mov.items.forEach(item => {
+            const current = stockMap.get(item.binMaterialCode) || 0;
+            const qty = mov.type === 'entrada' ? item.quantity : -item.quantity;
+            stockMap.set(item.binMaterialCode, current + qty);
+        });
+    });
+
+    // 2. Fruit Bins in Chambers (In-stock in plant)
+    (chamberLots || []).forEach(lot => {
+        if (lot.exporterId === exporterId && lot.status === 'Almacenado') {
+            const current = stockMap.get('FRUTA') || 0;
+            stockMap.set('FRUTA', current + lot.binCount);
+        }
+    });
+
+    // 3. Dispatches to Packing (Out-stock from plant)
+    (dispatches || []).forEach(dispatch => {
+        if (dispatch.exporterId === exporterId && dispatch.status === 'Completado') {
+            const current = stockMap.get('FRUTA') || 0;
+            stockMap.set('FRUTA', current - dispatch.totalBins);
+        }
+    });
+
+    return stockMap;
+  }, [movements, chamberLots, dispatches, exporters, exporterId, loadingExporters, loadingMovements, loadingChamberLots, loadingDispatches, loadingMaterials]);
+
+  const getStockForMaterial = React.useCallback((binMaterialCode: string) => {
+    return dynamicStock.get(binMaterialCode) || 0;
+  }, [dynamicStock]);
+
 
   // Effect for automatic quantity calculation
   React.useEffect(() => {
@@ -118,11 +166,6 @@ export function ExitsTab({ exporterId, exporterName, producerId }: ExitsTabProps
     return () => subscription.unsubscribe();
   }, [form, exporterName]);
 
-  const getStockForMaterial = React.useCallback((binMaterialId: string) => {
-    const stockItem = stockData.find(s => s.exporterId === exporterId && s.binMaterialId === binMaterialId);
-    return stockItem?.quantity || 0;
-  }, [stockData, exporterId]);
-
 
   React.useEffect(() => {
     if (materials.length > 0) {
@@ -162,7 +205,7 @@ export function ExitsTab({ exporterId, exporterName, producerId }: ExitsTabProps
     }
 
     for (const item of itemsToProcess) {
-        const availableStock = getStockForMaterial(item.binMaterialId);
+        const availableStock = getStockForMaterial(item.binMaterialCode);
         if (item.quantity > availableStock) {
             toast({
                 variant: 'destructive',
@@ -250,33 +293,8 @@ export function ExitsTab({ exporterId, exporterName, producerId }: ExitsTabProps
         };
         transaction.set(pendingDocRef, { ...dteData, createdAt: serverTimestamp() });
 
-        // Update stock
-        for (const item of itemsToProcess) {
-          const stockQuery = query(
-            collection(firestore, 'binMaterialStock'),
-            where('exporterId', '==', exporterId),
-            where('binMaterialId', '==', item.binMaterialId)
-          );
-
-          const stockSnap = await getDocs(stockQuery);
-
-          if (stockSnap.empty) {
-            throw new Error(`No existe stock para el material "${item.binMaterialName}".`);
-          }
-          
-          const stockDoc = stockSnap.docs[0];
-          const stockRef = stockDoc.ref;
-          const currentQuantity = stockDoc.data().quantity || 0;
-
-          if (item.quantity > currentQuantity) {
-            throw new Error(`Stock insuficiente para "${item.binMaterialName}".`);
-          }
-
-          transaction.update(stockRef, {
-            quantity: currentQuantity - item.quantity,
-            lastUpdatedAt: serverTimestamp(),
-          });
-        }
+        // Note: We no longer update the binMaterialStock collection directly here, 
+        // as the stock is now calculated dynamically from movements.
       });
 
       toast({ title: 'Éxito', description: 'Salida registrada y documento pendiente creado.' });
@@ -292,13 +310,13 @@ export function ExitsTab({ exporterId, exporterName, producerId }: ExitsTabProps
       console.error('Error processing exit:', error);
       toast({ variant: 'destructive', title: 'Error', description: error.message || 'No se pudo procesar la salida.' });
        errorEmitter.emit('permission-error', new FirestorePermissionError({
-          path: 'binMaterialMovements or binMaterialStock or documentosPendientes',
+          path: 'binMaterialMovements or documentosPendientes',
           operation: 'write'
       }));
     }
   };
   
-  const isLoading = loadingMaterials || loadingStock || loadingMovements || loadingEntities;
+  const isLoading = loadingMaterials || loadingMovements || loadingEntities || loadingChamberLots || loadingDispatches || loadingExporters;
   const formItems = form.getValues('items');
 
   return (
@@ -389,7 +407,7 @@ export function ExitsTab({ exporterId, exporterName, producerId }: ExitsTabProps
                                 <Input type="number" {...field} value={field.value ?? ''} autoComplete="off" min="0" placeholder="Cantidad a retirar" className="h-12 text-lg" />
                             </FormControl>
                              <p className="text-sm text-muted-foreground pt-1">
-                                Stock disponible: {getStockForMaterial(item.binMaterialId)}
+                                Stock disponible: {getStockForMaterial(item.binMaterialCode)}
                              </p>
                             <FormMessage />
                           </FormItem>
@@ -432,7 +450,7 @@ export function ExitsTab({ exporterId, exporterName, producerId }: ExitsTabProps
                                                         <Input type="number" {...field} value={field.value ?? ''} autoComplete="off" min="0" />
                                                     </FormControl>
                                                      <p className="text-xs text-muted-foreground pt-1">
-                                                        Stock: {getStockForMaterial(item.binMaterialId)}
+                                                        Stock: {getStockForMaterial(item.binMaterialCode)}
                                                      </p>
                                                     <FormMessage />
                                                 </FormItem>
