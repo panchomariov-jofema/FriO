@@ -278,12 +278,12 @@ export function EntriesTab({ exporterId, exporterName, producerId, isDirectDispa
                   <FormItem>
                     <FormLabel>Nombre Conductor (Opcional)</FormLabel>
                     <FormControl>
-                        <>
+                        <div>
                             <Input {...field} autoComplete="off" list="entry-driver-names" />
                             <datalist id="entry-driver-names">
                                 {suggestions.names.map(name => <option key={name} value={name} />)}
                             </datalist>
-                        </>
+                        </div>
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -296,12 +296,12 @@ export function EntriesTab({ exporterId, exporterName, producerId, isDirectDispa
                   <FormItem>
                     <FormLabel>Rut Conductor (Opcional)</FormLabel>
                     <FormControl>
-                        <>
+                        <div>
                             <Input {...field} autoComplete="off" inputMode="numeric" list="entry-driver-ruts" />
                             <datalist id="entry-driver-ruts">
                                 {suggestions.ruts.map(rut => <option key={rut} value={rut} />)}
                             </datalist>
-                        </>
+                        </div>
                     </FormControl>
                     <FormMessage />
                   </FormItem>

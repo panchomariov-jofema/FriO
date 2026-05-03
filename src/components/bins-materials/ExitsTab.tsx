@@ -367,12 +367,12 @@ export function ExitsTab({ exporterId, exporterName, producerId }: ExitsTabProps
                   <FormItem>
                     <FormLabel>Nombre Conductor (Opcional)</FormLabel>
                     <FormControl>
-                        <>
+                        <div>
                             <Input {...field} autoComplete="off" list="exit-driver-names" />
                             <datalist id="exit-driver-names">
                                 {suggestions.names.map(name => <option key={name} value={name} />)}
                             </datalist>
-                        </>
+                        </div>
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -385,12 +385,12 @@ export function ExitsTab({ exporterId, exporterName, producerId }: ExitsTabProps
                   <FormItem>
                     <FormLabel>Rut Conductor (Opcional)</FormLabel>
                     <FormControl>
-                        <>
+                        <div>
                             <Input {...field} autoComplete="off" inputMode="numeric" list="exit-driver-ruts" />
                             <datalist id="exit-driver-ruts">
                                 {suggestions.ruts.map(rut => <option key={rut} value={rut} />)}
                             </datalist>
-                        </>
+                        </div>
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -403,12 +403,12 @@ export function ExitsTab({ exporterId, exporterName, producerId }: ExitsTabProps
                   <FormItem>
                     <FormLabel>Patente Vehículo (Opcional)</FormLabel>
                     <FormControl>
-                        <>
+                        <div>
                             <Input {...field} value={field.value || ''} autoComplete="off" list="exit-vehicle-plates" />
                             <datalist id="exit-vehicle-plates">
                                 {suggestions.plates.map(plate => <option key={plate} value={plate} />)}
                             </datalist>
-                        </>
+                        </div>
                     </FormControl>
                     <FormMessage />
                   </FormItem>
