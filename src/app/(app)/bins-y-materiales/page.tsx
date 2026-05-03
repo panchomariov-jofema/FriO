@@ -13,8 +13,12 @@ import { ExitsTab } from '@/components/bins-materials/ExitsTab';
 import { StockTab } from '@/components/bins-materials/StockTab';
 import { Checkbox } from '@/components/ui/checkbox';
 import { usePermissions } from '@/contexts/PermissionsContext';
+import { useUser } from '@/firebase';
 
 export default function BinsYMaterialesPage() {
+  const { user } = useUser();
+  const isAdmin = user?.email === 'francisco.villarreal@outlook.es';
+
   const [selectedExporterId, setSelectedExporterId] = React.useState<string | null>(null);
   const [selectedProducerId, setSelectedProducerId] = React.useState<string | null>(null);
   const [isDirectDispatch, setIsDirectDispatch] = React.useState(false);
@@ -123,20 +127,22 @@ export default function BinsYMaterialesPage() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="flex items-center space-x-2 pt-4 md:pt-0 md:self-end md:pb-1">
-                <Checkbox 
-                    id="direct-dispatch" 
-                    checked={isDirectDispatch}
-                    onCheckedChange={(checked) => handleDirectDispatchChange(!!checked)}
-                    disabled={!selectedExporterId || !selectedProducerId}
-                />
-                <Label
-                    htmlFor="direct-dispatch"
-                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                >
-                    Despacho Directo
-                </Label>
-            </div>
+            {isAdmin && (
+              <div className="flex items-center space-x-2 pt-4 md:pt-0 md:self-end md:pb-1">
+                  <Checkbox 
+                      id="direct-dispatch" 
+                      checked={isDirectDispatch}
+                      onCheckedChange={(checked) => handleDirectDispatchChange(!!checked)}
+                      disabled={!selectedExporterId || !selectedProducerId}
+                  />
+                  <Label
+                      htmlFor="direct-dispatch"
+                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                  >
+                      Despacho Directo
+                  </Label>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
