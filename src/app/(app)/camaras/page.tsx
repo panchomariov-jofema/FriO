@@ -657,7 +657,10 @@ export default function CamarasPage() {
                                 <Label htmlFor={`fifo-switch-${chamberId}`}>Activar Layout FIFO (Serpiente)</Label>
                             </div>
                             <div className="p-2 sm:p-4 bg-muted/50 rounded-b-lg border border-t-0 overflow-x-auto">
-                                <div className="grid gap-1" style={{ gridTemplateColumns: `repeat(${config.columns.length}, minmax(0, 1fr))` }}>
+                                <div className="grid gap-1" style={{ 
+                                    gridTemplateRows: `repeat(${config.rows.length}, minmax(0, 1fr))`,
+                                    gridAutoFlow: 'column'
+                                }}>
                                 {config.columns.map(col => {
                                       return config.rows.map(row => {
                                       const coord = `${col.name}${row}`;
@@ -676,7 +679,7 @@ export default function CamarasPage() {
                                           <Popover key={coord}>
                                           <PopoverTrigger asChild>
                                               <div 
-                                              className={cn("h-12 w-full rounded border-2 flex items-center justify-center text-xs font-mono relative overflow-hidden cursor-pointer",
+                                              className={cn("h-12 w-full min-w-[60px] rounded border-2 flex items-center justify-center text-xs font-mono relative overflow-hidden cursor-pointer",
                                                   isOccupied ? 'border-[var(--lot-color-border)] bg-[var(--lot-color-bg)]' : 'bg-background border-dashed'
                                               )}
                                               style={{

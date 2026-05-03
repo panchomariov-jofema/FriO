@@ -513,9 +513,12 @@ export default function FallCreekPage() {
                                         </AccordionTrigger>
                                         <AccordionContent>
                                             <div className="p-4 bg-muted/30 rounded-lg border overflow-x-auto" onMouseDown={(e) => e.preventDefault()}>
-                                                <div className="grid gap-1 min-w-[800px]" style={{ gridTemplateColumns: `repeat(${config.columns.length}, minmax(0, 1fr))` }}>
-                                                    {config.rows.map(row =>
-                                                        config.columns.map(col => {
+                                                <div className="grid gap-1 min-w-[800px]" style={{ 
+                                                    gridTemplateRows: `repeat(${config.rows.length}, minmax(0, 1fr))`,
+                                                    gridAutoFlow: 'column'
+                                                }}>
+                                                    {config.columns.map(col =>
+                                                        config.rows.map(row => {
                                                             const coord = `${col.name}${row}`;
                                                             const itemsInCoord = storedItemsByChamber[chamberId]?.[coord] || [];
                                                             const isOccupied = itemsInCoord.length > 0;
@@ -540,7 +543,7 @@ export default function FallCreekPage() {
                                                                         handleMouseEnter(chamberId, coord);
                                                                     }}
                                                                     className={cn(
-                                                                        "h-12 w-full rounded border-2 flex items-center justify-center text-xs font-mono relative overflow-hidden transition-all",
+                                                                        "h-12 w-full min-w-[60px] rounded border-2 flex items-center justify-center text-xs font-mono relative overflow-hidden transition-all",
                                                                         isOccupied && "bg-[var(--lot-color-bg)] border-[var(--lot-color)]",
                                                                         !isOccupied && "bg-background border-dashed",
                                                                         selectionMode && isOccupied && !isReserved && "cursor-pointer hover:ring-2 hover:ring-primary",
