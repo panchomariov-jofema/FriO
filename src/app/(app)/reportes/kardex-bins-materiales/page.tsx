@@ -159,6 +159,7 @@ export default function BinMaterialKardexReportPage() {
             mov.items.forEach((item) => {
                 let currentProductorName = producerMap.get(mov.producerId) || mov.producerId;
                 
+                // Lógica de excepción para PALOGIX
                 if (mov.document === 'SALDO-INICIAL-2028' && item.binMaterialCode === '10017') {
                     currentProductorName = 'PALOGIX';
                 }
@@ -547,12 +548,6 @@ export default function BinMaterialKardexReportPage() {
                                     </TableHead>
                                     <TableHead>
                                         <div className="space-y-1">
-                                            <span>Cód. Prod.</span>
-                                            <Input className="h-7 text-xs" placeholder="Filtro..." value={codeFilter} onChange={e => setCodeFilter(e.target.value)} />
-                                        </div>
-                                    </TableHead>
-                                    <TableHead>
-                                        <div className="space-y-1">
                                             <span>Producto</span>
                                             <Input className="h-7 text-xs" placeholder="Filtro..." value={nameFilter} onChange={e => setNameFilter(e.target.value)} />
                                         </div>
@@ -583,7 +578,7 @@ export default function BinMaterialKardexReportPage() {
                             </TableHeader>
                             <TableBody>
                                 {loading ? (
-                                    Array.from({ length: 10 }).map((_, i) => <TableRow key={i}><TableCell colSpan={9}><Skeleton className="h-4 w-full" /></TableCell></TableRow>)
+                                    Array.from({ length: 10 }).map((_, i) => <TableRow key={i}><TableCell colSpan={8}><Skeleton className="h-4 w-full" /></TableCell></TableRow>)
                                 ) : filteredKardexData.length > 0 ? (
                                     filteredKardexData.map(item => (
                                         <TableRow key={item.key}>
@@ -591,7 +586,6 @@ export default function BinMaterialKardexReportPage() {
                                             <TableCell className="font-mono text-xs">{item.documento || '-'}</TableCell>
                                             <TableCell className="text-xs">{item.exportador}</TableCell>
                                             <TableCell className="text-xs">{item.productor}</TableCell>
-                                            <TableCell className="text-xs font-mono">{item.codigoProducto}</TableCell>
                                             <TableCell className="text-xs">{item.nombreProducto}</TableCell>
                                             <TableCell className={`font-semibold text-xs ${item.tipo === 'Entrada' ? 'text-green-600' : 'text-red-600'}`}>
                                                 {item.cantidad}
@@ -605,7 +599,7 @@ export default function BinMaterialKardexReportPage() {
                                         </TableRow>
                                     ))
                                 ) : (
-                                    <TableRow><TableCell colSpan={9} className="h-24 text-center">No hay registros coincidentes.</TableCell></TableRow>
+                                    <TableRow><TableCell colSpan={8} className="h-24 text-center">No hay registros coincidentes.</TableCell></TableRow>
                                 )}
                             </TableBody>
                         </Table>
