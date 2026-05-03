@@ -496,7 +496,7 @@ export default function CamarasPage() {
   return (
     <div className="space-y-6">
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
+        <CardHeader>
             <div>
               <CardTitle>Lotes de Productor Pendientes</CardTitle>
               <CardDescription>Lotes que esperan ser asignados a una cámara.</CardDescription>
@@ -661,9 +661,6 @@ export default function CamarasPage() {
                                 {config.columns.map(col => {
                                       return config.rows.map(row => {
                                       const coord = `${col.name}${row}`;
-                                      if (config.blocked?.includes(coord)) {
-                                          return <div key={coord} className="h-12 w-full rounded border-2 bg-gray-200 dark:bg-gray-700 relative"><div className="absolute inset-0 bg-repeat bg-[length:10px_10px]" style={{backgroundImage: "repeating-linear-gradient(-45deg, #a0aec0, #a0aec0 1px, transparent 1px, transparent 5px)"}} /></div>;
-                                      }
                                       const itemsInCoord = storedItemsByChamber[chamberId]?.[coord] || [];
                                       const isOccupied = itemsInCoord.length > 0;
                                     

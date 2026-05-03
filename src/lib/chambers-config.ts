@@ -18,59 +18,57 @@ const columns4to6 = [
 
 const rows = Array.from({ length: 14 }, (_, i) => i + 1);
 
-const blockedRows = [13, 14];
-const blocked1to3 = columns1to3.flatMap(col => blockedRows.map(row => `${col.name}${row}`));
-const blocked4to6 = columns4to6.flatMap(col => blockedRows.map(row => `${col.name}${row}`));
-
+// Todas las ubicaciones están ahora libres por requerimiento del usuario
+const noBlocked: string[] = [];
 
 export const chambersConfig: ChambersConfig = {
     'CAMARA-1': {
         id: 'CAMARA-1',
         name: 'CÁMARA 1',
-        capacity: 1000,
+        capacity: 1008,
         columns: columns1to3,
         rows,
-        blocked: blocked1to3,
+        blocked: noBlocked,
     },
     'CAMARA-2': {
         id: 'CAMARA-2',
         name: 'CÁMARA 2',
-        capacity: 1000,
+        capacity: 1008,
         columns: columns1to3,
         rows,
-        blocked: blocked1to3,
+        blocked: noBlocked,
     },
     'CAMARA-3': {
         id: 'CAMARA-3',
         name: 'CÁMARA 3',
-        capacity: 1000,
+        capacity: 1008,
         columns: columns1to3,
         rows,
-        blocked: blocked1to3,
+        blocked: noBlocked,
     },
     'CAMARA-4': {
         id: 'CAMARA-4',
         name: 'CÁMARA 4',
-        capacity: 1800,
+        capacity: 1260,
         columns: columns4to6,
         rows,
-        blocked: blocked4to6,
+        blocked: noBlocked,
     },
     'CAMARA-5': {
         id: 'CAMARA-5',
         name: 'CÁMARA 5',
-        capacity: 1800,
+        capacity: 1260,
         columns: columns4to6,
         rows,
-        blocked: blocked4to6,
+        blocked: noBlocked,
     },
     'CAMARA-6': {
         id: 'CAMARA-6',
         name: 'CÁMARA 6',
-        capacity: 1800,
+        capacity: 1260,
         columns: columns4to6,
         rows,
-        blocked: blocked4to6,
+        blocked: noBlocked,
     },
 };
 
@@ -79,6 +77,4 @@ export const exporterChamberAssignments: Record<string, string[]> = {
   'SUBSOLE': ['CAMARA-2', 'CAMARA-3'],
   'MEYER': ['CAMARA-3', 'CAMARA-6'],
   'BLOSSOM': ['CAMARA-3', 'CAMARA-5'],
-  // Agrega aquí otras asignaciones si es necesario
-  // Ejemplo: 'OTRO_EXPORTADOR': ['CAMARA-1']
 };

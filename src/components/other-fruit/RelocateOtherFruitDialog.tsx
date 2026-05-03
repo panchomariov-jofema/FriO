@@ -87,7 +87,7 @@ export function RelocateOtherFruitDialog({
         });
     });
     
-    const available = allPossibleCoords.filter(coord => !occupiedCoords.has(coord) && !chamberConfig.blocked?.includes(coord));
+    const available = allPossibleCoords.filter(coord => !occupiedCoords.has(coord));
 
     return { 
         availableCoordinates: available,
