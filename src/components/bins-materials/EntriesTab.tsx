@@ -19,6 +19,7 @@ import { Skeleton } from '../ui/skeleton';
 import { BinMaterialMovement } from '@/lib/types';
 import { usePackingsByExporter } from '@/hooks/use-packings-by-exporter';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
 
 const movementItemSchema = z.object({
   binMaterialId: z.string(),
@@ -57,11 +58,28 @@ export function EntriesTab({ exporterId, exporterName, producerId, isDirectDispa
   const { user } = useUser();
   const { materials, loading: loadingMaterials } = useBinMaterialsByExporter(exporterId);
   const { data: packings, loading: loadingPackings } = usePackingsByExporter(exporterId);
+  const { data: allMovements } = useFirestoreCollection<BinMaterialMovement>('binMaterialMovements');
 
   const form = useForm<MovementFormValues>({
     resolver: zodResolver(movementSchema),
     defaultValues: { document: '', driverName: '', driverRUT: '', packingId: undefined, items: [] },
   });
+
+  // Unique suggestions for Typeahead
+  const suggestions = React.useMemo(() => {
+    const names = new Set<string>();
+    const ruts = new Set<string>();
+    
+    (allMovements || []).forEach(m => {
+        if (m.driverName) names.add(m.driverName);
+        if (m.driverRUT) ruts.add(m.driverRUT);
+    });
+
+    return {
+        names: Array.from(names).sort(),
+        ruts: Array.from(ruts).sort(),
+    };
+  }, [allMovements]);
 
   const getMultiplierLabel = (itemCode: string): string => {
     if (!exporterName) return '';
@@ -259,7 +277,14 @@ export function EntriesTab({ exporterId, exporterName, producerId, isDirectDispa
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Nombre Conductor (Opcional)</FormLabel>
-                    <FormControl><Input {...field} autoComplete="off" /></FormControl>
+                    <FormControl>
+                        <>
+                            <Input {...field} autoComplete="off" list="entry-driver-names" />
+                            <datalist id="entry-driver-names">
+                                {suggestions.names.map(name => <option key={name} value={name} />)}
+                            </datalist>
+                        </>
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -270,7 +295,14 @@ export function EntriesTab({ exporterId, exporterName, producerId, isDirectDispa
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Rut Conductor (Opcional)</FormLabel>
-                    <FormControl><Input {...field} autoComplete="off" inputMode="numeric" /></FormControl>
+                    <FormControl>
+                        <>
+                            <Input {...field} autoComplete="off" inputMode="numeric" list="entry-driver-ruts" />
+                            <datalist id="entry-driver-ruts">
+                                {suggestions.ruts.map(rut => <option key={rut} value={rut} />)}
+                            </datalist>
+                        </>
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}

@@ -69,6 +69,28 @@ export function ExitsTab({ exporterId, exporterName, producerId }: ExitsTabProps
     defaultValues: { document: '', driverName: '', driverRUT: '', patente_vehiculo: '', observaciones: '', items: [] },
   });
 
+  // Unique suggestions for Typeahead
+  const suggestions = React.useMemo(() => {
+    const names = new Set<string>();
+    const ruts = new Set<string>();
+    const plates = new Set<string>();
+    
+    (movements || []).forEach(m => {
+        if (m.driverName) names.add(m.driverName);
+        if (m.driverRUT) ruts.add(m.driverRUT);
+        // Patente might be in observations or a custom field if we had it, 
+        // but for now we look in all existing movements where it might have been saved.
+        // Given DTE logic, it's often saved in the movement's data structure if we extend it.
+        if ((m as any).patente_vehiculo) plates.add((m as any).patente_vehiculo);
+    });
+
+    return {
+        names: Array.from(names).sort(),
+        ruts: Array.from(ruts).sort(),
+        plates: Array.from(plates).sort(),
+    };
+  }, [movements]);
+
   const getMultiplierLabel = (itemCode: string): string => {
     if (!exporterName) return '';
     const rules = calculationRules[exporterName];
@@ -234,6 +256,7 @@ export function ExitsTab({ exporterId, exporterName, producerId }: ExitsTabProps
           document: values.document,
           driverName: values.driverName || '',
           driverRUT: values.driverRUT || '',
+          patente_vehiculo: values.patente_vehiculo || '',
           exporterId,
           producerId,
           items: itemsToProcess,
@@ -292,9 +315,6 @@ export function ExitsTab({ exporterId, exporterName, producerId }: ExitsTabProps
             sourceMovementId: movementRef.id,
         };
         transaction.set(pendingDocRef, { ...dteData, createdAt: serverTimestamp() });
-
-        // Note: We no longer update the binMaterialStock collection directly here, 
-        // as the stock is now calculated dynamically from movements.
       });
 
       toast({ title: 'Éxito', description: 'Salida registrada y documento pendiente creado.' });
@@ -346,7 +366,14 @@ export function ExitsTab({ exporterId, exporterName, producerId }: ExitsTabProps
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Nombre Conductor (Opcional)</FormLabel>
-                    <FormControl><Input {...field} autoComplete="off" /></FormControl>
+                    <FormControl>
+                        <>
+                            <Input {...field} autoComplete="off" list="exit-driver-names" />
+                            <datalist id="exit-driver-names">
+                                {suggestions.names.map(name => <option key={name} value={name} />)}
+                            </datalist>
+                        </>
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -357,7 +384,14 @@ export function ExitsTab({ exporterId, exporterName, producerId }: ExitsTabProps
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Rut Conductor (Opcional)</FormLabel>
-                    <FormControl><Input {...field} autoComplete="off" inputMode="numeric" /></FormControl>
+                    <FormControl>
+                        <>
+                            <Input {...field} autoComplete="off" inputMode="numeric" list="exit-driver-ruts" />
+                            <datalist id="exit-driver-ruts">
+                                {suggestions.ruts.map(rut => <option key={rut} value={rut} />)}
+                            </datalist>
+                        </>
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -368,7 +402,14 @@ export function ExitsTab({ exporterId, exporterName, producerId }: ExitsTabProps
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Patente Vehículo (Opcional)</FormLabel>
-                    <FormControl><Input {...field} value={field.value || ''} autoComplete="off" /></FormControl>
+                    <FormControl>
+                        <>
+                            <Input {...field} value={field.value || ''} autoComplete="off" list="exit-vehicle-plates" />
+                            <datalist id="exit-vehicle-plates">
+                                {suggestions.plates.map(plate => <option key={plate} value={plate} />)}
+                            </datalist>
+                        </>
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
