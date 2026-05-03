@@ -84,6 +84,9 @@ interface KardexItem {
     tipo: 'Entrada' | 'Salida';
     userName?: string;
     documento?: string;
+    driverName?: string;
+    driverRUT?: string;
+    patente?: string;
 }
 
 
@@ -100,11 +103,11 @@ export default function BinMaterialKardexReportPage() {
     const [docFilter, setDocFilter] = React.useState('');
     const [expFilter, setExpFilter] = React.useState('');
     const [prodFilter, setProdFilter] = React.useState('');
-    const [codeFilter, setCodeFilter] = React.useState('');
     const [nameFilter, setNameFilter] = React.useState('');
     const [userFilter, setUserFilter] = React.useState('');
     const [movFilter, setMovFilter] = React.useState('');
     const [typeFilter, setTypeFilter] = React.useState<'all' | 'Entrada' | 'Salida'>('all');
+    const [driverFilter, setDriverFilter] = React.useState('');
 
     const { data: movements, loading: loadingMovements } = useFirestoreCollection<BinMaterialMovement>('binMaterialMovements');
     const { data: chamberLots, loading: loadingChamberLots } = useFirestoreCollection<ChamberLot>('chamberLots');
@@ -180,6 +183,9 @@ export default function BinMaterialKardexReportPage() {
                         tipo: typeLabel as 'Entrada' | 'Salida',
                         userName: formatUserName(mov.userName),
                         documento: mov.document,
+                        driverName: mov.driverName || '',
+                        driverRUT: mov.driverRUT || '',
+                        patente: (mov as any).patente_vehiculo || '',
                     };
                 } else {
                     groupedMovements[groupKey].cantidad += item.quantity;
@@ -246,15 +252,15 @@ export default function BinMaterialKardexReportPage() {
             if (docFilter && !item.documento?.toLowerCase().includes(docFilter.toLowerCase())) return false;
             if (expFilter && !item.exportador.toLowerCase().includes(expFilter.toLowerCase())) return false;
             if (prodFilter && !item.productor.toLowerCase().includes(prodFilter.toLowerCase())) return false;
-            if (codeFilter && !item.codigoProducto.toLowerCase().includes(codeFilter.toLowerCase())) return false;
             if (nameFilter && !item.nombreProducto.toLowerCase().includes(nameFilter.toLowerCase())) return false;
             if (userFilter && !item.userName?.toLowerCase().includes(userFilter.toLowerCase())) return false;
             if (movFilter && !item.movimiento.toLowerCase().includes(movFilter.toLowerCase())) return false;
+            if (driverFilter && !item.driverName?.toLowerCase().includes(driverFilter.toLowerCase())) return false;
             if (typeFilter !== 'all' && item.tipo !== typeFilter) return false;
 
             return true;
         });
-    }, [rawKardexData, dateRange, docFilter, expFilter, prodFilter, codeFilter, nameFilter, userFilter, movFilter, typeFilter]);
+    }, [rawKardexData, dateRange, docFilter, expFilter, prodFilter, nameFilter, userFilter, movFilter, driverFilter, typeFilter]);
     
 
     const handleExport = () => {
@@ -263,6 +269,9 @@ export default function BinMaterialKardexReportPage() {
             { key: 'documento', label: 'Documento' },
             { key: 'exportador', label: 'Exportador' },
             { key: 'productor', label: 'Productor' },
+            { key: 'driverName', label: 'Conductor' },
+            { key: 'driverRUT', label: 'Rut Conductor' },
+            { key: 'patente', label: 'Patente' },
             { key: 'codigoProducto', label: 'Codigo del Producto' },
             { key: 'nombreProducto', label: 'Nombre del Producto' },
             { key: 'cantidad', label: 'Cantidad' },
@@ -271,7 +280,7 @@ export default function BinMaterialKardexReportPage() {
             { key: 'userName', label: 'Usuario' },
         ];
         const csv = convertToCSV(filteredKardexData, headers);
-        downloadCSV(csv, 'kardex_bins_y_materiales_filtrado.csv');
+        downloadCSV(csv, 'kardex_bins_y_materiales_detallado.csv');
     };
 
     const handleDownloadTemplate = () => {
@@ -415,10 +424,10 @@ export default function BinMaterialKardexReportPage() {
         setDocFilter('');
         setExpFilter('');
         setProdFilter('');
-        setCodeFilter('');
         setNameFilter('');
         setUserFilter('');
         setMovFilter('');
+        setDriverFilter('');
         setTypeFilter('all');
     };
     
@@ -548,6 +557,12 @@ export default function BinMaterialKardexReportPage() {
                                     </TableHead>
                                     <TableHead>
                                         <div className="space-y-1">
+                                            <span>Conductor</span>
+                                            <Input className="h-7 text-xs" placeholder="Filtrar..." value={driverFilter} onChange={e => setDriverFilter(e.target.value)} />
+                                        </div>
+                                    </TableHead>
+                                    <TableHead>
+                                        <div className="space-y-1">
                                             <span>Producto</span>
                                             <Input className="h-7 text-xs" placeholder="Filtro..." value={nameFilter} onChange={e => setNameFilter(e.target.value)} />
                                         </div>
@@ -578,7 +593,7 @@ export default function BinMaterialKardexReportPage() {
                             </TableHeader>
                             <TableBody>
                                 {loading ? (
-                                    Array.from({ length: 10 }).map((_, i) => <TableRow key={i}><TableCell colSpan={8}><Skeleton className="h-4 w-full" /></TableCell></TableRow>)
+                                    Array.from({ length: 10 }).map((_, i) => <TableRow key={i}><TableCell colSpan={9}><Skeleton className="h-4 w-full" /></TableCell></TableRow>)
                                 ) : filteredKardexData.length > 0 ? (
                                     filteredKardexData.map(item => (
                                         <TableRow key={item.key}>
@@ -586,6 +601,7 @@ export default function BinMaterialKardexReportPage() {
                                             <TableCell className="font-mono text-xs">{item.documento || '-'}</TableCell>
                                             <TableCell className="text-xs">{item.exportador}</TableCell>
                                             <TableCell className="text-xs">{item.productor}</TableCell>
+                                            <TableCell className="text-xs">{item.driverName || '-'}</TableCell>
                                             <TableCell className="text-xs">{item.nombreProducto}</TableCell>
                                             <TableCell className={`font-semibold text-xs ${item.tipo === 'Entrada' ? 'text-green-600' : 'text-red-600'}`}>
                                                 {item.cantidad}
@@ -599,7 +615,7 @@ export default function BinMaterialKardexReportPage() {
                                         </TableRow>
                                     ))
                                 ) : (
-                                    <TableRow><TableCell colSpan={8} className="h-24 text-center">No hay registros coincidentes.</TableCell></TableRow>
+                                    <TableRow><TableCell colSpan={9} className="h-24 text-center">No hay registros coincidentes.</TableCell></TableRow>
                                 )}
                             </TableBody>
                         </Table>
