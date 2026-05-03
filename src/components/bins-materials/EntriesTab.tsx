@@ -185,43 +185,11 @@ export function EntriesTab({ exporterId, exporterName, producerId, isDirectDispa
         }
         
         transaction.set(movementRef, movementData);
-        
-        if (!isDirectDispatch) {
-            for (const item of itemsToProcess) {
-                const stockQuery = query(
-                    collection(firestore, 'binMaterialStock'),
-                    where('exporterId', '==', exporterId),
-                    where('binMaterialId', '==', item.binMaterialId)
-                );
-
-                const stockSnap = await getDocs(stockQuery);
-                
-                if (stockSnap.empty) {
-                    const newStockRef = doc(collection(firestore, 'binMaterialStock'));
-                    transaction.set(newStockRef, {
-                    binMaterialId: item.binMaterialId,
-                    binMaterialCode: item.binMaterialCode,
-                    binMaterialName: item.binMaterialName,
-                    exporterId: exporterId,
-                    quantity: item.quantity,
-                    lastUpdatedAt: serverTimestamp(),
-                    });
-                } else {
-                    const stockDoc = stockSnap.docs[0];
-                    const stockRef = stockDoc.ref;
-                    const currentQuantity = stockDoc.data().quantity || 0;
-                    transaction.update(stockRef, {
-                    quantity: currentQuantity + item.quantity,
-                    lastUpdatedAt: serverTimestamp(),
-                    });
-                }
-            }
-        }
       });
 
       const successDescription = isDirectDispatch 
         ? 'Movimiento de despacho directo registrado.'
-        : 'Entrada registrada y stock actualizado.';
+        : 'Entrada registrada correctamente.';
 
       toast({ title: 'Éxito', description: successDescription });
 
@@ -237,7 +205,7 @@ export function EntriesTab({ exporterId, exporterName, producerId, isDirectDispa
       console.error('Error processing entry:', error);
       toast({ variant: 'destructive', title: 'Error', description: 'No se pudo procesar la entrada.' });
       errorEmitter.emit('permission-error', new FirestorePermissionError({
-          path: 'binMaterialMovements or binMaterialStock',
+          path: 'binMaterialMovements',
           operation: 'write'
       }));
     }
@@ -278,7 +246,7 @@ export function EntriesTab({ exporterId, exporterName, producerId, isDirectDispa
                   <FormItem>
                     <FormLabel>Nombre Conductor (Opcional)</FormLabel>
                     <FormControl>
-                        <div>
+                        <div className="relative">
                             <Input {...field} autoComplete="off" list="entry-driver-names" />
                             <datalist id="entry-driver-names">
                                 {suggestions.names.map(name => <option key={name} value={name} />)}
@@ -296,7 +264,7 @@ export function EntriesTab({ exporterId, exporterName, producerId, isDirectDispa
                   <FormItem>
                     <FormLabel>Rut Conductor (Opcional)</FormLabel>
                     <FormControl>
-                        <div>
+                        <div className="relative">
                             <Input {...field} autoComplete="off" inputMode="numeric" list="entry-driver-ruts" />
                             <datalist id="entry-driver-ruts">
                                 {suggestions.ruts.map(rut => <option key={rut} value={rut} />)}

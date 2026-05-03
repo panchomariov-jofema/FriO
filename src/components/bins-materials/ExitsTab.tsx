@@ -78,9 +78,6 @@ export function ExitsTab({ exporterId, exporterName, producerId }: ExitsTabProps
     (movements || []).forEach(m => {
         if (m.driverName) names.add(m.driverName);
         if (m.driverRUT) ruts.add(m.driverRUT);
-        // Patente might be in observations or a custom field if we had it, 
-        // but for now we look in all existing movements where it might have been saved.
-        // Given DTE logic, it's often saved in the movement's data structure if we extend it.
         if ((m as any).patente_vehiculo) plates.add((m as any).patente_vehiculo);
     });
 
@@ -317,7 +314,7 @@ export function ExitsTab({ exporterId, exporterName, producerId }: ExitsTabProps
         transaction.set(pendingDocRef, { ...dteData, createdAt: serverTimestamp() });
       });
 
-      toast({ title: 'Éxito', description: 'Salida registrada y documento pendiente creado.' });
+      toast({ title: 'Éxito', description: 'Salida registrada correctamente.' });
       const resetItems = materials.map(m => ({
         binMaterialId: m.id,
         binMaterialCode: m.code,
@@ -367,7 +364,7 @@ export function ExitsTab({ exporterId, exporterName, producerId }: ExitsTabProps
                   <FormItem>
                     <FormLabel>Nombre Conductor (Opcional)</FormLabel>
                     <FormControl>
-                        <div>
+                        <div className="relative">
                             <Input {...field} autoComplete="off" list="exit-driver-names" />
                             <datalist id="exit-driver-names">
                                 {suggestions.names.map(name => <option key={name} value={name} />)}
@@ -385,7 +382,7 @@ export function ExitsTab({ exporterId, exporterName, producerId }: ExitsTabProps
                   <FormItem>
                     <FormLabel>Rut Conductor (Opcional)</FormLabel>
                     <FormControl>
-                        <div>
+                        <div className="relative">
                             <Input {...field} autoComplete="off" inputMode="numeric" list="exit-driver-ruts" />
                             <datalist id="exit-driver-ruts">
                                 {suggestions.ruts.map(rut => <option key={rut} value={rut} />)}
@@ -403,7 +400,7 @@ export function ExitsTab({ exporterId, exporterName, producerId }: ExitsTabProps
                   <FormItem>
                     <FormLabel>Patente Vehículo (Opcional)</FormLabel>
                     <FormControl>
-                        <div>
+                        <div className="relative">
                             <Input {...field} value={field.value || ''} autoComplete="off" list="exit-vehicle-plates" />
                             <datalist id="exit-vehicle-plates">
                                 {suggestions.plates.map(plate => <option key={plate} value={plate} />)}
