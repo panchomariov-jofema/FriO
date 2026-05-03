@@ -8,9 +8,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Skeleton } from '@/components/ui/skeleton';
 import { ReportHeader } from '@/components/reports/ReportHeader';
 import { Badge } from '@/components/ui/badge';
-import { Timestamp, collection, doc, writeBatch, query, where, getDocs, serverTimestamp } from 'firebase/firestore';
+import { Timestamp, collection, doc, writeBatch, query, where, getDocs, serverTimestamp, deleteDoc, updateDoc } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
-import { Upload, Download, Trash2, Info, X, Calendar as CalendarIcon } from 'lucide-react';
+import { Upload, Download, Trash2, Info, X, Calendar as CalendarIcon, Pencil } from 'lucide-react';
 import { useFirestore, useUser } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { parse, format, isWithinInterval, startOfDay, endOfDay } from 'date-fns';
@@ -25,6 +25,15 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+  DialogClose,
+} from '@/components/ui/dialog';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -32,6 +41,10 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
 import { DateRange } from 'react-day-picker';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 
 const IMPORT_HEADER_MAP: Record<string, string> = {
   'Fecha (DD-MM-YYYY)': 'fecha',
@@ -45,6 +58,12 @@ const IMPORT_HEADER_MAP: Record<string, string> = {
   'Cantidad': 'cantidad'
 };
 const FRIENDLY_HEADERS = Object.keys(IMPORT_HEADER_MAP);
+
+const editMovementSchema = z.object({
+  documento: z.string().min(1, 'Obligatorio'),
+  driverName: z.string().optional(),
+  cantidad: z.coerce.number().positive('Debe ser mayor a 0'),
+});
 
 function convertToCSV(data: any[], headers: {key: string, label: string}[]) {
     const headerRow = headers.map(h => h.label).join(';');
@@ -87,6 +106,9 @@ interface KardexItem {
     driverName?: string;
     driverRUT?: string;
     patente?: string;
+    sourceType: 'manual' | 'automatic';
+    movementId?: string;
+    itemIndex?: number;
 }
 
 
@@ -96,6 +118,7 @@ export default function BinMaterialKardexReportPage() {
     const { toast } = useToast();
     const fileInputRef = React.useRef<HTMLInputElement>(null);
 
+    const isAuthorized = user?.email === 'francisco.villarreal@outlook.es' || user?.email === 'jlog@frio.cl';
     const isAdmin = user?.email === 'francisco.villarreal@outlook.es';
 
     // Filters State
@@ -109,6 +132,11 @@ export default function BinMaterialKardexReportPage() {
     const [typeFilter, setTypeFilter] = React.useState<'all' | 'Entrada' | 'Salida'>('all');
     const [driverFilter, setDriverFilter] = React.useState('');
 
+    // Actions State
+    const [itemToEdit, setItemToEdit] = React.useState<KardexItem | null>(null);
+    const [itemToDelete, setItemToDelete] = React.useState<KardexItem | null>(null);
+    const [isSubmittingAction, setIsSubmittingAction] = React.useState(false);
+
     const { data: movements, loading: loadingMovements } = useFirestoreCollection<BinMaterialMovement>('binMaterialMovements');
     const { data: chamberLots, loading: loadingChamberLots } = useFirestoreCollection<ChamberLot>('chamberLots');
     const { data: dispatches, loading: loadingDispatches } = useFirestoreCollection<Dispatch>('dispatches');
@@ -116,6 +144,20 @@ export default function BinMaterialKardexReportPage() {
     const { data: producers, loading: loadingProducers } = useFirestoreCollection<Producer>('producers');
     const { data: receptionLots, loading: loadingReceptions } = useFirestoreCollection<ReceptionLot>('receptionLots');
     const { data: allMaterials } = useFirestoreCollection<BinMaterial>('binMaterials');
+
+    const editForm = useForm<z.infer<typeof editMovementSchema>>({
+        resolver: zodResolver(editMovementSchema),
+    });
+
+    React.useEffect(() => {
+        if (itemToEdit) {
+            editForm.reset({
+                documento: itemToEdit.documento || '',
+                driverName: itemToEdit.driverName || '',
+                cantidad: itemToEdit.cantidad,
+            });
+        }
+    }, [itemToEdit, editForm]);
 
     const loading = loadingMovements || loadingChamberLots || loadingDispatches || loadingExporters || loadingProducers || loadingReceptions;
 
@@ -152,51 +194,41 @@ export default function BinMaterialKardexReportPage() {
             return ts;
         };
 
-        const groupedMovements: Record<string, KardexItem> = {};
-
         (movements || []).forEach(mov => {
             const correctedDate = getCorrectedTimestamp(mov.createdAt);
             const isDirectDispatch = mov.observation === 'Despacho Directo';
             const typeLabel = (mov.type === 'entrada' && !isDirectDispatch) ? 'Entrada' : 'Salida';
             
-            mov.items.forEach((item) => {
+            mov.items.forEach((item, index) => {
                 let currentProductorName = producerMap.get(mov.producerId) || mov.producerId;
                 
-                // Lógica de excepción para PALOGIX
                 if (mov.document === 'SALDO-INICIAL-2028' && item.binMaterialCode === '10017') {
                     currentProductorName = 'PALOGIX';
                 }
 
-                const groupKey = `${mov.document}_${item.binMaterialCode}_${typeLabel}`;
                 const currentMaterialName = materialMasterMap.get(item.binMaterialCode) || item.binMaterialName;
 
-                if (!groupedMovements[groupKey]) {
-                    groupedMovements[groupKey] = {
-                        key: groupKey,
-                        fecha: correctedDate,
-                        exportador: exporterMap.get(mov.exporterId) || mov.exporterId,
-                        productor: currentProductorName,
-                        codigoProducto: item.binMaterialCode,
-                        nombreProducto: currentMaterialName,
-                        cantidad: item.quantity,
-                        movimiento: mov.observation || (isDirectDispatch ? 'Despacho Directo' : 'Bins y Materiales'),
-                        tipo: typeLabel as 'Entrada' | 'Salida',
-                        userName: formatUserName(mov.userName),
-                        documento: mov.document,
-                        driverName: mov.driverName || '',
-                        driverRUT: mov.driverRUT || '',
-                        patente: (mov as any).patente_vehiculo || '',
-                    };
-                } else {
-                    groupedMovements[groupKey].cantidad += item.quantity;
-                    if (correctedDate.toMillis() > groupedMovements[groupKey].fecha.toMillis()) {
-                        groupedMovements[groupKey].fecha = correctedDate;
-                    }
-                }
+                allItems.push({
+                    key: `${mov.id}_${index}`,
+                    fecha: correctedDate,
+                    exportador: exporterMap.get(mov.exporterId) || mov.exporterId,
+                    productor: currentProductorName,
+                    codigoProducto: item.binMaterialCode,
+                    nombreProducto: currentMaterialName,
+                    cantidad: item.quantity,
+                    movimiento: mov.observation || (isDirectDispatch ? 'Despacho Directo' : 'Bins y Materiales'),
+                    tipo: typeLabel as 'Entrada' | 'Salida',
+                    userName: formatUserName(mov.userName),
+                    documento: mov.document,
+                    driverName: mov.driverName || '',
+                    driverRUT: mov.driverRUT || '',
+                    patente: (mov as any).patente_vehiculo || '',
+                    sourceType: 'manual',
+                    movementId: mov.id,
+                    itemIndex: index,
+                });
             });
         });
-
-        Object.values(groupedMovements).forEach(item => allItems.push(item));
 
         (chamberLots || []).forEach(lot => {
             if (lot.status === 'Almacenado') {
@@ -212,6 +244,7 @@ export default function BinMaterialKardexReportPage() {
                     tipo: 'Entrada',
                     userName: formatUserName(lot.userName),
                     documento: lot.displayLotId,
+                    sourceType: 'automatic',
                 });
             }
         });
@@ -232,6 +265,7 @@ export default function BinMaterialKardexReportPage() {
                         tipo: 'Salida',
                         userName: formatUserName(dispatch.userName),
                         documento: bin.displayLotId,
+                        sourceType: 'automatic',
                     });
                 });
             }
@@ -269,8 +303,8 @@ export default function BinMaterialKardexReportPage() {
             { key: 'documento', label: 'Documento' },
             { key: 'exportador', label: 'Exportador' },
             { key: 'productor', label: 'Productor' },
-            { key: 'driverName', label: 'Conductor' },
-            { key: 'driverRUT', label: 'Rut Conductor' },
+            { key: 'driverName', label: 'Nombre Conductor' },
+            { key: 'driverRUT', label: 'RUT Conductor' },
             { key: 'patente', label: 'Patente' },
             { key: 'codigoProducto', label: 'Codigo del Producto' },
             { key: 'nombreProducto', label: 'Nombre del Producto' },
@@ -415,6 +449,66 @@ export default function BinMaterialKardexReportPage() {
         }
     };
 
+    const handleDeleteItem = async () => {
+        if (!itemToDelete?.movementId || !firestore) return;
+        setIsSubmittingAction(true);
+        try {
+            const movementRef = doc(firestore, 'binMaterialMovements', itemToDelete.movementId);
+            const movSnap = (movements || []).find(m => m.id === itemToDelete.movementId);
+            
+            if (!movSnap) throw new Error('No se encontró el movimiento.');
+
+            // Si el movimiento tiene solo un ítem, eliminamos el documento completo.
+            // Si tiene varios, actualizamos el array eliminando solo ese índice.
+            if (movSnap.items.length === 1) {
+                await deleteDoc(movementRef);
+            } else {
+                const newItems = [...movSnap.items];
+                newItems.splice(itemToDelete.itemIndex!, 1);
+                await updateDoc(movementRef, { items: newItems });
+            }
+
+            toast({ title: 'Eliminado', description: 'El registro ha sido removido correctamente.' });
+            setItemToDelete(null);
+        } catch (e) {
+            console.error(e);
+            toast({ title: 'Error', description: 'No se pudo eliminar el registro.', variant: 'destructive' });
+        } finally {
+            setIsSubmittingAction(false);
+        }
+    };
+
+    const handleUpdateItem = async (values: z.infer<typeof editMovementSchema>) => {
+        if (!itemToEdit?.movementId || !firestore) return;
+        setIsSubmittingAction(true);
+        try {
+            const movementRef = doc(firestore, 'binMaterialMovements', itemToEdit.movementId);
+            const movSnap = (movements || []).find(m => m.id === itemToEdit.movementId);
+            
+            if (!movSnap) throw new Error('No se encontró el movimiento.');
+
+            const newItems = [...movSnap.items];
+            newItems[itemToEdit.itemIndex!] = {
+                ...newItems[itemToEdit.itemIndex!],
+                quantity: values.cantidad,
+            };
+
+            await updateDoc(movementRef, {
+                document: values.documento,
+                driverName: values.driverName,
+                items: newItems,
+            });
+
+            toast({ title: 'Actualizado', description: 'El registro ha sido modificado correctamente.' });
+            setItemToEdit(null);
+        } catch (e) {
+            console.error(e);
+            toast({ title: 'Error', description: 'No se pudo actualizar el registro.', variant: 'destructive' });
+        } finally {
+            setIsSubmittingAction(false);
+        }
+    };
+
     const getBadgeVariant = (type: string): 'default' | 'destructive' => {
         return type === 'Entrada' ? 'default' : 'destructive';
     };
@@ -475,19 +569,6 @@ export default function BinMaterialKardexReportPage() {
                     </div>
                 )}
             </ReportHeader>
-
-            {isAdmin && (
-                <Alert>
-                    <Info className="h-4 w-4" />
-                    <AlertTitle>Instrucciones de Importación</AlertTitle>
-                    <AlertDescription>
-                        El archivo debe contener las siguientes columnas exactas:<br/>
-                        <code className="text-[10px] font-mono bg-muted p-1 rounded mt-1 inline-block">
-                            {FRIENDLY_HEADERS.join(',')}
-                        </code>
-                    </AlertDescription>
-                </Alert>
-            )}
 
             <Card>
                 <CardContent className="pt-6">
@@ -589,11 +670,12 @@ export default function BinMaterialKardexReportPage() {
                                             </Select>
                                         </div>
                                     </TableHead>
+                                    {isAuthorized && <TableHead className="text-right">Acciones</TableHead>}
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
                                 {loading ? (
-                                    Array.from({ length: 10 }).map((_, i) => <TableRow key={i}><TableCell colSpan={9}><Skeleton className="h-4 w-full" /></TableCell></TableRow>)
+                                    Array.from({ length: 10 }).map((_, i) => <TableRow key={i}><TableCell colSpan={10}><Skeleton className="h-4 w-full" /></TableCell></TableRow>)
                                 ) : filteredKardexData.length > 0 ? (
                                     filteredKardexData.map(item => (
                                         <TableRow key={item.key}>
@@ -612,16 +694,103 @@ export default function BinMaterialKardexReportPage() {
                                                     {item.tipo}
                                                 </Badge>
                                             </TableCell>
+                                            {isAuthorized && (
+                                                <TableCell className="text-right">
+                                                    {item.sourceType === 'manual' && (
+                                                        <div className="flex justify-end gap-1">
+                                                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setItemToEdit(item)}>
+                                                                <Pencil className="h-3.5 w-3.5" />
+                                                            </Button>
+                                                            <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => setItemToDelete(item)}>
+                                                                <Trash2 className="h-3.5 w-3.5" />
+                                                            </Button>
+                                                        </div>
+                                                    )}
+                                                </TableCell>
+                                            )}
                                         </TableRow>
                                     ))
                                 ) : (
-                                    <TableRow><TableCell colSpan={9} className="h-24 text-center">No hay registros coincidentes.</TableCell></TableRow>
+                                    <TableRow><TableCell colSpan={10} className="h-24 text-center">No hay registros coincidentes.</TableCell></TableRow>
                                 )}
                             </TableBody>
                         </Table>
                     </div>
                 </CardContent>
             </Card>
+
+            {/* Edit Dialog */}
+            <Dialog open={!!itemToEdit} onOpenChange={(open) => !open && setItemToEdit(null)}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Editar Movimiento</DialogTitle>
+                        <DialogDescription>
+                            Corrija los datos del movimiento manual. Los cambios afectarán los saldos en tiempo real.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <Form {...editForm}>
+                        <form onSubmit={editForm.handleSubmit(handleUpdateItem)} className="space-y-4">
+                            <FormField
+                                control={editForm.control}
+                                name="documento"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>N° Documento</FormLabel>
+                                        <FormControl><Input {...field} /></FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                            <FormField
+                                control={editForm.control}
+                                name="driverName"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Nombre Conductor</FormLabel>
+                                        <FormControl><Input {...field} /></FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                            <FormField
+                                control={editForm.control}
+                                name="cantidad"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Cantidad ({itemToEdit?.nombreProducto})</FormLabel>
+                                        <FormControl><Input type="number" {...field} /></FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                            <DialogFooter>
+                                <DialogClose asChild><Button variant="outline">Cancelar</Button></DialogClose>
+                                <Button type="submit" disabled={isSubmittingAction}>
+                                    {isSubmittingAction ? 'Guardando...' : 'Guardar Cambios'}
+                                </Button>
+                            </DialogFooter>
+                        </form>
+                    </Form>
+                </DialogContent>
+            </Dialog>
+
+            {/* Delete Alert */}
+            <AlertDialog open={!!itemToDelete} onOpenChange={(open) => !open && setItemToDelete(null)}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>¿Está seguro de eliminar este registro?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Esta acción es irreversible y ajustará el stock disponible en todos los reportes y módulos.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleDeleteItem} className="bg-destructive hover:bg-destructive/90" disabled={isSubmittingAction}>
+                            {isSubmittingAction ? 'Eliminando...' : 'Sí, Eliminar Registro'}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     )
 }
