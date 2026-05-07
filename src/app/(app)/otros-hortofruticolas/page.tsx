@@ -7,7 +7,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { OtherFruitReceptionTab } from '@/components/other-fruit/ReceptionTab';
 import { OtherFruitStorageTab } from '@/components/other-fruit/StorageTab';
 import { OtherFruitExitTab } from '@/components/other-fruit/ExitTab';
-import { StockAndRelocationTab } from '@/components/other-fruit/StockAndRelocationTab';
 import { OtherFruitPickingTab } from '@/components/other-fruit/PickingTab';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
 import type { OtherFruitMovement, OtherFruitReception, PackagingMovement, PackagingReception } from '@/lib/types';
@@ -46,7 +45,7 @@ export default function OtrosHortofruticolasPage() {
     const allowedTabs = React.useMemo(() => {
       const permission = permissions.find(p => typeof p === 'object' && p !== null && 'name' in p && p.name === 'Socios Comerciales');
       if (!permission || typeof permission === 'string') {
-        return ['recepcion', 'almacenamiento', 'salidas', 'picking', 'stock'];
+        return ['recepcion', 'almacenamiento', 'salidas', 'picking'];
       }
       if (typeof permission === 'object' && permission.allowedTabs) {
         return permission.allowedTabs;
@@ -59,7 +58,6 @@ export default function OtrosHortofruticolasPage() {
         { value: 'almacenamiento', label: 'Almacenamiento', badge: pendingStorageCount },
         { value: 'salidas', label: 'Despacho' },
         { value: 'picking', label: 'Picking', badge: pendingPickingCount },
-        { value: 'stock', label: 'Stock' },
     ];
     
     const visibleTabs = tabsConfig.filter(tab => allowedTabs.includes(tab.value));
@@ -92,7 +90,6 @@ export default function OtrosHortofruticolasPage() {
                 {allowedTabs.includes('almacenamiento') && <TabsContent value="almacenamiento"><OtherFruitStorageTab /></TabsContent>}
                 {allowedTabs.includes('salidas') && <TabsContent value="salidas"><OtherFruitExitTab /></TabsContent>}
                 {allowedTabs.includes('picking') && <TabsContent value="picking"><OtherFruitPickingTab /></TabsContent>}
-                {allowedTabs.includes('stock') && <TabsContent value="stock"><StockAndRelocationTab /></TabsContent>}
             </Tabs>
         </div>
     );

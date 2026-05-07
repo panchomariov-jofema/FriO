@@ -5,5 +5,10 @@
   "apphosting": {
     "backendId": "frigomanager",
     "rootDir": "./"
+  },
+  "auth": {
+    "providers": {
+      "anonymous": true
+    }
   }
 }
