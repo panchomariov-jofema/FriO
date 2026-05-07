@@ -18,6 +18,11 @@ import { useChamberStrategy } from '@/contexts/ChamberStrategyContext';
 import { StorePackagingDialog } from '../packaging/StorePackagingDialog';
 import { chambersConfig } from '@/lib/chambers-config';
 import { getPairedCoordinates, getSortedCoordinates } from '@/lib/utils';
+import { ClientStorageConfigDialog } from './ClientStorageConfigDialog';
+import { useUser } from '@/firebase';
+import { Settings2, ArrowLeft, Users } from 'lucide-react';
+import type { ClientStorageConfig, Exporter, OtherClient } from '@/lib/types';
+import { ClientSelector } from './ClientSelector';
 
 type PendingFruitItem = OtherFruitReceptionItem & {
     type: 'fruit';
@@ -44,14 +49,54 @@ export function OtherFruitStorageTab({ clientId: fixedClientId }: { clientId?: s
   const { data: otherFruitReceptions, loading: loadingFruit } = useFirestoreCollection<OtherFruitReception>('otherFruitReceptions');
   const { data: packagingReceptions, loading: loadingPackaging } = useFirestoreCollection<PackagingReception>('packagingReceptions');
   const { data: allChamberLots, loading: loadingChamberLots } = useFirestoreCollection<ChamberLot>('chamberLots');
+  const { data: clientConfigs } = useFirestoreCollection<ClientStorageConfig>('clientStorageConfigs');
+  const { data: exporters } = useFirestoreCollection<Exporter>('exporters');
+  const { data: otherClients } = useFirestoreCollection<OtherClient>('otherClients');
   
   const [selectedItem, setSelectedItem] = React.useState<ConsolidatedPendingItem | null>(null);
+  const [configDialogOpen, setConfigDialogOpen] = React.useState(false);
+  const [scanValue, setScanValue] = React.useState('');
+  const [selectedClientId, setSelectedClientId] = React.useState<string | null>(null);
+  
   const firestore = useFirestore();
+  const { user } = useUser();
   const { toast } = useToast();
   const { chamberStrategies } = useChamberStrategy();
+
+  const isLogisticsManager = user?.email === 'francisco.villarreal@outlook.es' || user?.email === 'jlog@frio.cl';
   
   const loading = loadingFruit || loadingPackaging || loadingChamberLots;
+  
+  const resolvedClientConfig = React.useMemo(() => {
+    if (!selectedItem) return undefined;
+    
+    const reception = [...(otherFruitReceptions || []), ...(packagingReceptions || [])].find(r => r.id === selectedItem.receptionId);
+    if (!reception) return undefined;
+    
+    const clientId = reception.clientId;
+    
+    // 1. Get explicit override if exists
+    const explicitOverride = clientConfigs?.find(c => c.id === clientId);
+    
+    // 2. Get master data defaults
+    const otherClient = otherClients?.find(c => c.clientId === clientId);
+    const exporter = exporters?.find(e => e.exporterId === clientId);
+    const masterData = otherClient || exporter;
+    
+    if (!masterData && !explicitOverride) return undefined;
+    
+    return {
+      id: clientId,
+      clientName: masterData?.name || explicitOverride?.clientName || 'Cliente',
+      strategy: (explicitOverride?.strategy || masterData?.storageStrategy || 'secuencial') as any,
+      binsPerCoordinate: explicitOverride?.binsPerCoordinate ?? masterData?.binsPerCoordinate ?? 6,
+      palletsPerCoordinate: explicitOverride?.palletsPerCoordinate ?? masterData?.palletsPerCoordinate ?? 3,
+      chamberOverrides: explicitOverride?.chamberOverrides
+    } as ClientStorageConfig;
+  }, [selectedItem, otherFruitReceptions, packagingReceptions, clientConfigs, otherClients, exporters]);
 
+
+  // ... (rest of the logic for pendingItems remains same)
   const pendingItems = React.useMemo((): ConsolidatedPendingItem[] => {
     const fruitItems: PendingFruitItem[] = (otherFruitReceptions || [])
         .filter(lot => 
@@ -76,6 +121,9 @@ export function OtherFruitStorageTab({ clientId: fixedClientId }: { clientId?: s
         );
 
     return [...fruitItems, ...packagingItems]
+        .filter(item => !selectedClientId || (item.type === 'fruit' ? 
+            (otherFruitReceptions?.find(r => r.id === item.receptionId)?.clientId === selectedClientId) : 
+            (packagingReceptions?.find(r => r.id === item.receptionId)?.clientId === selectedClientId)))
         .sort((a,b) => {
             const allReceptions = [...(otherFruitReceptions || []), ...(packagingReceptions || [])];
             const lotA = allReceptions.find(l => l.id === a.receptionId);
@@ -84,13 +132,72 @@ export function OtherFruitStorageTab({ clientId: fixedClientId }: { clientId?: s
             if (!lotB?.createdAt?.toMillis) return -1;
             return lotA.createdAt.toMillis() - lotB.createdAt.toMillis();
         });
-  }, [otherFruitReceptions, packagingReceptions, fixedClientId]);
+  }, [otherFruitReceptions, packagingReceptions, fixedClientId, selectedClientId]);
+
+  const clientsWithPending = React.useMemo(() => {
+    const clientsMap = new Map<string, { id: string; name: string; count: number }>();
+    
+    // Process fruit receptions
+    (otherFruitReceptions || []).forEach(reception => {
+        const pendingCount = reception.items.filter(i => i.status === 'Pendiente de almacenar').length;
+        if (pendingCount > 0) {
+            const existing = clientsMap.get(reception.clientId);
+            if (existing) {
+                existing.count += pendingCount;
+            } else {
+                clientsMap.set(reception.clientId, { id: reception.clientId, name: reception.clientName, count: pendingCount });
+            }
+        }
+    });
+
+    // Process packaging receptions
+    (packagingReceptions || []).forEach(reception => {
+        const pendingCount = reception.items.filter(i => i.status === 'Pendiente de almacenar').length;
+        if (pendingCount > 0) {
+            const existing = clientsMap.get(reception.clientId);
+            if (existing) {
+                existing.count += pendingCount;
+            } else {
+                clientsMap.set(reception.clientId, { id: reception.clientId, name: reception.clientName, count: pendingCount });
+            }
+        }
+    });
+
+    return Array.from(clientsMap.values()).sort((a, b) => b.count - a.count);
+  }, [otherFruitReceptions, packagingReceptions]);
+
+  const activeClientName = React.useMemo(() => {
+    if (!selectedClientId) return null;
+    const client = clientsWithPending.find(c => c.id === selectedClientId);
+    return client?.name || selectedClientId;
+  }, [selectedClientId, clientsWithPending]);
+
+  const handleScanSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!scanValue.trim()) return;
+
+    const val = scanValue.trim().toUpperCase();
+    const found = pendingItems.find(item => {
+        if (item.type === 'fruit') {
+            return item.palletId?.toUpperCase() === val || item.productCode?.toUpperCase() === val;
+        } else {
+            return item.packagingMasterCode?.toUpperCase() === val;
+        }
+    });
+
+    if (found) {
+        setSelectedItem(found);
+        setScanValue('');
+    } else {
+        toast({ title: "No encontrado", description: "No hay productos pendientes con ese ID.", variant: "destructive" });
+    }
+  };
 
   const handleStoreClick = (item: ConsolidatedPendingItem) => {
     setSelectedItem(item);
   };
 
-  const handleFruitStoreConfirm = async (data: { chamberId: string; coordinate: string; totalQuantity: number; quantityPerLocation: number; strategy: 'secuencial' | 'pareado' }) => {
+  const handleFruitStoreConfirm = async (data: { chamberId: string; coordinate: string; totalQuantity: number; quantityPerLocation: number; strategy: 'secuencial' | 'pareado' | 'aisle-access' }) => {
     if (!selectedItem || selectedItem.type !== 'fruit' || !firestore) return;
 
     const { chamberId, coordinate: startCoordinate, totalQuantity, quantityPerLocation, strategy } = data;
@@ -129,6 +236,8 @@ export function OtherFruitStorageTab({ clientId: fixedClientId }: { clientId?: s
     let allPossibleCoords;
     if (strategy === 'pareado') {
         allPossibleCoords = getPairedCoordinates(chamberConfig);
+    } else if (strategy === 'aisle-access') {
+        allPossibleCoords = getSortedCoordinates(chamberConfig, 'aisle-access');
     } else {
         const globalStrategy = chamberStrategies[chamberId] || 'secuencial';
         allPossibleCoords = getSortedCoordinates(chamberConfig, globalStrategy);
@@ -205,11 +314,6 @@ export function OtherFruitStorageTab({ clientId: fixedClientId }: { clientId?: s
     } catch (error) {
         console.error("Error storing fruit item:", error);
         toast({ variant: 'destructive', title: 'Error', description: 'No se pudo actualizar la ubicación.' });
-        errorEmitter.emit('permission-error', new FirestorePermissionError({
-            path: receptionRef.path,
-            operation: 'update',
-            requestResourceData: updateData
-        }));
     }
   };
   
@@ -235,13 +339,11 @@ export function OtherFruitStorageTab({ clientId: fixedClientId }: { clientId?: s
             const originalReception = receptionSnap.data() as PackagingReception;
             const updatedItems = JSON.parse(JSON.stringify(originalReception.items));
             
-            // Get the item to be stored and remove it from its original position
             const consumedItem = updatedItems.splice(itemToStore.itemIndex, 1)[0];
             if (!consumedItem) {
                  throw new Error("El ítem a almacenar no fue encontrado.");
             }
 
-            // Create new stored items for each specified location
             for (const newLocation of data.locations) {
                 if (newLocation.quantity > 0) {
                     updatedItems.push({
@@ -249,16 +351,14 @@ export function OtherFruitStorageTab({ clientId: fixedClientId }: { clientId?: s
                         palletCount: newLocation.quantity,
                         status: 'Almacenado',
                         storageLocation: { warehouse: newLocation.warehouse, aisle: newLocation.aisle },
-                        storedAt: new Date(), // Using client-side date for simplicity inside transaction
+                        storedAt: new Date(),
                     });
                 }
             }
 
-            // Determine the new overall status of the reception document
             const stillHasPending = updatedItems.some((item: PackagingReceptionItem) => item.status === 'Pendiente de almacenar' && item.palletCount > 0);
             const newStatus = stillHasPending ? 'Parcialmente Almacenado' : 'Almacenado';
 
-            // Update the document in the transaction
             transaction.update(receptionRef, {
                 items: updatedItems,
                 status: newStatus,
@@ -267,21 +367,92 @@ export function OtherFruitStorageTab({ clientId: fixedClientId }: { clientId?: s
         });
 
         toast({ title: 'Éxito', description: 'Embalaje almacenado en las ubicaciones especificadas.' });
-        setSelectedItem(null); // Close the dialog
+        setSelectedItem(null);
 
     } catch (error: any) {
         console.error("Error storing packaging item:", error);
         toast({ variant: 'destructive', title: 'Error', description: error.message || 'No se pudo actualizar la ubicación.' });
-        errorEmitter.emit('permission-error', new FirestorePermissionError({
-            path: 'packagingReceptions',
-            operation: 'write'
-        }));
     }
   };
 
 
+  if (!selectedClientId && !fixedClientId) {
+    return (
+        <>
+            <div className="flex justify-end mb-4">
+                {isLogisticsManager && (
+                  <Button variant="outline" size="sm" onClick={() => setConfigDialogOpen(true)} className="flex gap-2">
+                    <Settings2 className="h-4 w-4" />
+                    Configuración Logística
+                  </Button>
+                )}
+            </div>
+            <ClientSelector 
+                clients={clientsWithPending}
+                onSelect={setSelectedClientId}
+            />
+            <ClientStorageConfigDialog 
+                open={configDialogOpen}
+                onOpenChange={setConfigDialogOpen}
+            />
+        </>
+    );
+  }
+
   return (
     <>
+      <div className="flex flex-col md:flex-row gap-4 mb-4">
+        <Card className="flex-1">
+            <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
+                <div className="flex items-center gap-4">
+                    {!fixedClientId && (
+                        <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            onClick={() => setSelectedClientId(null)}
+                            className="h-8 w-8"
+                        >
+                            <ArrowLeft className="h-4 w-4" />
+                        </Button>
+                    )}
+                    <div>
+                        <CardTitle className="text-sm font-medium flex items-center gap-2">
+                            <Users className="h-4 w-4 text-primary" />
+                            Almacenamiento: <span className="text-primary font-bold">{activeClientName}</span>
+                        </CardTitle>
+                        <CardDescription>Escanee Pallet ID o seleccione un ítem de la lista.</CardDescription>
+                    </div>
+                </div>
+                <div className="flex gap-2">
+                    {isLogisticsManager && (
+                    <Button variant="outline" size="sm" onClick={() => setConfigDialogOpen(true)} className="flex gap-2">
+                        <Settings2 className="h-4 w-4" />
+                        Configuración Logística
+                    </Button>
+                    )}
+                    {!fixedClientId && (
+                        <Button variant="ghost" size="sm" onClick={() => setSelectedClientId(null)}>
+                            Cerrar Cliente
+                        </Button>
+                    )}
+                </div>
+            </CardHeader>
+            <CardContent>
+                <form onSubmit={handleScanSubmit} className="flex gap-2">
+                    <input 
+                        type="text" 
+                        placeholder={`Escanee Pallet ID de ${activeClientName}...`}
+                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                        value={scanValue}
+                        onChange={(e) => setScanValue(e.target.value)}
+                        autoFocus
+                    />
+                    <Button type="submit">Buscar</Button>
+                </form>
+            </CardContent>
+        </Card>
+      </div>
+
       <Card className="mt-4">
         <CardHeader>
           <CardTitle>Productos Pendientes de Almacenar</CardTitle>
@@ -365,6 +536,7 @@ export function OtherFruitStorageTab({ clientId: fixedClientId }: { clientId?: s
             allReceptions={otherFruitReceptions || []}
             allChamberLots={allChamberLots || []}
             chamberStrategies={chamberStrategies}
+            clientConfig={resolvedClientConfig}
           />
       )}
        {selectedItem?.type === 'packaging' && (
@@ -375,6 +547,11 @@ export function OtherFruitStorageTab({ clientId: fixedClientId }: { clientId?: s
             onConfirm={handlePackagingStoreConfirm}
           />
        )}
+
+       <ClientStorageConfigDialog 
+          open={configDialogOpen}
+          onOpenChange={setConfigDialogOpen}
+       />
     </>
   );
 }

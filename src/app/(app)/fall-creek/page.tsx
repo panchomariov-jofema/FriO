@@ -4,7 +4,7 @@ import * as React from 'react';
 import Image from 'next/image';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
-import type { OtherClient, OtherFruitReception, OtherFruitMovement, StoredItem, ChamberLot, OtherFruitMovementLocation } from '@/lib/types';
+import type { OtherClient, OtherFruitReception, OtherFruitReceptionItem, OtherFruitMovement, StoredItem, ChamberLot, OtherFruitMovementLocation } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -18,12 +18,18 @@ import { Badge } from '@/components/ui/badge';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { cn } from '@/lib/utils';
 import { chambersConfig } from '@/lib/chambers-config';
-import { CheckCircle2, CircleDot, Eye, Pencil, Trash2, X, Move } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { CheckCircle2, CircleDot, Eye, Pencil, Trash2, X, Move, QrCode, ClipboardCheck, History, PackageCheck } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
+import { parseFallCreekManifest, decomposePalletsIntoBins, type FallCreekManifestRow, fileToBase64 } from '@/lib/fall-creek-utils';
+import { parseManifestAIAction } from './actions';
+import { FileUp, ClipboardList, Loader2, Search } from 'lucide-react';
+import type { PendingItem } from '@/lib/types';
+import { StoreOtherFruitDialog } from '@/components/other-fruit/StoreOtherFruitDialog';
 
 
 const FALL_CREEK_CLIENT_NAME = 'FALL CREEK';
@@ -62,6 +68,7 @@ export default function FallCreekPage() {
     const [selectionMode, setSelectionMode] = React.useState(false);
     const [selectedCoords, setSelectedCoords] = React.useState<Record<string, StoredItem[]>>({});
     const [documentoDespacho, setDocumentoDespacho] = React.useState('');
+    const [receptionToView, setReceptionToView] = React.useState<OtherFruitReception | null>(null);
     const [clienteDestino, setClienteDestino] = React.useState('');
     const [rutDestino, setRutDestino] = React.useState('');
     const [isSubmitting, setIsSubmitting] = React.useState(false);
@@ -78,6 +85,20 @@ export default function FallCreekPage() {
     const [cardPosition, setCardPosition] = React.useState({ x: 0, y: 0 });
     const dragStartPos = React.useRef({ x: 0, y: 0 });
     const initialCardPos = React.useRef({ x: 0, y: 0 });
+    
+    const [importing, setImporting] = React.useState(false);
+    const [previewItems, setPreviewItems] = React.useState<FallCreekManifestRow[]>([]);
+    const [showPreview, setShowPreview] = React.useState(false);
+    const [manifestDocument, setManifestDocument] = React.useState('');
+    const [activeReception, setActiveReception] = React.useState<OtherFruitReception | null>(null);
+    const [scannedBinId, setScannedBinId] = React.useState('');
+    const [showReceptionDialog, setShowReceptionDialog] = React.useState(false);
+    const [storingItem, setStoringItem] = React.useState<PendingItem | null>(null);
+    const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+    const handleConfirmStorage = async (data: { chamberId: string; coordinate: string; totalQuantity: number }) => {
+        // Logic removed as client doesn't manage physical storage
+    };
 
     const fallCreekLogo = PlaceHolderImages.find(img => img.id === 'fall-creek-logo');
 
@@ -86,8 +107,8 @@ export default function FallCreekPage() {
         return allClients.find(c => c.name.toUpperCase() === FALL_CREEK_CLIENT_NAME) || null;
     }, [allClients]);
 
-    const { storedItemsByChamber, chamberOccupancy, chambersWithFallCreekStock, reservedCoords } = React.useMemo(() => {
-        if (!fallCreekClient) return { storedItemsByChamber: {}, chamberOccupancy: {}, chambersWithFallCreekStock: [], reservedCoords: new Set<string>() };
+    const { storedItemsByChamber, chamberOccupancy, chambersWithFallCreekStock, reservedCoords, pendingItems } = React.useMemo(() => {
+        if (!fallCreekClient) return { storedItemsByChamber: {}, chamberOccupancy: {}, chambersWithFallCreekStock: [], reservedCoords: new Set<string>(), pendingItems: [] };
 
         const fallCreekStoredItems: StoredItem[] = (allReceptions || [])
             .filter(r => r.clientId === fallCreekClient.clientId)
@@ -109,9 +130,24 @@ export default function FallCreekPage() {
                     itemIndex: index,
                     clientLotId: item.clientLotId,
                     netWeightPerBin: 0,
+                    isMixedVariety: item.isMixedVariety,
                 }))
             );
         
+        const pendingItems: PendingItem[] = (allReceptions || [])
+            .filter(r => r.clientId === fallCreekClient.clientId && (r.status === 'Recibido' || r.status === 'Parcialmente Almacenado'))
+            .flatMap(reception => reception.items
+                .map((item, index) => ({ 
+                    ...item, 
+                    receptionId: reception.id, 
+                    itemIndex: index,
+                    clientName: reception.clientName,
+                    document: reception.document || '',
+                    unit: reception.unit as 'Bins' | 'Pallets'
+                }))
+                .filter(item => !item.storageLocation)
+            );
+
         const calculatedStoredItemsByChamber = fallCreekStoredItems.reduce((acc, item) => {
             if (!acc[item.chamberId]) acc[item.chamberId] = {};
             if (!acc[item.chamberId][item.coordinate]) acc[item.chamberId][item.coordinate] = [];
@@ -154,7 +190,8 @@ export default function FallCreekPage() {
             storedItemsByChamber: calculatedStoredItemsByChamber,
             chamberOccupancy: calculatedChamberOccupancy,
             chambersWithFallCreekStock: calculatedChambersWithStock,
-            reservedCoords: calculatedReservedCoords
+            reservedCoords: calculatedReservedCoords,
+            pendingItems
         };
 
     }, [fallCreekClient, allReceptions, allMovements, editingMovement]);
@@ -357,6 +394,80 @@ export default function FallCreekPage() {
             setIsSubmitting(false);
         }
     };
+
+    const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        setImporting(true);
+        try {
+            let items: FallCreekManifestRow[] = [];
+            
+            if (file.type === 'application/pdf' || file.type.startsWith('image/')) {
+                // Handle via AI Vision
+                toast({ title: 'Procesando con IA', description: 'Leyendo el documento visualmente...' });
+                const base64 = await fileToBase64(file);
+                const response = await parseManifestAIAction(base64, file.type);
+                
+                if (response.success && response.data) {
+                    items = response.data;
+                } else {
+                    throw new Error(response.error || 'No se pudo extraer la información del documento.');
+                }
+            } else {
+                // Handle via standard Excel parser
+                items = await parseFallCreekManifest(file);
+            }
+
+            if (items.length === 0) {
+                toast({ variant: 'destructive', title: 'Sin Datos', description: 'No se encontraron registros en el archivo.' });
+                return;
+            }
+
+            setPreviewItems(items);
+            setManifestDocument(file.name.replace(/\.[^/.]+$/, ""));
+            setShowPreview(true);
+        } catch (error: any) {
+            console.error("Error parsing manifest:", error);
+            toast({ 
+                variant: 'destructive', 
+                title: 'Error de Importación', 
+                description: error.message || 'No se pudo procesar el archivo.' 
+            });
+        } finally {
+            setImporting(false);
+            if (fileInputRef.current) fileInputRef.current.value = '';
+        }
+    };
+
+    const handleConfirmImport = async () => {
+        if (!firestore || !fallCreekClient || previewItems.length === 0) return;
+
+        setIsSubmitting(true);
+        try {
+            // Decompose pallet rows into individual bins for our internal tracking
+            const decomposedItems = decomposePalletsIntoBins(previewItems);
+
+            const receptionData: Partial<OtherFruitReception> = {
+                clientId: fallCreekClient.clientId,
+                clientName: fallCreekClient.name,
+                unit: fallCreekClient.unit,
+                document: manifestDocument,
+                items: decomposedItems,
+                status: 'Pendiente de recibir',
+                createdAt: serverTimestamp() as any,
+            };
+
+            await addDoc(collection(firestore, 'otherFruitReceptions'), receptionData);
+            toast({ title: 'Éxito', description: 'Manifiesto cargado correctamente. Se han generado los bins correspondientes para su recepción.' });
+            setShowPreview(false);
+            setPreviewItems([]);
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    // Physical reception logic removed
     
     const handleEditMovement = (movementToEdit: OtherFruitMovement) => {
         setEditingMovement(movementToEdit);
@@ -465,8 +576,22 @@ export default function FallCreekPage() {
     
     return (
         <div className="min-h-[calc(100vh-10rem)] pb-52">
-            <div className="space-y-6">
-                <Card className="border-t-4 border-t-[#004b8d]">
+            <Tabs defaultValue="storage" className="space-y-6">
+                <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                    <TabsList className="bg-[#004b8d]/10 p-1">
+                        <TabsTrigger value="storage" className="data-[state=active]:bg-[#004b8d] data-[state=active]:text-white">
+                            <PackageCheck className="mr-2 h-4 w-4" />
+                            Stock en Cámaras
+                        </TabsTrigger>
+                        <TabsTrigger value="history" className="data-[state=active]:bg-[#004b8d] data-[state=active]:text-white">
+                            <History className="mr-2 h-4 w-4" />
+                            Historial
+                        </TabsTrigger>
+                    </TabsList>
+                </div>
+
+                <TabsContent value="storage" className="space-y-6">
+                    <Card className="border-t-4 border-t-[#004b8d]">
                     <CardHeader className="flex flex-col md:flex-row items-center justify-between gap-4">
                         <div className="flex items-center gap-6">
                             {fallCreekLogo && (
@@ -485,18 +610,38 @@ export default function FallCreekPage() {
                                 <CardDescription>Gestión de stock y generación de pre-despachos para plantas.</CardDescription>
                             </div>
                         </div>
-                        <Button 
-                            onClick={handleToggleSelectionMode} 
-                            variant={selectionMode ? "destructive" : "default"}
-                            className={cn(!selectionMode && "bg-[#7aba28] hover:bg-[#6aa423] text-white")}
-                        >
-                            {selectionMode ? <X className="mr-2 h-4 w-4"/> : <CircleDot className="mr-2 h-4 w-4"/>}
-                            {selectionMode ? (isEditing ? 'Cancelar Edición' : 'Cancelar Selección') : 'Iniciar Selección de Despacho'}
-                        </Button>
+                        <div className="flex items-center gap-2">
+                            <Input
+                                type="file"
+                                ref={fileInputRef}
+                                className="hidden"
+                                accept=".xlsx,.xls,.csv,.pdf,image/*"
+                                onChange={handleFileUpload}
+                            />
+                            <Button 
+                                onClick={() => fileInputRef.current?.click()}
+                                variant="outline"
+                                className="border-[#004b8d] text-[#004b8d] hover:bg-[#004b8d]/10"
+                                disabled={importing}
+                            >
+                                {importing ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <FileUp className="mr-2 h-4 w-4"/>}
+                                Cargar Manifiesto
+                            </Button>
+                            <Button 
+                                onClick={handleToggleSelectionMode} 
+                                variant={selectionMode ? "destructive" : "default"}
+                                className={cn(!selectionMode && "bg-[#7aba28] hover:bg-[#6aa423] text-white")}
+                            >
+                                {selectionMode ? <X className="mr-2 h-4 w-4"/> : <CircleDot className="mr-2 h-4 w-4"/>}
+                                {selectionMode ? (isEditing ? 'Cancelar Edición' : 'Cancelar Selección') : 'Iniciar Selección de Despacho'}
+                            </Button>
+                        </div>
                     </CardHeader>
-                    <CardContent>
-                        <Accordion type="multiple" onValueChange={setOpenAccordions}>
-                            {chambersWithFallCreekStock.map(chamberId => {
+                    <CardContent className="space-y-6">
+                        {/* Bins por Ubicar section removed */}
+
+                        <Accordion type="multiple" onValueChange={setOpenAccordions} defaultValue={chambersWithFallCreekStock}>
+                            {Object.keys(chambersConfig).map(chamberId => {
                                 const config = chambersConfig[chamberId];
                                 const occupancy = chamberOccupancy[chamberId];
                                 return (
@@ -553,6 +698,11 @@ export default function FallCreekPage() {
                                                                     style={cellStyle}
                                                                 >
                                                                     <span className={cn("relative z-10 font-bold", isReserved && "opacity-40")}>{coord}</span>
+                                                                    {isOccupied && itemsInCoord.some(i => i.isMixedVariety) && (
+                                                                        <div className="absolute top-0 right-0 p-0.5">
+                                                                            <div className="h-2 w-2 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.8)]" />
+                                                                        </div>
+                                                                    )}
                                                                     {isSelected && <div className="absolute inset-0 bg-[#7aba28]/40 flex items-center justify-center"><CheckCircle2 className="h-6 w-6 text-white" /></div>}
                                                                     {isReserved && (
                                                                         <div className="absolute inset-0 bg-destructive/10">
@@ -571,90 +721,126 @@ export default function FallCreekPage() {
                             })}
                         </Accordion>
                     </CardContent>
-                </Card>
+                           {/* Redundant history card removed from Stock tab */}
+           </Card>
+                </TabsContent>
 
-                <Card>
-                    <CardHeader>
-                        <div className="flex justify-between items-center">
-                            <div>
-                                <CardTitle className="text-xl">Historial de Solicitudes</CardTitle>
-                                <CardDescription>Consulte el estado de sus pedidos de despacho.</CardDescription>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                                <Checkbox id="show-pending" checked={showOnlyPending} onCheckedChange={(checked) => setShowOnlyPending(!!checked)} />
-                                <Label htmlFor="show-pending">Ver solo pendientes</Label>
-                            </div>
-                        </div>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="rounded-md border max-h-96 overflow-y-auto">
-                            <Table>
-                                <TableHeader>
-                                    <TableRow className="bg-muted/50">
-                                        <TableHead>Fecha Solicitud</TableHead>
-                                        <TableHead>Referencia Doc.</TableHead>
-                                        <TableHead>Lotes Cliente</TableHead>
-                                        <TableHead>Cant. Total</TableHead>
-                                        <TableHead>Estado</TableHead>
-                                        <TableHead className="text-right">Acciones</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                {filteredMovements.length > 0 ? filteredMovements.map(mov => {
-                                    const status = mov.status === 'Completado' ? 'Completado' : 'En Proceso';
-                                    return (
-                                        <TableRow key={mov.id}>
-                                            <TableCell>{mov.createdAt?.toDate().toLocaleString('es-CL')}</TableCell>
-                                            <TableCell className="font-mono font-bold">{mov.document || '-'}</TableCell>
-                                            <TableCell className="font-mono text-xs max-w-[200px] truncate">{mov.lotes}</TableCell>
-                                            <TableCell className="font-semibold">{mov.totalQuantity} {mov.unit}</TableCell>
-                                            <TableCell>
-                                                <Badge variant={status === 'Completado' ? 'default' : 'secondary'} className={cn(status !== 'Completado' && "bg-orange-100 text-orange-800")}>
-                                                    {status}
-                                                </Badge>
-                                            </TableCell>
-                                            <TableCell className="text-right">
-                                                <div className="flex items-center justify-end gap-1">
-                                                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setMovementToView(mov)}>
-                                                        <Eye className="h-4 w-4" />
-                                                    </Button>
-                                                    {status !== 'Completado' && (
-                                                        <>
-                                                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEditMovement(mov)}>
-                                                                <Pencil className="h-4 w-4" />
+                <TabsContent value="history" className="space-y-6">
+                    <Tabs defaultValue="manifests" className="w-full">
+                        <TabsList className="grid w-full grid-cols-2 mb-4">
+                            <TabsTrigger value="manifests">Manifiestos (Pallet Logs)</TabsTrigger>
+                            <TabsTrigger value="dispatches">Solicitudes de Despacho</TabsTrigger>
+                        </TabsList>
+
+                        <TabsContent value="manifests">
+                            <Card className="border-t-4 border-t-orange-500">
+                                <CardHeader>
+                                    <CardTitle>Historial de Manifiestos</CardTitle>
+                                    <CardDescription>Consulte el estado de los Pallet Logs cargados y recibidos.</CardDescription>
+                                </CardHeader>
+                                <CardContent>
+                                    <Table>
+                                        <TableHeader>
+                                            <TableRow>
+                                                <TableHead>Fecha</TableHead>
+                                                <TableHead>Documento</TableHead>
+                                                <TableHead>Bins</TableHead>
+                                                <TableHead>Estado</TableHead>
+                                                <TableHead className="text-right">Acciones</TableHead>
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {(allReceptions || [])
+                                                .filter(r => r.clientId === fallCreekClient.clientId)
+                                                .sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0))
+                                                .map(reception => (
+                                                    <TableRow key={reception.id}>
+                                                        <TableCell>{reception.createdAt?.toDate().toLocaleDateString()}</TableCell>
+                                                        <TableCell className="font-mono font-bold">{reception.document}</TableCell>
+                                                        <TableCell>{reception.items.length}</TableCell>
+                                                        <TableCell>
+                                                            <Badge 
+                                                                variant={reception.status === 'Almacenado' ? 'default' : 'secondary'}
+                                                                className={cn(
+                                                                    reception.status === 'Pendiente de recibir' && "bg-orange-100 text-orange-800",
+                                                                    reception.status === 'Recibido' && "bg-blue-100 text-blue-800",
+                                                                    reception.status === 'Almacenado' && "bg-green-100 text-green-800"
+                                                                )}
+                                                            >
+                                                                {reception.status}
+                                                            </Badge>
+                                                        </TableCell>
+                                                        <TableCell className="text-right">
+                                                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setReceptionToView(reception)}>
+                                                                <Eye className="h-4 w-4" />
                                                             </Button>
-                                                             <AlertDialog>
-                                                                <AlertDialogTrigger asChild>
-                                                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive">
-                                                                        <Trash2 className="h-4 w-4" />
-                                                                    </Button>
-                                                                </AlertDialogTrigger>
-                                                                <AlertDialogContent>
-                                                                    <AlertDialogHeader>
-                                                                        <AlertDialogTitle>¿Desea eliminar esta solicitud?</AlertDialogTitle>
-                                                                        <AlertDialogDescription>
-                                                                            Esta acción cancelará la solicitud de pre-despacho y liberará los productos reservados.
-                                                                        </AlertDialogDescription>
-                                                                    </AlertDialogHeader>
-                                                                    <AlertDialogFooter>
-                                                                        <AlertDialogCancel>Volver</AlertDialogCancel>
-                                                                        <AlertDialogAction onClick={() => handleDeleteMovement(mov)} className="bg-destructive hover:bg-destructive/90">Confirmar Eliminación</AlertDialogAction>
-                                                                    </AlertDialogFooter>
-                                                                </AlertDialogContent>
-                                                            </AlertDialog>
-                                                        </>
-                                                    )}
-                                                </div>
-                                            </TableCell>
-                                        </TableRow>
-                                    );
-                                }) : <TableRow><TableCell colSpan={6} className="h-24 text-center">No se encontraron solicitudes.</TableCell></TableRow>}
-                                </TableBody>
-                            </Table>
-                        </div>
-                    </CardContent>
-                </Card>
-            </div>
+                                                        </TableCell>
+                                                    </TableRow>
+                                                ))}
+                                            {(allReceptions || []).filter(r => r.clientId === fallCreekClient.clientId).length === 0 && (
+                                                <TableRow>
+                                                    <TableCell colSpan={5} className="h-24 text-center">No se encontraron manifiestos.</TableCell>
+                                                </TableRow>
+                                            )}
+                                        </TableBody>
+                                    </Table>
+                                </CardContent>
+                            </Card>
+                        </TabsContent>
+
+                        <TabsContent value="dispatches">
+                            <Card className="border-t-4 border-t-[#004b8d]">
+                                <CardHeader>
+                                    <CardTitle>Solicitudes de Pre-Despacho</CardTitle>
+                                    <CardDescription>Consulte el estado de todas las solicitudes de picking y despacho sugeridas.</CardDescription>
+                                </CardHeader>
+                                <CardContent>
+                                    <Table>
+                                        <TableHeader>
+                                            <TableRow>
+                                                <TableHead>Fecha / Hora</TableHead>
+                                                <TableHead>Documento</TableHead>
+                                                <TableHead>Lotes / Productos</TableHead>
+                                                <TableHead>Cantidad</TableHead>
+                                                <TableHead>Estado</TableHead>
+                                                <TableHead className="text-right">Acciones</TableHead>
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {fallCreekMovements.map(mov => {
+                                                const status = mov.status === 'Completado' ? 'Completado' : 'En Proceso';
+                                                return (
+                                                    <TableRow key={mov.id}>
+                                                        <TableCell className="text-xs">{mov.createdAt?.toDate().toLocaleString('es-CL')}</TableCell>
+                                                        <TableCell className="font-mono font-bold">{mov.document || '-'}</TableCell>
+                                                        <TableCell className="font-mono text-[10px] max-w-[250px] truncate">{mov.lotes}</TableCell>
+                                                        <TableCell className="font-semibold">{mov.totalQuantity} {mov.unit}</TableCell>
+                                                        <TableCell>
+                                                            <Badge variant={status === 'Completado' ? 'default' : 'secondary'} className={cn(status !== 'Completado' && "bg-orange-100 text-orange-800")}>
+                                                                {status}
+                                                            </Badge>
+                                                        </TableCell>
+                                                        <TableCell className="text-right">
+                                                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setMovementToView(mov)}>
+                                                                <Eye className="h-4 w-4" />
+                                                            </Button>
+                                                        </TableCell>
+                                                    </TableRow>
+                                                );
+                                            })}
+                                            {fallCreekMovements.length === 0 && (
+                                                <TableRow>
+                                                    <TableCell colSpan={6} className="h-24 text-center">No se encontraron solicitudes.</TableCell>
+                                                </TableRow>
+                                            )}
+                                        </TableBody>
+                                    </Table>
+                                </CardContent>
+                            </Card>
+                        </TabsContent>
+                    </Tabs>
+                </TabsContent>
+            </Tabs>
 
             {selectionMode && (
                 <div
@@ -729,45 +915,176 @@ export default function FallCreekPage() {
                     </Card>
                 </div>
             )}
-             {movementToView && (
-                <Dialog open={!!movementToView} onOpenChange={(isOpen) => !isOpen && setMovementToView(null)}>
-                    <DialogContent className="max-w-2xl">
+              {movementToView && (
+                 <Dialog open={!!movementToView} onOpenChange={(isOpen) => !isOpen && setMovementToView(null)}>
+                     <DialogContent className="max-w-2xl">
+                         <DialogHeader>
+                             <DialogTitle className="text-[#004b8d]">Detalle de Solicitud de Picking</DialogTitle>
+                             <DialogDescription>
+                                 Cliente: {movementToView.clientName} - Referencia: {movementToView.document || 'N/A'}
+                             </DialogDescription>
+                         </DialogHeader>
+                         <div className="max-h-96 overflow-y-auto">
+                             <Table>
+                                 <TableHeader>
+                                     <TableRow>
+                                         <TableHead>Producto</TableHead>
+                                         <TableHead>Lote Cliente</TableHead>
+                                         <TableHead>Cámara / Coord.</TableHead>
+                                         <TableHead className="text-right">Cantidad</TableHead>
+                                     </TableRow>
+                                 </TableHeader>
+                                 <TableBody>
+                                     {movementToView.locations?.map((loc, index) => (
+                                         <TableRow key={index}>
+                                             <TableCell className="font-medium">{loc.productName}</TableCell>
+                                             <TableCell className="font-mono">{loc.clientLotId || 'N/A'}</TableCell>
+                                             <TableCell className="font-mono text-xs">{chambersConfig[loc.location.chamberId]?.name} / {loc.location.coordinate}</TableCell>
+                                             <TableCell className="text-right font-bold">{loc.quantity} {loc.unit}</TableCell>
+                                         </TableRow>
+                                     ))}
+                                 </TableBody>
+                             </Table>
+                         </div>
+                         <DialogFooter>
+                             <DialogClose asChild>
+                                 <Button type="button" variant="secondary">Cerrar Detalle</Button>
+                             </DialogClose>
+                         </DialogFooter>
+                     </DialogContent>
+                 </Dialog>
+             )}
+
+             {receptionToView && (
+                 <Dialog open={!!receptionToView} onOpenChange={(isOpen) => !isOpen && setReceptionToView(null)}>
+                     <DialogContent className="max-w-3xl">
+                         <DialogHeader>
+                             <DialogTitle className="text-[#004b8d]">Detalle de Manifiesto (Pallet Log)</DialogTitle>
+                             <DialogDescription>
+                                 Documento: {receptionToView.document} - Fecha: {receptionToView.createdAt?.toDate().toLocaleDateString()}
+                             </DialogDescription>
+                         </DialogHeader>
+                         <div className="max-h-96 overflow-y-auto">
+                             <Table>
+                                 <TableHeader>
+                                     <TableRow>
+                                         <TableHead>Pallet ID</TableHead>
+                                         <TableHead>Producto / Variedad</TableHead>
+                                         <TableHead className="text-right">Bultos</TableHead>
+                                         <TableHead>Estado</TableHead>
+                                     </TableRow>
+                                 </TableHeader>
+                                 <TableBody>
+                                     {receptionToView.items.map((item, index) => (
+                                         <TableRow key={index}>
+                                             <TableCell className="font-mono text-xs font-bold">{item.palletId}</TableCell>
+                                             <TableCell>
+                                                 <div className="flex items-center gap-2">
+                                                     <span className="text-sm">{item.productName}</span>
+                                                     {item.isMixedVariety && (
+                                                         <Badge variant="outline" className="text-[9px] border-blue-200 text-blue-600 bg-blue-50">MIXTO</Badge>
+                                                     )}
+                                                 </div>
+                                             </TableCell>
+                                             <TableCell className="text-right font-bold">{item.quantity || 1}</TableCell>
+                                             <TableCell>
+                                                 <Badge variant="secondary" className="text-[10px]">
+                                                     {item.status || 'Recibido'}
+                                                 </Badge>
+                                             </TableCell>
+                                         </TableRow>
+                                     ))}
+                                 </TableBody>
+                             </Table>
+                         </div>
+                         <DialogFooter>
+                             <DialogClose asChild>
+                                 <Button type="button" variant="secondary">Cerrar</Button>
+                             </DialogClose>
+                         </DialogFooter>
+                     </DialogContent>
+                 </Dialog>
+             )}
+            {/* Reception Dialog removed */}
+
+            {showPreview && (
+                <Dialog open={showPreview} onOpenChange={setShowPreview}>
+                    <DialogContent className="max-w-4xl">
                         <DialogHeader>
-                            <DialogTitle className="text-[#004b8d]">Detalle de Solicitud de Picking</DialogTitle>
+                            <DialogTitle className="text-[#004b8d]">Previsualización de Manifiesto</DialogTitle>
                             <DialogDescription>
-                                Cliente: {movementToView.clientName} - Referencia: {movementToView.document || 'N/A'}
+                                Se han detectado {previewItems.length} registros en el archivo. Revise la información antes de confirmar.
                             </DialogDescription>
                         </DialogHeader>
-                        <div className="max-h-96 overflow-y-auto">
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Producto</TableHead>
-                                        <TableHead>Lote Cliente</TableHead>
-                                        <TableHead>Cámara / Coord.</TableHead>
-                                        <TableHead className="text-right">Cantidad</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {movementToView.locations?.map((loc, index) => (
-                                        <TableRow key={index}>
-                                            <TableCell className="font-medium">{loc.productName}</TableCell>
-                                            <TableCell className="font-mono">{loc.clientLotId || 'N/A'}</TableCell>
-                                            <TableCell className="font-mono text-xs">{chambersConfig[loc.location.chamberId]?.name} / {loc.location.coordinate}</TableCell>
-                                            <TableCell className="text-right font-bold">{loc.quantity} {loc.unit}</TableCell>
+                        
+                        <div className="space-y-4 py-4">
+                            <div className="flex items-center gap-4 px-1">
+                                <div className="flex-1 space-y-1">
+                                    <Label>Referencia del Manifiesto / Guía</Label>
+                                    <Input 
+                                        value={manifestDocument} 
+                                        onChange={e => setManifestDocument(e.target.value)}
+                                        placeholder="Ej: Guía Fall Creek 1234"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="rounded-md border max-h-[40vh] overflow-y-auto">
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow className="bg-muted/50">
+                                            <TableHead>Pallet ID</TableHead>
+                                            <TableHead>Variedad / Producto</TableHead>
+                                            <TableHead>Lote (Batch)</TableHead>
+                                            <TableHead className="text-right">Bins</TableHead>
+                                            <TableHead className="text-right">Plantas Totales</TableHead>
                                         </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {previewItems.map((item, index) => (
+                                            <TableRow key={index}>
+                                                <TableCell className="font-mono font-bold">{item['Pallet ID']}</TableCell>
+                                                <TableCell>{item['Item Description']}</TableCell>
+                                                <TableCell className="font-mono text-xs text-muted-foreground">{item['Lot Number (Batch)']}</TableCell>
+                                                <TableCell className="text-right font-bold">{item['# of Packages']}</TableCell>
+                                                <TableCell className="text-right font-semibold text-[#7aba28]">{item['Qty of Plants']}</TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            </div>
                         </div>
-                        <DialogFooter>
-                            <DialogClose asChild>
-                                <Button type="button" variant="secondary">Cerrar Detalle</Button>
-                            </DialogClose>
+
+                        <DialogFooter className="flex items-center justify-between sm:justify-between">
+                            <div className="flex gap-6 text-sm">
+                                <div className="flex flex-col">
+                                    <span className="text-muted-foreground text-xs uppercase tracking-wider font-semibold">Total Pallets ID</span>
+                                    <span className="text-xl font-bold text-[#004b8d]">{previewItems.length}</span>
+                                </div>
+                                <div className="flex flex-col">
+                                    <span className="text-muted-foreground text-xs uppercase tracking-wider font-semibold">Total Plantas</span>
+                                    <span className="text-xl font-bold text-[#7aba28]">
+                                        {previewItems.reduce((sum, item) => sum + (Number(item['Qty of Plants']) || 0), 0).toLocaleString()}
+                                    </span>
+                                </div>
+                            </div>
+                            <div className="flex gap-2">
+                                <Button variant="outline" onClick={() => setShowPreview(false)}>Cancelar</Button>
+                                <Button 
+                                    onClick={handleConfirmImport} 
+                                    className="bg-[#7aba28] hover:bg-[#6aa423] text-white font-bold"
+                                    disabled={isSubmitting || !manifestDocument}
+                                >
+                                    {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <ClipboardList className="mr-2 h-4 w-4"/>}
+                                    Confirmar e Importar Manifiesto
+                                </Button>
+                            </div>
                         </DialogFooter>
                     </DialogContent>
                 </Dialog>
             )}
+
+            {/* Store dialog removed */}
         </div>
     );
 }

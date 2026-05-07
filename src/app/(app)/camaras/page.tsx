@@ -11,7 +11,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { StoreInChamberDialog } from '@/components/hidrocooler/StoreInChamberDialog';
-import { collection, doc, writeBatch, getDocs, updateDoc, getDoc, serverTimestamp, query, orderBy, limit, onSnapshot, where } from 'firebase/firestore';
+import { collection, doc, writeBatch, getDocs, updateDoc, getDoc, serverTimestamp, query, orderBy, limit, onSnapshot, where, getCountFromServer } from 'firebase/firestore';
 import { useFirestore, useCollection, useMemoFirebase, useUser } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { errorEmitter } from '@/firebase/error-emitter';
@@ -28,6 +28,7 @@ import { ExternalReceptionUploader } from '@/components/hidrocooler/ExternalRece
 import { ChamberTemperatureInput } from '@/components/camaras/ChamberTemperatureInput';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useChamberStrategy } from '@/contexts/ChamberStrategyContext';
 
 
@@ -69,6 +70,7 @@ export default function CamarasPage() {
   const firestore = useFirestore();
   const { data: exporters, loading: loadingExporters } = useFirestoreCollection<Exporter>('exporters');
   const { data: otherFruitReceptions, loading: loadingOtherFruit } = useFirestoreCollection<OtherFruitReception>('otherFruitReceptions');
+  const { data: clientConfigs, loading: loadingConfigs } = useFirestoreCollection<ClientStorageConfig>('clientStorageConfigs');
 
   const pendingLotsQuery = useMemoFirebase(() => {
     if (!firestore) return null;
@@ -91,9 +93,9 @@ export default function CamarasPage() {
   const { toast } = useToast();
   const [showChamberStatus, setShowChamberStatus] = React.useState(false);
   const { chamberStrategies, setChamberStrategies } = useChamberStrategy();
-  const [strategyChangeToConfirm, setStrategyChangeToConfirm] = React.useState<{ chamberId: string; strategy: 'secuencial' | 'fifo' } | null>(null);
+  const [strategyChangeToConfirm, setStrategyChangeToConfirm] = React.useState<{ chamberId: string; strategy: 'secuencial' | 'fifo' | 'aisle-access' } | null>(null);
 
-  const loading = loadingPendingLots || loadingStoredLots || loadingOtherFruit || loadingExporters;
+  const loading = loadingPendingLots || loadingStoredLots || loadingOtherFruit || loadingExporters || loadingConfigs;
   
   React.useEffect(() => {
     if (!firestore) return;
@@ -131,6 +133,8 @@ export default function CamarasPage() {
 
     const calculatedPendingLots = (pendingLots || [])
       .sort((a, b) => b.receptionDate && a.receptionDate ? a.receptionDate.toMillis() - b.receptionDate.toMillis() : 0);
+
+    const configs = clientConfigs || [];
       
     const allStoredItems: StoredItem[] = [
       ...allStoredLots
@@ -195,19 +199,23 @@ export default function CamarasPage() {
         const chamberConfig = chambersConfig[chamberId];
         const itemsInThisChamber = allStoredItems.filter(item => item.chamberId === chamberId);
         
+        // Find if any client has an override for this chamber
+        const clientWithOverride = configs.find(c => c.chamberOverrides?.[chamberId]);
+        const totalCapacity = clientWithOverride?.chamberOverrides?.[chamberId] || chamberConfig.capacity;
+
         const occupiedEquivalentBins = itemsInThisChamber.reduce((sum, item) => {
             if (item.unit === 'Bins') {
                 return sum + item.quantity;
             } else if (item.unit === 'Pallets') {
-                return sum + item.quantity; // Pallets now count as 1 unit for occupancy, not 2.
+                return sum + item.quantity; // Pallets now count as 1 unit for occupancy
             }
             return sum;
         }, 0);
 
         acc[chamberId] = {
             occupied: occupiedEquivalentBins,
-            total: chamberConfig.capacity,
-            percentage: chamberConfig.capacity > 0 ? (occupiedEquivalentBins / chamberConfig.capacity) * 100 : 0,
+            total: totalCapacity,
+            percentage: totalCapacity > 0 ? (occupiedEquivalentBins / totalCapacity) * 100 : 0,
         };
         return acc;
     }, {} as Record<string, {occupied: number; total: number; percentage: number}>);
@@ -237,7 +245,9 @@ export default function CamarasPage() {
   const handleStoreInChamber = async ({ chamberId, coordinate: startCoordinate }: { chamberId: string; coordinate: string; }) => {
     if (!lotToStore || !firestore) return;
   
-    const BINS_PER_COORDINATE = 6;
+    const clientConfig = (clientConfigs || []).find(c => c.clientName.toUpperCase() === lotToStore.producerShortName.toUpperCase());
+    const BINS_PER_COORDINATE = clientConfig?.binsPerCoordinate || 6;
+    const PALLETS_PER_COORDINATE = clientConfig?.palletsPerCoordinate || 3;
     const chamberConfig = chambersConfig[chamberId];
     const strategy = chamberStrategies[chamberId] || 'secuencial';
   
@@ -471,9 +481,8 @@ export default function CamarasPage() {
     }
   };
 
-  const handleStrategyChange = (chamberId: string, checked: boolean) => {
-    const newStrategy = checked ? 'fifo' : 'secuencial';
-    if (!checked) {
+  const handleStrategyChange = (chamberId: string, newStrategy: 'secuencial' | 'fifo' | 'aisle-access') => {
+    if (newStrategy === 'secuencial') {
         setStrategyChangeToConfirm({ chamberId, strategy: newStrategy });
     } else {
         setChamberStrategies(prev => ({
@@ -651,13 +660,23 @@ export default function CamarasPage() {
                             </div>
                         </AccordionTrigger>
                         <AccordionContent>
-                            <div className="flex items-center space-x-2 px-4 pb-4 border-b">
-                                <Switch
-                                    id={`fifo-switch-${chamberId}`}
-                                    checked={chamberStrategies[chamberId] === 'fifo'}
-                                    onCheckedChange={(checked) => handleStrategyChange(chamberId, checked)}
-                                />
-                                <Label htmlFor={`fifo-switch-${chamberId}`}>Activar Layout FIFO (Serpiente)</Label>
+                            <div className="flex items-center space-x-4 px-4 pb-4 border-b">
+                                <Label htmlFor={`strategy-select-${chamberId}`} className="text-sm font-medium">Estrategia de Almacenamiento:</Label>
+                                <Select 
+                                    value={chamberStrategies[chamberId] || 'secuencial'} 
+                                    onValueChange={(value) => handleStrategyChange(chamberId, value as any)}
+                                >
+                                    <SelectTrigger id={`strategy-select-${chamberId}`} className="w-[200px] h-8 text-xs">
+                                        <SelectValue placeholder="Seleccione..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="secuencial">Lineal (A1 &rarr; L12)</SelectItem>
+                                        <SelectItem value="inverted-secuencial">Invertido (A12 &rarr; A1)</SelectItem>
+                                        <SelectItem value="horizontal-secuencial">Horizontal (A1 &rarr; O1)</SelectItem>
+                                        <SelectItem value="fifo">FIFO (Serpiente)</SelectItem>
+                                        <SelectItem value="aisle-access">Acceso Pasillos (Fall Creek)</SelectItem>
+                                    </SelectContent>
+                                </Select>
                             </div>
                             <div className="p-2 sm:p-4 bg-muted/50 rounded-b-lg border border-t-0 overflow-x-auto">
                                 <div className="grid gap-1" style={{ 
@@ -675,8 +694,16 @@ export default function CamarasPage() {
                                       const totalNetWeight = itemsInCoord.reduce((sum, i) => sum + (i.quantity * (i.netWeightPerBin || 0)), 0);
                                       const clientLotIds = Array.from(new Set(itemsInCoord.map(i => i.clientLotId).filter(Boolean)));
                                     
-                                      const occupancyPercentage = isOccupied ? (totalBins + totalPallets) / 6 * 100 : 0;
                                       const firstItem = isOccupied ? itemsInCoord[0] : null;
+                                      
+                                      // Dynamic capacity lookup
+                                      const clientName = firstItem?.ownerName || '';
+                                      const clientConfig = (clientConfigs || []).find(c => c.clientName.toUpperCase() === clientName.toUpperCase());
+                                      const coordCapacity = clientConfig 
+                                        ? (firstItem?.unit === 'Pallets' ? clientConfig.palletsPerCoordinate : clientConfig.binsPerCoordinate)
+                                        : (firstItem?.unit === 'Pallets' ? 3 : 6);
+
+                                      const occupancyPercentage = isOccupied ? (totalBins + totalPallets) / coordCapacity * 100 : 0;
 
                                       return (
                                           <Popover key={coord}>

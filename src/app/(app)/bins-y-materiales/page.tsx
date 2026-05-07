@@ -14,6 +14,9 @@ import { StockTab } from '@/components/bins-materials/StockTab';
 import { Checkbox } from '@/components/ui/checkbox';
 import { usePermissions } from '@/contexts/PermissionsContext';
 import { useUser } from '@/firebase';
+import { Plus } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { CreateProducerDialog } from '@/components/bins-materials/CreateProducerDialog';
 
 export default function BinsYMaterialesPage() {
   const { user } = useUser();
@@ -22,6 +25,7 @@ export default function BinsYMaterialesPage() {
   const [selectedExporterId, setSelectedExporterId] = React.useState<string | null>(null);
   const [selectedProducerId, setSelectedProducerId] = React.useState<string | null>(null);
   const [isDirectDispatch, setIsDirectDispatch] = React.useState(false);
+  const [isCreateProducerDialogOpen, setIsCreateProducerDialogOpen] = React.useState(false);
 
   const { data: allExporters, loading: loadingExporters } = useFirestoreCollection<Exporter>('exporters');
   
@@ -85,8 +89,8 @@ export default function BinsYMaterialesPage() {
           <CardDescription>Seleccione un exportador y productor para gestionar el inventario.</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="space-y-2">
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
+            <div className="md:col-span-4 space-y-2">
               <Label htmlFor="exporter-select">Exportador / Dueño</Label>
               <Select
                 value={selectedExporterId ?? ''}
@@ -108,27 +112,41 @@ export default function BinsYMaterialesPage() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2">
+
+            <div className="md:col-span-5 space-y-2">
               <Label htmlFor="producer-select">Productor / Arrendatario</Label>
-              <Select
-                value={selectedProducerId ?? ''}
-                onValueChange={(value) => setSelectedProducerId(value)}
-                disabled={!selectedExporterId || loadingProducers}
-              >
-                <SelectTrigger id="producer-select">
-                  <SelectValue placeholder="Seleccione un productor..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {producers.map(p => (
-                    <SelectItem key={p.id} value={p.producerId}>
-                      {p.shortName}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="flex gap-2">
+                <Select
+                  value={selectedProducerId ?? ''}
+                  onValueChange={(value) => setSelectedProducerId(value)}
+                  disabled={!selectedExporterId || loadingProducers}
+                >
+                  <SelectTrigger id="producer-select" className="flex-1">
+                    <SelectValue placeholder="Seleccione un productor..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {producers.map(p => (
+                      <SelectItem key={p.id} value={p.producerId}>
+                        {p.shortName}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {selectedExporterId === 'EXP005' && (
+                  <Button 
+                    variant="outline" 
+                    className="flex-shrink-0"
+                    onClick={() => setIsCreateProducerDialogOpen(true)}
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Crear Cliente
+                  </Button>
+                )}
+              </div>
             </div>
+
             {isAdmin && (
-              <div className="flex items-center space-x-2 pt-4 md:pt-0 md:self-end md:pb-1">
+              <div className="md:col-span-3 flex items-center space-x-2 pb-3">
                   <Checkbox 
                       id="direct-dispatch" 
                       checked={isDirectDispatch}
@@ -137,7 +155,7 @@ export default function BinsYMaterialesPage() {
                   />
                   <Label
                       htmlFor="direct-dispatch"
-                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 whitespace-nowrap"
                   >
                       Despacho Directo
                   </Label>
@@ -209,6 +227,12 @@ export default function BinsYMaterialesPage() {
             </TabsContent>
           )}
       </Tabs>
+
+      <CreateProducerDialog 
+        open={isCreateProducerDialogOpen} 
+        onOpenChange={setIsCreateProducerDialogOpen}
+        onSuccess={(id) => setSelectedProducerId(id)}
+      />
 
     </div>
   );

@@ -9,6 +9,10 @@ export interface Exporter {
   name: string;
   type: string;
   status?: 'activo' | 'inactivo';
+  // Logistics Configuration
+  storageStrategy?: 'secuencial' | 'fifo' | 'aisle-access' | 'horizontal-secuencial' | 'inverted-secuencial';
+  binsPerCoordinate?: number;
+  palletsPerCoordinate?: number;
 }
 
 export interface Producer {
@@ -71,6 +75,10 @@ export interface OtherClient {
   type: 'embalaje' | 'frio_hortofruticola' | 'fruta';
   unit: 'Bins' | 'Pallets';
   status?: 'activo' | 'inactivo';
+  // Logistics Configuration
+  storageStrategy?: 'secuencial' | 'fifo' | 'aisle-access' | 'horizontal-secuencial' | 'inverted-secuencial';
+  binsPerCoordinate?: number;
+  palletsPerCoordinate?: number;
 }
 
 export interface PackagingMaster {
@@ -293,16 +301,29 @@ export interface Dispatch {
 
 export interface OtherFruitReceptionItem {
     clientLotId?: string;
+    palletId?: string;
+    containerId?: string;
+    plantsPerBin?: number;
+    totalPlants?: number;
     productCode: string;
     productName: string;
     quantity: number;
     weight?: number;
-    status: 'Pendiente de almacenar' | 'Almacenado' | 'Despachado';
+    status: 'Pendiente de recibir' | 'Recibido' | 'Pendiente de almacenar' | 'Almacenado' | 'Despachado';
     storageLocation?: {
       chamberId: string;
       coordinate: string;
     };
     storedAt?: Timestamp | Date;
+    isMixedVariety?: boolean;
+}
+
+export interface PendingItem extends OtherFruitReceptionItem {
+    receptionId: string;
+    clientName: string;
+    document: string;
+    itemIndex: number;
+    unit: 'Bins' | 'Pallets';
 }
 
 export interface OtherFruitReception {
@@ -314,7 +335,7 @@ export interface OtherFruitReception {
   document: string;
   temperature?: number;
   items: OtherFruitReceptionItem[];
-  status: 'Pendiente de almacenar' | 'Parcialmente Almacenado' | 'Almacenado' | 'Despachado';
+  status: 'Pendiente de recibir' | 'Recibido' | 'Pendiente de almacenar' | 'Parcialmente Almacenado' | 'Almacenado' | 'Despachado';
   createdAt: Timestamp;
   updatedAt?: Timestamp;
   userId?: string;
@@ -429,6 +450,7 @@ export type StoredItem = {
   itemIndex: number; // Index of the item within the parent document's `items` array
   netWeightPerBin?: number;
   clientLotId?: string;
+  isMixedVariety?: boolean;
 }
 
 export interface BusinessEntity {
@@ -441,6 +463,8 @@ export interface BusinessEntity {
   giro: string;
   actividadComercial: string;
 }
+
+export type MasterData = Exporter | Producer | BinMaterial | OtherClient | PackagingMaster | UserMaster | Profile | Packing | Hidrocooler | BusinessEntity | Warehouse | Aisle;
 
 export interface Warehouse {
   id: string;
@@ -459,4 +483,14 @@ export interface ReportSetting {
   hidden: boolean;
 }
 
-export type MasterData = Exporter | Producer | BinMaterial | OtherClient | PackagingMaster | UserMaster | Profile | Packing | Hidrocooler | BusinessEntity | Warehouse | Aisle;
+
+export interface ClientStorageConfig {
+  id: string; // ClientId (Exporter ID or OtherClient ID)
+  clientName: string;
+  strategy: 'secuencial' | 'fifo' | 'aisle-access' | 'horizontal-secuencial' | 'inverted-secuencial';
+  binsPerCoordinate: number;
+  palletsPerCoordinate: number;
+  chamberOverrides?: Record<string, number>; // chamberId -> reservedCapacity
+}
+
+

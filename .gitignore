@@ -43,3 +43,9 @@ next-env.d.ts
 # firebase
 firebase-debug.log
 firestore-debug.log
+
+# antigravity & workspace
+.agents/
+scratch/
+studio.json
+*.xlsx

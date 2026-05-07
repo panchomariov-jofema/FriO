@@ -55,10 +55,16 @@ export function BarcodeScanner({ open, onOpenChange, onScan }: BarcodeScannerPro
             undefined
         ).catch((err: any) => {
             console.error("Failed to start html5-qrcode scanner", err);
+            
+            // Contexto seguro check (Camera requires HTTPS or Localhost)
+            const isNotSecure = typeof window !== 'undefined' && !window.isSecureContext;
+            
             toast({
                 variant: "destructive",
                 title: "Error de Cámara",
-                description: "No se pudo iniciar el escáner. Verifique los permisos de la cámara.",
+                description: isNotSecure 
+                    ? "La cámara requiere una conexión segura (HTTPS). Chrome bloquea la cámara en IPs locales (192.168.x.x) sin SSL."
+                    : "No se pudo iniciar el escáner. Verifique los permisos o si otra app usa la cámara.",
             });
             onOpenChange(false);
         });

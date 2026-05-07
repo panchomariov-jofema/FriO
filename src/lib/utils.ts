@@ -20,8 +20,27 @@ export const naturalSort = (a: string, b: string) => {
   return aNum - bNum;
 };
 
-// Generates coordinates for chamber display, handling sequential and snake (FIFO) layouts.
-export const getSortedCoordinates = (chamberConfig: Chamber, strategy: 'secuencial' | 'fifo'): string[] => {
+// Generates coordinates for chamber display, handling sequential, snake (FIFO), and aisle-access layouts.
+export const getSortedCoordinates = (chamberConfig: Chamber, strategy: 'secuencial' | 'fifo' | 'aisle-access' | 'horizontal-secuencial' | 'inverted-secuencial'): string[] => {
+  if (strategy === 'aisle-access') {
+    return getAisleAccessCoordinates(chamberConfig, 'secuencial');
+  }
+
+  if (strategy === 'horizontal-secuencial') {
+    const coords: string[] = [];
+    const columns = chamberConfig.columns.map(c => c.name);
+    const rows = chamberConfig.rows;
+    rows.forEach(row => {
+      columns.forEach(col => {
+        const coord = `${col}${row}`;
+        if (!chamberConfig.blocked?.includes(coord)) {
+          coords.push(coord);
+        }
+      });
+    });
+    return coords;
+  }
+
   const coords: string[] = [];
   const columns = chamberConfig.columns.map(c => c.name);
   const rows = chamberConfig.rows;
@@ -33,8 +52,11 @@ export const getSortedCoordinates = (chamberConfig: Chamber, strategy: 'secuenci
     if (strategy === 'fifo') {
       const isEvenColumn = colIndex % 2 === 1; // A=0, B=1, C=2...
       rowsToIterate = isEvenColumn ? [...rows].reverse() : rows;
+    } else if (strategy === 'inverted-secuencial') {
+      // Start from the back (e.g., A12 -> A1)
+      rowsToIterate = [...rows].reverse();
     } else {
-      // In sequential mode, all columns go down.
+      // In sequential mode, all columns go down (e.g., A1 -> A12).
       rowsToIterate = rows;
     }
 
@@ -49,7 +71,45 @@ export const getSortedCoordinates = (chamberConfig: Chamber, strategy: 'secuenci
   return coords;
 };
 
-// Paired / Z-pattern layout for Fall Creek
+/**
+ * Aisle-access layout for Fall Creek (SAG sampling friendly).
+ * Fills by Row: A-E, skip gap, H-L.
+ */
+export const getAisleAccessCoordinates = (chamberConfig: Chamber, strategy: 'secuencial' | 'fifo' | 'inverted-secuencial'): string[] => {
+    const coords: string[] = [];
+    const columns = chamberConfig.columns.map(c => c.name);
+    const rows = [...chamberConfig.rows];
+
+    // In FIFO or Inverted, we start from the back row
+    const rowsToIterate = (strategy === 'fifo' || strategy === 'inverted-secuencial') ? rows.reverse() : rows;
+
+    rowsToIterate.forEach(row => {
+        // Group 1: Columns A to E
+        columns.forEach(col => {
+            if (['A', 'B', 'C', 'D', 'E'].includes(col)) {
+                const coord = `${col}${row}`;
+                if (!chamberConfig.blocked?.includes(coord)) {
+                    coords.push(coord);
+                }
+            }
+        });
+
+        // Group 2: Columns H to L (skipping F, G) or H to O for large chambers
+        columns.forEach(col => {
+            // We skip F, G as they are the central "aisle"
+            if (!['A', 'B', 'C', 'D', 'E', 'F', 'G'].includes(col)) {
+                const coord = `${col}${row}`;
+                if (!chamberConfig.blocked?.includes(coord)) {
+                    coords.push(coord);
+                }
+            }
+        });
+    });
+
+    return coords;
+};
+
+// Paired / Z-pattern layout for Fall Creek (Legacy/Specific)
 export const getPairedCoordinates = (chamberConfig: Chamber): string[] => {
     const coords: string[] = [];
     const columns = chamberConfig.columns.map(c => c.name);

@@ -25,7 +25,7 @@ export const chambersConfig: ChambersConfig = {
     'CAMARA-1': {
         id: 'CAMARA-1',
         name: 'CÁMARA 1',
-        capacity: 1008,
+        capacity: 600,
         columns: columns1to3,
         rows,
         blocked: noBlocked,
@@ -33,7 +33,7 @@ export const chambersConfig: ChambersConfig = {
     'CAMARA-2': {
         id: 'CAMARA-2',
         name: 'CÁMARA 2',
-        capacity: 1008,
+        capacity: 600,
         columns: columns1to3,
         rows,
         blocked: noBlocked,
@@ -41,7 +41,7 @@ export const chambersConfig: ChambersConfig = {
     'CAMARA-3': {
         id: 'CAMARA-3',
         name: 'CÁMARA 3',
-        capacity: 1008,
+        capacity: 600,
         columns: columns1to3,
         rows,
         blocked: noBlocked,
@@ -49,7 +49,7 @@ export const chambersConfig: ChambersConfig = {
     'CAMARA-4': {
         id: 'CAMARA-4',
         name: 'CÁMARA 4',
-        capacity: 1260,
+        capacity: 600,
         columns: columns4to6,
         rows,
         blocked: noBlocked,
@@ -57,7 +57,7 @@ export const chambersConfig: ChambersConfig = {
     'CAMARA-5': {
         id: 'CAMARA-5',
         name: 'CÁMARA 5',
-        capacity: 1260,
+        capacity: 600,
         columns: columns4to6,
         rows,
         blocked: noBlocked,
@@ -65,7 +65,7 @@ export const chambersConfig: ChambersConfig = {
     'CAMARA-6': {
         id: 'CAMARA-6',
         name: 'CÁMARA 6',
-        capacity: 1260,
+        capacity: 600,
         columns: columns4to6,
         rows,
         blocked: noBlocked,

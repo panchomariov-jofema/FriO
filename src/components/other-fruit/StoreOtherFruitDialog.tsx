@@ -28,39 +28,42 @@ interface StoreOtherFruitDialogProps {
   item: PendingItem | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onConfirm: (data: { chamberId: string; coordinate: string; totalQuantity: number; quantityPerLocation: number; strategy: 'secuencial' | 'pareado' }) => void;
+  onConfirm: (data: { chamberId: string; coordinate: string; totalQuantity: number; quantityPerLocation: number; strategy: 'secuencial' | 'pareado' | 'aisle-access' }) => void;
   allReceptions: OtherFruitReception[];
   allChamberLots: ChamberLot[];
   chamberStrategies: Record<string, 'secuencial' | 'fifo'>;
+  clientConfig?: ClientStorageConfig;
 }
 
-const BINS_PER_COORDINATE = 9;
-const PALLETS_PER_COORDINATE = 3; 
+const DEFAULT_BINS_PER_COORDINATE = 6;
+const DEFAULT_PALLETS_PER_COORDINATE = 3; 
 
 const storeSchema = z.object({
   chamberId: z.string({ required_error: 'Debe seleccionar una cámara.' }),
   coordinate: z.string({ required_error: 'Debe seleccionar una coordenada de inicio.' }),
   totalQuantity: z.coerce.number().positive('La cantidad total debe ser mayor a 0.'),
   quantityPerLocation: z.coerce.number().positive('La cantidad por ubicación debe ser mayor a 0.'),
-  strategy: z.enum(['secuencial', 'pareado']).default('secuencial'),
+  strategy: z.enum(['secuencial', 'pareado', 'aisle-access']).default('secuencial'),
 });
 
 type StoreFormValues = z.infer<typeof storeSchema>;
 
 
-export function StoreOtherFruitDialog({ item, open, onOpenChange, onConfirm, allReceptions, allChamberLots, chamberStrategies }: StoreOtherFruitDialogProps) {
+export function StoreOtherFruitDialog({ item, open, onOpenChange, onConfirm, allReceptions, allChamberLots, chamberStrategies, clientConfig }: StoreOtherFruitDialogProps) {
   const form = useForm<StoreFormValues>({
     resolver: zodResolver(storeSchema),
   });
   const { toast } = useToast();
 
   const selectedChamberId = form.watch('chamberId');
-  const selectedStrategy = form.watch('strategy');
   
   const capacityPerCoord = useMemo(() => {
-    if (!item) return PALLETS_PER_COORDINATE;
-    return item.unit === 'Bins' ? BINS_PER_COORDINATE : PALLETS_PER_COORDINATE;
-  }, [item]);
+    if (!item) return DEFAULT_PALLETS_PER_COORDINATE;
+    if (item.unit === 'Bins') {
+      return clientConfig?.binsPerCoordinate ?? DEFAULT_BINS_PER_COORDINATE;
+    }
+    return clientConfig?.palletsPerCoordinate ?? DEFAULT_PALLETS_PER_COORDINATE;
+  }, [item, clientConfig]);
 
   const { availableCoordinates, suggestion } = useMemo(() => {
     if (!selectedChamberId || !item) {
@@ -81,6 +84,8 @@ export function StoreOtherFruitDialog({ item, open, onOpenChange, onConfirm, all
           occupancyMap.get(lot.coordinate)!.lots.push({ displayLotId: lot.displayLotId, binCount: lot.binCount });
         }
     });
+    
+    // We also consider items stored in 'otherFruitReceptions' that aren't yet in chamberLots if they were stored in this session
     (allReceptions || []).forEach(reception => {
         reception.items.forEach(storedItem => {
             if (storedItem.status === 'Almacenado' && storedItem.storageLocation?.chamberId === selectedChamberId && storedItem.storageLocation.coordinate && storedItem.quantity > 0) {
@@ -88,19 +93,27 @@ export function StoreOtherFruitDialog({ item, open, onOpenChange, onConfirm, all
                 if (!occupancyMap.has(storedItem.storageLocation.coordinate)) {
                     occupancyMap.set(storedItem.storageLocation.coordinate, { lots: [] });
                 }
-                occupancyMap.get(storedItem.storageLocation.coordinate)!.lots.push({ displayLotId: lotId, binCount: 9 });
+                // Logic check: if already in occupancyMap (from chamberLots), don't duplicate
+                const exists = occupancyMap.get(storedItem.storageLocation.coordinate)!.lots.some(l => l.displayLotId === lotId);
+                if (!exists) {
+                   occupancyMap.get(storedItem.storageLocation.coordinate)!.lots.push({ displayLotId: lotId, binCount: storedItem.quantity });
+                }
             }
         });
     });
 
-    const globalStrategy = chamberStrategies[selectedChamberId] || 'secuencial';
-    const formStrategy = form.getValues('strategy'); // This is for 'pareado' override
+    const formStrategy = form.getValues('strategy');
 
     let allPossibleCoords;
     if (formStrategy === 'pareado') {
       allPossibleCoords = getPairedCoordinates(chamberConfig);
+    } else if (formStrategy === 'aisle-access') {
+      allPossibleCoords = getSortedCoordinates(chamberConfig, 'aisle-access');
     } else {
-      allPossibleCoords = getSortedCoordinates(chamberConfig, globalStrategy);
+      // If client has a specific strategy, we should probably default to that in the form, 
+      // but here we use whatever the form says.
+      const baseStrategy = (chamberStrategies[selectedChamberId] as 'secuencial' | 'fifo') || 'secuencial';
+      allPossibleCoords = getSortedCoordinates(chamberConfig, baseStrategy);
     }
     
     const emptyCoords = allPossibleCoords.filter(coord => !occupancyMap.has(coord));
@@ -112,17 +125,21 @@ export function StoreOtherFruitDialog({ item, open, onOpenChange, onConfirm, all
 
   useEffect(() => {
     if (open && item) {
-       const defaultQtyPerLocation = item.unit === 'Pallets' ? 1 : capacityPerCoord;
-       const isFallCreek = item.clientName.toUpperCase() === 'FALL CREEK';
+       const initialCapacity = item.unit === 'Bins' 
+         ? (clientConfig?.binsPerCoordinate ?? DEFAULT_BINS_PER_COORDINATE)
+         : (clientConfig?.palletsPerCoordinate ?? DEFAULT_PALLETS_PER_COORDINATE);
+       
+       const defaultQtyPerLocation = item.unit === 'Pallets' ? 1 : initialCapacity;
+       
       form.reset({
         totalQuantity: item.quantity,
         quantityPerLocation: defaultQtyPerLocation,
         chamberId: undefined,
         coordinate: undefined,
-        strategy: isFallCreek ? 'pareado' : 'secuencial',
+        strategy: clientConfig?.strategy ?? 'secuencial',
        });
     }
-  }, [item, open, form, capacityPerCoord]);
+  }, [item, open, form, clientConfig]);
 
   useEffect(() => {
     if (suggestion) {
@@ -135,7 +152,7 @@ export function StoreOtherFruitDialog({ item, open, onOpenChange, onConfirm, all
   const onSubmit = (values: StoreFormValues) => {
     if (!item) return;
     if (values.quantityPerLocation > capacityPerCoord) {
-        toast({ variant: 'destructive', title: 'Límite Excedido', description: `La cantidad por ubicación no puede ser mayor a ${capacityPerCoord}.`});
+        toast({ variant: 'destructive', title: 'Límite Excedido', description: `La cantidad por ubicación no puede ser mayor a ${capacityPerCoord} para este cliente.`});
         return;
     }
     if (values.totalQuantity > item.quantity) {
@@ -149,51 +166,70 @@ export function StoreOtherFruitDialog({ item, open, onOpenChange, onConfirm, all
     return null;
   }
 
-  const isFallCreekClient = item.clientName.toUpperCase() === 'FALL CREEK';
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle>Almacenar Producto</DialogTitle>
           <DialogDescription>
-            Guardar <span className="font-semibold">{item.productName}</span>. Pendiente: {item.quantity} {item.unit}.
+            Guardar <span className="font-semibold">{item.productName}</span> para <span className="font-semibold">{item.clientName}</span>. Pendiente: {item.quantity} {item.unit}.
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 py-4">
-            {isFallCreekClient && (
-                 <FormField
-                    control={form.control}
-                    name="strategy"
-                    render={({ field }) => (
-                        <FormItem className="space-y-3">
-                            <FormLabel>Estrategia de Almacenamiento</FormLabel>
-                            <FormControl>
-                                <RadioGroup
-                                    onValueChange={field.onChange}
-                                    value={field.value}
-                                    className="flex flex-row space-x-4"
-                                >
-                                    <FormItem className="flex items-center space-x-2 space-y-0">
-                                        <FormControl>
-                                            <RadioGroupItem value="secuencial" />
-                                        </FormControl>
-                                        <FormLabel className="font-normal">Secuencial</FormLabel>
-                                    </FormItem>
-                                    <FormItem className="flex items-center space-x-2 space-y-0">
-                                        <FormControl>
-                                            <RadioGroupItem value="pareado" />
-                                        </FormControl>
-                                        <FormLabel className="font-normal">Pareado</FormLabel>
-                                    </FormItem>
-                                </RadioGroup>
-                            </FormControl>
-                            <FormMessage />
-                        </FormItem>
-                    )}
-                />
-            )}
+             <FormField
+                control={form.control}
+                name="strategy"
+                render={({ field }) => (
+                    <FormItem className="space-y-3">
+                        <FormLabel>Estrategia de Almacenamiento</FormLabel>
+                        <FormControl>
+                            <RadioGroup
+                                onValueChange={field.onChange}
+                                value={field.value}
+                                className="grid grid-cols-2 gap-4"
+                            >
+                                <FormItem className="flex items-center space-x-2 space-y-0">
+                                    <FormControl>
+                                        <RadioGroupItem value="secuencial" />
+                                    </FormControl>
+                                    <FormLabel className="font-normal cursor-pointer text-xs">Secuencial (A1 &rarr; L12)</FormLabel>
+                                </FormItem>
+                                <FormItem className="flex items-center space-x-2 space-y-0">
+                                    <FormControl>
+                                        <RadioGroupItem value="inverted-secuencial" />
+                                    </FormControl>
+                                    <FormLabel className="font-normal cursor-pointer text-xs">Invertido (A12 &rarr; A1)</FormLabel>
+                                </FormItem>
+                                <FormItem className="flex items-center space-x-2 space-y-0">
+                                    <FormControl>
+                                        <RadioGroupItem value="horizontal-secuencial" />
+                                    </FormControl>
+                                    <FormLabel className="font-normal cursor-pointer text-xs">Horizontal (A1 &rarr; O1)</FormLabel>
+                                </FormItem>
+                                <FormItem className="flex items-center space-x-2 space-y-0">
+                                    <FormControl>
+                                        <RadioGroupItem value="aisle-access" />
+                                    </FormControl>
+                                    <FormLabel className="font-normal cursor-pointer text-xs">Pasillo (Fall Creek)</FormLabel>
+                                </FormItem>
+                                <FormItem className="flex items-center space-x-2 space-y-0">
+                                    <FormControl>
+                                        <RadioGroupItem value="fifo" />
+                                    </FormControl>
+                                    <FormLabel className="font-normal cursor-pointer text-xs">FIFO (Serpiente)</FormLabel>
+                                </FormItem>
+                            </RadioGroup>
+                        </FormControl>
+                        {clientConfig && (
+                          <p className="text-[10px] text-primary font-medium uppercase tracking-wider">
+                            Sugerido por Configuración de Cliente: {clientConfig.strategy}
+                          </p>
+                        )}
+                        <FormMessage />
+                    </FormItem>
+                )}
+            />
              <div className="grid grid-cols-2 gap-4">
                 <FormField control={form.control} name="chamberId" render={({ field }) => (
                     <FormItem>
@@ -202,7 +238,10 @@ export function StoreOtherFruitDialog({ item, open, onOpenChange, onConfirm, all
                         <FormControl><SelectTrigger><SelectValue placeholder="Seleccione..." /></SelectTrigger></FormControl>
                         <SelectContent>
                         {Object.values(chambersConfig).map(chamber => (
-                            <SelectItem key={chamber.id} value={chamber.id}>{chamber.name}</SelectItem>
+                            <SelectItem key={chamber.id} value={chamber.id}>
+                              {chamber.name} 
+                              {clientConfig?.chamberOverrides?.[chamber.id] && ` (Cap. Reservada: ${clientConfig.chamberOverrides[chamber.id]})`}
+                            </SelectItem>
                         ))}
                         </SelectContent>
                     </Select>
@@ -255,7 +294,7 @@ export function StoreOtherFruitDialog({ item, open, onOpenChange, onConfirm, all
                         <Input type="number" {...field} value={field.value ?? ''} autoComplete="off" inputMode="numeric" />
                     </FormControl>
                      <p className="text-xs text-muted-foreground pt-1">
-                        Máx: {capacityPerCoord}
+                        Máx: {capacityPerCoord} ({item.unit})
                     </p>
                     <FormMessage />
                     </FormItem>

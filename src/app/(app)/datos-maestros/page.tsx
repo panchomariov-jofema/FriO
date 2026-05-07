@@ -45,8 +45,14 @@ import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, Settings2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 
 const ExporterForm = ({ form }: { form: any }) => (
   <>
@@ -79,7 +85,78 @@ const ExporterForm = ({ form }: { form: any }) => (
           </FormItem>
         )}
       />
+    <LogisticsConfigFields form={form} />
   </>
+);
+
+const LogisticsConfigFields = ({ form }: { form: any }) => (
+  <Accordion type="single" collapsible className="w-full mt-4 border rounded-md px-4 bg-muted/30">
+    <AccordionItem value="logistics" className="border-b-0">
+      <AccordionTrigger className="hover:no-underline py-3">
+        <div className="flex items-center gap-3">
+          <div className="bg-primary/10 p-2 rounded-full">
+            <Settings2 className="h-4 w-4 text-primary" />
+          </div>
+          <div className="flex flex-col items-start">
+            <span className="text-sm font-semibold">Configuración de Logística</span>
+            <span className="text-xs text-muted-foreground font-normal">Modelos de almacenamiento y densidades</span>
+          </div>
+        </div>
+      </AccordionTrigger>
+      <AccordionContent className="space-y-4 pt-2 pb-4">
+        <FormField
+          control={form.control}
+          name="storageStrategy"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Modelo de Almacenamiento</FormLabel>
+              <Select onValueChange={field.onChange} value={field.value}>
+                <FormControl>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seleccione un modelo" />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  <SelectItem value="secuencial">Vertical Estándar (A1 &rarr; A12)</SelectItem>
+                  <SelectItem value="horizontal-secuencial">Horizontal Estándar (A1 &rarr; L1)</SelectItem>
+                  <SelectItem value="inverted-secuencial">Vertical FIFO (A12 &rarr; A1)</SelectItem>
+                  <SelectItem value="fifo">Serpiente (Z-pattern)</SelectItem>
+                  <SelectItem value="aisle-access">Acceso Pasillos (Fall Creek)</SelectItem>
+                </SelectContent>
+              </Select>
+              <FormDescription className="text-[10px]">Define el orden de llenado sugerido por el sistema.</FormDescription>
+            </FormItem>
+          )}
+        />
+        <div className="grid grid-cols-2 gap-4">
+          <FormField
+            control={form.control}
+            name="binsPerCoordinate"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel className="text-xs">Bins / Coordenada</FormLabel>
+                <FormControl>
+                  <Input type="number" {...field} placeholder="Ej: 6" />
+                </FormControl>
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="palletsPerCoordinate"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel className="text-xs">Pallets / Coordenada</FormLabel>
+                <FormControl>
+                  <Input type="number" {...field} placeholder="Ej: 3" />
+                </FormControl>
+              </FormItem>
+            )}
+          />
+        </div>
+      </AccordionContent>
+    </AccordionItem>
+  </Accordion>
 );
 
 const ProducerForm = ({ form, exporters }: { form: any; exporters: Exporter[] }) => {
@@ -304,6 +381,7 @@ const OtherClientForm = ({ form }: { form: any }) => (
           </FormItem>
         )}
       />
+      <LogisticsConfigFields form={form} />
     </>
 );
 

@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { chambersConfig } from '@/lib/chambers-config';
 
-type Strategy = 'secuencial' | 'fifo';
+type Strategy = 'secuencial' | 'fifo' | 'aisle-access';
 type ChamberStrategies = Record<string, Strategy>;
 
 interface ChamberStrategyContextType {

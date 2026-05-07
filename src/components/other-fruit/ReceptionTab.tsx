@@ -22,6 +22,7 @@ import { Label } from '@/components/ui/label';
 import { usePackagingMastersByClient } from '@/hooks/usePackagingMastersByClient';
 import { Checkbox } from '../ui/checkbox';
 import { BarcodeScanner } from '../BarcodeScanner';
+import { FallCreekReceptionWorkflow } from './FallCreekReceptionWorkflow';
 
 type ReceptionFormValues = z.infer<typeof otherFruitReceptionSchema>;
 
@@ -179,6 +180,37 @@ export function OtherFruitReceptionTab({ clientId: fixedClientId }: { clientId?:
   }
 
   const gridColsClass = showClientLot ? 'sm:grid-cols-5' : 'sm:grid-cols-4';
+
+  if (selectedClient?.name === 'FALL CREEK') {
+    return (
+      <div className="space-y-4 sm:space-y-6">
+        <Card className="border-none sm:border shadow-none sm:shadow-md">
+          <CardHeader className="px-4 sm:px-6 py-4">
+            <CardTitle className="text-xl sm:text-2xl">Recepción de Productos</CardTitle>
+            <CardDescription>Socio: <span className="font-bold text-[#004b8d]">{selectedClient.name}</span></CardDescription>
+          </CardHeader>
+          <CardContent className="px-2 sm:px-6 pb-6">
+             {!fixedClientId && (
+                <div className="max-w-md mb-4 sm:mb-6 px-2 sm:px-0">
+                  <Label className="mb-2 block text-xs sm:text-sm uppercase font-bold text-muted-foreground">Socio Comercial</Label>
+                  <Select onValueChange={handleClientChange} value={selectedClientId} disabled={loadingClients}>
+                    <SelectTrigger className="h-12 border-2">
+                      <SelectValue placeholder="Seleccione un socio..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {fruitClients.map(c => (
+                        <SelectItem key={c.id} value={c.clientId}>{c.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+              <FallCreekReceptionWorkflow />
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <>
