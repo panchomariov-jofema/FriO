@@ -32,12 +32,13 @@ interface StoredOtherFruitItem {
 export function StockAndRelocationTab({ clientId: fixedClientId }: { clientId?: string }) {
   const { data: allReceptions, loading: loadingReceptions } = useFirestoreCollection<OtherFruitReception>('otherFruitReceptions');
   const { data: allChamberLots, loading: loadingChamberLots } = useFirestoreCollection<ChamberLot>('chamberLots');
+  const { data: clientConfigs, loading: loadingConfigs } = useFirestoreCollection<ClientStorageConfig>('clientStorageConfigs');
   const [itemToRelocate, setItemToRelocate] = React.useState<StoredOtherFruitItem | null>(null);
   const [isDialogOpen, setDialogOpen] = React.useState(false);
   const firestore = useFirestore();
   const { toast } = useToast();
 
-  const loading = loadingReceptions || loadingChamberLots;
+  const loading = loadingReceptions || loadingChamberLots || loadingConfigs;
 
   const storedItems = React.useMemo(() => {
     const filteredReceptions = (allReceptions || []).filter(r => !fixedClientId || r.clientId === fixedClientId);
@@ -161,6 +162,7 @@ export function StockAndRelocationTab({ clientId: fixedClientId }: { clientId?: 
         onRelocate={handleRelocateConfirm}
         allChamberLots={allChamberLots || []}
         allOtherFruitReceptions={allReceptions || []}
+        clientConfigs={clientConfigs || []}
        />
     </>
   );

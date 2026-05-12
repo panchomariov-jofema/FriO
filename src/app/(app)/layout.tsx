@@ -43,7 +43,6 @@ import type { UserMaster, Profile, ModulePermission, OtherFruitReception, Packag
 import { signOut } from 'firebase/auth';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { cn } from '@/lib/utils';
-import { ChamberStrategyProvider } from '@/contexts/ChamberStrategyContext';
 import { FrioLogo } from '@/components/ui/FrioLogo';
 import { CustomAppleIcon } from '@/components/ui/CustomAppleIcon';
 import { PermissionsProvider } from '@/contexts/PermissionsContext';
@@ -386,9 +385,7 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <SidebarProvider defaultOpen={true}>
-      <ChamberStrategyProvider>
-        <AppLayoutContent>{children}</AppLayoutContent>
-      </ChamberStrategyProvider>
+      <AppLayoutContent>{children}</AppLayoutContent>
     </SidebarProvider>
   )
 }

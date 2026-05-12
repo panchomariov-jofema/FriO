@@ -13,6 +13,7 @@ import { chambersConfig } from '@/lib/chambers-config';
 import { Alert, AlertDescription } from '../ui/alert';
 import { useToast } from '@/hooks/use-toast';
 import { naturalSort } from '@/lib/utils';
+import type { ClientStorageConfig, Exporter } from '@/lib/types';
 
 interface RelocateLotDialogProps {
   open: boolean;
@@ -23,6 +24,8 @@ interface RelocateLotDialogProps {
   lotsInCoordinate: StoredItem[];
   allChamberLots: ChamberLot[];
   allOtherFruitReceptions: OtherFruitReception[];
+  clientConfigs: ClientStorageConfig[];
+  exporters: Exporter[];
 }
 
 const relocateSchema = z.object({
@@ -41,6 +44,8 @@ export function RelocateLotDialog({
   lotsInCoordinate,
   allChamberLots,
   allOtherFruitReceptions,
+  clientConfigs,
+  exporters,
 }: RelocateLotDialogProps) {
   const { toast } = useToast();
   const form = useForm<RelocateFormValues>({
@@ -64,36 +69,100 @@ export function RelocateLotDialog({
         .filter(coord => !chamberConfig.blocked?.includes(coord))
         .sort(naturalSort);
 
-    const occupiedCoords = new Set<string>();
-
+    // 1. Calculate current occupancy and document set for all coordinates in target chamber
+    const occupancyMap = new Map<string, { quantity: number; ownerName: string; unit: string; documents: Set<string> }>();
+    
     allChamberLots.forEach(lot => {
       if (lot.status === 'Almacenado' && lot.chamberId === targetChamberId && lot.coordinate) {
-        occupiedCoords.add(lot.coordinate);
+        const current = occupancyMap.get(lot.coordinate) || { quantity: 0, ownerName: lot.producerShortName, unit: 'Bins', documents: new Set<string>() };
+        current.documents.add(lot.document);
+        occupancyMap.set(lot.coordinate, { 
+            quantity: current.quantity + lot.binCount, 
+            ownerName: lot.producerShortName, 
+            unit: 'Bins',
+            documents: current.documents
+        });
       }
     });
 
     allOtherFruitReceptions.forEach(reception => {
         reception.items.forEach(item => {
             if(item.status === 'Almacenado' && item.storageLocation?.chamberId === targetChamberId && item.storageLocation.coordinate) {
-                 occupiedCoords.add(item.storageLocation.coordinate);
+                const current = occupancyMap.get(item.storageLocation.coordinate) || { quantity: 0, ownerName: reception.clientName, unit: reception.unit, documents: new Set<string>() };
+                current.documents.add(reception.document);
+                
+                // Determine units: if it's Fall Creek, 1 pallet = 3 bins.
+                const multiplier = (reception.clientName === 'FALL CREEK' && reception.unit === 'Pallets') ? 3 : (reception.unit === 'Bins' ? 1 : 2);
+                const equivalentUnits = item.quantity * multiplier;
+
+                occupancyMap.set(item.storageLocation.coordinate, { 
+                    quantity: current.quantity + equivalentUnits, 
+                    ownerName: reception.clientName, 
+                    unit: reception.unit,
+                    documents: current.documents
+                });
             }
         });
     });
 
-    // We can move to the same coordinate if we are changing chambers
-    if (sourceChamberId !== targetChamberId) {
-        // occupiedCoords doesn't need change
-    } else {
-    // If moving within the same chamber, the source coord is available
-      occupiedCoords.delete(sourceCoordinate);
-    }
-    
-    const available = allPossibleCoords.filter(coord => !occupiedCoords.has(coord));
+    // 2. Determine quantity and identity of lot to relocate
+    const quantityToRelocate = lotsInCoordinate.reduce((sum, item) => {
+        const multiplier = (item.ownerName === 'FALL CREEK' && item.unit === 'Pallets') ? 3 : (item.unit === 'Bins' ? 1 : 2);
+        return sum + (item.quantity * multiplier);
+    }, 0);
+
+    const firstItemToRelocate = lotsInCoordinate[0];
+    const incomingOwnerName = firstItemToRelocate?.ownerName || '';
+    const incomingDocument = firstItemToRelocate?.receptionId ? 
+        allOtherFruitReceptions.find(r => r.id === firstItemToRelocate.receptionId)?.document : 
+        allChamberLots.find(l => l.displayLotId === firstItemToRelocate.displayId)?.document;
+
+    // 3. Filter coordinates by capacity and mixing rules
+    const available = allPossibleCoords.filter(coord => {
+        // Always exclude source coordinate if moving within the same chamber
+        if (targetChamberId === sourceChamberId && coord === sourceCoordinate) return false;
+
+        const occupancyData = occupancyMap.get(coord);
+        const currentOccupancy = occupancyData?.quantity || 0;
+        
+        // Rule: Absolute maximum capacity of 9 Bins
+        const MAX_CAPACITY = 9;
+        if ((currentOccupancy + quantityToRelocate) > MAX_CAPACITY) return false;
+
+        // If coordinate is not empty, check mixing rules
+        if (occupancyData && occupancyData.quantity > 0) {
+            const existingOwnerName = occupancyData.ownerName;
+            
+            // Find types in exporters list
+            const existingExporter = exporters.find(e => e.name.toUpperCase() === existingOwnerName.toUpperCase());
+            const incomingExporter = exporters.find(e => e.name.toUpperCase() === incomingOwnerName.toUpperCase());
+            
+            const existingType = existingExporter?.type?.toUpperCase() || 'EXPORTADOR';
+            const incomingType = incomingExporter?.type?.toUpperCase() || 'EXPORTADOR';
+
+            // REGLA CEREZA: Solo mismo cliente y mismo documento
+            if (existingType === 'CEREZA') {
+                if (existingOwnerName.toUpperCase() !== incomingOwnerName.toUpperCase()) return false;
+                if (!incomingDocument || !occupancyData.documents.has(incomingDocument)) return false;
+            } 
+            // REGLA EXPORTADOR: Solo mismo cliente (permite distintos documentos)
+            else if (existingType === 'EXPORTADOR') {
+                if (existingOwnerName.toUpperCase() !== incomingOwnerName.toUpperCase()) return false;
+            }
+            // Fallback for safety: if they are different owners, don't mix unless both are EXPORTADOR and rules say so
+            // But the rule says "no entre exportadores", so same owner is always required.
+            else {
+                if (existingOwnerName.toUpperCase() !== incomingOwnerName.toUpperCase()) return false;
+            }
+        }
+
+        return true;
+    });
 
     return { 
         availableCoordinates: available,
     };
-  }, [targetChamberId, allChamberLots, allOtherFruitReceptions, sourceChamberId, sourceCoordinate]);
+  }, [targetChamberId, allChamberLots, allOtherFruitReceptions, sourceChamberId, sourceCoordinate, lotsInCoordinate, clientConfigs, exporters]);
 
 
   React.useEffect(() => {
@@ -173,11 +242,11 @@ export function RelocateLotDialog({
               name="targetCoordinate"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Coordenada de Destino (Solo vacías)</FormLabel>
+                  <FormLabel>Coordenada de Destino (Disponibles según reglas)</FormLabel>
                   <Select onValueChange={field.onChange} value={field.value} disabled={!targetChamberId || availableCoordinates.length === 0}>
                     <FormControl>
                       <SelectTrigger>
-                        <SelectValue placeholder={!targetChamberId ? "Seleccione una cámara primero" : "Seleccione una coordenada vacía"} />
+                      <SelectValue placeholder={!targetChamberId ? "Seleccione una cámara primero" : "Seleccione una coordenada"} />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
@@ -186,7 +255,7 @@ export function RelocateLotDialog({
                           <SelectItem key={coord} value={coord}>{coord}</SelectItem>
                         ))
                       ) : (
-                        <div className="p-4 text-sm text-center text-muted-foreground">No hay coordenadas vacías.</div>
+                        <div className="p-4 text-sm text-center text-muted-foreground">No hay coordenadas con capacidad suficiente.</div>
                       )}
                     </SelectContent>
                   </Select>

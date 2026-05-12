@@ -12,6 +12,7 @@ import type { ChamberLot, OtherFruitReception } from '@/lib/types';
 import { chambersConfig } from '@/lib/chambers-config';
 import { useToast } from '@/hooks/use-toast';
 import { naturalSort } from '@/lib/utils';
+import type { ClientStorageConfig } from '@/lib/types';
 
 // This will represent a single, located item from an OtherFruitReception
 interface StoredOtherFruitItem {
@@ -35,6 +36,7 @@ interface RelocateOtherFruitDialogProps {
   item: StoredOtherFruitItem | null;
   allChamberLots: ChamberLot[];
   allOtherFruitReceptions: OtherFruitReception[];
+  clientConfigs: ClientStorageConfig[];
 }
 
 const relocateSchema = z.object({
@@ -51,6 +53,7 @@ export function RelocateOtherFruitDialog({
   item,
   allChamberLots,
   allOtherFruitReceptions,
+  clientConfigs,
 }: RelocateOtherFruitDialogProps) {
   const { toast } = useToast();
   const form = useForm<RelocateFormValues>({
@@ -69,30 +72,67 @@ export function RelocateOtherFruitDialog({
     const chamberConfig = chambersConfig[targetChamberId];
     if (!chamberConfig) return { availableCoordinates: [] };
 
-    const allPossibleCoords = chamberConfig.columns.flatMap(col => chamberConfig.rows.map(row => `${col.name}${row}`)).sort(naturalSort);
-    
-    const occupiedCoords = new Set<string>();
+    const allPossibleCoords = chamberConfig.columns
+        .flatMap(col => chamberConfig.rows.map(row => `${col.name}${row}`))
+        .filter(coord => !chamberConfig.blocked?.includes(coord))
+        .sort(naturalSort);
 
+    // 1. Calculate current occupancy for all coordinates in target chamber
+    const occupancyMap = new Map<string, { quantity: number; ownerName: string }>();
+    
     allChamberLots.forEach(lot => {
       if (lot.status === 'Almacenado' && lot.chamberId === targetChamberId && lot.coordinate) {
-        occupiedCoords.add(lot.coordinate);
+        const current = occupancyMap.get(lot.coordinate) || { quantity: 0, ownerName: lot.producerShortName };
+        occupancyMap.set(lot.coordinate, { 
+            quantity: current.quantity + lot.binCount, 
+            ownerName: lot.producerShortName 
+        });
       }
     });
 
     allOtherFruitReceptions.forEach(reception => {
-        reception.items.forEach(item => {
-            if(item.status === 'Almacenado' && item.storageLocation?.chamberId === targetChamberId && item.storageLocation.coordinate) {
-                 occupiedCoords.add(item.storageLocation.coordinate);
+        reception.items.forEach(it => {
+            if(it.status === 'Almacenado' && it.storageLocation?.chamberId === targetChamberId && it.storageLocation.coordinate) {
+                const current = occupancyMap.get(it.storageLocation.coordinate) || { quantity: 0, ownerName: reception.clientName };
+                // Determine units: if it's Fall Creek, 1 pallet = 3 bins.
+                const multiplier = (reception.clientName === 'FALL CREEK' && reception.unit === 'Pallets') ? 3 : (reception.unit === 'Bins' ? 1 : 2);
+                const equivalentUnits = it.quantity * multiplier;
+
+                occupancyMap.set(it.storageLocation.coordinate, { 
+                    quantity: current.quantity + equivalentUnits, 
+                    ownerName: reception.clientName 
+                });
             }
         });
     });
-    
-    const available = allPossibleCoords.filter(coord => !occupiedCoords.has(coord));
+
+    // 2. Determine quantity to relocate
+    if (!item) return { availableCoordinates: [] };
+    const multiplier = (item.clientName === 'FALL CREEK' && item.unit === 'Pallets') ? 3 : (item.unit === 'Bins' ? 1 : 2);
+    const quantityToRelocate = item.quantity * multiplier;
+
+    // 3. Filter coordinates by capacity
+    const available = allPossibleCoords.filter(coord => {
+        // Always exclude source coordinate if moving within the same chamber
+        if (targetChamberId === item.location.chamberId && coord === item.location.coordinate) return false;
+
+        const occupancyData = occupancyMap.get(coord);
+        const currentOccupancy = occupancyData?.quantity || 0;
+        
+        // Determine capacity for this coordinate
+        const relevantClientName = occupancyData?.ownerName || item.clientName || '';
+        const clientConfig = clientConfigs.find(c => c.clientName.toUpperCase() === relevantClientName.toUpperCase());
+        
+        const defaultBinsPerCoord = relevantClientName.toUpperCase() === 'FALL CREEK' ? 9 : 6;
+        const capacity = clientConfig?.binsPerCoordinate ?? defaultBinsPerCoord;
+
+        return (currentOccupancy + quantityToRelocate) <= capacity;
+    });
 
     return { 
         availableCoordinates: available,
     };
-  }, [targetChamberId, allChamberLots, allOtherFruitReceptions]);
+  }, [targetChamberId, allChamberLots, allOtherFruitReceptions, item, clientConfigs]);
 
 
   React.useEffect(() => {
@@ -161,7 +201,7 @@ export function RelocateOtherFruitDialog({
                   <Select onValueChange={field.onChange} value={field.value} disabled={!targetChamberId || availableCoordinates.length === 0}>
                     <FormControl>
                       <SelectTrigger>
-                        <SelectValue placeholder={!targetChamberId ? "Seleccione una cámara primero" : "Seleccione una coordenada vacía"} />
+                      <SelectValue placeholder={!targetChamberId ? "Seleccione una cámara primero" : "Seleccione una coordenada"} />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
@@ -170,7 +210,7 @@ export function RelocateOtherFruitDialog({
                           <SelectItem key={coord} value={coord}>{coord}</SelectItem>
                         ))
                       ) : (
-                        <div className="p-4 text-sm text-center text-muted-foreground">No hay coordenadas vacías.</div>
+                        <div className="p-4 text-sm text-center text-muted-foreground">No hay coordenadas con capacidad suficiente.</div>
                       )}
                     </SelectContent>
                   </Select>

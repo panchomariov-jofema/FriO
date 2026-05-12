@@ -29,7 +29,7 @@ import { ChamberTemperatureInput } from '@/components/camaras/ChamberTemperature
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useChamberStrategy } from '@/contexts/ChamberStrategyContext';
+
 
 
 // --- Color Palette Logic (Moved outside component to persist state) ---
@@ -92,9 +92,6 @@ export default function CamarasPage() {
   const [latestTemperatures, setLatestTemperatures] = React.useState<Record<string, ChamberTemperature | null>>({});
   const { toast } = useToast();
   const [showChamberStatus, setShowChamberStatus] = React.useState(false);
-  const { chamberStrategies, setChamberStrategies } = useChamberStrategy();
-  const [strategyChangeToConfirm, setStrategyChangeToConfirm] = React.useState<{ chamberId: string; strategy: 'secuencial' | 'fifo' | 'aisle-access' } | null>(null);
-
   const loading = loadingPendingLots || loadingStoredLots || loadingOtherFruit || loadingExporters || loadingConfigs;
   
   React.useEffect(() => {
@@ -249,7 +246,8 @@ export default function CamarasPage() {
     const BINS_PER_COORDINATE = clientConfig?.binsPerCoordinate || 6;
     const PALLETS_PER_COORDINATE = clientConfig?.palletsPerCoordinate || 3;
     const chamberConfig = chambersConfig[chamberId];
-    const strategy = chamberStrategies[chamberId] || 'secuencial';
+    const exporter = (exporters || []).find(e => e.exporterId === lotToStore.exporterId);
+    const strategy = exporter?.storageStrategy || 'secuencial';
   
     // 1. Get a fresh snapshot of all occupied coordinates
     const occupiedCoordinates = new Map<string, { displayLotId: string; binCount: number }[]>();
@@ -481,26 +479,6 @@ export default function CamarasPage() {
     }
   };
 
-  const handleStrategyChange = (chamberId: string, newStrategy: 'secuencial' | 'fifo' | 'aisle-access') => {
-    if (newStrategy === 'secuencial') {
-        setStrategyChangeToConfirm({ chamberId, strategy: newStrategy });
-    } else {
-        setChamberStrategies(prev => ({
-            ...prev,
-            [chamberId]: newStrategy,
-        }));
-    }
-  };
-
-  const confirmStrategyChange = () => {
-      if (strategyChangeToConfirm) {
-          setChamberStrategies(prev => ({
-              ...prev,
-              [strategyChangeToConfirm.chamberId]: strategyChangeToConfirm.strategy,
-          }));
-          setStrategyChangeToConfirm(null);
-      }
-  };
 
   const lotsInCoordToRelocate = coordToRelocate ? storedItemsByChamber[coordToRelocate.chamberId]?.[coordToRelocate.coordinate] || [] : [];
 
@@ -660,24 +638,6 @@ export default function CamarasPage() {
                             </div>
                         </AccordionTrigger>
                         <AccordionContent>
-                            <div className="flex items-center space-x-4 px-4 pb-4 border-b">
-                                <Label htmlFor={`strategy-select-${chamberId}`} className="text-sm font-medium">Estrategia de Almacenamiento:</Label>
-                                <Select 
-                                    value={chamberStrategies[chamberId] || 'secuencial'} 
-                                    onValueChange={(value) => handleStrategyChange(chamberId, value as any)}
-                                >
-                                    <SelectTrigger id={`strategy-select-${chamberId}`} className="w-[200px] h-8 text-xs">
-                                        <SelectValue placeholder="Seleccione..." />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="secuencial">Lineal (A1 &rarr; L12)</SelectItem>
-                                        <SelectItem value="inverted-secuencial">Invertido (A12 &rarr; A1)</SelectItem>
-                                        <SelectItem value="horizontal-secuencial">Horizontal (A1 &rarr; O1)</SelectItem>
-                                        <SelectItem value="fifo">FIFO (Serpiente)</SelectItem>
-                                        <SelectItem value="aisle-access">Acceso Pasillos (Fall Creek)</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
                             <div className="p-2 sm:p-4 bg-muted/50 rounded-b-lg border border-t-0 overflow-x-auto">
                                 <div className="grid gap-1" style={{ 
                                     gridTemplateRows: `repeat(${config.rows.length}, minmax(0, 1fr))`,
@@ -767,7 +727,6 @@ export default function CamarasPage() {
             onStore={handleStoreInChamber}
             allChamberLots={allLotsInChambers.filter(l => l.status === 'Almacenado')}
             allOtherFruitReceptions={otherFruitReceptions || []}
-            chamberStrategies={chamberStrategies}
         />
       )}
 
@@ -781,25 +740,10 @@ export default function CamarasPage() {
             lotsInCoordinate={lotsInCoordToRelocate}
             allChamberLots={allLotsInChambers.filter(l => l.status === 'Almacenado')}
             allOtherFruitReceptions={otherFruitReceptions || []}
+            clientConfigs={clientConfigs || []}
+            exporters={exporters || []}
         />
       )}
-      <AlertDialog open={!!strategyChangeToConfirm} onOpenChange={() => setStrategyChangeToConfirm(null)}>
-        <AlertDialogContent>
-            <AlertDialogHeader>
-                <AlertDialogTitle>¿Desactivar Layout FIFO?</AlertDialogTitle>
-                <AlertDialogDescription>
-                    Esta acción cambiará el criterio visual para futuros almacenamientos en esta cámara.
-                    El almacenamiento existente no se verá afectado. ¿Desea continuar?
-                </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-                <AlertDialogCancel onClick={() => setStrategyChangeToConfirm(null)}>Cancelar</AlertDialogCancel>
-                <AlertDialogAction onClick={confirmStrategyChange}>
-                    Sí, Desactivar
-                </AlertDialogAction>
-            </AlertDialogFooter>
-        </AlertDialogContent>
-    </AlertDialog>
     </div>
   );
 }

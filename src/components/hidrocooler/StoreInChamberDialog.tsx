@@ -19,7 +19,7 @@ interface StoreInChamberDialogProps {
   onStore: (data: { chamberId: string, coordinate: string }) => void;
   allChamberLots: ChamberLot[];
   allOtherFruitReceptions: OtherFruitReception[];
-  chamberStrategies: Record<string, 'secuencial' | 'fifo' | 'aisle-access'>;
+  chamberStrategies?: Record<string, 'secuencial' | 'fifo' | 'aisle-access'>;
 }
 
 const storeSchema = z.object({
@@ -29,7 +29,7 @@ const storeSchema = z.object({
 
 type StoreFormValues = z.infer<typeof storeSchema>;
 
-export function StoreInChamberDialog({ lot, open, onOpenChange, onStore, allChamberLots, allOtherFruitReceptions, chamberStrategies }: StoreInChamberDialogProps) {
+export function StoreInChamberDialog({ lot, open, onOpenChange, onStore, allChamberLots, allOtherFruitReceptions, chamberStrategies = {} }: StoreInChamberDialogProps) {
   const form = useForm<StoreFormValues>({
     resolver: zodResolver(storeSchema),
     defaultValues: {
@@ -66,7 +66,7 @@ export function StoreInChamberDialog({ lot, open, onOpenChange, onStore, allCham
     });
 
     // Determine strategy to find the SUGGESTION
-    const strategy = chamberStrategies[selectedChamberId] || 'secuencial';
+    const strategy = chamberStrategies?.[selectedChamberId] || 'secuencial';
 
     // Get the full sorted list based on the strategy to find the first available spot
     const strategyPath = getSortedCoordinates(chamberConfig, strategy);

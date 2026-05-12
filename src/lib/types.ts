@@ -464,6 +464,13 @@ export interface BusinessEntity {
   actividadComercial: string;
 }
 
+export interface ReportSetting {
+  id: string;
+  reportId: string;
+  hidden: boolean;
+}
+
+
 export type MasterData = Exporter | Producer | BinMaterial | OtherClient | PackagingMaster | UserMaster | Profile | Packing | Hidrocooler | BusinessEntity | Warehouse | Aisle;
 
 export interface Warehouse {
@@ -477,12 +484,6 @@ export interface Aisle {
   warehouseIds: string[];
 }
 
-export interface ReportSetting {
-  id: string;
-  reportId: string;
-  hidden: boolean;
-}
-
 
 export interface ClientStorageConfig {
   id: string; // ClientId (Exporter ID or OtherClient ID)
@@ -490,6 +491,7 @@ export interface ClientStorageConfig {
   strategy: 'secuencial' | 'fifo' | 'aisle-access' | 'horizontal-secuencial' | 'inverted-secuencial';
   binsPerCoordinate: number;
   palletsPerCoordinate: number;
+  preferredChamberId?: string;
   chamberOverrides?: Record<string, number>; // chamberId -> reservedCapacity
 }
 

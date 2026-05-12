@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QRs de Prueba - FrigoManager</title>
+    <style>
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            text-align: center; 
+            padding: 40px;
+            background-color: #f4f7f6;
+            color: #333;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        }
+        h1 { 
+            color: #004b8d; 
+            margin-bottom: 10px;
+        }
+        p {
+            color: #666;
+            margin-bottom: 30px;
+        }
+        .grid { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); 
+            gap: 25px; 
+        }
+        .qr-card { 
+            border: 2px solid #eee; 
+            padding: 20px; 
+            border-radius: 12px; 
+            background: white;
+            transition: transform 0.2s;
+        }
+        .qr-card:hover {
+            transform: translateY(-5px);
+            border-color: #7aba28;
+        }
+        .qr-id { 
+            font-weight: bold; 
+            margin-top: 15px; 
+            color: #004b8d; 
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 1.1em;
+        }
+        img { 
+            width: 150px; 
+            height: 150px; 
+            border-radius: 5px;
+        }
+        .footer {
+            margin-top: 50px;
+            font-size: 0.8em;
+            color: #999;
+            border-top: 1px solid #eee;
+            padding-top: 20px;
+        }
+        @media print {
+            body { background: white; padding: 0; }
+            .container { box-shadow: none; width: 100%; }
+            .qr-card { break-inside: avoid; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Códigos QR de Prueba</h1>
+        <p>Utilice estos códigos para validar el flujo de recepción de Bins (Fall Creek / Otros).</p>
+        
+        <div class="grid">
+            <div class="qr-card">
+                <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=BIN-FC-0001" alt="QR 0001">
+            </div>
+            <div class="qr-card">
+                <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=BIN-FC-0002" alt="QR 0002">
+            </div>
+            <div class="qr-card">
+                <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=BIN-FC-0003" alt="QR 0003">
+            </div>
+            <div class="qr-card">
+                <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=BIN-FC-0004" alt="QR 0004">
+            </div>
+            <div class="qr-card">
+                <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=BIN-FC-0005" alt="QR 0005">
+            </div>
+            <div class="qr-card">
+                <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=BIN-FC-0006" alt="QR 0006">
+            </div>
+            <div class="qr-card">
+                <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=BIN-FC-0007" alt="QR 0007">
+            </div>
+            <div class="qr-card">
+                <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=BIN-FC-0008" alt="QR 0008">
+            </div>
+            <div class="qr-card">
+                <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=BIN-FC-0009" alt="QR 0009">
+            </div>
+            <div class="qr-card">
+                <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=BIN-FC-0010" alt="QR 0010">
+            </div>
+        </div>
+
+        <div class="footer">
+            Generado automáticamente por Antigravity para FrigoManager &bull; 2024
+        </div>
+    </div>
+</body>
+</html>

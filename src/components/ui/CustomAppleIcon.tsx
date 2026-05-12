@@ -9,14 +9,16 @@ export const CustomAppleIcon = React.forwardRef<SVGSVGElement, React.SVGProps<SV
         viewBox="0 0 24 24"
         fill="none"
         stroke="currentColor"
-        strokeWidth="2.5"
+        strokeWidth="2"
         strokeLinecap="round"
         strokeLinejoin="round"
         className={cn("", className)}
         {...props}
     >
-        <path d="M12 20.94c1.5 0 2.75 1.06 4 1.06 3 0 6-8 6-12.22A4.91 4.91 0 0 0 17 5c-2.22 0-4 1.44-5 2-1-.56-2.78-2-5-2a4.9 4.9 0 0 0-5 4.78C2 14 5 22 8 22c1.25 0 2.5-1.06 4-1.06Z" />
-        <path d="M8.5 1.5 C 9.5 -0.5, 11.5 3.5, 14.5 1.5" stroke="currentColor" strokeWidth="2.5"/>
+        {/* Simplified Geometric Apple for Icon Use */}
+        <path d="M12 21C7 21 3 17.5 3 12C3 7 7.5 4.5 12 7.5C16.5 4.5 21 7 21 12C21 17.5 17 21 12 21Z" fill="currentColor" fillOpacity="0.15" />
+        <path d="M12 21C7 21 3 17.5 3 12C3 7 7.5 4.5 12 7.5C16.5 4.5 21 7 21 12C21 17.5 17 21 12 21Z" />
+        <path d="M12.5 7.5C13 3 18 2.5 19 5C19 8 14 9 12.5 7.5Z" fill="currentColor" />
     </svg>
 ));
 CustomAppleIcon.displayName = 'CustomAppleIcon';

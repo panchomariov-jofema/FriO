@@ -27,11 +27,26 @@ const cleanVarietyName = (name: string) => {
     return name;
 };
 
-export function FallCreekReceptionWorkflow() {
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
+
+export function FallCreekReceptionWorkflow({ 
+    directStorageMode, 
+    onTriggerStorage 
+}: { 
+    directStorageMode?: boolean, 
+    onTriggerStorage?: (item: any) => void 
+}) {
     const firestore = useFirestore();
     const { toast } = useToast();
     const { data: allReceptions, loading } = useFirestoreCollection<OtherFruitReception>('otherFruitReceptions');
     
+    // Fetch necessary collections for direct storage suggestions (optional here if we pass item up)
+    const { data: exporters } = useFirestoreCollection<any>('exporters');
+    const { data: otherClients } = useFirestoreCollection<any>('otherClients');
+    const { data: clientConfigs } = useFirestoreCollection<any>('clientStorageConfigs');
+    const { data: allChamberLots } = useFirestoreCollection<any>('chamberLots');
+
     const [selectedManifestId, setSelectedManifestId] = React.useState<string | null>(null);
     const [selectedPalletId, setSelectedPalletId] = React.useState<string | null>(null);
     const [scannedBins, setScannedBins] = React.useState<string[]>([]);
@@ -88,14 +103,32 @@ export function FallCreekReceptionWorkflow() {
 
     const handleScan = (qrCode: string) => {
         if (!qrCode) return;
+        
+        // 1. Check local session (current pallet)
         if (scannedBins.includes(qrCode)) {
-            toast({ variant: 'destructive', title: 'Error', description: 'Este código ya ha sido escaneado.' });
+            toast({ variant: 'destructive', title: 'Error', description: 'Este código ya ha sido escaneado en este pallet.' });
             return;
         }
+
+        // 2. Global Uniqueness Check (Across all manifests/years)
+        const existingReception = allReceptions?.find(r => 
+            r.items.some(item => item.containerId === qrCode)
+        );
+
+        if (existingReception) {
+            toast({ 
+                variant: 'destructive', 
+                title: 'Bin ya registrado', 
+                description: `El bin ${qrCode} ya fue recibido previamente en el manifiesto "${existingReception.document}".` 
+            });
+            return;
+        }
+
         if (scannedBins.length >= 3) {
             toast({ variant: 'destructive', title: 'Error', description: 'Ya se han escaneado los 3 bins de este pallet.' });
             return;
         }
+
         setScannedBins(prev => [...prev, qrCode]);
         setScanning(false);
     };
@@ -129,6 +162,35 @@ export function FallCreekReceptionWorkflow() {
             });
 
             toast({ title: 'Éxito', description: `Pallet ${selectedPalletId} actualizado.` });
+            
+            // If directStorageMode is ON, trigger storage dialog
+            if (directStorageMode && onTriggerStorage) {
+                // Construct a consolidated item for storage
+                const palletItems = updatedItems.filter(i => i.palletId === selectedPalletId);
+                const itemIndices = updatedItems
+                    .map((it, idx) => it.palletId === selectedPalletId ? idx : -1)
+                    .filter(idx => idx !== -1);
+
+                const itemToStore = {
+                    ...palletItems[0],
+                    receptionId: activeManifest.id,
+                    clientId: activeManifest.clientId,
+                    clientName: activeManifest.clientName,
+                    document: activeManifest.document,
+                    itemIndices: itemIndices,
+                    unit: activeManifest.unit,
+                    quantity: palletItems.length // Usually 3
+                };
+
+                onTriggerStorage(itemToStore);
+            }
+            
+            // Check if manifest is fully received
+            const hasMorePending = updatedItems.some(item => item.status === 'Pendiente de recibir');
+            if (!hasMorePending) {
+                setSelectedManifestId(null);
+            }
+
             setSelectedPalletId(null);
             setScannedBins([]);
         } catch (error) {
@@ -144,13 +206,15 @@ export function FallCreekReceptionWorkflow() {
     return (
         <Card className="border-2 border-[#004b8d]/20 shadow-lg overflow-hidden">
             <CardHeader className="bg-[#004b8d]/5 border-b p-4 sm:p-6">
-                <div className="flex items-center gap-3">
-                    <div className="p-2 bg-[#004b8d] rounded-lg shrink-0">
-                        <PackageCheck className="h-5 w-5 sm:h-6 sm:h-6 text-white" />
-                    </div>
-                    <div>
-                        <CardTitle className="text-lg sm:text-xl text-[#004b8d]">Recepción Especial Fall Creek</CardTitle>
-                        <CardDescription className="text-xs sm:text-sm">Escaneo masivo de bins por Pallet ID.</CardDescription>
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                        <div className="p-2 bg-[#004b8d] rounded-lg shrink-0">
+                            <PackageCheck className="h-5 w-5 sm:h-6 text-white" />
+                        </div>
+                        <div>
+                            <CardTitle className="text-lg sm:text-xl text-[#004b8d]">Recepción Especial Fall Creek</CardTitle>
+                            <CardDescription className="text-xs sm:text-sm">Escaneo masivo de bins por Pallet ID.</CardDescription>
+                        </div>
                     </div>
                 </div>
             </CardHeader>

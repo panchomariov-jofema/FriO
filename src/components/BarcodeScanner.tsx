@@ -99,10 +99,34 @@ export function BarcodeScanner({ open, onOpenChange, onScan }: BarcodeScannerPro
             Apunte la cámara al código de barras. La lectura será automática.
           </DialogDescription>
         </DialogHeader>
-        <div id={qrcodeRegionId} className="w-full aspect-square rounded-md overflow-hidden" />
+        <div id={qrcodeRegionId} className="w-full aspect-square rounded-md overflow-hidden bg-black/5 flex items-center justify-center relative">
+           <div className="absolute inset-0 border-2 border-primary/20 pointer-events-none z-10" />
+        </div>
+        
+        <div className="pt-4 border-t">
+          <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-2">Entrada Manual / Lector Láser</p>
+          <div className="flex gap-2">
+            <input 
+              type="text" 
+              placeholder="Escriba o escanee..."
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              autoFocus
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  const val = (e.target as HTMLInputElement).value;
+                  if (val) {
+                    onScan(val);
+                    onOpenChange(false);
+                  }
+                }
+              }}
+            />
+          </div>
+        </div>
+
         <DialogFooter>
           <Button type="button" variant="secondary" onClick={() => onOpenChange(false)}>
-            Cancelar
+            Cerrar
           </Button>
         </DialogFooter>
       </DialogContent>

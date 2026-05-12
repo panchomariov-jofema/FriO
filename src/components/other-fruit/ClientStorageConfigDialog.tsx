@@ -23,6 +23,7 @@ const configSchema = z.object({
   strategy: z.enum(['secuencial', 'fifo', 'aisle-access', 'horizontal-secuencial', 'inverted-secuencial']).default('secuencial'),
   binsPerCoordinate: z.coerce.number().min(1).max(20).default(6),
   palletsPerCoordinate: z.coerce.number().min(1).max(10).default(3),
+  preferredChamberId: z.string().optional(),
   chamberOverrides: z.record(z.coerce.number()).optional(),
 });
 
@@ -48,6 +49,7 @@ export function ClientStorageConfigDialog({ open, onOpenChange }: ClientStorageC
       strategy: 'secuencial',
       binsPerCoordinate: 6,
       palletsPerCoordinate: 3,
+      preferredChamberId: undefined,
       chamberOverrides: {},
     },
   });
@@ -67,6 +69,7 @@ export function ClientStorageConfigDialog({ open, onOpenChange }: ClientStorageC
       strategy: config.strategy,
       binsPerCoordinate: config.binsPerCoordinate,
       palletsPerCoordinate: config.palletsPerCoordinate,
+      preferredChamberId: config.preferredChamberId,
       chamberOverrides: config.chamberOverrides || {},
     });
   };
@@ -78,6 +81,7 @@ export function ClientStorageConfigDialog({ open, onOpenChange }: ClientStorageC
       strategy: 'secuencial',
       binsPerCoordinate: 6,
       palletsPerCoordinate: 3,
+      preferredChamberId: undefined,
       chamberOverrides: {},
     });
   };
@@ -95,6 +99,7 @@ export function ClientStorageConfigDialog({ open, onOpenChange }: ClientStorageC
       strategy: values.strategy,
       binsPerCoordinate: values.binsPerCoordinate,
       palletsPerCoordinate: values.palletsPerCoordinate,
+      preferredChamberId: values.preferredChamberId,
       chamberOverrides: values.chamberOverrides,
     };
 
@@ -243,6 +248,33 @@ export function ClientStorageConfigDialog({ open, onOpenChange }: ClientStorageC
                         <Input type="number" {...field} />
                       </FormControl>
                       <FormDescription>Estándar: 3. Fall Creek: 3.</FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="preferredChamberId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Cámara Preferida (Opcional)</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Cualquiera..." />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="none">Cualquiera</SelectItem>
+                          {Object.values(chambersConfig).map(chamber => (
+                            <SelectItem key={chamber.id} value={chamber.id}>
+                              {chamber.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormDescription>Si se define, el sistema sugerirá esta cámara primero.</FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}

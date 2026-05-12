@@ -10,11 +10,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
-import type { OtherClient, OtherFruitReceptionItem } from '@/lib/types';
+import type { OtherClient, OtherFruitReceptionItem, OtherFruitReception } from '@/lib/types';
 import { otherFruitReceptionSchema } from '@/lib/schemas';
 import { PlusCircle, ScanLine, Trash2 } from 'lucide-react';
 import { useFirestore } from '@/firebase';
-import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
+import { doc, updateDoc, addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
@@ -23,6 +23,10 @@ import { usePackagingMastersByClient } from '@/hooks/usePackagingMastersByClient
 import { Checkbox } from '../ui/checkbox';
 import { BarcodeScanner } from '../BarcodeScanner';
 import { FallCreekReceptionWorkflow } from './FallCreekReceptionWorkflow';
+import { chambersConfig } from '@/lib/chambers-config';
+import { getSortedCoordinates, getPairedCoordinates } from '@/lib/utils';
+import { Switch } from '@/components/ui/switch';
+import { StoreOtherFruitDialog } from './StoreOtherFruitDialog';
 
 type ReceptionFormValues = z.infer<typeof otherFruitReceptionSchema>;
 
@@ -38,10 +42,119 @@ export function OtherFruitReceptionTab({ clientId: fixedClientId }: { clientId?:
   const { data: allClients, loading: loadingClients } = useFirestoreCollection<OtherClient>('otherClients');
   const firestore = useFirestore();
   const { toast } = useToast();
+  
+  const { data: exporters } = useFirestoreCollection<any>('exporters');
+  const { data: otherClients } = useFirestoreCollection<any>('otherClients');
+  const { data: clientConfigs } = useFirestoreCollection<any>('clientStorageConfigs');
+  const { data: allChamberLots } = useFirestoreCollection<any>('chamberLots');
+  const { data: allReceptions } = useFirestoreCollection<OtherFruitReception>('otherFruitReceptions');
+
   const [selectedClient, setSelectedClient] = React.useState<OtherClient | null>(null);
   const [scanningIndex, setScanningIndex] = React.useState<number | null>(null);
   const [showClientLot, setShowClientLot] = React.useState(false);
   const [showTemperature, setShowTemperature] = React.useState(false);
+  const [directStorageMode, setDirectStorageMode] = React.useState(true);
+  const [itemToStore, setItemToStore] = React.useState<any | null>(null);
+  const [isStoreDialogOpen, setIsStoreDialogOpen] = React.useState(false);
+
+  const onStoreConfirm = async (data: { chamberId: string; coordinate: string; totalQuantity: number; quantityPerLocation: number; strategy: any }) => {
+    if (!itemToStore || !firestore || !allReceptions) return;
+
+    const { chamberId, coordinate: startCoordinate, totalQuantity, quantityPerLocation, strategy } = data;
+
+    const originalReception = allReceptions.find(r => r.id === itemToStore.receptionId);
+    if (!originalReception) {
+        toast({ title: "Error", description: "No se encontró la recepción original.", variant: "destructive" });
+        return;
+    }
+
+    const chamberConfig = chambersConfig[chamberId];
+    if (!chamberConfig) return;
+
+    const occupancyMap = new Map<string, number>();
+    (allChamberLots || []).forEach(l => {
+        if (l.status === 'Almacenado' && l.chamberId === chamberId && l.coordinate) {
+            occupancyMap.set(l.coordinate, (occupancyMap.get(l.coordinate) || 0) + l.binCount);
+        }
+    });
+    allReceptions.forEach(r => {
+        r.items.forEach((item) => {
+            if (item.status === 'Almacenado' && item.storageLocation?.chamberId === chamberId && item.storageLocation.coordinate) {
+                const multiplier = (r.clientName === 'FALL CREEK' && r.unit === 'Pallets') ? 3 : (r.unit === 'Bins' ? 1 : 2);
+                const equivalentUnits = item.quantity * multiplier;
+                occupancyMap.set(item.storageLocation.coordinate, (occupancyMap.get(item.storageLocation.coordinate) || 0) + equivalentUnits);
+            }
+        });
+    });
+
+    let allPossibleCoords;
+    if (strategy === 'pareado') {
+        allPossibleCoords = getPairedCoordinates(chamberConfig);
+    } else {
+        allPossibleCoords = getSortedCoordinates(chamberConfig, strategy || 'secuencial');
+    }
+
+    const itemsToProcess = itemToStore.itemIndices.map((idx: number) => originalReception.items[idx]);
+    const updatedItems = [...originalReception.items];
+    
+    let remainingToStore = totalQuantity;
+    const startIndex = allPossibleCoords.indexOf(startCoordinate);
+    const coordsToFill = allPossibleCoords.slice(startIndex);
+    
+    let currentCoordIdx = 0;
+    const occupancyThreshold = quantityPerLocation;
+
+    for (const idx of itemToStore.itemIndices) {
+        if (remainingToStore <= 0) break;
+        if (currentCoordIdx >= coordsToFill.length) break;
+
+        let itemToProcess = updatedItems[idx];
+        const isFallCreek = originalReception.clientName === 'FALL CREEK';
+        const unitsPerItem = (isFallCreek && originalReception.unit === 'Pallets') ? 3 : 1;
+
+        while (currentCoordIdx < coordsToFill.length) {
+            let currentCoord = coordsToFill[currentCoordIdx];
+            const currentOccupancy = occupancyMap.get(currentCoord) || 0;
+            const availableSpace = Math.max(0, occupancyThreshold - currentOccupancy);
+
+            if (availableSpace < unitsPerItem || chamberConfig.blocked?.includes(currentCoord)) {
+                currentCoordIdx++;
+                continue;
+            }
+
+            updatedItems[idx] = {
+                ...itemToProcess,
+                status: 'Almacenado',
+                storageLocation: {
+                    chamberId,
+                    coordinate: currentCoord
+                },
+                storedAt: new Date()
+            };
+            
+            occupancyMap.set(currentCoord, currentOccupancy + unitsPerItem);
+            remainingToStore -= 1;
+            break;
+        }
+    }
+
+    try {
+        const allStored = updatedItems.every(i => i.status === 'Almacenado');
+        const newStatus = allStored ? 'Almacenado' : 'Parcialmente Almacenado';
+
+        await updateDoc(doc(firestore, 'otherFruitReceptions', originalReception.id!), {
+            items: updatedItems,
+            status: newStatus
+        });
+
+        setIsStoreDialogOpen(false);
+        setItemToStore(null);
+        toast({ title: 'Éxito', description: 'Ubicación asignada correctamente.' });
+    } catch (error) {
+        console.error("Error storing fruit:", error);
+        toast({ variant: 'destructive', title: 'Error', description: 'No se pudo asignar la ubicación.' });
+    }
+  };
 
   const form = useForm<ReceptionFormValues>({
     resolver: zodResolver(otherFruitReceptionSchema),
@@ -84,16 +197,28 @@ export function OtherFruitReceptionTab({ clientId: fixedClientId }: { clientId?:
               items: [defaultItem],
           });
       }
-    } else if (!fixedClientId) {
-        setSelectedClient(null);
-        form.reset({
-            clientId: '',
-            document: '',
-            temperature: undefined,
-            items: [defaultItem],
-        });
+    } else if (!fixedClientId && fruitClients.length > 0 && !selectedClient) {
+        // Default to FALL CREEK if available
+        const fallCreek = fruitClients.find(c => c.name.toUpperCase() === 'FALL CREEK');
+        if (fallCreek) {
+            setSelectedClient(fallCreek);
+            form.reset({
+                clientId: fallCreek.clientId,
+                document: '',
+                temperature: undefined,
+                items: [defaultItem],
+            });
+        } else {
+            setSelectedClient(null);
+            form.reset({
+                clientId: '',
+                document: '',
+                temperature: undefined,
+                items: [defaultItem],
+            });
+        }
     }
-  }, [fixedClientId, fruitClients, form]);
+  }, [fixedClientId, fruitClients, form, selectedClient]);
 
   const handleClientChange = (clientId: string) => {
     const client = fruitClients.find(c => c.clientId === clientId);
@@ -152,8 +277,31 @@ export function OtherFruitReceptionTab({ clientId: fixedClientId }: { clientId?:
     
     try {
         const collRef = collection(firestore, 'otherFruitReceptions');
-        await addDoc(collRef, receptionData);
-        toast({ title: 'Éxito', description: `Recepción de fruta registrada con lote ${displayLotId}. Ahora puede asignar una ubicación.` });
+        const docRef = await addDoc(collRef, receptionData);
+        toast({ title: 'Éxito', description: `Recepción de fruta registrada con lote ${displayLotId}.` });
+        
+        if (directStorageMode) {
+            // For general reception, we usually have one or multiple items.
+            // If there's only one item, it's easy. If there are many, we might want to store them one by one.
+            // For now, let's trigger it for the first item or consolidate if possible.
+            // Usually, these are Bins or Pallets.
+            
+            const firstItem = itemsWithStatus[0];
+            const itemToStore = {
+                ...firstItem,
+                receptionId: docRef.id,
+                clientId: values.clientId,
+                clientName: selectedClient.name,
+                document: values.document,
+                itemIndices: [0], // First item
+                unit: selectedClient.unit,
+                quantity: firstItem.quantity
+            };
+            
+            setItemToStore(itemToStore);
+            setIsStoreDialogOpen(true);
+        }
+
         form.reset({
             clientId: values.clientId,
             document: '',
@@ -163,11 +311,6 @@ export function OtherFruitReceptionTab({ clientId: fixedClientId }: { clientId?:
     } catch (error) {
         console.error("Error creating fruit reception:", error);
         toast({ variant: 'destructive', title: 'Error', description: 'No se pudo registrar la recepción.' });
-        errorEmitter.emit('permission-error', new FirestorePermissionError({
-            path: 'otherFruitReceptions',
-            operation: 'create',
-            requestResourceData: receptionData
-        }));
     }
   };
   
@@ -186,8 +329,21 @@ export function OtherFruitReceptionTab({ clientId: fixedClientId }: { clientId?:
       <div className="space-y-4 sm:space-y-6">
         <Card className="border-none sm:border shadow-none sm:shadow-md">
           <CardHeader className="px-4 sm:px-6 py-4">
-            <CardTitle className="text-xl sm:text-2xl">Recepción de Productos</CardTitle>
-            <CardDescription>Socio: <span className="font-bold text-[#004b8d]">{selectedClient.name}</span></CardDescription>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <CardTitle className="text-xl sm:text-2xl">Recepción de Productos</CardTitle>
+                <CardDescription>Socio: <span className="font-bold text-[#004b8d]">{selectedClient.name}</span></CardDescription>
+              </div>
+              <div className="flex items-center space-x-2 bg-[#7aba28]/10 px-4 py-2 rounded-full border border-[#7aba28]/20">
+                  <Label htmlFor="direct-storage-fc" className="text-xs font-bold uppercase text-[#004b8d] cursor-pointer">Almacenamiento Directo</Label>
+                  <Switch 
+                      id="direct-storage-fc" 
+                      checked={directStorageMode} 
+                      onCheckedChange={setDirectStorageMode}
+                      className="data-[state=checked]:bg-[#7aba28]"
+                  />
+              </div>
+            </div>
           </CardHeader>
           <CardContent className="px-2 sm:px-6 pb-6">
              {!fixedClientId && (
@@ -205,9 +361,25 @@ export function OtherFruitReceptionTab({ clientId: fixedClientId }: { clientId?:
                   </Select>
                 </div>
               )}
-              <FallCreekReceptionWorkflow />
+              <FallCreekReceptionWorkflow 
+                directStorageMode={directStorageMode}
+                onTriggerStorage={(item) => {
+                  setItemToStore(item);
+                  setIsStoreDialogOpen(true);
+                }}
+              />
           </CardContent>
         </Card>
+
+        <StoreOtherFruitDialog
+            item={itemToStore}
+            open={isStoreDialogOpen}
+            onOpenChange={setIsStoreDialogOpen}
+            onConfirm={onStoreConfirm}
+            allReceptions={allReceptions || []}
+            allChamberLots={allChamberLots || []}
+            clientConfig={clientConfigs?.find((c: any) => c.id === itemToStore?.clientId)}
+        />
       </div>
     );
   }
@@ -215,9 +387,20 @@ export function OtherFruitReceptionTab({ clientId: fixedClientId }: { clientId?:
   return (
     <>
       <Card>
-        <CardHeader>
-          <CardTitle>Recepción de Productos</CardTitle>
-          <CardDescription>Registre la entrada de productos de socios comerciales.</CardDescription>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0">
+          <div>
+            <CardTitle>Recepción de Productos</CardTitle>
+            <CardDescription>Registre la entrada de productos de socios comerciales.</CardDescription>
+          </div>
+          <div className="flex items-center space-x-2 bg-[#7aba28]/10 px-4 py-2 rounded-full border border-[#7aba28]/20">
+              <Label htmlFor="direct-storage-gen" className="text-xs font-bold uppercase text-[#004b8d] cursor-pointer">Almacenamiento Directo</Label>
+              <Switch 
+                  id="direct-storage-gen" 
+                  checked={directStorageMode} 
+                  onCheckedChange={setDirectStorageMode}
+                  className="data-[state=checked]:bg-[#7aba28]"
+              />
+          </div>
         </CardHeader>
         <CardContent>
           <Form {...form}>
@@ -446,6 +629,16 @@ export function OtherFruitReceptionTab({ clientId: fixedClientId }: { clientId?:
         open={scanningIndex !== null}
         onOpenChange={(isOpen) => !isOpen && setScanningIndex(null)}
         onScan={handleScanConfirm}
+      />
+
+      <StoreOtherFruitDialog
+          item={itemToStore}
+          open={isStoreDialogOpen}
+          onOpenChange={setIsStoreDialogOpen}
+          onConfirm={onStoreConfirm}
+          allReceptions={allReceptions || []}
+          allChamberLots={allChamberLots || []}
+          clientConfig={clientConfigs?.find((c: any) => c.id === itemToStore?.clientId)}
       />
     </>
   );

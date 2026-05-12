@@ -136,7 +136,7 @@ const LogisticsConfigFields = ({ form }: { form: any }) => (
               <FormItem>
                 <FormLabel className="text-xs">Bins / Coordenada</FormLabel>
                 <FormControl>
-                  <Input type="number" {...field} placeholder="Ej: 6" />
+                  <Input type="number" {...field} placeholder="Ej: 9" />
                 </FormControl>
               </FormItem>
             )}
@@ -585,7 +585,8 @@ const AisleForm = ({ form, warehouses }: { form: any; warehouses: Warehouse[] })
       )}
     />
   </>
-)};
+  );
+};
 
 
 export default function DatosMaestrosPage() {
