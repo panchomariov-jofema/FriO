@@ -101,41 +101,53 @@ export function OtherFruitReceptionTab({ clientId: fixedClientId }: { clientId?:
     const startIndex = allPossibleCoords.indexOf(startCoordinate);
     const coordsToFill = allPossibleCoords.slice(startIndex);
     
-    let currentCoordIdx = 0;
-    const occupancyThreshold = quantityPerLocation;
+    const occupancyThreshold = data.quantityPerLocation;
 
     for (const idx of itemToStore.itemIndices) {
         if (remainingToStore <= 0) break;
-        if (currentCoordIdx >= coordsToFill.length) break;
 
         let itemToProcess = updatedItems[idx];
         const isFallCreek = originalReception.clientName === 'FALL CREEK';
         const unitsPerItem = (isFallCreek && originalReception.unit === 'Pallets') ? 3 : 1;
 
-        while (currentCoordIdx < coordsToFill.length) {
-            let currentCoord = coordsToFill[currentCoordIdx];
-            const currentOccupancy = occupancyMap.get(currentCoord) || 0;
-            const availableSpace = Math.max(0, occupancyThreshold - currentOccupancy);
+        const currentOccupancy = occupancyMap.get(startCoordinate) || 0;
+        const availableSpace = Math.max(0, occupancyThreshold - currentOccupancy);
 
-            if (availableSpace < unitsPerItem || chamberConfig.blocked?.includes(currentCoord)) {
-                currentCoordIdx++;
-                continue;
-            }
+        // Check compatibility (only same client)
+        const existingClientsInCoord = new Set<string>();
+        (allChamberLots || []).forEach(l => {
+            if (l.chamberId === chamberId && l.coordinate === startCoordinate) existingClientsInCoord.add(l.exporterId);
+        });
+        allReceptions.forEach(r => {
+            r.items.forEach(it => {
+                if (it.status === 'Almacenado' && it.storageLocation?.chamberId === chamberId && it.storageLocation.coordinate === startCoordinate) {
+                    existingClientsInCoord.add(r.clientId);
+                }
+            });
+        });
 
-            updatedItems[idx] = {
-                ...itemToProcess,
-                status: 'Almacenado',
-                storageLocation: {
-                    chamberId,
-                    coordinate: currentCoord
-                },
-                storedAt: new Date()
-            };
-            
-            occupancyMap.set(currentCoord, currentOccupancy + unitsPerItem);
-            remainingToStore -= 1;
-            break;
+        if (existingClientsInCoord.size > 0 && !existingClientsInCoord.has(itemToStore.clientId)) {
+            toast({ variant: 'destructive', title: 'Error de Mezcla', description: `La coordenada ${startCoordinate} tiene fruta de otro cliente.` });
+            return;
         }
+
+        if (availableSpace < unitsPerItem) {
+            toast({ variant: 'destructive', title: 'Espacio Insuficiente', description: `La coordenada ${startCoordinate} no tiene espacio suficiente (${currentOccupancy}/${occupancyThreshold}).` });
+            return;
+        }
+
+        updatedItems[idx] = {
+            ...itemToProcess,
+            status: 'Almacenado',
+            storageLocation: {
+                chamberId,
+                coordinate: startCoordinate
+            },
+            storedAt: new Date()
+        };
+        
+        occupancyMap.set(startCoordinate, currentOccupancy + unitsPerItem);
+        remainingToStore -= 1;
     }
 
     try {

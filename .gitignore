@@ -49,3 +49,7 @@ firestore-debug.log
 scratch/
 studio.json
 *.xlsx
+
+# credentials
+service-account.json
+

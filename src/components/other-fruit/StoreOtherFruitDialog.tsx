@@ -90,17 +90,22 @@ export function StoreOtherFruitDialog({
       return { availableCoordinates: [], suggestion: null };
     }
 
-    const occupancyMap = new Map<string, { lots: {displayLotId: string, binCount: number }[] }>();
+    const occupancyMap = new Map<string, { lots: {displayLotId: string, binCount: number, clientId: string }[] }>();
+    
     (allChamberLots || []).forEach(lot => {
         if (lot.status === 'Almacenado' && lot.chamberId === selectedChamberId && lot.coordinate && lot.binCount > 0) {
           if (!occupancyMap.has(lot.coordinate)) {
             occupancyMap.set(lot.coordinate, { lots: [] });
           }
-          occupancyMap.get(lot.coordinate)!.lots.push({ displayLotId: lot.displayLotId, binCount: lot.binCount });
+          // Note: for ChamberLots (Cherry), we treat exporterId as the clientId
+          occupancyMap.get(lot.coordinate)!.lots.push({ 
+            displayLotId: lot.displayLotId, 
+            binCount: lot.binCount,
+            clientId: lot.exporterId 
+          });
         }
     });
     
-    // We also consider items stored in 'otherFruitReceptions' that aren't yet in chamberLots if they were stored in this session
     (allReceptions || []).forEach(reception => {
         reception.items.forEach(storedItem => {
             if (storedItem.status === 'Almacenado' && storedItem.storageLocation?.chamberId === selectedChamberId && storedItem.storageLocation.coordinate && storedItem.quantity > 0) {
@@ -108,10 +113,13 @@ export function StoreOtherFruitDialog({
                 if (!occupancyMap.has(storedItem.storageLocation.coordinate)) {
                     occupancyMap.set(storedItem.storageLocation.coordinate, { lots: [] });
                 }
-                // Logic check: if already in occupancyMap (from chamberLots), don't duplicate
                 const exists = occupancyMap.get(storedItem.storageLocation.coordinate)!.lots.some(l => l.displayLotId === lotId);
                 if (!exists) {
-                   occupancyMap.get(storedItem.storageLocation.coordinate)!.lots.push({ displayLotId: lotId, binCount: storedItem.quantity });
+                   occupancyMap.get(storedItem.storageLocation.coordinate)!.lots.push({ 
+                     displayLotId: lotId, 
+                     binCount: storedItem.quantity,
+                     clientId: reception.clientId 
+                   });
                 }
             }
         });
@@ -153,14 +161,29 @@ export function StoreOtherFruitDialog({
 
     const currentSuggestion = prioritizedCoords.find(coord => {
         if (chamberConfig.blocked?.includes(coord)) return false;
-        const currentOccupancy = (occupancyMap.get(coord)?.lots || []).reduce((sum, l) => sum + l.binCount, 0);
+        const entry = occupancyMap.get(coord);
+        if (!entry || entry.lots.length === 0) return true; // Empty is always good
+
+        // Incompatibility check: must be the SAME client
+        const hasDifferentClient = entry.lots.some(l => l.clientId !== item.clientId);
+        if (hasDifferentClient) return false;
+
+        const currentOccupancy = entry.lots.reduce((sum, l) => sum + l.binCount, 0);
         return currentOccupancy + requiredSpace <= occupancyThreshold;
     }) || null;
 
-    // Available are all that have ANY space left
+    // Available are all that have ANY space left AND are compatible
     const available = allPossibleCoords.filter(coord => {
         if (chamberConfig.blocked?.includes(coord)) return false;
-        const currentOccupancy = (occupancyMap.get(coord)?.lots || []).reduce((sum, l) => sum + l.binCount, 0);
+        
+        const entry = occupancyMap.get(coord);
+        if (!entry || entry.lots.length === 0) return true; // Empty
+
+        // Compatibility: only same client allowed for Exportador/Other Fruit
+        const hasDifferentClient = entry.lots.some(l => l.clientId !== item.clientId);
+        if (hasDifferentClient) return false;
+
+        const currentOccupancy = entry.lots.reduce((sum, l) => sum + l.binCount, 0);
         return currentOccupancy < occupancyThreshold;
     });
     

@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { QrCode, PackageCheck, ScanLine, Trash2, CheckCircle2, Loader2, AlertCircle } from 'lucide-react';
+import { QrCode, PackageCheck, ScanLine, Trash2, CheckCircle2, Loader2, AlertCircle, AlertTriangle } from 'lucide-react';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
 import { useFirestore } from '@/firebase';
 import { doc, updateDoc } from 'firebase/firestore';
@@ -261,12 +261,12 @@ export function FallCreekReceptionWorkflow({
                                             <div className="flex items-center gap-2">
                                                 <span className="font-mono font-bold text-lg">{p.id}</span>
                                                 {p.isMixed && (
-                                                    <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[9px] h-5 px-1.5 font-black uppercase tracking-tighter">
-                                                        Multi-Variedad
+                                                    <Badge variant="destructive" className="bg-red-500 text-white border-none text-[9px] h-5 px-1.5 font-black uppercase tracking-tighter shadow-sm animate-pulse">
+                                                        ⚠️ MIXTO
                                                     </Badge>
                                                 )}
                                             </div>
-                                            <Badge variant="secondary" className="ml-2 bg-[#004b8d]/10 text-[#004b8d]">
+                                            <Badge variant="secondary" className={`ml-2 ${p.isMixed ? 'bg-red-100 text-red-700' : 'bg-[#004b8d]/10 text-[#004b8d]'}`}>
                                                 {p.received}/{p.total}
                                             </Badge>
                                         </div>
@@ -283,13 +283,23 @@ export function FallCreekReceptionWorkflow({
                         <CardContent className="p-3 sm:p-6 space-y-4 sm:space-y-6">
                             <div className="flex items-center justify-between">
                                 <h3 className="text-sm sm:text-lg font-bold flex items-center gap-2">
-                                    <QrCode className="h-4 w-4 sm:h-5 sm:h-5 text-[#7aba28]" />
+                                    <QrCode className="h-4 w-4 sm:h-5 text-[#7aba28]" />
                                     Bins de Pallet {selectedPalletId}
                                 </h3>
                                 <Badge variant="outline" className="bg-[#7aba28]/10 text-[#7aba28] border-[#7aba28]/20 px-2 py-0.5 text-[10px] sm:text-xs">
                                     {scannedBins.length + (currentPalletItems.filter(i => i.status !== 'Pendiente de recibir').length)} / 3
                                 </Badge>
                             </div>
+
+                            {availablePallets.find(p => p.id === selectedPalletId)?.isMixed && (
+                                <div className="bg-red-50 border-l-4 border-red-500 p-3 rounded-r-lg flex items-start gap-3 animate-in fade-in slide-in-from-left-2 duration-300">
+                                    <AlertTriangle className="h-5 w-5 text-red-600 shrink-0 mt-0.5" />
+                                    <div>
+                                        <p className="text-xs font-black text-red-800 uppercase tracking-tight">Atención: Pallet Multi-Variedad</p>
+                                        <p className="text-[10px] text-red-700 leading-tight">Este pallet contiene diferentes tipos de plantas. Verifique físicamente cada bin antes de escanearlo para asegurar la trazabilidad.</p>
+                                    </div>
+                                </div>
+                            )}
 
                             <div className="grid grid-cols-1 gap-3">
                                 {currentPalletItems.map((item, i) => {

@@ -316,6 +316,7 @@ export interface OtherFruitReceptionItem {
     };
     storedAt?: Timestamp | Date;
     isMixedVariety?: boolean;
+    unit?: 'Bins' | 'Pallets';
 }
 
 export interface PendingItem extends OtherFruitReceptionItem {
