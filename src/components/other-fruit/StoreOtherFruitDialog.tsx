@@ -20,6 +20,7 @@ import { Zap } from 'lucide-react';
 
 interface PendingItem extends OtherFruitReceptionItem {
     receptionId: string;
+    clientId?: string;
     clientName: string;
     document: string;
     itemIndices: number[];
@@ -30,7 +31,7 @@ interface StoreOtherFruitDialogProps {
   item: PendingItem | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onConfirm: (data: { chamberId: string; coordinate: string; totalQuantity: number; quantityPerLocation: number; strategy: 'secuencial' | 'pareado' | 'aisle-access' }) => void;
+  onConfirm: (data: { chamberId: string; coordinate: string; totalQuantity: number; quantityPerLocation: number; strategy: 'secuencial' | 'pareado' | 'aisle-access' | 'inverted-secuencial' | 'horizontal-secuencial' | 'fifo' | 'serpentina-vertical' }) => void;
   allReceptions: OtherFruitReception[];
   allChamberLots: ChamberLot[];
   clientConfig?: ClientStorageConfig;
@@ -46,7 +47,7 @@ const storeSchema = z.object({
   coordinate: z.string({ required_error: 'Debe seleccionar una coordenada de inicio.' }),
   totalQuantity: z.coerce.number().positive('La cantidad total debe ser mayor a 0.'),
   quantityPerLocation: z.coerce.number().positive('La cantidad por ubicación debe ser mayor a 0.'),
-  strategy: z.enum(['secuencial', 'pareado', 'aisle-access', 'inverted-secuencial', 'horizontal-secuencial', 'fifo']).default('secuencial'),
+  strategy: z.enum(['secuencial', 'pareado', 'aisle-access', 'inverted-secuencial', 'horizontal-secuencial', 'fifo', 'serpentina-vertical']).default('secuencial'),
 });
 
 type StoreFormValues = z.infer<typeof storeSchema>;
@@ -91,6 +92,8 @@ export function StoreOtherFruitDialog({
     }
 
     const occupancyMap = new Map<string, { lots: {displayLotId: string, binCount: number, clientId: string }[] }>();
+    let lastCoordInChamber: string | null = null;
+    let latestTimestamp = 0;
     
     (allChamberLots || []).forEach(lot => {
         if (lot.status === 'Almacenado' && lot.chamberId === selectedChamberId && lot.coordinate && lot.binCount > 0) {
@@ -103,13 +106,23 @@ export function StoreOtherFruitDialog({
             binCount: lot.binCount,
             clientId: lot.exporterId 
           });
+
+          const time = (lot as any).storedAt?.toMillis ? (lot as any).storedAt.toMillis() : 0;
+          if (time > latestTimestamp) {
+              latestTimestamp = time;
+              lastCoordInChamber = lot.coordinate;
+          }
         }
     });
     
     (allReceptions || []).forEach(reception => {
-        reception.items.forEach(storedItem => {
+        const isFC = reception.clientName === 'FALL CREEK' || reception.clientName?.toUpperCase() === 'FALL CREEK';
+        const multiplier = (isFC && reception.unit === 'Pallets') ? 3 : (reception.unit === 'Bins' ? 1 : 2);
+
+        reception.items.forEach((storedItem, idx) => {
             if (storedItem.status === 'Almacenado' && storedItem.storageLocation?.chamberId === selectedChamberId && storedItem.storageLocation.coordinate && storedItem.quantity > 0) {
-                const lotId = `other_${reception.id}_${storedItem.productCode}`;
+                const equivalentUnits = storedItem.quantity * multiplier;
+                const lotId = `other_${reception.id}_${storedItem.containerId || storedItem.palletId || idx}`;
                 if (!occupancyMap.has(storedItem.storageLocation.coordinate)) {
                     occupancyMap.set(storedItem.storageLocation.coordinate, { lots: [] });
                 }
@@ -117,9 +130,15 @@ export function StoreOtherFruitDialog({
                 if (!exists) {
                    occupancyMap.get(storedItem.storageLocation.coordinate)!.lots.push({ 
                      displayLotId: lotId, 
-                     binCount: storedItem.quantity,
+                     binCount: equivalentUnits,
                      clientId: reception.clientId 
                    });
+                }
+
+                const time = (storedItem as any).storedAt?.toMillis ? (storedItem as any).storedAt.toMillis() : (storedItem as any).storedAt instanceof Date ? (storedItem as any).storedAt.getTime() : 0;
+                if (time > latestTimestamp) {
+                    latestTimestamp = time;
+                    lastCoordInChamber = storedItem.storageLocation.coordinate;
                 }
             }
         });
@@ -138,6 +157,8 @@ export function StoreOtherFruitDialog({
         allPossibleCoords = getSortedCoordinates(chamberConfig, 'horizontal-secuencial');
     } else if (formStrategy === 'fifo') {
         allPossibleCoords = getSortedCoordinates(chamberConfig, 'fifo');
+    } else if (formStrategy === 'serpentina-vertical') {
+        allPossibleCoords = getSortedCoordinates(chamberConfig, 'serpentina-vertical');
     } else {
       allPossibleCoords = getSortedCoordinates(chamberConfig, 'secuencial');
     }
@@ -147,10 +168,22 @@ export function StoreOtherFruitDialog({
 
     // Determine the starting point for suggestion search
     let startIndex = 0;
-    const isContinuingChamber = selectedChamberId === lastUsedChamberId;
-    if (isContinuingChamber && lastUsedCoordinate) {
-        const foundIdx = allPossibleCoords.indexOf(lastUsedCoordinate);
-        if (foundIdx !== -1) startIndex = foundIdx + 1;
+    const effectiveLastChamber = lastUsedChamberId || (typeof window !== 'undefined' ? localStorage.getItem('frio_last_chamber_id') : null);
+    const effectiveSessionCoord = lastUsedCoordinate || (typeof window !== 'undefined' ? localStorage.getItem('frio_last_coordinate') : null);
+    const isContinuingChamber = selectedChamberId === effectiveLastChamber;
+    const effectiveLastCoord = (isContinuingChamber && effectiveSessionCoord) ? effectiveSessionCoord : null;
+    
+    if (effectiveLastCoord) {
+        const foundIdx = allPossibleCoords.indexOf(effectiveLastCoord);
+        if (foundIdx !== -1) {
+            const entry = occupancyMap.get(effectiveLastCoord);
+            const currentOccupancy = entry ? entry.lots.reduce((sum, l) => sum + l.binCount, 0) : 0;
+            if (currentOccupancy + requiredSpace > occupancyThreshold) {
+                startIndex = foundIdx + 1;
+            } else {
+                startIndex = foundIdx;
+            }
+        }
     }
 
     // Create a prioritized search list: From last used position forward, then wrap around
@@ -193,20 +226,18 @@ export function StoreOtherFruitDialog({
 
   useEffect(() => {
     if (open && item) {
-       let strategy = clientConfig?.strategy ?? 'secuencial';
+       const isFallCreek = item.clientName === 'FALL CREEK' || item.clientName?.toUpperCase() === 'FALL CREEK';
+       let strategy = isFallCreek ? 'aisle-access' : (clientConfig?.strategy ?? 'secuencial');
        let totalQuantity = item.quantity;
-       let qtyPerLocation = item.unit === 'Bins' 
-         ? (clientConfig?.binsPerCoordinate ?? DEFAULT_BINS_PER_COORDINATE)
-         : (clientConfig?.palletsPerCoordinate ?? DEFAULT_PALLETS_PER_COORDINATE);
+       let qtyPerLocation = isFallCreek 
+         ? 9 
+         : (item.unit === 'Bins' 
+           ? (clientConfig?.binsPerCoordinate ?? DEFAULT_BINS_PER_COORDINATE)
+           : (clientConfig?.palletsPerCoordinate ?? DEFAULT_PALLETS_PER_COORDINATE));
 
-        // Load last used chamber from localStorage if no client preference
-        let chamberId = clientConfig?.preferredChamberId;
-        if (!chamberId) {
-            const savedChamber = localStorage.getItem('frio_last_chamber_id');
-            if (savedChamber && chambersConfig[savedChamber]) {
-                chamberId = savedChamber;
-            }
-        }
+        // Prioritize session continuity (lastUsedChamberId from props or localStorage) over client preferred chamber
+        const savedChamber = lastUsedChamberId || (typeof window !== 'undefined' ? localStorage.getItem('frio_last_chamber_id') : null);
+        let chamberId = (savedChamber && chambersConfig[savedChamber]) ? savedChamber : clientConfig?.preferredChamberId;
         
         // Validation: Ensure the preferred chamber actually exists in config
         if (chamberId && !chambersConfig[chamberId]) {
@@ -221,7 +252,7 @@ export function StoreOtherFruitDialog({
          strategy: strategy as any,
         });
     }
-  }, [item, open, form, clientConfig]);
+  }, [item, open, form, clientConfig, lastUsedChamberId]);
 
   useEffect(() => {
     if (suggestion) {
@@ -353,6 +384,12 @@ export function StoreOtherFruitDialog({
                                         <RadioGroupItem value="fifo" />
                                     </FormControl>
                                     <FormLabel className="font-normal cursor-pointer text-xs">FIFO (Serpiente)</FormLabel>
+                                </FormItem>
+                                <FormItem className="flex items-center space-x-2 space-y-0">
+                                    <FormControl>
+                                        <RadioGroupItem value="serpentina-vertical" />
+                                    </FormControl>
+                                    <FormLabel className="font-normal cursor-pointer text-xs">Serpentina Vertical</FormLabel>
                                 </FormItem>
                             </RadioGroup>
                         </FormControl>

@@ -148,8 +148,8 @@ export default function OtherFruitKardexReportPage() {
     return (
         <div className="space-y-6">
             <ReportHeader
-                title="Kardex de Movimientos de Fruta (Otros Clientes)"
-                description="Historial de entradas y salidas de fruta de clientes externos."
+                title="Kardex de Movimientos de Fruta (Clientes)"
+                description="Historial detallado de entradas y salidas de fruta de clientes externos."
                 onExport={handleExport}
                 isExportDisabled={loading || filteredData.length === 0}
             >

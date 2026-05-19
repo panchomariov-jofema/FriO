@@ -21,7 +21,15 @@ export const naturalSort = (a: string, b: string) => {
 };
 
 // Generates coordinates for chamber display, handling sequential, snake (FIFO), and aisle-access layouts.
-export const getSortedCoordinates = (chamberConfig: Chamber, strategy: 'secuencial' | 'fifo' | 'aisle-access' | 'horizontal-secuencial' | 'inverted-secuencial'): string[] => {
+export const getSortedCoordinates = (chamberConfig: Chamber, strategy: 'secuencial' | 'fifo' | 'aisle-access' | 'horizontal-secuencial' | 'inverted-secuencial' | 'pareado' | 'serpentina-vertical'): string[] => {
+  if (strategy === 'serpentina-vertical') {
+    return getSerpentinaVerticalCoordinates(chamberConfig);
+  }
+
+  if (strategy === 'pareado') {
+    return getPairedCoordinates(chamberConfig);
+  }
+
   if (strategy === 'aisle-access') {
     return getAisleAccessCoordinates(chamberConfig, 'secuencial');
   }
@@ -136,6 +144,51 @@ export const getPairedCoordinates = (chamberConfig: Chamber): string[] => {
             }
         });
     }
+    return coords;
+};
+
+/**
+ * Serpentina Vertical layout with central aisles.
+ * Norte (Left block): A (door->back), B (back->door), C (door->back)...
+ * Sur (Right block, from outside in): L (door->back), K (back->door), J (door->back)...
+ */
+export const getSerpentinaVerticalCoordinates = (chamberConfig: Chamber): string[] => {
+    const coords: string[] = [];
+    const columns = chamberConfig.columns.map(c => c.name);
+    const rowsAsc = [...chamberConfig.rows].sort((a, b) => a - b);
+    const rowsDesc = [...rowsAsc].reverse(); // door to back
+
+    let norteCols: string[] = [];
+    let surCols: string[] = [];
+
+    const hasStandardCols = columns.some(c => ['A', 'B', 'C', 'D', 'E'].includes(c)) && columns.some(c => ['H', 'I', 'J', 'K', 'L'].includes(c));
+
+    if (hasStandardCols) {
+        norteCols = columns.filter(c => ['A', 'B', 'C', 'D', 'E'].includes(c));
+        surCols = columns.filter(c => ['H', 'I', 'J', 'K', 'L'].includes(c)).reverse();
+    } else {
+        const mid = Math.floor(columns.length / 2);
+        const aisleCount = columns.length % 2 === 0 ? 2 : 1;
+        const leftEnd = mid - Math.floor(aisleCount / 2);
+        norteCols = columns.slice(0, leftEnd);
+        surCols = columns.slice(leftEnd + aisleCount).reverse();
+    }
+
+    const processBlock = (cols: string[]) => {
+        cols.forEach((col, idx) => {
+            const rowsToIterate = idx % 2 === 0 ? rowsDesc : rowsAsc;
+            rowsToIterate.forEach(row => {
+                const coord = `${col}${row}`;
+                if (!chamberConfig.blocked?.includes(coord)) {
+                    coords.push(coord);
+                }
+            });
+        });
+    };
+
+    processBlock(norteCols);
+    processBlock(surCols);
+
     return coords;
 };
 

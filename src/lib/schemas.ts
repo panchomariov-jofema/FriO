@@ -5,8 +5,8 @@ export const exporterSchema = z.object({
   name: z.string().min(1, 'El nombre es obligatorio'),
   type: z.string().min(1, 'El tipo es obligatorio'),
   status: z.enum(['activo', 'inactivo']).default('activo'),
-  storageStrategy: z.enum(['secuencial', 'fifo', 'aisle-access', 'horizontal-secuencial', 'inverted-secuencial']).optional(),
-  binsPerCoordinate: z.coerce.number().optional(),
+  storageStrategy: z.enum(['secuencial', 'fifo', 'aisle-access', 'horizontal-secuencial', 'inverted-secuencial', 'pareado', 'serpentina-vertical']).optional(),
+  binsPerCoordinate: z.coerce.number().max(9, 'Ninguna ubicación soporta físicamente más de 9 bins.').optional(),
   palletsPerCoordinate: z.coerce.number().optional(),
 });
 
@@ -39,8 +39,8 @@ export const otherClientSchema = z.object({
   type: z.enum(['embalaje', 'frio_hortofruticola', 'fruta'], { required_error: 'El tipo es obligatorio.'}),
   unit: z.enum(['Bins', 'Pallets'], { required_error: 'La unidad es obligatoria.'}),
   status: z.enum(['activo', 'inactivo']).default('activo'),
-  storageStrategy: z.enum(['secuencial', 'fifo', 'aisle-access', 'horizontal-secuencial', 'inverted-secuencial']).optional(),
-  binsPerCoordinate: z.coerce.number().optional(),
+  storageStrategy: z.enum(['secuencial', 'fifo', 'aisle-access', 'horizontal-secuencial', 'inverted-secuencial', 'pareado', 'serpentina-vertical']).optional(),
+  binsPerCoordinate: z.coerce.number().max(9, 'Ninguna ubicación soporta físicamente más de 9 bins.').optional(),
   palletsPerCoordinate: z.coerce.number().optional(),
 });
 

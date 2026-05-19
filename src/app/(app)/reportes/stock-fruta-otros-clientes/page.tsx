@@ -102,7 +102,7 @@ export default function OtherFruitStockReportPage() {
     return (
         <div className="space-y-6">
              <ReportHeader
-                title="Reporte Stock por Ubicacion (Otros Clientes)"
+                title="Reporte Stock por Ubicacion (Clientes)"
                 description="Inventario de fruta de clientes externos detallado por ubicación."
                 onExport={handleExport}
                 isExportDisabled={loadingReceptions || filteredData.length === 0}

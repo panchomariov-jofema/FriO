@@ -65,7 +65,7 @@ const navStructure: any[] = [
     },
     {
         type: 'group',
-        label: 'Otros clientes',
+        label: 'Clientes',
         icon: Users, // New Icon
         items: [
             { type: 'item', href: '/embalajes', label: 'Embalajes', icon: Package },
@@ -266,6 +266,34 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
     }
   }, [accessibleNav, pathname, router]);
 
+  const mobileTabs = React.useMemo(() => {
+    if (!accessibleNav) return [];
+    const flatItems: any[] = [];
+    const extract = (list: any[]) => {
+      list.forEach(item => {
+        if (item.type === 'item') flatItems.push(item);
+        else if (item.type === 'group' && item.items) extract(item.items);
+      });
+    };
+    extract(accessibleNav);
+
+    const priorityUris = ['/dashboard', '/recepcion', '/camaras', '/despachos', '/bins-y-materiales', '/reportes'];
+    const tabs: any[] = [];
+    
+    priorityUris.forEach(uri => {
+      const found = flatItems.find(i => i.href === uri);
+      if (found && tabs.length < 4) tabs.push(found);
+    });
+    
+    flatItems.forEach(item => {
+      if (tabs.length < 4 && !tabs.some(t => t.href === item.href)) {
+        tabs.push(item);
+      }
+    });
+    
+    return tabs;
+  }, [accessibleNav]);
+
   const loading = isUserLoading || accessibleNav === null || loadingOFR || loadingPR || loadingOFM || loadingPM || loadingDispatches;
 
   if (loading || !user) {
@@ -334,6 +362,7 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
     return null;
   }
 
+
   return (
       <>
         <Sidebar>
@@ -353,8 +382,14 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
           </SidebarFooter>
         </Sidebar>
         <SidebarInset>
-           <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b bg-background px-4">
-              <SidebarTrigger />
+           <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b bg-background/95 backdrop-blur px-4 shadow-sm">
+              <div className="flex items-center gap-3">
+                <SidebarTrigger className="md:hidden" />
+                <SidebarTrigger className="hidden md:flex" />
+                <div className="flex items-center gap-2 md:hidden">
+                  <FrioLogo className="text-2xl text-primary" />
+                </div>
+              </div>
               <div className="flex flex-1 items-center justify-end gap-2">
                 <PwaInstallButton />
                 {user && (
@@ -365,17 +400,62 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
                       : user.displayName || user.email}
                   </span>
                 )}
-                <Button variant="ghost" size="sm" onClick={handleSignOut}>
-                  <LogOut className="h-4 w-4 sm:mr-2" />
-                  <span className="hidden sm:inline">Cerrar Sesión</span>
+                <Button variant="ghost" size="sm" onClick={handleSignOut} className="text-muted-foreground hover:text-destructive transition-colors">
+                  <LogOut className="h-4 w-4 md:mr-2" />
+                  <span className="hidden md:inline">Cerrar Sesión</span>
                 </Button>
               </div>
             </header>
-          <main className="p-4">
+          <main className="p-4 pb-24 md:pb-4 max-w-[100vw] overflow-x-hidden pt-4 animate-in fade-in-50 duration-300">
             <PermissionsProvider permissions={activePermissions}>
               {children}
             </PermissionsProvider>
           </main>
+          
+          {/* Navegación Inferior Móvil (Estilo Android/PWA Nativo) */}
+          <nav className="fixed bottom-0 left-0 right-0 z-40 flex items-center justify-around border-t bg-background/95 backdrop-blur-lg py-2 px-1 shadow-lg md:hidden pb-safe animate-in slide-in-from-bottom duration-300">
+            {mobileTabs.map((tab) => {
+              const isActive = pathname.startsWith(tab.href);
+              const Icon = tab.icon;
+              return (
+                <Link
+                  key={tab.href}
+                  href={tab.href}
+                  className={cn(
+                    "relative flex flex-col items-center justify-center gap-1 py-1 px-3 rounded-xl transition-all duration-200 select-none",
+                    isActive 
+                      ? "text-primary scale-105 font-semibold" 
+                      : "text-muted-foreground hover:text-primary font-medium"
+                  )}
+                >
+                  <div className={cn(
+                    "flex items-center justify-center w-8 h-8 rounded-full transition-colors", 
+                    isActive && "bg-primary/10"
+                  )}>
+                    <Icon className="h-5 w-5" />
+                  </div>
+                  <span className="text-[10px] leading-none tracking-tight truncate max-w-[68px]">
+                    {tab.label}
+                  </span>
+                  {tab.badge > 0 && (
+                    <span className="absolute top-0 right-2 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-[9px] font-bold text-destructive-foreground animate-pulse">
+                      {tab.badge}
+                    </span>
+                  )}
+                </Link>
+              );
+            })}
+
+            <button
+              onClick={() => setOpenMobile(true)}
+              className="flex flex-col items-center justify-center gap-1 py-1 px-3 text-muted-foreground hover:text-primary transition-all duration-200 select-none"
+            >
+              <div className="flex items-center justify-center w-8 h-8 rounded-full">
+                <PanelLeft className="h-5 w-5" />
+              </div>
+              <span className="text-[10px] font-medium leading-none tracking-tight">Menú</span>
+            </button>
+          </nav>
         </SidebarInset>
       </>
   );

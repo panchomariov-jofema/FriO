@@ -20,8 +20,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 const configSchema = z.object({
   clientId: z.string({ required_error: 'Debe seleccionar un cliente.' }),
-  strategy: z.enum(['secuencial', 'fifo', 'aisle-access', 'horizontal-secuencial', 'inverted-secuencial']).default('secuencial'),
-  binsPerCoordinate: z.coerce.number().min(1).max(20).default(6),
+  strategy: z.enum(['secuencial', 'fifo', 'aisle-access', 'horizontal-secuencial', 'inverted-secuencial', 'pareado', 'serpentina-vertical']).default('secuencial'),
+  binsPerCoordinate: z.coerce.number().min(1).max(9, 'Ninguna ubicación soporta físicamente más de 9 bins.').default(6),
   palletsPerCoordinate: z.coerce.number().min(1).max(10).default(3),
   preferredChamberId: z.string().optional(),
   chamberOverrides: z.record(z.coerce.number()).optional(),
@@ -216,6 +216,8 @@ export function ClientStorageConfigDialog({ open, onOpenChange }: ClientStorageC
                           <SelectItem value="inverted-secuencial">Invertido (A12 &rarr; A1)</SelectItem>
                           <SelectItem value="fifo">FIFO (Serpiente)</SelectItem>
                           <SelectItem value="aisle-access">Acceso Pasillos (Muestreo SAG)</SelectItem>
+                          <SelectItem value="pareado">Pareado</SelectItem>
+                          <SelectItem value="serpentina-vertical">Serpentina Vertical</SelectItem>
                         </SelectContent>
                       </Select>
                       <FormMessage />

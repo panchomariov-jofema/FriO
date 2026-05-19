@@ -61,7 +61,7 @@ export function OtherFruitStorageTab({ clientId: fixedClientId }: { clientId?: s
     coordinate: string;
     totalQuantity: number;
     quantityPerLocation: number;
-    strategy: 'secuencial' | 'pareado' | 'aisle-access';
+    strategy: 'secuencial' | 'pareado' | 'aisle-access' | 'serpentina-vertical';
   } | null>(null);
   const [selectedClientId, setSelectedClientId] = React.useState<string | null>(null);
   const [isScannerOpen, setIsScannerOpen] = React.useState(false);
@@ -253,7 +253,7 @@ export function OtherFruitStorageTab({ clientId: fixedClientId }: { clientId?: s
     let strategy = explicitOverride?.strategy || masterData?.storageStrategy || 'secuencial';
     let binsPerCoordinate = explicitOverride?.binsPerCoordinate ?? masterData?.binsPerCoordinate ?? 9;
     let palletsPerCoordinate = explicitOverride?.palletsPerCoordinate ?? masterData?.palletsPerCoordinate ?? 3;
-    let preferredChamberId = lastUsedChamberId || explicitOverride?.preferredChamberId || (masterData as any)?.preferredChamberId;
+    let preferredChamberId = lastUsedChamberId || (typeof window !== 'undefined' ? localStorage.getItem('frio_last_chamber_id') : null) || explicitOverride?.preferredChamberId || (masterData as any)?.preferredChamberId;
 
     if (item.clientName === 'FALL CREEK') {
         if (!explicitOverride?.strategy && !masterData?.storageStrategy) strategy = 'aisle-access';
@@ -268,7 +268,7 @@ export function OtherFruitStorageTab({ clientId: fixedClientId }: { clientId?: s
 
     // Calculate occupancy and find the last used coordinate
     const occupancyMap = new Map<string, number>();
-    let lastCoordInChamber = lastUsedCoordinate; // Use the session state as primary source
+    let lastCoordInChamber = lastUsedCoordinate || (typeof window !== 'undefined' ? localStorage.getItem('frio_last_coordinate') : null); // Use the session state as primary source
     
     // We also cross-reference with stored items to find the truly most recent storage
     let latestTimestamp = 0;
@@ -286,8 +286,7 @@ export function OtherFruitStorageTab({ clientId: fixedClientId }: { clientId?: s
 
     (otherFruitReceptions || []).forEach(r => {
         r.items.forEach((it) => {
-            if (it.status === 'Almacenado' && it.storageLocation?.chamberId === chamberId && it.storageLocation.coordinate) {
-                // Determine units: if it's Fall Creek, 1 pallet = 3 bins.
+            if (it.status === 'Almacenado' && it.storageLocation && it.storageLocation.chamberId === chamberId && it.storageLocation.coordinate) {
                 const multiplier = (r.clientName === 'FALL CREEK' && r.unit === 'Pallets') ? 3 : (r.unit === 'Bins' ? 1 : 2);
                 const equivalentUnits = it.quantity * multiplier;
                 
@@ -311,12 +310,26 @@ export function OtherFruitStorageTab({ clientId: fixedClientId }: { clientId?: s
         allPossibleCoords = getSortedCoordinates(chamberConfig, finalStrategy as any);
     }
 
+    const isFC = item.clientName === 'FALL CREEK';
+    const occupancyThreshold = (isFC || item.unit === 'Bins') ? binsPerCoordinate : palletsPerCoordinate * 2;
+    const requiredSpace = item.quantity * ((isFC && item.unit === 'Pallets') ? 3 : (item.unit === 'Bins' ? 1 : 2));
+
     // Determine the starting point for suggestion search
     let startIndex = 0;
-    if (lastUsedChamberId === chamberId && lastUsedCoordinate) {
-        startIndex = allPossibleCoords.indexOf(lastUsedCoordinate);
-        if (startIndex === -1) startIndex = 0;
-        else startIndex = startIndex + 1; // Start from NEXT one
+    const effectiveLastChamber = lastUsedChamberId || (typeof window !== 'undefined' ? localStorage.getItem('frio_last_chamber_id') : null);
+    const effectiveSessionCoord = lastUsedCoordinate || (typeof window !== 'undefined' ? localStorage.getItem('frio_last_coordinate') : null);
+    const effectiveLastCoord = (effectiveLastChamber === chamberId && effectiveSessionCoord) ? effectiveSessionCoord : null;
+    
+    if (effectiveLastCoord) {
+        const foundIdx = allPossibleCoords.indexOf(effectiveLastCoord);
+        if (foundIdx !== -1) {
+            const currentOccupancy = occupancyMap.get(effectiveLastCoord) || 0;
+            if (currentOccupancy + requiredSpace > occupancyThreshold) {
+                startIndex = foundIdx + 1;
+            } else {
+                startIndex = foundIdx;
+            }
+        }
     }
 
     // Create a prioritized search list: From last used position forward, then wrap around
@@ -325,13 +338,10 @@ export function OtherFruitStorageTab({ clientId: fixedClientId }: { clientId?: s
         ...allPossibleCoords.slice(0, startIndex)
     ];
 
-    // Find the first coordinate with enough space
-    // For Fall Creek, we usually store 1 pallet (3 bins) at a time
-    const requiredSpace = item.quantity * ((item.clientName === 'FALL CREEK' && item.unit === 'Pallets') ? 3 : 1);
     const suggestedCoord = prioritizedCoords.find(coord => {
         if (chamberConfig.blocked?.includes(coord)) return false;
         const currentOccupancy = occupancyMap.get(coord) || 0;
-        return currentOccupancy + requiredSpace <= binsPerCoordinate;
+        return currentOccupancy + requiredSpace <= occupancyThreshold;
     });
     
     if (!suggestedCoord) return null;
@@ -340,12 +350,12 @@ export function OtherFruitStorageTab({ clientId: fixedClientId }: { clientId?: s
         chamberId,
         coordinate: suggestedCoord,
         totalQuantity: item.quantity,
-        quantityPerLocation: item.unit === 'Bins' ? binsPerCoordinate : palletsPerCoordinate,
+        quantityPerLocation: occupancyThreshold,
         strategy: strategy as any
     };
   };
 
-  const handleFruitStoreConfirm = async (data: { chamberId: string; coordinate: string; totalQuantity: number; quantityPerLocation: number; strategy: 'secuencial' | 'pareado' | 'aisle-access' }, overrideItem?: PendingFruitItem) => {
+  const handleFruitStoreConfirm = async (data: { chamberId: string; coordinate: string; totalQuantity: number; quantityPerLocation: number; strategy: 'secuencial' | 'pareado' | 'aisle-access' | 'inverted-secuencial' | 'horizontal-secuencial' | 'fifo' | 'serpentina-vertical' }, overrideItem?: PendingFruitItem) => {
     const itemToProcessScope = overrideItem || (selectedItem?.type === 'fruit' ? selectedItem : null);
     if (!itemToProcessScope || !firestore) return;
 
@@ -373,7 +383,8 @@ export function OtherFruitStorageTab({ clientId: fixedClientId }: { clientId?: s
     (otherFruitReceptions || []).forEach(r => {
         r.items.forEach((item) => {
             if (item.status === 'Almacenado' && item.storageLocation?.chamberId === chamberId && item.storageLocation.coordinate) {
-                const equivalentUnits = r.unit === 'Bins' ? item.quantity : item.quantity * 2;
+                const multiplier = (r.clientName === 'FALL CREEK' && r.unit === 'Pallets') ? 3 : (r.unit === 'Bins' ? 1 : 2);
+                const equivalentUnits = item.quantity * multiplier;
                 occupancyMap.set(item.storageLocation.coordinate, (occupancyMap.get(item.storageLocation.coordinate) || 0) + equivalentUnits);
             }
         });
@@ -413,7 +424,9 @@ export function OtherFruitStorageTab({ clientId: fixedClientId }: { clientId?: s
     
     let currentCoordIdx = 0;
     let currentCoord = coordsToFill[currentCoordIdx];
-    let spaceInCurrentCoord = Math.max(0, occupancyThreshold - (occupancyMap.get(currentCoord) || 0));
+
+    const isFC = originalReception.clientName === 'FALL CREEK';
+    const unitsPerItem = (isFC && originalReception.unit === 'Pallets') ? 3 : (originalReception.unit === 'Bins' ? 1 : 2);
 
     for (const itemToStore of itemsToProcess) {
         if (remainingToStore <= 0) break;
@@ -422,17 +435,17 @@ export function OtherFruitStorageTab({ clientId: fixedClientId }: { clientId?: s
         let itemQuantityRemaining = itemToStore.quantity;
 
         while (itemQuantityRemaining > 0 && currentCoordIdx < coordsToFill.length) {
-            // Skip blocked coords or truly full ones in the middle of the sequence
             currentCoord = coordsToFill[currentCoordIdx];
             const currentOccupancy = occupancyMap.get(currentCoord) || 0;
-            const availableSpace = Math.max(0, occupancyThreshold - currentOccupancy);
+            const availableSpaceInBins = Math.max(0, occupancyThreshold - currentOccupancy);
+            const availableSpaceInItemUnits = Math.floor(availableSpaceInBins / unitsPerItem);
 
-            if (availableSpace <= 0 || chamberConfig.blocked?.includes(currentCoord)) {
+            if (availableSpaceInItemUnits <= 0 || chamberConfig.blocked?.includes(currentCoord)) {
                 currentCoordIdx++;
                 continue;
             }
 
-            const amountToStore = Math.min(itemQuantityRemaining, availableSpace, remainingToStore);
+            const amountToStore = Math.min(itemQuantityRemaining, availableSpaceInItemUnits, remainingToStore);
             if (amountToStore <= 0) {
                 currentCoordIdx++;
                 continue;
@@ -449,12 +462,14 @@ export function OtherFruitStorageTab({ clientId: fixedClientId }: { clientId?: s
                 storedAt: new Date(),
             });
 
+            const binsStored = amountToStore * unitsPerItem;
+            occupancyMap.set(currentCoord, currentOccupancy + binsStored);
+
             itemQuantityRemaining -= amountToStore;
             remainingToStore -= amountToStore;
             
-            // Re-calculate space if we continue with the same coord (should be 0 or more)
-            const remainingInCoord = availableSpace - amountToStore;
-            if (remainingInCoord <= 0) {
+            const remainingInCoord = availableSpaceInBins - binsStored;
+            if (remainingInCoord < unitsPerItem) {
                 currentCoordIdx++;
             }
         }
@@ -465,6 +480,10 @@ export function OtherFruitStorageTab({ clientId: fixedClientId }: { clientId?: s
     if (lastCoord) {
         setLastUsedChamberId(chamberId);
         setLastUsedCoordinate(lastCoord);
+        if (typeof window !== 'undefined') {
+            localStorage.setItem('frio_last_chamber_id', chamberId);
+            localStorage.setItem('frio_last_coordinate', lastCoord);
+        }
     }
 
     const finalItemsArray = originalReception.items.filter((_, index) => !itemToProcessScope.itemIndices.includes(index));
@@ -482,8 +501,13 @@ export function OtherFruitStorageTab({ clientId: fixedClientId }: { clientId?: s
             updatedAt: serverTimestamp(),
         });
         toast({ title: 'Éxito', description: `Almacenado en ${chamberConfig.name}, Coord: ${startCoordinate}.` });
+        const finalSessionCoord = lastCoord || startCoordinate;
         setLastUsedChamberId(chamberId);
-        setLastUsedCoordinate(startCoordinate);
+        setLastUsedCoordinate(finalSessionCoord);
+        if (typeof window !== 'undefined') {
+            localStorage.setItem('frio_last_chamber_id', chamberId);
+            localStorage.setItem('frio_last_coordinate', finalSessionCoord);
+        }
         setSelectedItem(null);
         setQuickStoreItem(null);
     } catch (error) {
@@ -498,29 +522,31 @@ export function OtherFruitStorageTab({ clientId: fixedClientId }: { clientId?: s
     if (!cleanVal) return;
 
     // Search across ALL pending items (ignoring selectedClientId for the search)
-    const allPendingItems = (otherFruitReceptions || []).flatMap(lot => {
+    const fruitPending: (PendingFruitItem | PendingPackagingItem)[] = (otherFruitReceptions || []).flatMap(lot => {
         const fruitItemsRaw = lot.items
             .map((item, itemIndex) => ({ ...item, type: 'fruit' as const, receptionId: lot.id, clientName: lot.clientName, document: lot.document, itemIndices: [itemIndex], unit: lot.unit }))
             .filter(item => item.status === 'Pendiente de almacenar');
 
-        // Note: For Fall Creek items, we'd normally group here too, but for searching by ID, 
-        // we can just find the raw item and the parent logic will handle the group if needed.
         return fruitItemsRaw;
-    }).concat(
-        (packagingReceptions || []).flatMap(lot => 
-            lot.items.map((item, itemIndex) => ({ ...item, type: 'packaging' as const, receptionId: lot.id, clientName: lot.clientName, document: lot.document, itemIndex, unit: 'Pallets' as const }))
-                .filter(item => item.status === 'Pendiente de almacenar')
-        )
+    });
+
+    const packagingPending: (PendingFruitItem | PendingPackagingItem)[] = (packagingReceptions || []).flatMap(lot => 
+        lot.items.map((item, itemIndex) => ({ ...item, type: 'packaging' as const, receptionId: lot.id, clientName: lot.clientName, document: lot.document, itemIndex, unit: 'Pallets' as const }))
+            .filter(item => item.status === 'Pendiente de almacenar')
     );
+
+    const allPendingItems = fruitPending.concat(packagingPending);
 
     const found = allPendingItems.find(item => {
         if (item.type === 'fruit') {
-            if (item.palletId?.toUpperCase() === cleanVal) return true;
-            if (item.productCode?.toUpperCase() === cleanVal) return true;
-            if (item.containerId?.toUpperCase() === cleanVal) return true;
+            const fruitItem = item as PendingFruitItem;
+            if (fruitItem.palletId?.toUpperCase() === cleanVal) return true;
+            if (fruitItem.productCode?.toUpperCase() === cleanVal) return true;
+            if (fruitItem.containerId?.toUpperCase() === cleanVal) return true;
             return false;
         } else {
-            return item.packagingMasterCode?.toUpperCase() === cleanVal;
+            const pkgItem = item as PendingPackagingItem;
+            return pkgItem.packagingMasterCode?.toUpperCase() === cleanVal;
         }
     });
 
@@ -965,7 +991,7 @@ export function OtherFruitStorageTab({ clientId: fixedClientId }: { clientId?: s
                         <div className="divide-y divide-primary/5">
                             {pendingItems.map((item) => (
                                 <div 
-                                    key={`${item.receptionId}-${item.itemIndices.join('-')}`} 
+                                    key={`${item.receptionId}-${item.type === 'fruit' ? (item as PendingFruitItem).itemIndices.join('-') : (item as PendingPackagingItem).itemIndex}`} 
                                     className={cn(
                                         "group flex items-center justify-between p-4 transition-all duration-300 border-l-4",
                                         isDirectMode 

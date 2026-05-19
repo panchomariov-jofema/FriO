@@ -163,7 +163,7 @@ export function OtherFruitPickingTab() {
     }
   };
 
-  const handleConfirmPackagingExit = async (confirmedPayload: ExitFormValues) => {
+  const handleConfirmPackagingExit = async (confirmedMovement: PackagingMovement) => {
     if (!firestore || !pickingMovement) return;
     setIsConfirming(true);
     
@@ -172,7 +172,7 @@ export function OtherFruitPickingTab() {
         const movementRef = doc(firestore, 'packagingMovements', pickingMovement.id);
         batch.update(movementRef, { status: 'Completado' });
         
-        for(const item of confirmedPayload.items) {
+        for(const item of confirmedMovement.items) {
             if (item.locations) {
               for(const loc of item.locations) {
                 if (loc.palletsToWithdraw > 0) {
@@ -404,8 +404,6 @@ export function OtherFruitPickingTab() {
           onConfirmExit={handleConfirmPackagingExit}
           isConfirming={isConfirming}
           clientName={clientMap[pickingMovement.clientId] || ''}
-          allReceptions={allReceptions || []}
-          loadingReceptions={loadingReceptions}
         />
       )}
     </>

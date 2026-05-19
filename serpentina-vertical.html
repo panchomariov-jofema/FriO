@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FriO — Llenado Serpentina Vertical</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: #0f1117; color: #e0e0e0;
+  font-family: 'Segoe UI', sans-serif;
+  display: flex; flex-direction: column; align-items: center;
+  min-height: 100vh; padding: 20px;
+}
+h1 { font-size: 1.1rem; color: #4fc3f7; margin-bottom: 4px; letter-spacing: 0.05em; text-transform: uppercase; }
+.subtitle { font-size: 0.72rem; color: #667; margin-bottom: 14px; text-align: center; line-height: 1.7; }
+
+.legend { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; margin-bottom: 14px; font-size: 0.68rem; }
+.legend-item { display: flex; align-items: center; gap: 5px; }
+.legend-box { width: 13px; height: 13px; border-radius: 3px; }
+
+.camera-wrap {
+  background: #1a1d26; border: 1px solid #2a2d3a; border-radius: 10px;
+  padding: 14px 14px 10px; width: 100%; max-width: 740px;
+}
+.col-headers { display: grid; grid-template-columns: 28px repeat(13, 1fr) 28px; gap: 2px; margin-bottom: 4px; }
+.col-headers span { text-align: center; font-size: 0.6rem; color: #667; font-weight: 700; }
+.col-headers .pasillo-label { color: #ff4444; font-weight: 900; }
+
+.grid-area { display: flex; flex-direction: column; gap: 2px; }
+.grid-row { display: grid; grid-template-columns: 28px repeat(13, 1fr) 28px; gap: 2px; }
+.row-label { display: flex; align-items: center; justify-content: center; font-size: 0.55rem; color: #556; font-weight: 700; }
+
+.cell {
+  height: 24px; border-radius: 3px;
+  border: 1px solid #ffffff08; background: #252836;
+  transition: background 0.15s, transform 0.1s, border-color 0.15s;
+  position: relative;
+}
+.cell.pasillo {
+  background: repeating-linear-gradient(45deg,#3d0000,#3d0000 3px,#1a0000 3px,#1a0000 6px);
+  border: 2px solid #ff3333 !important;
+}
+.cell.active { transform: scale(1.22); border-color: #fff !important; z-index: 10; box-shadow: 0 0 12px rgba(255,255,255,0.55); }
+.cell .snum {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  font-size: 0.38rem; color: rgba(255,255,255,0.6); font-weight: 900; pointer-events: none;
+}
+
+/* NORTE: serpentina azul — columnas A→E, oscuro al fondo (fila1), claro cerca de puerta (fila13) */
+/* Usamos degradado por número de paso: primeros 65 pasos = azul, últimos 65 = verde */
+
+.door-indicator { text-align: center; margin-top: 8px; font-size: 0.68rem; color: #ff5555; font-weight: 700; letter-spacing: 0.08em; }
+
+.phase-banner {
+  margin-top: 12px; width: 100%; max-width: 740px;
+  border-radius: 8px; padding: 9px 16px; text-align: center;
+  font-size: 0.82rem; font-weight: 700; letter-spacing: 0.03em;
+  transition: background 0.3s, color 0.3s;
+  background: #1a1d26; border: 1px solid #2a2d3a; color: #556;
+}
+.phase-banner.norte { background: #0d2d6e; border-color: #1976d2; color: #90caf9; }
+.phase-banner.sur   { background: #0a2e0a; border-color: #388e3c; color: #a5d6a7; }
+.phase-banner.done  { background: #0a1a2a; border-color: #4fc3f7; color: #4fc3f7; }
+
+.info-bar {
+  margin-top: 10px; background: #1a1d26; border: 1px solid #2a2d3a;
+  border-radius: 8px; padding: 10px 16px; width: 100%; max-width: 740px;
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; text-align: center;
+}
+.info-item label { display: block; font-size: 0.58rem; color: #556; text-transform: uppercase; letter-spacing: 0.07em; }
+.info-item span { font-size: 0.95rem; font-weight: 700; }
+
+.controls { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; justify-content: center; }
+button { padding: 8px 18px; border-radius: 6px; border: none; cursor: pointer; font-size: 0.78rem; font-weight: 600; transition: all 0.2s; }
+.btn-play { background: #1976d2; color: #fff; }
+.btn-reset { background: #37474f; color: #cfd8dc; }
+.btn-speed { background: #1e2130; color: #90a4ae; border: 1px solid #2a2d3a; font-size: 0.7rem; }
+.btn-speed.active { background: #37474f; color: #fff; border-color: #546e7a; }
+</style>
+</head>
+<body>
+
+<h1>FriO — Serpentina Vertical por Bloques</h1>
+<p class="subtitle">
+  Bloque Izquierdo: A13↑A1 → B1↓B13 → C13↑C1 → D1↓D13 → E13↑E1<br>
+  Bloque Derecho: L13↑L1 → K1↓K13 → J13↑J1 → I1↓I13 → H13↑H1
+</p>
+
+<div class="legend">
+  <div class="legend-item"><div class="legend-box" style="background:#003c8f;border:1px solid #1565c0"></div> Norte inicio (A13)</div>
+  <div class="legend-item"><div class="legend-box" style="background:#64b5f6;border:1px solid #90caf9"></div> Norte final (E1)</div>
+  <div class="legend-item"><div class="legend-box" style="background:#1b3a1b;border:1px solid #2e7d32"></div> Sur inicio (L13)</div>
+  <div class="legend-item"><div class="legend-box" style="background:#a5d6a7;border:1px solid #c8e6c9"></div> Sur final (H1)</div>
+  <div class="legend-item"><div class="legend-box" style="background:#3d0000;border:2px solid #ff3333"></div> Pasillo F–G</div>
+</div>
+
+<div class="camera-wrap">
+  <div class="col-headers">
+    <span></span>
+    <span>A</span><span>B</span><span>C</span><span>D</span><span>E</span>
+    <span class="pasillo-label">F</span><span class="pasillo-label">G</span>
+    <span>H</span><span>I</span><span>J</span><span>K</span><span>L</span>
+    <span></span>
+  </div>
+  <div class="grid-area" id="grid"></div>
+  <div class="door-indicator">▲ PUERTA / ACCESO — Fila 13</div>
+</div>
+
+<div class="phase-banner" id="phase-banner">Presiona ▶ Play para iniciar</div>
+
+<div class="info-bar">
+  <div class="info-item"><label>Paso</label><span id="info-step">0</span></div>
+  <div class="info-item"><label>Bloque</label><span id="info-bloque">—</span></div>
+  <div class="info-item"><label>Columna</label><span id="info-col">—</span></div>
+  <div class="info-item"><label>Fila</label><span id="info-row">—</span></div>
+</div>
+
+<div class="controls">
+  <button class="btn-play" id="btn-play" onclick="togglePlay()">▶ Play</button>
+  <button class="btn-reset" onclick="resetAnim()">↺ Reset</button>
+  <button class="btn-speed active" id="spd-1" onclick="setSpeed(1)">1×</button>
+  <button class="btn-speed" id="spd-2" onclick="setSpeed(2)">2×</button>
+  <button class="btn-speed" id="spd-5" onclick="setSpeed(5)">5×</button>
+  <button class="btn-speed" id="spd-10" onclick="setSpeed(10)">10×</button>
+</div>
+
+<script>
+const COLS = ['A','B','C','D','E','F','G','H','I','J','K','L'];
+const ROWS = 13;
+const PASILLO = ['F','G'];
+const NORTE_COLS = ['A','B','C','D','E'];
+const SUR_COLS   = ['L','K','J','I','H'];
+
+// Generar secuencia serpentina vertical
+// Norte: A col 0 (impar index=0) → fila 13→1; B col 1 (par) → 1→13; C→13→1; etc.
+// Sur: L col 0 → 13→1; K col 1 → 1→13; etc.
+function makeSequence(cols, block) {
+  const seq = [];
+  cols.forEach((col, idx) => {
+    const downward = (idx % 2 === 0); // 0=A,L: 13→1 (downward en pantalla = fila alta a baja)
+    const rows = downward
+      ? Array.from({length: ROWS}, (_, i) => ROWS - i)   // 13,12,...,1
+      : Array.from({length: ROWS}, (_, i) => i + 1);     // 1,2,...,13
+    rows.forEach(row => seq.push({col, row, block}));
+  });
+  return seq;
+}
+
+const sequence = [
+  ...makeSequence(NORTE_COLS, 'norte'),
+  ...makeSequence(SUR_COLS, 'sur')
+];
+
+// Build grid
+const grid = document.getElementById('grid');
+const cells = {};
+for (let row = 1; row <= ROWS; row++) {
+  const rowEl = document.createElement('div'); rowEl.className = 'grid-row';
+  const l1 = document.createElement('div'); l1.className = 'row-label'; l1.textContent = row; rowEl.appendChild(l1);
+  for (const col of COLS) {
+    const cell = document.createElement('div');
+    cell.className = 'cell' + (PASILLO.includes(col) ? ' pasillo' : '');
+    const num = document.createElement('div'); num.className = 'snum'; cell.appendChild(num);
+    rowEl.appendChild(cell);
+    cells[`${col}-${row}`] = cell;
+  }
+  const l2 = document.createElement('div'); l2.className = 'row-label'; l2.textContent = row === 13 ? '🚪' : row; rowEl.appendChild(l2);
+  grid.appendChild(rowEl);
+}
+
+// Color interpolation
+function norteColor(stepInBlock) {
+  // 65 pasos: azul oscuro → azul claro
+  const t = stepInBlock / (NORTE_COLS.length * ROWS - 1);
+  const r = Math.round(0 + t * 100);
+  const g = Math.round(60 + t * 121);
+  const b = Math.round(143 + t * 102);
+  return `rgb(${r},${g},${b})`;
+}
+function surColor(stepInBlock) {
+  const t = stepInBlock / (SUR_COLS.length * ROWS - 1);
+  const r = Math.round(27 + t * 138);
+  const g = Math.round(58 + t * 149);
+  const b = Math.round(27 + t * 140);
+  return `rgb(${r},${g},${b})`;
+}
+
+let curStep = 0, playing = false, timer = null, speed = 1, prevActive = null;
+const NORTE_TOTAL = NORTE_COLS.length * ROWS;
+
+function getDelay() { return Math.max(25, 220 / speed); }
+
+function tick() {
+  if (prevActive) { prevActive.classList.remove('active'); prevActive = null; }
+  if (curStep >= sequence.length) {
+    playing = false; clearInterval(timer);
+    document.getElementById('btn-play').textContent = '▶ Play';
+    const b = document.getElementById('phase-banner');
+    b.className = 'phase-banner done'; b.textContent = '✓ Cámara llena — Serpentina vertical completa';
+    return;
+  }
+  const s = sequence[curStep];
+  const cell = cells[`${s.col}-${s.row}`];
+  const stepInBlock = s.block === 'norte' ? curStep : curStep - NORTE_TOTAL;
+  const color = s.block === 'norte' ? norteColor(stepInBlock) : surColor(stepInBlock);
+  cell.style.background = color;
+  cell.style.borderColor = color;
+  cell.classList.add('active');
+  cell.querySelector('.snum').textContent = curStep + 1;
+  prevActive = cell;
+
+  document.getElementById('info-step').textContent = curStep + 1;
+  document.getElementById('info-col').textContent = s.col;
+  document.getElementById('info-row').textContent = s.row;
+  document.getElementById('info-bloque').textContent = s.block === 'norte' ? 'Izq 🔵' : 'Der 🟢';
+
+  const b = document.getElementById('phase-banner');
+  b.className = 'phase-banner ' + s.block;
+  const fase = s.block === 'norte' ? 'BLOQUE IZQUIERDO' : 'BLOQUE DERECHO';
+  b.textContent = `${fase} · Columna ${s.col} · Fila ${s.row} → ${s.col}${s.row} (paso ${curStep + 1})`;
+  curStep++;
+}
+
+function togglePlay() {
+  if (playing) { playing = false; clearInterval(timer); document.getElementById('btn-play').textContent = '▶ Play'; }
+  else { playing = true; document.getElementById('btn-play').textContent = '⏸ Pausa'; timer = setInterval(tick, getDelay()); }
+}
+
+function resetAnim() {
+  playing = false; clearInterval(timer); curStep = 0; prevActive = null;
+  document.getElementById('btn-play').textContent = '▶ Play';
+  for (const col of COLS) for (let r = 1; r <= ROWS; r++) {
+    if (!PASILLO.includes(col)) {
+      const c = cells[`${col}-${r}`];
+      c.style.background = ''; c.style.borderColor = '';
+      c.classList.remove('active');
+      c.querySelector('.snum').textContent = '';
+    }
+  }
+  document.getElementById('info-step').textContent = '0';
+  document.getElementById('info-col').textContent = '—';
+  document.getElementById('info-row').textContent = '—';
+  document.getElementById('info-bloque').textContent = '—';
+  const b = document.getElementById('phase-banner');
+  b.className = 'phase-banner'; b.textContent = 'Presiona ▶ Play para iniciar';
+}
+
+function setSpeed(s) {
+  speed = s;
+  ['spd-1','spd-2','spd-5','spd-10'].forEach(id => { const el = document.getElementById(id); if (el) el.classList.remove('active'); });
+  document.getElementById(`spd-${s}`).classList.add('active');
+  if (playing) { clearInterval(timer); timer = setInterval(tick, getDelay()); }
+}
+</script>
+</body>
+</html>

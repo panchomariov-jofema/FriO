@@ -285,7 +285,7 @@ export function OtherFruitExitTab({ clientId: fixedClientId }: { clientId?: stri
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Registrar Despacho de Fruta (Otros Clientes)</CardTitle>
+        <CardTitle>Registrar Despacho de Fruta (Clientes)</CardTitle>
         <CardDescription>
           Seleccione un cliente para ver su stock. Expanda cada lote para despachar una cantidad específica de cada coordenada.
         </CardDescription>

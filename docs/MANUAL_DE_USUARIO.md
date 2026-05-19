@@ -63,7 +63,7 @@ Gestión del inventario de materiales vacíos.
 
 ---
 
-## 5. Socios Comerciales y Otros Clientes
+## 5. Socios Comerciales y Clientes
 
 ### 5.1. Flujo de Fruta y Embalajes de Terceros
 Módulo diseñado para clientes como **FALL CREEK** o servicios de frío externos.

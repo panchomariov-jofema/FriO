@@ -57,6 +57,9 @@ export function OtherFruitReceptionTab({ clientId: fixedClientId }: { clientId?:
   const [itemToStore, setItemToStore] = React.useState<any | null>(null);
   const [isStoreDialogOpen, setIsStoreDialogOpen] = React.useState(false);
 
+  const [lastUsedChamberId, setLastUsedChamberId] = React.useState<string | null>(null);
+  const [lastUsedCoordinate, setLastUsedCoordinate] = React.useState<string | null>(null);
+
   const onStoreConfirm = async (data: { chamberId: string; coordinate: string; totalQuantity: number; quantityPerLocation: number; strategy: any }) => {
     if (!itemToStore || !firestore || !allReceptions) return;
 
@@ -102,52 +105,61 @@ export function OtherFruitReceptionTab({ clientId: fixedClientId }: { clientId?:
     const coordsToFill = allPossibleCoords.slice(startIndex);
     
     const occupancyThreshold = data.quantityPerLocation;
+    let currentCoordIdx = 0;
+    let currentCoord = coordsToFill[currentCoordIdx];
+    let newLastCoord: string | null = null;
 
     for (const idx of itemToStore.itemIndices) {
         if (remainingToStore <= 0) break;
+        if (currentCoordIdx >= coordsToFill.length) break;
 
         let itemToProcess = updatedItems[idx];
         const isFallCreek = originalReception.clientName === 'FALL CREEK';
-        const unitsPerItem = (isFallCreek && originalReception.unit === 'Pallets') ? 3 : 1;
+        const unitsPerItem = (isFallCreek && originalReception.unit === 'Pallets') ? 3 : (originalReception.unit === 'Bins' ? itemToProcess.quantity : itemToProcess.quantity * 2);
 
-        const currentOccupancy = occupancyMap.get(startCoordinate) || 0;
-        const availableSpace = Math.max(0, occupancyThreshold - currentOccupancy);
+        while (currentCoordIdx < coordsToFill.length) {
+            currentCoord = coordsToFill[currentCoordIdx];
+            const currentOccupancy = occupancyMap.get(currentCoord) || 0;
+            const availableSpace = Math.max(0, occupancyThreshold - currentOccupancy);
 
-        // Check compatibility (only same client)
-        const existingClientsInCoord = new Set<string>();
-        (allChamberLots || []).forEach(l => {
-            if (l.chamberId === chamberId && l.coordinate === startCoordinate) existingClientsInCoord.add(l.exporterId);
-        });
-        allReceptions.forEach(r => {
-            r.items.forEach(it => {
-                if (it.status === 'Almacenado' && it.storageLocation?.chamberId === chamberId && it.storageLocation.coordinate === startCoordinate) {
-                    existingClientsInCoord.add(r.clientId);
-                }
+            if (availableSpace < unitsPerItem || chamberConfig.blocked?.includes(currentCoord)) {
+                currentCoordIdx++;
+                continue;
+            }
+
+            // Check compatibility (only same client)
+            const existingClientsInCoord = new Set<string>();
+            (allChamberLots || []).forEach(l => {
+                if (l.chamberId === chamberId && l.coordinate === currentCoord) existingClientsInCoord.add(l.exporterId);
             });
-        });
+            allReceptions.forEach(r => {
+                r.items.forEach(it => {
+                    if (it.status === 'Almacenado' && it.storageLocation?.chamberId === chamberId && it.storageLocation.coordinate === currentCoord) {
+                        existingClientsInCoord.add(r.clientId);
+                    }
+                });
+            });
 
-        if (existingClientsInCoord.size > 0 && !existingClientsInCoord.has(itemToStore.clientId)) {
-            toast({ variant: 'destructive', title: 'Error de Mezcla', description: `La coordenada ${startCoordinate} tiene fruta de otro cliente.` });
-            return;
+            if (existingClientsInCoord.size > 0 && !existingClientsInCoord.has(itemToStore.clientId)) {
+                currentCoordIdx++;
+                continue;
+            }
+
+            updatedItems[idx] = {
+                ...itemToProcess,
+                status: 'Almacenado',
+                storageLocation: {
+                    chamberId,
+                    coordinate: currentCoord
+                },
+                storedAt: new Date()
+            };
+            
+            occupancyMap.set(currentCoord, currentOccupancy + unitsPerItem);
+            newLastCoord = currentCoord;
+            remainingToStore -= itemToProcess.quantity;
+            break;
         }
-
-        if (availableSpace < unitsPerItem) {
-            toast({ variant: 'destructive', title: 'Espacio Insuficiente', description: `La coordenada ${startCoordinate} no tiene espacio suficiente (${currentOccupancy}/${occupancyThreshold}).` });
-            return;
-        }
-
-        updatedItems[idx] = {
-            ...itemToProcess,
-            status: 'Almacenado',
-            storageLocation: {
-                chamberId,
-                coordinate: startCoordinate
-            },
-            storedAt: new Date()
-        };
-        
-        occupancyMap.set(startCoordinate, currentOccupancy + unitsPerItem);
-        remainingToStore -= 1;
     }
 
     try {
@@ -159,9 +171,18 @@ export function OtherFruitReceptionTab({ clientId: fixedClientId }: { clientId?:
             status: newStatus
         });
 
+        if (newLastCoord) {
+            setLastUsedChamberId(chamberId);
+            setLastUsedCoordinate(newLastCoord);
+            if (typeof window !== 'undefined') {
+                localStorage.setItem('frio_last_chamber_id', chamberId);
+                localStorage.setItem('frio_last_coordinate', newLastCoord);
+            }
+        }
+
         setIsStoreDialogOpen(false);
         setItemToStore(null);
-        toast({ title: 'Éxito', description: 'Ubicación asignada correctamente.' });
+        toast({ title: 'Éxito', description: `Ubicación asignada correctamente en ${chamberConfig.name}.` });
     } catch (error) {
         console.error("Error storing fruit:", error);
         toast({ variant: 'destructive', title: 'Error', description: 'No se pudo asignar la ubicación.' });
@@ -391,6 +412,8 @@ export function OtherFruitReceptionTab({ clientId: fixedClientId }: { clientId?:
             allReceptions={allReceptions || []}
             allChamberLots={allChamberLots || []}
             clientConfig={clientConfigs?.find((c: any) => c.id === itemToStore?.clientId)}
+            lastUsedChamberId={lastUsedChamberId}
+            lastUsedCoordinate={lastUsedCoordinate}
         />
       </div>
     );
@@ -651,6 +674,8 @@ export function OtherFruitReceptionTab({ clientId: fixedClientId }: { clientId?:
           allReceptions={allReceptions || []}
           allChamberLots={allChamberLots || []}
           clientConfig={clientConfigs?.find((c: any) => c.id === itemToStore?.clientId)}
+          lastUsedChamberId={lastUsedChamberId}
+          lastUsedCoordinate={lastUsedCoordinate}
       />
     </>
   );

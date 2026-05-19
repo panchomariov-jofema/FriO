@@ -4,7 +4,7 @@ import * as React from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
-import type { OtherFruitReception, ChamberLot } from '@/lib/types';
+import type { OtherFruitReception, ChamberLot, ClientStorageConfig } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useFirestore } from '@/firebase';
@@ -113,7 +113,7 @@ export function StockAndRelocationTab({ clientId: fixedClientId }: { clientId?: 
       <Card>
         <CardHeader>
           <CardTitle>Stock Actual y Reubicación</CardTitle>
-          <CardDescription>Consulte el stock de fruta de otros clientes y reubique según sea necesario.</CardDescription>
+          <CardDescription>Consulte el stock de fruta de clientes y reubique según sea necesario.</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="rounded-md border">

@@ -6,7 +6,7 @@ import * as React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
-import type { ChamberLot, Exporter, OtherFruitReception, StoredItem, ChamberTemperature } from '@/lib/types';
+import type { ChamberLot, Exporter, OtherFruitReception, StoredItem, ChamberTemperature, ClientStorageConfig } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -604,7 +604,7 @@ export default function CamarasPage() {
                                 <AlertDialogHeader>
                                     <AlertDialogTitle>¿Está seguro de limpiar todo el stock?</AlertDialogTitle>
                                     <AlertDialogDescription>
-                                    Esta acción eliminará permanentemente todos los lotes almacenados en todas las cámaras (productores y otros clientes). Esta acción no se puede deshacer.
+                                    Esta acción eliminará permanentemente todos los lotes almacenados en todas las cámaras (productores y clientes). Esta acción no se puede deshacer.
                                     </AlertDialogDescription>
                                 </AlertDialogHeader>
                                 <AlertDialogFooter>

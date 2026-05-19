@@ -122,6 +122,7 @@ const LogisticsConfigFields = ({ form }: { form: any }) => (
                   <SelectItem value="inverted-secuencial">Vertical FIFO (A12 &rarr; A1)</SelectItem>
                   <SelectItem value="fifo">Serpiente (Z-pattern)</SelectItem>
                   <SelectItem value="aisle-access">Acceso Pasillos (Fall Creek)</SelectItem>
+                  <SelectItem value="serpentina-vertical">Serpentina Vertical</SelectItem>
                 </SelectContent>
               </Select>
               <FormDescription className="text-[10px]">Define el orden de llenado sugerido por el sistema.</FormDescription>
@@ -606,7 +607,7 @@ export default function DatosMaestrosPage() {
     { value: 'exporters', label: 'Exportadores' },
     { value: 'producers', label: 'Productores' },
     { value: 'binMaterials', label: 'Bins y Mat.' },
-    { value: 'otherClients', label: 'Otros Clientes' },
+    { value: 'otherClients', label: 'Clientes' },
     { value: 'packagingMaster', label: 'Embalajes' },
     { value: 'warehouses', label: 'Almacenes (Emb.)' },
     { value: 'aisles', label: 'Pasillos (Emb.)' },
@@ -700,7 +701,7 @@ export default function DatosMaestrosPage() {
           </TabsContent>
           <TabsContent value="otherClients" className="mt-4">
             <MasterDataShell<OtherClient>
-              title="Otros Clientes"
+              title="Clientes"
               collectionName="otherClients"
               schema={otherClientSchema}
               columns={[{key: 'clientId', header: 'ID'}, {key: 'name', header: 'Nombre'}, {key: 'type', header: 'Tipo'}, {key: 'unit', header: 'Unidad'}, {key: 'status', header: 'Estado'}]}

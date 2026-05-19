@@ -21,7 +21,7 @@ interface PackagingPickingDialogProps {
   movement: PackagingMovement | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onConfirmExit: (movement: PackagingMovement) => void;
+  onConfirmExit: (movement: PackagingMovement) => void | Promise<void>;
   isConfirming: boolean;
   clientName: string;
 }

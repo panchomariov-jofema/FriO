@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>100 Códigos QR Masivos (10 por hoja) - FrigoManager</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=JetBrains+Mono:wght@700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #004b8d;
+            --primary-light: #e6f0f8;
+            --secondary: #7aba28;
+            --bg: #f8fafc;
+            --card-bg: #ffffff;
+            --text: #1e293b;
+            --text-muted: #64748b;
+        }
+
+        body { 
+            font-family: 'Inter', sans-serif; 
+            text-align: center; 
+            padding: 20px;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: var(--card-bg);
+            padding: 20px 40px;
+            border-radius: 24px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.05);
+        }
+
+        /* Screen Header */
+        .header {
+            margin-bottom: 30px;
+            border-bottom: 2px solid var(--primary-light);
+            padding-bottom: 20px;
+        }
+
+        h1 { 
+            color: var(--primary); 
+            margin: 0 0 10px 0;
+            font-size: 2.2rem;
+            font-weight: 700;
+        }
+
+        .subtitle {
+            color: var(--text-muted);
+            font-size: 1.05rem;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .print-btn-container {
+            margin: 20px 0;
+        }
+
+        .print-btn {
+            background-color: var(--secondary);
+            color: white;
+            border: none;
+            padding: 12px 28px;
+            font-size: 1.1rem;
+            font-weight: 700;
+            border-radius: 12px;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(122, 186, 40, 0.3);
+            transition: all 0.2s;
+        }
+
+        .print-btn:hover {
+            background-color: #689f22;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(122, 186, 40, 0.4);
+        }
+
+        .section-title {
+            text-align: left;
+            margin: 40px 0 20px 0;
+            padding-left: 15px;
+            border-left: 5px solid var(--secondary);
+            color: var(--primary);
+            font-size: 1.4rem;
+            font-weight: 600;
+        }
+
+        /* Screen Grid */
+        .page-sheet { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); 
+            gap: 20px; 
+            margin-bottom: 50px;
+            padding: 20px;
+            background: #f1f5f9;
+            border-radius: 20px;
+            border: 2px solid #e2e8f0;
+        }
+
+        .qr-card { 
+            border: 2px solid #cbd5e1; 
+            padding: 20px; 
+            border-radius: 16px; 
+            background: white;
+            transition: all 0.2s;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.02);
+        }
+
+        .qr-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.08);
+            border-color: var(--primary);
+        }
+
+        .qr-id { 
+            font-weight: 700; 
+            margin-top: 14px; 
+            color: var(--primary); 
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1.1rem;
+            background: var(--primary-light);
+            padding: 6px 16px;
+            border-radius: 8px;
+            border: 1px solid #bae6fd;
+            letter-spacing: 0.5px;
+        }
+
+        .qr-type {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 12px;
+            font-weight: 700;
+        }
+
+        .qr-card img { 
+            width: 160px; 
+            height: 160px; 
+            border-radius: 8px;
+            object-fit: contain;
+        }
+
+        .footer {
+            margin-top: 40px;
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            border-top: 1px solid #e2e8f0;
+            padding-top: 20px;
+        }
+
+        /* ==================== PRINT MEDIA CONFIGURATION ==================== */
+        @media print {
+            @page {
+                margin: 8mm 10mm; /* Minimal margins to maximize printable area */
+                size: portrait;
+            }
+
+            body { 
+                background: white !important; 
+                padding: 0 !important; 
+                margin: 0 !important; 
+            }
+
+            .container { 
+                box-shadow: none !important; 
+                width: 100% !important; 
+                max-width: 100% !important; 
+                border-radius: 0 !important; 
+                padding: 0 !important; 
+                margin: 0 !important; 
+                background: transparent !important;
+            }
+
+            /* HIDE ALL TITLES, BUTTONS AND FOOTERS FOR 100% QR SPACE */
+            .header, .print-btn-container, .section-title, .footer { 
+                display: none !important; 
+            }
+
+            /* EXACTLY 10 QR CARDS PER SHEET (2 COLUMNS x 5 ROWS) */
+            .page-sheet {
+                display: grid !important;
+                grid-template-columns: repeat(2, 1fr) !important;
+                grid-template-rows: repeat(5, 1fr) !important;
+                height: 98vh !important; /* Fit exactly on one page */
+                max-height: 98vh !important;
+                page-break-after: always !important;
+                break-after: page !important;
+                box-sizing: border-box !important;
+                padding: 0 !important;
+                margin: 0 !important;
+                background: transparent !important;
+                border: none !important;
+                gap: 12px !important; /* Perfect spacing between cards */
+            }
+
+            .qr-card { 
+                break-inside: avoid !important; 
+                border: 2px dashed #94a3b8 !important; 
+                box-shadow: none !important; 
+                transform: none !important;
+                padding: 10px !important;
+                display: flex !important;
+                flex-direction: column !important;
+                align-items: center !important;
+                justify-content: center !important;
+                height: 100% !important;
+                width: 100% !important;
+                box-sizing: border-box !important;
+                background: white !important;
+                border-radius: 12px !important;
+            }
+
+            .qr-card img {
+                width: 145px !important;
+                height: 145px !important;
+                max-width: 100% !important;
+                max-height: 65% !important;
+                object-fit: contain !important;
+            }
+
+            .qr-id {
+                font-size: 1.3rem !important;
+                margin-top: 8px !important;
+                padding: 4px 16px !important;
+                background: transparent !important;
+                border: 2px solid #004b8d !important;
+                color: #004b8d !important;
+                font-weight: 700 !important;
+            }
+
+            .qr-type {
+                font-size: 0.85rem !important;
+                margin-bottom: 6px !important;
+                color: #334155 !important;
+                font-weight: 700 !important;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>100 Códigos QR Masivos para Pruebas (10 por hoja)</h1>
+            <p class="subtitle">Diseñado específicamente para pruebas intensivas de Recepción y Almacenamiento Directo. Al imprimir (Ctrl+P), los títulos y encabezados desaparecerán automáticamente para aprovechar el 100% del espacio en las 10 hojas.</p>
+            <div class="print-btn-container">
+                <button class="print-btn" onclick="window.print()">🖨️ Imprimir 10 Hojas (100 QRs)</button>
+            </div>
+        </div>
+        
+        <!-- HOJA 1: Fall Creek Bins 0031-0040 -->
+        <div class="section-title">Hoja 1: Bins Fall Creek (0031 - 0040)</div>
+        <div class="page-sheet">
+            <div class="qr-card"><span class="qr-type">Fall Creek Bin</span><img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=BIN-FC-0031" alt="QR"><div class="qr-id">BIN-FC-0031</div></div>
+            <div class="qr-card"><span class="qr-type">Fall Creek Bin</span><img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=BIN-FC-0032" alt="QR"><div class="qr-id">BIN-FC-0032</div></div>
+            <div class="qr-card"><span class="qr-type">Fall Creek Bin</span><img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=BIN-FC-0033" alt="QR"><div class="qr-id">BIN-FC-0033</div></div>
+            <div class="qr-card"><span class="qr-type">Fall Creek Bin</span><img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=BIN-FC-0034" alt="QR"><div class="qr-id">BIN-FC-0034</div></div>
+            <div class="qr-card"><span class="qr-type">Fall Creek Bin</span><img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=BIN-FC-0035" alt="QR"><div class="qr-id">BIN-FC-0035</div></div>
+            <div class="qr-card"><span class="qr-type">Fall Creek Bin</span><img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=BIN-FC-0036" alt="QR"><div class="qr-id">BIN-FC-0036</div></div>
+            <div class="qr-card"><span class="qr-type">Fall Creek Bin</span><img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=BIN-FC-0037" alt="QR"><div class="qr-id">BIN-FC-0037</div></div>
+            <div class="qr-card"><span class="qr-type">Fall Creek Bin</span><img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=BIN-FC-0038" alt="QR"><div class="qr-id">BIN-FC-0038</div></div>
+            <div class="qr-card"><span class="qr-type">Fall Creek Bin</span><img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=BIN-FC-0039" alt="QR"><div class="qr-id">BIN-FC-0039</div></div>
+            <div class="qr-card"><span class="qr-type">Fall Creek Bin</span><img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=BIN-FC-0040" alt="QR"><div class="qr-id">BIN-FC-0040</div></div>
+        </div>
+
+        <!-- HOJA 2: Fall Creek Bins 0041-0050 -->
+        <div class="section-title">Hoja 2: Bins Fall Creek (0041 - 0050)</div>
+        <div class="page-sheet">
+            <div class="qr-card"><span class="qr-type">Fall Creek Bin</span><img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=BIN-FC-0041" alt="QR"><div class="qr-id">BIN-FC-0041</div></div>
+            <div class="qr-card"><span class="qr-type">Fall Creek Bin</span><img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=BIN-FC-0042" alt="QR"><div class="qr-id">BIN-FC-0042</div></div>
+            <div class="qr-card"><span class="qr-type">Fall Creek Bin</span><img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=BIN-FC-0043" alt="QR"><div class="qr-id">BIN-FC-0043</div></div>
+            <div class="qr-card"><span class="qr-type">Fall Creek Bin</span><img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=BIN-FC-0044" alt="QR"><div class="qr-id">BIN-FC-0044</div></div>
+            <div class="qr-card"><span class="qr-type">Fall Creek Bin</span><img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=BIN-FC-0045" alt="QR"><div class="qr-id">BIN-FC-0045</div></div>
+            <div class="qr-card"><span class="qr-type">Fall Creek Bin</span><img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=BIN-FC-0046" alt="QR"><div class="qr-id">BIN-FC-0046</div></div>
+            <div class="qr-card"><span class="qr-type">Fall Creek Bin</span><img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=BIN-FC-0047" alt="QR"><div class="qr-id">BIN-FC-0047</div></div>
+            <div class="qr-card"><span class="qr-type">Fall Creek Bin</span><img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=BIN-FC-0048" alt="QR"><div class="qr-id">BIN-FC-0048</div></div>
+            <div class="qr-card"><span class="qr-type">Fall Creek Bin</span><img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=BIN-FC-0049" alt="QR"><div class="qr-id">BIN-FC-0049</div></div>
+            <div class="qr-card"><span class="qr-type">Fall Creek Bin</span><img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=BIN-FC-0050" alt="QR"><div class="qr-id">BIN-FC-0050</div></div>
+        </div>
+
+        <!-- HOJA 3: Fall Creek Bins 0051-0060 -->
+        <div class="section-title">Hoja 3: Bins Fall Creek (0051 - 0060)</div>
+        <div class="page-sheet">
+            <div class="qr-card"><span class="qr-type">Fall Creek Bin</span><img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=BIN-FC-0051" alt="QR"><div class="qr-id">BIN-FC-0051</div></div>
+            <div class="qr-card"><span class="qr-type">Fall Creek Bin</span><img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=BIN-FC-0052" alt="QR"><div class="qr-id">BIN-FC-0052</div></div>
+            <div class="qr-card"><span class="qr-type">Fall Creek Bin</span><img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=BIN-FC-0053" alt="QR"><div class="qr-id">BIN-FC-0053</div></div>
+            <div class="qr-card"><span class="qr-type">Fall Creek Bin</span><img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=BIN-FC-0054" alt="QR"><div class="qr-id">BIN-FC-0054</div></div>
+            <div class="qr-card"><span class="qr-type">Fall Creek Bin</span><img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=BIN-FC-0055" alt="QR"><div class="qr-id">BIN-FC-0055</div></div>
+            <div class="qr-card"><span class="qr-type">Fall Creek Bin</span><img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=BIN-FC-0056" alt="QR"><div class="qr-id">BIN-FC-0056</div></div>
+            <div class="qr-card"><span class="qr-type">Fall Creek Bin</span><img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=BIN-FC-0057" alt="QR"><div class="qr-id">BIN-FC-0057</div></div>
+            <div class="qr-card"><span class="qr-type">Fall Creek Bin</span><img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=BIN-FC-0058" alt="QR"><div class="qr-id">BIN-FC-0058</div></div>
+            <div class="qr-card"><span class="qr-type">Fall Creek Bin</span><img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=BIN-FC-0059" alt="QR"><div class="qr-id">BIN-FC-0059</div></div>
+            <div class="qr-card"><span class="qr-type">Fall Creek Bin</span><img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=BIN-FC-0060" alt="QR"><div class="qr-id">BIN-FC-0060</div></div>
+        </div>
+
+        <!-- HOJA 4: Fall Creek Bins 0061-0070 -->
+        <div class="section-title">Hoja 4: Bins Fall Creek (0061 - 0070)</div>
+        <div class="page-sheet">
+            <div class="qr-card"><span class="qr-type">Fall Creek Bin</span><img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=BIN-FC-0061" alt="QR"><div class="qr-id">BIN-FC-0061</div></div>
+            <div class="qr-card"><span class="qr-type">Fall Creek Bin</span><img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=BIN-FC-0062" alt="QR"><div class="qr-id">BIN-FC-0062</div></div>
+            <div class="qr-card"><span class="qr-type">Fall Creek Bin</span><img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=BIN-FC-0063" alt="QR"><div class="qr-id">BIN-FC-0063</div></div>
+            <div class="qr-card"><span class="qr-type">Fall Creek Bin</span><img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=BIN-FC-0064" alt="QR"><div class="qr-id">BIN-FC-0064</div></div>
+            <div class="qr-card"><span class="qr-type">Fall Creek Bin</span><img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=BIN-FC-0065" alt="QR"><div class="qr-id">BIN-FC-0065</div></div>
+            <div class="qr-card"><span class="qr-type">Fall Creek Bin</span><img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=BIN-FC-0066" alt="QR"><div class="qr-id">BIN-FC-0066</div></div>
+            <div class="qr-card"><span class="qr-type">Fall Creek Bin</span><img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=BIN-FC-0067" alt="QR"><div class="qr-id">BIN-FC-0067</div></div>
+            <div class="qr-card"><span class="qr-type">Fall Creek Bin</span><img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=BIN-FC-0068" alt="QR"><div class="qr-id">BIN-FC-0068</div></div>
+            <div class="qr-card"><span class="qr-type">Fall Creek Bin</span><img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=BIN-FC-0069" alt="QR"><div class="qr-id">BIN-FC-0069</div></div>
+            <div class="qr-card"><span class="qr-type">Fall Creek Bin</span><img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=BIN-FC-0070" alt="QR"><div class="qr-id">BIN-FC-0070</div></div>
+        </div>
+
+        <!-- HOJA 5: Fall Creek Bins 0071-0080 -->
+        <div class="section-title">Hoja 5: Bins Fall Creek (0071 - 0080)</div>
+        <div class="page-sheet">
+            <div class="qr-card"><span class="qr-type">Fall Creek Bin</span><img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=BIN-FC-0071" alt="QR"><div class="qr-id">BIN-FC-0071</div></div>
+            <div class="qr-card"><span class="qr-type">Fall Creek Bin</span><img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=BIN-FC-0072" alt="QR"><div class="qr-id">BIN-FC-0072</div></div>
+            <div class="qr-card"><span class="qr-type">Fall Creek Bin</span><img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=BIN-FC-0073" alt="QR"><div class="qr-id">BIN-FC-0073</div></div>
+            <div class="qr-card"><span class="qr-type">Fall Creek Bin</span><img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=BIN-FC-0074" alt="QR"><div class="qr-id">BIN-FC-0074</div></div>
+            <div class="qr-card"><span class="qr-type">Fall Creek Bin</span><img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=BIN-FC-0075" alt="QR"><div class="qr-id">BIN-FC-0075</div></div>
+            <div class="qr-card"><span class="qr-type">Fall Creek Bin</span><img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=BIN-FC-0076" alt="QR"><div class="qr-id">BIN-FC-0076</div></div>
+            <div class="qr-card"><span class="qr-type">Fall Creek Bin</span><img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=BIN-FC-0077" alt="QR"><div class="qr-id">BIN-FC-0077</div></div>
+            <div class="qr-card"><span class="qr-type">Fall Creek Bin</span><img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=BIN-FC-0078" alt="QR"><div class="qr-id">BIN-FC-0078</div></div>
+            <div class="qr-card"><span class="qr-type">Fall Creek Bin</span><img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=BIN-FC-0079" alt="QR"><div class="qr-id">BIN-FC-0079</div></div>
+            <div class="qr-card"><span class="qr-type">Fall Creek Bin</span><img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=BIN-FC-0080" alt="QR"><div class="qr-id">BIN-FC-0080</div></div>
+        </div>
+
+        <!-- HOJA 6: Otros Bins 0021-0030 -->
+        <div class="section-title">Hoja 6: Bins Otros Clientes (0021 - 0030)</div>
+        <div class="page-sheet">
+            <div class="qr-card"><span class="qr-type">General Bin</span><img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=BIN-OT-0021" alt="QR"><div class="qr-id">BIN-OT-0021</div></div>
+            <div class="qr-card"><span class="qr-type">General Bin</span><img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=BIN-OT-0022" alt="QR"><div class="qr-id">BIN-OT-0022</div></div>
+            <div class="qr-card"><span class="qr-type">General Bin</span><img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=BIN-OT-0023" alt="QR"><div class="qr-id">BIN-OT-0023</div></div>
+            <div class="qr-card"><span class="qr-type">General Bin</span><img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=BIN-OT-0024" alt="QR"><div class="qr-id">BIN-OT-0024</div></div>
+            <div class="qr-card"><span class="qr-type">General Bin</span><img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=BIN-OT-0025" alt="QR"><div class="qr-id">BIN-OT-0025</div></div>
+            <div class="qr-card"><span class="qr-type">General Bin</span><img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=BIN-OT-0026" alt="QR"><div class="qr-id">BIN-OT-0026</div></div>
+            <div class="qr-card"><span class="qr-type">General Bin</span><img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=BIN-OT-0027" alt="QR"><div class="qr-id">BIN-OT-0027</div></div>
+            <div class="qr-card"><span class="qr-type">General Bin</span><img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=BIN-OT-0028" alt="QR"><div class="qr-id">BIN-OT-0028</div></div>
+            <div class="qr-card"><span class="qr-type">General Bin</span><img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=BIN-OT-0029" alt="QR"><div class="qr-id">BIN-OT-0029</div></div>
+            <div class="qr-card"><span class="qr-type">General Bin</span><img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=BIN-OT-0030" alt="QR"><div class="qr-id">BIN-OT-0030</div></div>
+        </div>
+
+        <!-- HOJA 7: Otros Bins 0031-0040 -->
+        <div class="section-title">Hoja 7: Bins Otros Clientes (0031 - 0040)</div>
+        <div class="page-sheet">
+            <div class="qr-card"><span class="qr-type">General Bin</span><img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=BIN-OT-0031" alt="QR"><div class="qr-id">BIN-OT-0031</div></div>
+            <div class="qr-card"><span class="qr-type">General Bin</span><img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=BIN-OT-0032" alt="QR"><div class="qr-id">BIN-OT-0032</div></div>
+            <div class="qr-card"><span class="qr-type">General Bin</span><img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=BIN-OT-0033" alt="QR"><div class="qr-id">BIN-OT-0033</div></div>
+            <div class="qr-card"><span class="qr-type">General Bin</span><img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=BIN-OT-0034" alt="QR"><div class="qr-id">BIN-OT-0034</div></div>
+            <div class="qr-card"><span class="qr-type">General Bin</span><img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=BIN-OT-0035" alt="QR"><div class="qr-id">BIN-OT-0035</div></div>
+            <div class="qr-card"><span class="qr-type">General Bin</span><img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=BIN-OT-0036" alt="QR"><div class="qr-id">BIN-OT-0036</div></div>
+            <div class="qr-card"><span class="qr-type">General Bin</span><img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=BIN-OT-0037" alt="QR"><div class="qr-id">BIN-OT-0037</div></div>
+            <div class="qr-card"><span class="qr-type">General Bin</span><img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=BIN-OT-0038" alt="QR"><div class="qr-id">BIN-OT-0038</div></div>
+            <div class="qr-card"><span class="qr-type">General Bin</span><img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=BIN-OT-0039" alt="QR"><div class="qr-id">BIN-OT-0039</div></div>
+            <div class="qr-card"><span class="qr-type">General Bin</span><img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=BIN-OT-0040" alt="QR"><div class="qr-id">BIN-OT-0040</div></div>
+        </div>
+
+        <!-- HOJA 8: Otros Bins 0041-0050 -->
+        <div class="section-title">Hoja 8: Bins Otros Clientes (0041 - 0050)</div>
+        <div class="page-sheet">
+            <div class="qr-card"><span class="qr-type">General Bin</span><img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=BIN-OT-0041" alt="QR"><div class="qr-id">BIN-OT-0041</div></div>
+            <div class="qr-card"><span class="qr-type">General Bin</span><img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=BIN-OT-0042" alt="QR"><div class="qr-id">BIN-OT-0042</div></div>
+            <div class="qr-card"><span class="qr-type">General Bin</span><img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=BIN-OT-0043" alt="QR"><div class="qr-id">BIN-OT-0043</div></div>
+            <div class="qr-card"><span class="qr-type">General Bin</span><img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=BIN-OT-0044" alt="QR"><div class="qr-id">BIN-OT-0044</div></div>
+            <div class="qr-card"><span class="qr-type">General Bin</span><img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=BIN-OT-0045" alt="QR"><div class="qr-id">BIN-OT-0045</div></div>
+            <div class="qr-card"><span class="qr-type">General Bin</span><img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=BIN-OT-0046" alt="QR"><div class="qr-id">BIN-OT-0046</div></div>
+            <div class="qr-card"><span class="qr-type">General Bin</span><img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=BIN-OT-0047" alt="QR"><div class="qr-id">BIN-OT-0047</div></div>
+            <div class="qr-card"><span class="qr-type">General Bin</span><img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=BIN-OT-0048" alt="QR"><div class="qr-id">BIN-OT-0048</div></div>
+            <div class="qr-card"><span class="qr-type">General Bin</span><img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=BIN-OT-0049" alt="QR"><div class="qr-id">BIN-OT-0049</div></div>
+            <div class="qr-card"><span class="qr-type">General Bin</span><img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=BIN-OT-0050" alt="QR"><div class="qr-id">BIN-OT-0050</div></div>
+        </div>
+
+        <!-- HOJA 9: Pallets 0021-0030 -->
+        <div class="section-title">Hoja 9: Pallet IDs (0021 - 0030)</div>
+        <div class="page-sheet">
+            <div class="qr-card"><span class="qr-type">Pallet ID</span><img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=PAL-0021" alt="QR"><div class="qr-id">PAL-0021</div></div>
+            <div class="qr-card"><span class="qr-type">Pallet ID</span><img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=PAL-0022" alt="QR"><div class="qr-id">PAL-0022</div></div>
+            <div class="qr-card"><span class="qr-type">Pallet ID</span><img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=PAL-0023" alt="QR"><div class="qr-id">PAL-0023</div></div>
+            <div class="qr-card"><span class="qr-type">Pallet ID</span><img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=PAL-0024" alt="QR"><div class="qr-id">PAL-0024</div></div>
+            <div class="qr-card"><span class="qr-type">Pallet ID</span><img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=PAL-0025" alt="QR"><div class="qr-id">PAL-0025</div></div>
+            <div class="qr-card"><span class="qr-type">Pallet ID</span><img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=PAL-0026" alt="QR"><div class="qr-id">PAL-0026</div></div>
+            <div class="qr-card"><span class="qr-type">Pallet ID</span><img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=PAL-0027" alt="QR"><div class="qr-id">PAL-0027</div></div>
+            <div class="qr-card"><span class="qr-type">Pallet ID</span><img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=PAL-0028" alt="QR"><div class="qr-id">PAL-0028</div></div>
+            <div class="qr-card"><span class="qr-type">Pallet ID</span><img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=PAL-0029" alt="QR"><div class="qr-id">PAL-0029</div></div>
+            <div class="qr-card"><span class="qr-type">Pallet ID</span><img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=PAL-0030" alt="QR"><div class="qr-id">PAL-0030</div></div>
+        </div>
+
+        <!-- HOJA 10: Pallets 0031-0040 -->
+        <div class="section-title">Hoja 10: Pallet IDs (0031 - 0040)</div>
+        <div class="page-sheet">
+            <div class="qr-card"><span class="qr-type">Pallet ID</span><img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=PAL-0031" alt="QR"><div class="qr-id">PAL-0031</div></div>
+            <div class="qr-card"><span class="qr-type">Pallet ID</span><img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=PAL-0032" alt="QR"><div class="qr-id">PAL-0032</div></div>
+            <div class="qr-card"><span class="qr-type">Pallet ID</span><img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=PAL-0033" alt="QR"><div class="qr-id">PAL-0033</div></div>
+            <div class="qr-card"><span class="qr-type">Pallet ID</span><img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=PAL-0034" alt="QR"><div class="qr-id">PAL-0034</div></div>
+            <div class="qr-card"><span class="qr-type">Pallet ID</span><img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=PAL-0035" alt="QR"><div class="qr-id">PAL-0035</div></div>
+            <div class="qr-card"><span class="qr-type">Pallet ID</span><img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=PAL-0036" alt="QR"><div class="qr-id">PAL-0036</div></div>
+            <div class="qr-card"><span class="qr-type">Pallet ID</span><img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=PAL-0037" alt="QR"><div class="qr-id">PAL-0037</div></div>
+            <div class="qr-card"><span class="qr-type">Pallet ID</span><img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=PAL-0038" alt="QR"><div class="qr-id">PAL-0038</div></div>
+            <div class="qr-card"><span class="qr-type">Pallet ID</span><img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=PAL-0039" alt="QR"><div class="qr-id">PAL-0039</div></div>
+            <div class="qr-card"><span class="qr-type">Pallet ID</span><img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=PAL-0040" alt="QR"><div class="qr-id">PAL-0040</div></div>
+        </div>
+
+        <div class="footer">
+            Generado por Antigravity para pruebas masivas de FrigoManager &bull; 100 QRs Masivos
+        </div>
+    </div>
+</body>
+</html>

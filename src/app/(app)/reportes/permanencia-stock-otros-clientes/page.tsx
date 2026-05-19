@@ -104,8 +104,8 @@ export default function PermanenceReportPage() {
     return (
         <div className="space-y-6">
             <ReportHeader
-                title="Permanencia de Stock (Otros Clientes)"
-                description="Calcula los días de permanencia del stock de fruta de otros clientes para facturación."
+                title="Permanencia de Stock (Clientes)"
+                description="Calcula los días de permanencia del stock de fruta de clientes para facturación."
                 onExport={handleExport}
                 isExportDisabled={loading || reportData.length === 0}
             />

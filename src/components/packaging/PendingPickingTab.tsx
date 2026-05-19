@@ -149,8 +149,6 @@ export function PendingPickingTab() {
           onConfirmExit={handleConfirmExit}
           isConfirming={isConfirming}
           clientName={clientMap[pickingMovement.clientId] || ''}
-          allReceptions={allReceptions}
-          loadingReceptions={loadingReceptions}
         />
       )}
     </>
