@@ -54,6 +54,20 @@ export function OtherFruitReceptionTab({ clientId: fixedClientId }: { clientId?:
   const [showClientLot, setShowClientLot] = React.useState(false);
   const [showTemperature, setShowTemperature] = React.useState(false);
   const [directStorageMode, setDirectStorageMode] = React.useState(true);
+  const [usePhysicalScanner, setUsePhysicalScanner] = React.useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('frio_use_physical_scanner') === 'true';
+    }
+    return false;
+  });
+
+  const handleTogglePhysical = (checked: boolean) => {
+    setUsePhysicalScanner(checked);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('frio_use_physical_scanner', String(checked));
+    }
+  };
+
   const [itemToStore, setItemToStore] = React.useState<any | null>(null);
   const [isStoreDialogOpen, setIsStoreDialogOpen] = React.useState(false);
 
@@ -367,14 +381,25 @@ export function OtherFruitReceptionTab({ clientId: fixedClientId }: { clientId?:
                 <CardTitle className="text-xl sm:text-2xl">Recepción de Productos</CardTitle>
                 <CardDescription>Socio: <span className="font-bold text-[#004b8d]">{selectedClient.name}</span></CardDescription>
               </div>
-              <div className="flex items-center space-x-2 bg-[#7aba28]/10 px-4 py-2 rounded-full border border-[#7aba28]/20">
-                  <Label htmlFor="direct-storage-fc" className="text-xs font-bold uppercase text-[#004b8d] cursor-pointer">Almacenamiento Directo</Label>
-                  <Switch 
-                      id="direct-storage-fc" 
-                      checked={directStorageMode} 
-                      onCheckedChange={setDirectStorageMode}
-                      className="data-[state=checked]:bg-[#7aba28]"
-                  />
+              <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex items-center space-x-2 bg-[#7aba28]/10 px-4 py-2 rounded-full border border-[#7aba28]/20">
+                      <Label htmlFor="physical-scanner-fc" className="text-xs font-bold uppercase text-[#004b8d] cursor-pointer">Lector / Cámara</Label>
+                      <Switch 
+                          id="physical-scanner-fc" 
+                          checked={usePhysicalScanner} 
+                          onCheckedChange={handleTogglePhysical}
+                          className="data-[state=checked]:bg-[#7aba28]"
+                      />
+                  </div>
+                  <div className="flex items-center space-x-2 bg-[#7aba28]/10 px-4 py-2 rounded-full border border-[#7aba28]/20">
+                      <Label htmlFor="direct-storage-fc" className="text-xs font-bold uppercase text-[#004b8d] cursor-pointer">Almacenamiento Directo</Label>
+                      <Switch 
+                          id="direct-storage-fc" 
+                          checked={directStorageMode} 
+                          onCheckedChange={setDirectStorageMode}
+                          className="data-[state=checked]:bg-[#7aba28]"
+                      />
+                  </div>
               </div>
             </div>
           </CardHeader>
@@ -396,6 +421,7 @@ export function OtherFruitReceptionTab({ clientId: fixedClientId }: { clientId?:
               )}
               <FallCreekReceptionWorkflow 
                 directStorageMode={directStorageMode}
+                usePhysicalScanner={usePhysicalScanner}
                 onTriggerStorage={(item) => {
                   setItemToStore(item);
                   setIsStoreDialogOpen(true);
@@ -427,14 +453,25 @@ export function OtherFruitReceptionTab({ clientId: fixedClientId }: { clientId?:
             <CardTitle>Recepción de Productos</CardTitle>
             <CardDescription>Registre la entrada de productos de socios comerciales.</CardDescription>
           </div>
-          <div className="flex items-center space-x-2 bg-[#7aba28]/10 px-4 py-2 rounded-full border border-[#7aba28]/20">
-              <Label htmlFor="direct-storage-gen" className="text-xs font-bold uppercase text-[#004b8d] cursor-pointer">Almacenamiento Directo</Label>
-              <Switch 
-                  id="direct-storage-gen" 
-                  checked={directStorageMode} 
-                  onCheckedChange={setDirectStorageMode}
-                  className="data-[state=checked]:bg-[#7aba28]"
-              />
+          <div className="flex flex-wrap items-center gap-2">
+              <div className="flex items-center space-x-2 bg-[#7aba28]/10 px-4 py-2 rounded-full border border-[#7aba28]/20">
+                  <Label htmlFor="physical-scanner-gen" className="text-xs font-bold uppercase text-[#004b8d] cursor-pointer">Lector / Cámara</Label>
+                  <Switch 
+                      id="physical-scanner-gen" 
+                      checked={usePhysicalScanner} 
+                      onCheckedChange={handleTogglePhysical}
+                      className="data-[state=checked]:bg-[#7aba28]"
+                  />
+              </div>
+              <div className="flex items-center space-x-2 bg-[#7aba28]/10 px-4 py-2 rounded-full border border-[#7aba28]/20">
+                  <Label htmlFor="direct-storage-gen" className="text-xs font-bold uppercase text-[#004b8d] cursor-pointer">Almacenamiento Directo</Label>
+                  <Switch 
+                      id="direct-storage-gen" 
+                      checked={directStorageMode} 
+                      onCheckedChange={setDirectStorageMode}
+                      className="data-[state=checked]:bg-[#7aba28]"
+                  />
+              </div>
           </div>
         </CardHeader>
         <CardContent>
@@ -664,6 +701,7 @@ export function OtherFruitReceptionTab({ clientId: fixedClientId }: { clientId?:
         open={scanningIndex !== null}
         onOpenChange={(isOpen) => !isOpen && setScanningIndex(null)}
         onScan={handleScanConfirm}
+        usePhysicalScanner={usePhysicalScanner}
       />
 
       <StoreOtherFruitDialog

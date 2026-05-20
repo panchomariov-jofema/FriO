@@ -16,6 +16,7 @@ interface BarcodeScannerProps {
   closeOnScan?: boolean;
   title?: string;
   description?: string;
+  usePhysicalScanner?: boolean;
 }
 
 const qrcodeRegionId = "reader";
@@ -26,29 +27,34 @@ export function BarcodeScanner({
   onScan,
   closeOnScan = true,
   title,
-  description
+  description,
+  usePhysicalScanner: propUsePhysicalScanner
 }: BarcodeScannerProps) {
   const { toast } = useToast();
-  const [usePhysicalScanner, setUsePhysicalScanner] = React.useState<boolean>(false);
+  const [localUsePhysicalScanner, setLocalUsePhysicalScanner] = React.useState<boolean>(false);
   
   React.useEffect(() => {
-    if (typeof window !== 'undefined') {
+    if (propUsePhysicalScanner === undefined && typeof window !== 'undefined') {
       const saved = localStorage.getItem('frio_use_physical_scanner');
       if (saved !== null) {
-        setUsePhysicalScanner(saved === 'true');
+        setLocalUsePhysicalScanner(saved === 'true');
       }
     }
-  }, []);
+  }, [propUsePhysicalScanner, open]);
 
   const handleTogglePhysical = (checked: boolean) => {
-    setUsePhysicalScanner(checked);
+    setLocalUsePhysicalScanner(checked);
     if (typeof window !== 'undefined') {
       localStorage.setItem('frio_use_physical_scanner', String(checked));
     }
   };
+
+  const activeUsePhysicalScanner = propUsePhysicalScanner !== undefined 
+    ? propUsePhysicalScanner 
+    : localUsePhysicalScanner;
   
   React.useEffect(() => {
-    if (!open || usePhysicalScanner) {
+    if (!open || activeUsePhysicalScanner) {
       return;
     }
     
@@ -56,6 +62,10 @@ export function BarcodeScanner({
 
     // Dynamically import the library only on the client-side
     import('html5-qrcode').then(({ Html5Qrcode }) => {
+        // Ensure the element exists in DOM before creating instance
+        const el = document.getElementById(qrcodeRegionId);
+        if (!el) return;
+
         html5QrCode = new Html5Qrcode(qrcodeRegionId);
         let isScanning = true;
 
@@ -119,14 +129,15 @@ export function BarcodeScanner({
 
     // Cleanup function to stop the scanner when the component unmounts or dialog closes.
     return () => {
-      if (html5QrCode && html5QrCode.isScanning) {
+      const el = document.getElementById(qrcodeRegionId);
+      if (el && html5QrCode && html5QrCode.isScanning) {
         html5QrCode.stop().catch((err: any) => {
           console.warn("Could not stop html5-qrcode scanner on cleanup:", err);
         });
       }
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, usePhysicalScanner]);
+  }, [open, activeUsePhysicalScanner]);
   
   const inputRef = React.useRef<HTMLInputElement>(null);
 
@@ -170,47 +181,59 @@ export function BarcodeScanner({
           )}
         </DialogHeader>
 
-        {usePhysicalScanner ? (
-          <div className="w-full aspect-square rounded-md overflow-hidden bg-muted/30 flex flex-col items-center justify-center relative border-2 border-dashed border-[#7aba28]/20">
+        {/* ALWAYS keep the reader div mounted in DOM to prevent html5-qrcode crashes, 
+            but hide it using 'hidden' class when physical scanner mode is active */}
+        <div 
+          id={qrcodeRegionId} 
+          className={cn(
+            "w-full aspect-square rounded-md overflow-hidden bg-black/5 flex items-center justify-center relative",
+            activeUsePhysicalScanner && "hidden"
+          )}
+        >
+           <div className="absolute inset-0 border-2 border-primary/20 pointer-events-none z-10" />
+        </div>
+
+        {/* Compact layout for hardware reader mode on mobile */}
+        {activeUsePhysicalScanner && (
+          <div className="w-full py-4 px-3 rounded-lg bg-muted/30 flex items-center gap-3 relative border border-dashed border-[#7aba28]/40 overflow-hidden">
             <style>{`
-              @keyframes scan {
-                0% { top: 10%; }
-                50% { top: 90%; }
-                100% { top: 10%; }
+              @keyframes scan-thin {
+                0% { left: 5%; }
+                50% { left: 95%; }
+                100% { left: 5%; }
               }
-              .laser-line {
+              .laser-line-thin {
                 position: absolute;
-                left: 0;
-                width: 100%;
-                height: 2px;
+                top: 0;
+                bottom: 0;
+                width: 2px;
                 background-color: #ef4444;
-                box-shadow: 0 0 8px #ef4444;
-                animation: scan 2s infinite linear;
+                box-shadow: 0 0 6px #ef4444;
+                animation: scan-thin 1.5s infinite ease-in-out;
               }
             `}</style>
-            <div className="absolute inset-0 border-2 border-primary/10 pointer-events-none z-10" />
-            <div className="laser-line" />
-            <ScanLine className="h-16 w-16 text-[#004b8d]/30 animate-pulse" />
-            <p className="text-sm font-bold text-[#004b8d]/80 mt-4">Lector físico activo</p>
-            <p className="text-xs text-muted-foreground mt-1">Apunte y escanee el código QR/Barra</p>
-          </div>
-        ) : (
-          <div id={qrcodeRegionId} className="w-full aspect-square rounded-md overflow-hidden bg-black/5 flex items-center justify-center relative">
-             <div className="absolute inset-0 border-2 border-primary/20 pointer-events-none z-10" />
+            <div className="laser-line-thin" />
+            <ScanLine className="h-8 w-8 text-[#004b8d]/40 shrink-0" />
+            <div className="flex flex-col text-left">
+              <p className="text-xs font-bold text-[#004b8d]">Lector de Hardware Activo</p>
+              <p className="text-[10px] text-muted-foreground">La cámara está desactivada. Escanee usando su lector físico.</p>
+            </div>
           </div>
         )}
         
-        <div className="flex items-center justify-between bg-muted/40 p-3 rounded-lg border border-muted/20 my-1">
-          <div className="flex flex-col">
-            <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Lector / Cámara</span>
-            <span className="text-[10px] text-muted-foreground">Alternar entre lector de hardware o cámara</span>
+        {propUsePhysicalScanner === undefined && (
+          <div className="flex items-center justify-between bg-muted/40 p-3 rounded-lg border border-muted/20 my-1">
+            <div className="flex flex-col">
+              <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Lector / Cámara</span>
+              <span className="text-[10px] text-muted-foreground">Alternar entre lector de hardware o cámara</span>
+            </div>
+            <Switch 
+              checked={localUsePhysicalScanner} 
+              onCheckedChange={handleTogglePhysical}
+              className="data-[state=checked]:bg-[#7aba28]"
+            />
           </div>
-          <Switch 
-            checked={usePhysicalScanner} 
-            onCheckedChange={handleTogglePhysical}
-            className="data-[state=checked]:bg-[#7aba28]"
-          />
-        </div>
+        )}
 
         <div className="pt-3 border-t">
           <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-2">Entrada Manual / Lector Láser</p>

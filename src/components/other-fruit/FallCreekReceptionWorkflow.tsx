@@ -32,9 +32,11 @@ import { Label } from '@/components/ui/label';
 
 export function FallCreekReceptionWorkflow({ 
     directStorageMode, 
+    usePhysicalScanner,
     onTriggerStorage 
 }: { 
     directStorageMode?: boolean, 
+    usePhysicalScanner?: boolean,
     onTriggerStorage?: (item: any) => void 
 }) {
     const firestore = useFirestore();
@@ -458,6 +460,7 @@ export function FallCreekReceptionWorkflow({
                     closeOnScan={false}
                     title={`Lector de Bins - Pallet ${selectedPalletId}`}
                     description={activeScanDescription}
+                    usePhysicalScanner={usePhysicalScanner}
                 />
             </CardContent>
         </Card>
