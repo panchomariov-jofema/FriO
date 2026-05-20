@@ -1,4 +1,4 @@
-import { ai } from './genkit';
+import { ai, getModel } from './genkit';
 import { z } from 'zod';
 
 export const parseFallCreekVisionFlow = ai.defineFlow(
@@ -22,7 +22,7 @@ export const parseFallCreekVisionFlow = ai.defineFlow(
   },
   async (input) => {
     const response = await ai.generate({
-      model: 'vertexai/gemini-1.5-flash',
+      model: getModel(),
       prompt: [
         { text: 'Actúa como un experto en extracción de datos de documentos logísticos. Extrae la tabla completa del "Pallet Log" de Fall Creek de la imagen proporcionada. \n\nImportante:\n1. Devuelve un array JSON de objetos.\n2. Los campos deben ser EXACTAMENTE: "Pallet #", "Pallet ID", "Package IDs", "Item", "Item Description", "Lot Number (Batch)", "Qty of Plants", "# of Pots/Tray", "# of Packages".\n3. Si un valor es numérico en la imagen, conviértelo a número en el JSON.\n4. Si hay varias filas, extrae todas.\n5. Responde SOLO con el JSON puro, sin explicaciones ni markdown.' },
         { media: { url: `data:${input.mimeType};base64,${input.base64Data}` } }

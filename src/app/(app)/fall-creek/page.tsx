@@ -403,16 +403,33 @@ export default function FallCreekPage() {
         try {
             let items: FallCreekManifestRow[] = [];
             
-            if (file.type === 'application/pdf' || file.type.startsWith('image/')) {
+            const fileName = file.name.toLowerCase();
+            const isPdf = file.type === 'application/pdf' || fileName.endsWith('.pdf');
+            const isImage = file.type.startsWith('image/') || /\.(jpe?g|png|webp|gif)$/i.test(fileName);
+
+            if (isPdf || isImage) {
                 // Handle via AI Vision
                 toast({ title: 'Procesando con IA', description: 'Leyendo el documento visualmente...' });
                 const base64 = await fileToBase64(file);
-                const response = await parseManifestAIAction(base64, file.type);
+                const mimeType = isPdf ? 'application/pdf' : (file.type || 'image/jpeg');
+                const response = await parseManifestAIAction(base64, mimeType);
                 
                 if (response.success && response.data) {
                     items = response.data;
                 } else {
-                    throw new Error(response.error || 'No se pudo extraer la información del documento.');
+                    let friendlyError = response.error || 'No se pudo extraer la información del documento.';
+                    if (
+                        friendlyError.includes('API_KEY_SERVICE_BLOCKED') || 
+                        friendlyError.includes('API key') || 
+                        friendlyError.includes('leaked') || 
+                        friendlyError.includes('blocked') || 
+                        friendlyError.includes('NOT_FOUND') ||
+                        friendlyError.includes('403') ||
+                        friendlyError.includes('404')
+                    ) {
+                        friendlyError = 'Error de API Key de Gemini: La clave configurada en el servidor no es válida, está bloqueada o fue reportada como filtrada. Por favor, genere y configure una clave válida (GOOGLE_GENAI_API_KEY) en las variables de entorno de App Hosting o local.';
+                    }
+                    throw new Error(friendlyError);
                 }
             } else {
                 // Handle via standard Excel parser

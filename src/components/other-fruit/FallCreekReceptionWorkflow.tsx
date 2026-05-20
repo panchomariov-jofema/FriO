@@ -101,47 +101,37 @@ export function FallCreekReceptionWorkflow({
         return activeManifest.items.filter(item => item.palletId === selectedPalletId);
     }, [activeManifest, selectedPalletId]);
 
-    const handleScan = (qrCode: string) => {
-        if (!qrCode) return;
+    const activeScanDescription = React.useMemo(() => {
+        if (!selectedPalletId) return '';
         
-        // 1. Check local session (current pallet)
-        if (scannedBins.includes(qrCode)) {
-            toast({ variant: 'destructive', title: 'Error', description: 'Este código ya ha sido escaneado en este pallet.' });
-            return;
+        // Find which items are pending in the database
+        const pendingItems = currentPalletItems.filter(item => item.status === 'Pendiente de recibir');
+        
+        // The one we are currently scanning corresponds to index `scannedBins.length`
+        const currentScanningItem = pendingItems[scannedBins.length];
+        if (!currentScanningItem) return '';
+        
+        const variety = cleanVarietyName(currentScanningItem.productName);
+        const palletInfo = availablePallets.find(p => p.id === selectedPalletId);
+        const isMixed = palletInfo?.isMixed || false;
+        
+        if (isMixed) {
+            return `⚠️ PALLET MIXTO - Escanee el bin para la variedad: ${variety} (Bin ${scannedBins.length + 1} de ${pendingItems.length})`;
+        } else {
+            return `Escaneando bin ${scannedBins.length + 1} de ${pendingItems.length}. Variedad: ${variety}`;
         }
+    }, [selectedPalletId, currentPalletItems, scannedBins, availablePallets]);
 
-        // 2. Global Uniqueness Check (Across all manifests/years)
-        const existingReception = allReceptions?.find(r => 
-            r.items.some(item => item.containerId === qrCode)
-        );
-
-        if (existingReception) {
-            toast({ 
-                variant: 'destructive', 
-                title: 'Bin ya registrado', 
-                description: `El bin ${qrCode} ya fue recibido previamente en el manifiesto "${existingReception.document}".` 
-            });
-            return;
-        }
-
-        if (scannedBins.length >= 3) {
-            toast({ variant: 'destructive', title: 'Error', description: 'Ya se han escaneado los 3 bins de este pallet.' });
-            return;
-        }
-
-        setScannedBins(prev => [...prev, qrCode]);
-        setScanning(false);
-    };
-
-    const handleConfirmPallet = async () => {
-        if (!firestore || !activeManifest || !selectedPalletId || scannedBins.length === 0) return;
+    const handleConfirmPallet = async (binsOverride?: string[]) => {
+        const binsToUse = binsOverride || scannedBins;
+        if (!firestore || !activeManifest || !selectedPalletId || binsToUse.length === 0) return;
 
         setIsSubmitting(true);
         try {
             let scanIdx = 0;
             const updatedItems = activeManifest.items.map(item => {
                 if (item.palletId === selectedPalletId && item.status === 'Pendiente de recibir') {
-                    const binQr = scannedBins[scanIdx++];
+                    const binQr = binsToUse[scanIdx++];
                     if (binQr) {
                         return {
                             ...item,
@@ -198,6 +188,47 @@ export function FallCreekReceptionWorkflow({
             toast({ variant: 'destructive', title: 'Error', description: 'No se pudo registrar.' });
         } finally {
             setIsSubmitting(false);
+        }
+    };
+
+    const handleScan = async (qrCode: string) => {
+        if (!qrCode) return;
+        
+        // 1. Check local session (current pallet)
+        if (scannedBins.includes(qrCode)) {
+            toast({ variant: 'destructive', title: 'Error', description: 'Este código ya ha sido escaneado en este pallet.' });
+            return;
+        }
+
+        // 2. Global Uniqueness Check (Across all manifests/years)
+        const existingReception = allReceptions?.find(r => 
+            r.items.some(item => item.containerId === qrCode)
+        );
+
+        if (existingReception) {
+            toast({ 
+                variant: 'destructive', 
+                title: 'Bin ya registrado', 
+                description: `El bin ${qrCode} ya fue recibido previamente en el manifiesto "${existingReception.document}".` 
+            });
+            return;
+        }
+
+        // How many items need to be scanned on this pallet in total?
+        const pendingItemsForPallet = currentPalletItems.filter(i => i.status === 'Pendiente de recibir').length;
+
+        if (scannedBins.length >= pendingItemsForPallet) {
+            toast({ variant: 'destructive', title: 'Error', description: 'Ya se han escaneado todos los bins pendientes de este pallet.' });
+            return;
+        }
+
+        const nextBins = [...scannedBins, qrCode];
+        setScannedBins(nextBins);
+
+        // If we reached the total required, we close the scanner and auto-submit
+        if (nextBins.length >= pendingItemsForPallet) {
+            setScanning(false);
+            await handleConfirmPallet(nextBins);
         }
     };
 
@@ -314,7 +345,7 @@ export function FallCreekReceptionWorkflow({
 
                                     return (
                                         <div 
-                                            key={item.id || i}
+                                            key={i}
                                             onClick={() => isActive && setScanning(true)}
                                             className={cn(
                                                 "relative h-24 sm:h-28 rounded-xl border-2 flex flex-col items-center justify-center gap-1 transition-all cursor-pointer",
@@ -403,7 +434,7 @@ export function FallCreekReceptionWorkflow({
                                 <Button 
                                     className="h-14 sm:h-16 text-sm sm:text-lg font-bold bg-[#7aba28] hover:bg-[#6aa423] shadow-md"
                                     disabled={scannedBins.length === 0 || isSubmitting}
-                                    onClick={handleConfirmPallet}
+                                    onClick={() => handleConfirmPallet()}
                                 >
                                     {isSubmitting ? <Loader2 className="h-5 w-5 animate-spin" /> : <CheckCircle2 className="mr-2 h-5 w-5 sm:h-6 sm:h-6" />}
                                     Finalizar
@@ -424,6 +455,9 @@ export function FallCreekReceptionWorkflow({
                     open={scanning}
                     onOpenChange={setScanning}
                     onScan={handleScan}
+                    closeOnScan={false}
+                    title={`Lector de Bins - Pallet ${selectedPalletId}`}
+                    description={activeScanDescription}
                 />
             </CardContent>
         </Card>
