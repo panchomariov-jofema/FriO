@@ -106,10 +106,7 @@ export function FallCreekReceptionWorkflow({
     const activeScanDescription = React.useMemo(() => {
         if (!selectedPalletId) return '';
         
-        // Find which items are pending in the database
         const pendingItems = currentPalletItems.filter(item => item.status === 'Pendiente de recibir');
-        
-        // The one we are currently scanning corresponds to index `scannedBins.length`
         const currentScanningItem = pendingItems[scannedBins.length];
         if (!currentScanningItem) return '';
         
@@ -118,9 +115,9 @@ export function FallCreekReceptionWorkflow({
         const isMixed = palletInfo?.isMixed || false;
         
         if (isMixed) {
-            return `⚠️ PALLET MIXTO - Escanee el bin para la variedad: ${variety} (Bin ${scannedBins.length + 1} de ${pendingItems.length})`;
+            return `⚠️ PALLET MIXTO - Escanee variedad: ${variety}`;
         } else {
-            return `Escaneando bin ${scannedBins.length + 1} de ${pendingItems.length}. Variedad: ${variety}`;
+            return `Variedad a escanear: ${variety}`;
         }
     }, [selectedPalletId, currentPalletItems, scannedBins, availablePallets]);
 
@@ -461,6 +458,8 @@ export function FallCreekReceptionWorkflow({
                     title={`Lector de Bins - Pallet ${selectedPalletId}`}
                     description={activeScanDescription}
                     usePhysicalScanner={usePhysicalScanner}
+                    currentCount={Math.min(scannedBins.length + 1, currentPalletItems.filter(item => item.status === 'Pendiente de recibir').length)}
+                    totalCount={currentPalletItems.filter(item => item.status === 'Pendiente de recibir').length}
                 />
             </CardContent>
         </Card>

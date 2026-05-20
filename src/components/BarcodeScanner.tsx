@@ -17,6 +17,8 @@ interface BarcodeScannerProps {
   title?: string;
   description?: string;
   usePhysicalScanner?: boolean;
+  currentCount?: number;
+  totalCount?: number;
 }
 
 const qrcodeRegionId = "reader";
@@ -28,7 +30,9 @@ export function BarcodeScanner({
   closeOnScan = true,
   title,
   description,
-  usePhysicalScanner: propUsePhysicalScanner
+  usePhysicalScanner: propUsePhysicalScanner,
+  currentCount,
+  totalCount
 }: BarcodeScannerProps) {
   const { toast } = useToast();
   const [localUsePhysicalScanner, setLocalUsePhysicalScanner] = React.useState<boolean>(false);
@@ -193,31 +197,29 @@ export function BarcodeScanner({
            <div className="absolute inset-0 border-2 border-primary/20 pointer-events-none z-10" />
         </div>
 
-        {/* Compact layout for hardware reader mode on mobile */}
+        {/* Prominent count/progress card for physical reader mode */}
         {activeUsePhysicalScanner && (
-          <div className="w-full py-4 px-3 rounded-lg bg-muted/30 flex items-center gap-3 relative border border-dashed border-[#7aba28]/40 overflow-hidden">
-            <style>{`
-              @keyframes scan-thin {
-                0% { left: 5%; }
-                50% { left: 95%; }
-                100% { left: 5%; }
-              }
-              .laser-line-thin {
-                position: absolute;
-                top: 0;
-                bottom: 0;
-                width: 2px;
-                background-color: #ef4444;
-                box-shadow: 0 0 6px #ef4444;
-                animation: scan-thin 1.5s infinite ease-in-out;
-              }
-            `}</style>
-            <div className="laser-line-thin" />
-            <ScanLine className="h-8 w-8 text-[#004b8d]/40 shrink-0" />
-            <div className="flex flex-col text-left">
-              <p className="text-xs font-bold text-[#004b8d]">Lector de Hardware Activo</p>
-              <p className="text-[10px] text-muted-foreground">La cámara está desactivada. Escanee usando su lector físico.</p>
-            </div>
+          <div className="w-full py-6 px-4 rounded-xl bg-muted/40 flex flex-col items-center justify-center border-2 border-dashed border-[#7aba28]/40 shadow-inner">
+            {currentCount !== undefined && totalCount !== undefined ? (
+              <div className="flex flex-col items-center gap-2">
+                <div className="flex items-baseline gap-1 bg-[#004b8d]/10 px-8 py-4 rounded-2xl border border-[#004b8d]/20 shadow-md">
+                  <span className="text-6xl font-black text-[#004b8d] tracking-tight">{currentCount}</span>
+                  <span className="text-3xl font-bold text-muted-foreground/60 mx-1">/</span>
+                  <span className="text-3xl font-bold text-muted-foreground">{totalCount}</span>
+                </div>
+                <span className="text-xs uppercase font-extrabold tracking-widest text-[#004b8d] mt-2">
+                  Bins Escaneados
+                </span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-3">
+                <ScanLine className="h-8 w-8 text-[#004b8d]/40 shrink-0" />
+                <div className="flex flex-col text-left">
+                  <p className="text-xs font-bold text-[#004b8d]">Lector de Hardware Activo</p>
+                  <p className="text-[10px] text-muted-foreground">La cámara está desactivada. Escanee usando su lector físico.</p>
+                </div>
+              </div>
+            )}
           </div>
         )}
         
