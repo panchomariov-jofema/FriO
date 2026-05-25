@@ -137,7 +137,7 @@ const LogisticsConfigFields = ({ form }: { form: any }) => (
               <FormItem>
                 <FormLabel className="text-xs">Bins / Coordenada</FormLabel>
                 <FormControl>
-                  <Input type="number" {...field} placeholder="Ej: 9" />
+                  <Input type="number" {...field} value={field.value ?? ''} placeholder="Ej: 9" />
                 </FormControl>
               </FormItem>
             )}
@@ -149,7 +149,7 @@ const LogisticsConfigFields = ({ form }: { form: any }) => (
               <FormItem>
                 <FormLabel className="text-xs">Pallets / Coordenada</FormLabel>
                 <FormControl>
-                  <Input type="number" {...field} placeholder="Ej: 3" />
+                  <Input type="number" {...field} value={field.value ?? ''} placeholder="Ej: 3" />
                 </FormControl>
               </FormItem>
             )}

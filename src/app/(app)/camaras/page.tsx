@@ -76,13 +76,13 @@ export default function CamarasPage() {
     if (!firestore) return null;
     return query(collection(firestore, 'chamberLots'), where('status', '==', 'Pendiente por Almacenar'));
   }, [firestore]);
-  const { data: pendingLots, loading: loadingPendingLots } = useCollection<ChamberLot>(pendingLotsQuery);
+  const { data: pendingLots, isLoading: loadingPendingLots } = useCollection<ChamberLot>(pendingLotsQuery);
 
   const storedLotsQuery = useMemoFirebase(() => {
     if (!firestore) return null;
     return query(collection(firestore, 'chamberLots'), where('status', '==', 'Almacenado'));
   }, [firestore]);
-  const { data: storedLots, loading: loadingStoredLots } = useCollection<ChamberLot>(storedLotsQuery);
+  const { data: storedLots, isLoading: loadingStoredLots } = useCollection<ChamberLot>(storedLotsQuery);
 
 
   const [lotToStore, setLotToStore] = React.useState<ChamberLot | null>(null);
@@ -442,36 +442,89 @@ export default function CamarasPage() {
     }
   };
   
-  const handleClearStock = async () => {
+  const handleClearChamberStock = async (chamberId: string) => {
     if (!firestore) return;
-    const hasChamberLots = storedLots && storedLots.length > 0;
-    const hasOtherFruit = otherFruitReceptions && otherFruitReceptions.length > 0;
-    
-    if (!hasChamberLots && !hasOtherFruit) {
-      toast({ title: 'Sin Stock', description: 'No hay lotes en las cámaras para limpiar.' });
-      return;
-    }
+
+    const chamberConfig = chambersConfig[chamberId];
+    const chamberName = chamberConfig?.name || chamberId;
 
     try {
       const batch = writeBatch(firestore);
-      
-      if (hasChamberLots) {
-        const chamberLotsRef = collection(firestore, 'chamberLots');
-        const querySnapshot = await getDocs(chamberLotsRef);
-        querySnapshot.forEach((doc) => batch.delete(doc.ref));
-      }
+      let deletionCount = 0;
 
-      if (hasOtherFruit) {
-        const otherFruitRef = collection(firestore, 'otherFruitReceptions');
-        const querySnapshot = await getDocs(otherFruitRef);
-        querySnapshot.forEach((doc) => batch.delete(doc.ref));
+      // 1. Delete producer lots (chamberLots) in this chamber
+      const chamberLotsRef = collection(firestore, 'chamberLots');
+      const lotsQuery = query(
+        chamberLotsRef,
+        where('chamberId', '==', chamberId)
+      );
+      const lotsSnapshot = await getDocs(lotsQuery);
+      lotsSnapshot.forEach((doc) => {
+        batch.delete(doc.ref);
+        deletionCount++;
+      });
+
+      // 2. Handle items stored in this chamber within otherFruitReceptions
+      const otherFruitRef = collection(firestore, 'otherFruitReceptions');
+      const otherFruitSnapshot = await getDocs(otherFruitRef);
+      
+      otherFruitSnapshot.forEach((receptionDoc) => {
+        const data = receptionDoc.data() as OtherFruitReception;
+        if (!data.items) return;
+
+        // Check if any item in this reception is stored in the target chamber
+        const hasItemsInChamber = data.items.some(
+          item => item.status === 'Almacenado' && item.storageLocation?.chamberId === chamberId
+        );
+
+        if (hasItemsInChamber) {
+          // Filter out items stored in this chamber
+          const updatedItems = data.items.filter(
+            item => !(item.status === 'Almacenado' && item.storageLocation?.chamberId === chamberId)
+          );
+
+          if (updatedItems.length === 0) {
+            // Delete the entire document if no items remain
+            batch.delete(receptionDoc.ref);
+            deletionCount++;
+          } else {
+            // Check if there are still stored items left
+            const hasStoredLeft = updatedItems.some(item => item.status === 'Almacenado');
+            const hasPendingLeft = updatedItems.some(item => 
+              item.status === 'Pendiente de almacenar' || 
+              item.status === 'Pendiente de recibir' || 
+              item.status === 'Recibido'
+            );
+            
+            let newStatus = data.status;
+            if (hasStoredLeft && hasPendingLeft) {
+              newStatus = 'Parcialmente Almacenado';
+            } else if (hasStoredLeft) {
+              newStatus = 'Almacenado';
+            } else if (hasPendingLeft) {
+              newStatus = 'Pendiente de almacenar';
+            }
+
+            batch.update(receptionDoc.ref, {
+              items: updatedItems,
+              status: newStatus,
+              updatedAt: serverTimestamp()
+            });
+            deletionCount++;
+          }
+        }
+      });
+
+      if (deletionCount === 0) {
+        toast({ title: 'Sin Stock', description: `No hay lotes en la ${chamberName} para limpiar.` });
+        return;
       }
 
       await batch.commit();
-      toast({ title: 'Éxito', description: 'Todo el stock de las cámaras ha sido eliminado.' });
+      toast({ title: 'Éxito', description: `El stock de la ${chamberName} ha sido eliminado.` });
     } catch (e: any) {
-      console.error("Error al limpiar el stock de cámaras: ", e);
-      toast({ variant: 'destructive', title: 'Error', description: 'Ocurrió un error al limpiar el stock.' });
+      console.error(`Error al limpiar el stock de la cámara ${chamberId}: `, e);
+      toast({ variant: 'destructive', title: 'Error', description: 'Ocurrió un error al limpiar el stock de la cámara.' });
       errorEmitter.emit('permission-error', new FirestorePermissionError({
           path: 'chamberLots or otherFruitReceptions',
           operation: 'delete'
@@ -592,30 +645,6 @@ export default function CamarasPage() {
                             {loading ? <Skeleton className="h-8 w-32" /> : `${totalNetWeightInStock.toLocaleString('es-CL', {maximumFractionDigits: 0})} kg`}
                         </div>
                     </div>
-                    {isAdmin && (
-                        <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                                <Button variant="destructive" size="sm" className="hidden md:flex">
-                                    <Trash2 className="mr-2 h-4 w-4" />
-                                    Limpiar Stock
-                                </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                                <AlertDialogHeader>
-                                    <AlertDialogTitle>¿Está seguro de limpiar todo el stock?</AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                    Esta acción eliminará permanentemente todos los lotes almacenados en todas las cámaras (productores y clientes). Esta acción no se puede deshacer.
-                                    </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                    <AlertDialogAction onClick={handleClearStock} className="bg-destructive hover:bg-destructive/90">
-                                    Sí, Limpiar Todo
-                                    </AlertDialogAction>
-                                </AlertDialogFooter>
-                            </AlertDialogContent>
-                        </AlertDialog>
-                    )}
                 </div>
             </CardHeader>
             <CardContent>
@@ -638,77 +667,105 @@ export default function CamarasPage() {
                             </div>
                         </AccordionTrigger>
                         <AccordionContent>
-                            <div className="p-2 sm:p-4 bg-muted/50 rounded-b-lg border border-t-0 overflow-x-auto">
-                                <div className="grid gap-1" style={{ 
-                                    gridTemplateRows: `repeat(${config.rows.length}, minmax(0, 1fr))`,
-                                    gridAutoFlow: 'column'
-                                }}>
-                                {config.columns.map(col => {
-                                      return config.rows.map(row => {
-                                      const coord = `${col.name}${row}`;
-                                      const itemsInCoord = storedItemsByChamber[chamberId]?.[coord] || [];
-                                      const isOccupied = itemsInCoord.length > 0;
-                                    
-                                      const totalBins = itemsInCoord.filter(i => i.unit === 'Bins').reduce((s, i) => s + i.quantity, 0);
-                                      const totalPallets = itemsInCoord.filter(i => i.unit === 'Pallets').reduce((s, i) => s + i.quantity, 0);
-                                      const totalNetWeight = itemsInCoord.reduce((sum, i) => sum + (i.quantity * (i.netWeightPerBin || 0)), 0);
-                                      const clientLotIds = Array.from(new Set(itemsInCoord.map(i => i.clientLotId).filter(Boolean)));
-                                    
-                                      const firstItem = isOccupied ? itemsInCoord[0] : null;
-                                      
-                                      // Dynamic capacity lookup
-                                      const clientName = firstItem?.ownerName || '';
-                                      const clientConfig = (clientConfigs || []).find(c => c.clientName.toUpperCase() === clientName.toUpperCase());
-                                      const coordCapacity = clientConfig 
-                                        ? (firstItem?.unit === 'Pallets' ? clientConfig.palletsPerCoordinate : clientConfig.binsPerCoordinate)
-                                        : (firstItem?.unit === 'Pallets' ? 3 : 6);
-
-                                      const occupancyPercentage = isOccupied ? (totalBins + totalPallets) / coordCapacity * 100 : 0;
-
-                                      return (
-                                          <Popover key={coord}>
-                                          <PopoverTrigger asChild>
-                                              <div 
-                                              className={cn("h-12 w-full min-w-[60px] rounded border-2 flex items-center justify-center text-xs font-mono relative overflow-hidden cursor-pointer",
-                                                  isOccupied ? 'border-[var(--lot-color-border)] bg-[var(--lot-color-bg)]' : 'bg-background border-dashed'
-                                              )}
-                                              style={{
-                                                '--lot-color': firstItem ? getColorForLot(`${firstItem.type}-${firstItem.lotIdForColor}`) : 'transparent',
-                                                '--lot-color-border': firstItem ? getColorForLot(`${firstItem.type}-${firstItem.lotIdForColor}`).replace(')', ', 0.5)') : 'transparent',
-                                                '--lot-color-bg': firstItem ? getColorForLot(`${firstItem.type}-${firstItem.lotIdForColor}`).replace(')', ', 0.2)') : 'transparent',
-                                                '--lot-color-progress': firstItem ? getColorForLot(`${firstItem.type}-${firstItem.lotIdForColor}`).replace(')', ', 0.3)') : 'transparent',
-                                              } as React.CSSProperties}
-                                              >
-                                              <div className="absolute bottom-0 left-0 top-0 bg-[var(--lot-color-progress)]" style={{ right: `${100 - occupancyPercentage}%` }} />
-                                              <span className="relative z-10 font-semibold">{coord}</span>
-                                              </div>
-                                          </PopoverTrigger>
-                                          {isOccupied && firstItem && (
-                                              <PopoverContent className="p-4 w-60 sm:w-64" side="bottom" align="center">
-                                              <div className="space-y-2">
-                                                  <p className="font-bold">
-                                                  {firstItem.type === 'producerLot' ? `Lote: ${firstItem.displayId}` : `Producto: ${firstItem.displayId}`}
-                                                  </p>
-                                                  {clientLotIds.length > 0 && (
-                                                  <p>Lote Cliente: <span className="font-mono">{clientLotIds.join(', ')}</span></p>
+                            <div className="p-2 sm:p-4 bg-muted/50 rounded-b-lg border border-t-0">
+                                {isAdmin && (
+                                    <div className="flex justify-end mb-4">
+                                        <AlertDialog>
+                                            <AlertDialogTrigger asChild>
+                                                <Button variant="destructive" size="sm">
+                                                    <Trash2 className="mr-2 h-4 w-4" />
+                                                    Limpiar Stock Cámara
+                                                </Button>
+                                            </AlertDialogTrigger>
+                                            <AlertDialogContent>
+                                                <AlertDialogHeader>
+                                                    <AlertDialogTitle>¿Está seguro de limpiar el stock de la {config.name}?</AlertDialogTitle>
+                                                    <AlertDialogDescription>
+                                                    Esta acción eliminará permanentemente todos los lotes almacenados en esta cámara (productores y clientes). Esta acción no se puede deshacer.
+                                                    </AlertDialogDescription>
+                                                </AlertDialogHeader>
+                                                <AlertDialogFooter>
+                                                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                                    <AlertDialogAction onClick={() => handleClearChamberStock(chamberId)} className="bg-destructive hover:bg-destructive/90">
+                                                    Sí, Limpiar Cámara
+                                                    </AlertDialogAction>
+                                                </AlertDialogFooter>
+                                            </AlertDialogContent>
+                                        </AlertDialog>
+                                    </div>
+                                )}
+                                <div className="overflow-x-auto">
+                                    <div className="grid gap-1" style={{ 
+                                        gridTemplateRows: `repeat(${config.rows.length}, minmax(0, 1fr))`,
+                                        gridAutoFlow: 'column'
+                                    }}>
+                                    {config.columns.map(col => {
+                                          return config.rows.map(row => {
+                                          const coord = `${col.name}${row}`;
+                                          const itemsInCoord = storedItemsByChamber[chamberId]?.[coord] || [];
+                                          const isOccupied = itemsInCoord.length > 0;
+                                        
+                                          const totalBins = itemsInCoord.filter(i => i.unit === 'Bins').reduce((s, i) => s + i.quantity, 0);
+                                          const totalPallets = itemsInCoord.filter(i => i.unit === 'Pallets').reduce((s, i) => s + i.quantity, 0);
+                                          const totalNetWeight = itemsInCoord.reduce((sum, i) => sum + (i.quantity * (i.netWeightPerBin || 0)), 0);
+                                          const clientLotIds = Array.from(new Set(itemsInCoord.map(i => i.clientLotId).filter(Boolean)));
+                                        
+                                          const firstItem = isOccupied ? itemsInCoord[0] : null;
+                                          
+                                          // Dynamic capacity lookup
+                                          const clientName = firstItem?.ownerName || '';
+                                          const clientConfig = (clientConfigs || []).find(c => c.clientName.toUpperCase() === clientName.toUpperCase());
+                                          const coordCapacity = clientConfig 
+                                            ? (firstItem?.unit === 'Pallets' ? clientConfig.palletsPerCoordinate : clientConfig.binsPerCoordinate)
+                                            : (firstItem?.unit === 'Pallets' ? 3 : 6);
+     
+                                          const occupancyPercentage = isOccupied ? (totalBins + totalPallets) / coordCapacity * 100 : 0;
+    
+                                          return (
+                                              <Popover key={coord}>
+                                              <PopoverTrigger asChild>
+                                                  <div 
+                                                  className={cn("h-12 w-full min-w-[60px] rounded border-2 flex items-center justify-center text-xs font-mono relative overflow-hidden cursor-pointer",
+                                                      isOccupied ? 'border-[var(--lot-color-border)] bg-[var(--lot-color-bg)]' : 'bg-background border-dashed'
                                                   )}
-                                                  <p>
-                                                  {firstItem.type === 'producerLot' ? `Productor: ${firstItem.ownerName}` : `Cliente: ${firstItem.ownerName}`}
-                                                  </p>
-                                                  <p>Variedad/Producto: {firstItem.varietyOrProduct}</p>
-                                                  <div className="grid grid-cols-2 gap-x-4">
-                                                      <p>Bins: {totalBins}</p>
-                                                      <p>Pallets: {totalPallets}</p>
-                                                      {totalNetWeight > 0 && <p className="col-span-2">Peso Neto: {totalNetWeight.toFixed(1)} kg</p>}
+                                                  style={{
+                                                    '--lot-color': firstItem ? getColorForLot(`${firstItem.type}-${firstItem.lotIdForColor}`) : 'transparent',
+                                                    '--lot-color-border': firstItem ? getColorForLot(`${firstItem.type}-${firstItem.lotIdForColor}`).replace(')', ', 0.5)') : 'transparent',
+                                                    '--lot-color-bg': firstItem ? getColorForLot(`${firstItem.type}-${firstItem.lotIdForColor}`).replace(')', ', 0.2)') : 'transparent',
+                                                    '--lot-color-progress': firstItem ? getColorForLot(`${firstItem.type}-${firstItem.lotIdForColor}`).replace(')', ', 0.3)') : 'transparent',
+                                                  } as React.CSSProperties}
+                                                  >
+                                                  <div className="absolute bottom-0 left-0 top-0 bg-[var(--lot-color-progress)]" style={{ right: `${100 - occupancyPercentage}%` }} />
+                                                  <span className="relative z-10 font-semibold">{coord}</span>
                                                   </div>
-                                                  <Button size="sm" className="w-full mt-2" onClick={() => handleRelocateClick(chamberId, coord)}>Reubicar</Button>
-                                                </div>
-                                              </PopoverContent>
-                                          )}
-                                          </Popover>
-                                      );
-                                      });
-                                    })}
+                                              </PopoverTrigger>
+                                              {isOccupied && firstItem && (
+                                                  <PopoverContent className="p-4 w-60 sm:w-64" side="bottom" align="center">
+                                                  <div className="space-y-2">
+                                                      <p className="font-bold">
+                                                      {firstItem.type === 'producerLot' ? `Lote: ${firstItem.displayId}` : `Producto: ${firstItem.displayId}`}
+                                                      </p>
+                                                      {clientLotIds.length > 0 && (
+                                                      <p>Lote Cliente: <span className="font-mono">{clientLotIds.join(', ')}</span></p>
+                                                      )}
+                                                      <p>
+                                                      {firstItem.type === 'producerLot' ? `Productor: ${firstItem.ownerName}` : `Cliente: ${firstItem.ownerName}`}
+                                                      </p>
+                                                      <p>Variedad/Producto: {firstItem.varietyOrProduct}</p>
+                                                      <div className="grid grid-cols-2 gap-x-4">
+                                                          <p>Bins: {totalBins}</p>
+                                                          <p>Pallets: {totalPallets}</p>
+                                                          {totalNetWeight > 0 && <p className="col-span-2">Peso Neto: {totalNetWeight.toFixed(1)} kg</p>}
+                                                      </div>
+                                                      <Button size="sm" className="w-full mt-2" onClick={() => handleRelocateClick(chamberId, coord)}>Reubicar</Button>
+                                                    </div>
+                                                  </PopoverContent>
+                                              )}
+                                              </Popover>
+                                          );
+                                          });
+                                        })}
+                                    </div>
                                 </div>
                             </div>
                         </AccordionContent>

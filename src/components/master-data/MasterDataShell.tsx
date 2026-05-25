@@ -156,6 +156,13 @@ export function MasterDataShell<T extends MasterData>({
   const onSubmit = async (values: z.infer<typeof schema>) => {
       const dataToSave = {...values};
       
+      // Remove undefined values to prevent Firestore error: Unsupported field value: undefined
+      Object.keys(dataToSave).forEach(key => {
+        if (dataToSave[key] === undefined) {
+          delete dataToSave[key];
+        }
+      });
+      
       if (currentItem?.id) { // --- UPDATE ---
         const docRef = doc(firestore, collectionName, currentItem.id);
         await updateDoc(docRef, dataToSave)

@@ -14,7 +14,7 @@ import type { OtherClient, OtherFruitReceptionItem, OtherFruitReception } from '
 import { otherFruitReceptionSchema } from '@/lib/schemas';
 import { PlusCircle, ScanLine, Trash2 } from 'lucide-react';
 import { useFirestore } from '@/firebase';
-import { doc, updateDoc, addDoc, collection, serverTimestamp } from 'firebase/firestore';
+import { doc, updateDoc, addDoc, collection, serverTimestamp, getDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
@@ -74,12 +74,60 @@ export function OtherFruitReceptionTab({ clientId: fixedClientId }: { clientId?:
   const [lastUsedChamberId, setLastUsedChamberId] = React.useState<string | null>(null);
   const [lastUsedCoordinate, setLastUsedCoordinate] = React.useState<string | null>(null);
 
+  const resolvedClientConfig = React.useMemo(() => {
+    if (!itemToStore) return undefined;
+    
+    const clientId = itemToStore.clientId;
+    
+    // 1. Get explicit override if exists
+    const explicitOverride = clientConfigs?.find((c: any) => c.id === clientId);
+    
+    // 2. Get master data defaults
+    const otherClient = otherClients?.find((c: any) => c.clientId === clientId);
+    const exporter = exporters?.find((e: any) => e.exporterId === clientId);
+    const masterData = otherClient || exporter;
+    
+    if (!masterData && !explicitOverride) return undefined;
+    
+    let strategy = explicitOverride?.strategy || masterData?.storageStrategy || 'secuencial';
+    let binsPerCoordinate = explicitOverride?.binsPerCoordinate ?? masterData?.binsPerCoordinate ?? 6;
+    let palletsPerCoordinate = explicitOverride?.palletsPerCoordinate ?? masterData?.palletsPerCoordinate ?? 3;
+    let preferredChamberId = explicitOverride?.preferredChamberId ?? (masterData as any)?.preferredChamberId;
+
+    // Hardcoded defaults for Fall Creek
+    if (masterData?.name === 'FALL CREEK' || masterData?.id === 'fallcreek' || itemToStore.clientName === 'FALL CREEK') {
+        strategy = 'aisle-access';
+        binsPerCoordinate = 9;
+        palletsPerCoordinate = 3;
+    }
+
+    return {
+      id: clientId,
+      clientName: masterData?.name || explicitOverride?.clientName || itemToStore.clientName,
+      strategy: strategy as any,
+      binsPerCoordinate,
+      palletsPerCoordinate,
+      preferredChamberId,
+      chamberOverrides: explicitOverride?.chamberOverrides
+    };
+  }, [itemToStore, clientConfigs, otherClients, exporters]);
+
   const onStoreConfirm = async (data: { chamberId: string; coordinate: string; totalQuantity: number; quantityPerLocation: number; strategy: any }) => {
-    if (!itemToStore || !firestore || !allReceptions) return;
+    if (!itemToStore || !firestore) return;
 
     const { chamberId, coordinate: startCoordinate, totalQuantity, quantityPerLocation, strategy } = data;
 
-    const originalReception = allReceptions.find(r => r.id === itemToStore.receptionId);
+    const receptionRef = doc(firestore, 'otherFruitReceptions', itemToStore.receptionId);
+    let originalReception: OtherFruitReception | null = null;
+    try {
+      const receptionSnap = await getDoc(receptionRef);
+      if (receptionSnap.exists()) {
+        originalReception = { id: receptionSnap.id, ...receptionSnap.data() } as OtherFruitReception;
+      }
+    } catch (err) {
+      console.error("Error fetching original reception:", err);
+    }
+
     if (!originalReception) {
         toast({ title: "Error", description: "No se encontró la recepción original.", variant: "destructive" });
         return;
@@ -94,7 +142,7 @@ export function OtherFruitReceptionTab({ clientId: fixedClientId }: { clientId?:
             occupancyMap.set(l.coordinate, (occupancyMap.get(l.coordinate) || 0) + l.binCount);
         }
     });
-    allReceptions.forEach(r => {
+    (allReceptions || []).forEach(r => {
         r.items.forEach((item) => {
             if (item.status === 'Almacenado' && item.storageLocation?.chamberId === chamberId && item.storageLocation.coordinate) {
                 const multiplier = (r.clientName === 'FALL CREEK' && r.unit === 'Pallets') ? 3 : (r.unit === 'Bins' ? 1 : 2);
@@ -112,41 +160,43 @@ export function OtherFruitReceptionTab({ clientId: fixedClientId }: { clientId?:
     }
 
     const itemsToProcess = itemToStore.itemIndices.map((idx: number) => originalReception.items[idx]);
-    const updatedItems = [...originalReception.items];
     
+    const newStoredItems: OtherFruitReceptionItem[] = [];
     let remainingToStore = totalQuantity;
     const startIndex = allPossibleCoords.indexOf(startCoordinate);
     const coordsToFill = allPossibleCoords.slice(startIndex);
     
-    const occupancyThreshold = data.quantityPerLocation;
+    const occupancyThreshold = quantityPerLocation;
     let currentCoordIdx = 0;
     let currentCoord = coordsToFill[currentCoordIdx];
     let newLastCoord: string | null = null;
 
-    for (const idx of itemToStore.itemIndices) {
+    const isFallCreek = originalReception.clientName === 'FALL CREEK';
+    const unitsPerItem = (isFallCreek && originalReception.unit === 'Pallets') ? 3 : (originalReception.unit === 'Bins' ? 1 : 2);
+
+    for (const itemToProcess of itemsToProcess) {
         if (remainingToStore <= 0) break;
         if (currentCoordIdx >= coordsToFill.length) break;
 
-        let itemToProcess = updatedItems[idx];
-        const isFallCreek = originalReception.clientName === 'FALL CREEK';
-        const unitsPerItem = (isFallCreek && originalReception.unit === 'Pallets') ? 3 : (originalReception.unit === 'Bins' ? itemToProcess.quantity : itemToProcess.quantity * 2);
+        let itemQuantityRemaining = itemToProcess.quantity;
 
-        while (currentCoordIdx < coordsToFill.length) {
+        while (itemQuantityRemaining > 0 && currentCoordIdx < coordsToFill.length) {
             currentCoord = coordsToFill[currentCoordIdx];
             const currentOccupancy = occupancyMap.get(currentCoord) || 0;
-            const availableSpace = Math.max(0, occupancyThreshold - currentOccupancy);
+            const availableSpaceInBins = Math.max(0, occupancyThreshold - currentOccupancy);
+            const availableSpaceInItemUnits = Math.floor(availableSpaceInBins / unitsPerItem);
 
-            if (availableSpace < unitsPerItem || chamberConfig.blocked?.includes(currentCoord)) {
+            if (availableSpaceInItemUnits <= 0 || chamberConfig.blocked?.includes(currentCoord)) {
                 currentCoordIdx++;
                 continue;
             }
 
-            // Check compatibility (only same client)
+            // Compatibility check (only same client)
             const existingClientsInCoord = new Set<string>();
             (allChamberLots || []).forEach(l => {
                 if (l.chamberId === chamberId && l.coordinate === currentCoord) existingClientsInCoord.add(l.exporterId);
             });
-            allReceptions.forEach(r => {
+            (allReceptions || []).forEach(r => {
                 r.items.forEach(it => {
                     if (it.status === 'Almacenado' && it.storageLocation?.chamberId === chamberId && it.storageLocation.coordinate === currentCoord) {
                         existingClientsInCoord.add(r.clientId);
@@ -159,29 +209,52 @@ export function OtherFruitReceptionTab({ clientId: fixedClientId }: { clientId?:
                 continue;
             }
 
-            updatedItems[idx] = {
+            const amountToStore = Math.min(itemQuantityRemaining, availableSpaceInItemUnits, remainingToStore);
+            if (amountToStore <= 0) {
+                currentCoordIdx++;
+                continue;
+            }
+            
+            newStoredItems.push({
                 ...itemToProcess,
+                quantity: amountToStore,
                 status: 'Almacenado',
                 storageLocation: {
                     chamberId,
                     coordinate: currentCoord
                 },
                 storedAt: new Date()
-            };
-            
-            occupancyMap.set(currentCoord, currentOccupancy + unitsPerItem);
+            });
+
+            const unitsStored = amountToStore * unitsPerItem;
+            occupancyMap.set(currentCoord, currentOccupancy + unitsStored);
             newLastCoord = currentCoord;
-            remainingToStore -= itemToProcess.quantity;
-            break;
+
+            itemQuantityRemaining -= amountToStore;
+            remainingToStore -= amountToStore;
+            
+            const remainingInCoord = availableSpaceInBins - unitsStored;
+            if (remainingInCoord < unitsPerItem) {
+                currentCoordIdx++;
+            }
         }
     }
 
+    if (newStoredItems.length === 0) {
+        toast({ variant: 'destructive', title: 'Error de espacio', description: 'No se encontraron coordenadas compatibles con espacio suficiente.' });
+        return;
+    }
+
+    // Filter out the original processed items and insert the new stored items (possibly split)
+    const finalItemsArray = originalReception.items.filter((_, index) => !itemToStore.itemIndices.includes(index));
+    finalItemsArray.push(...newStoredItems);
+
     try {
-        const allStored = updatedItems.every(i => i.status === 'Almacenado');
-        const newStatus = allStored ? 'Almacenado' : 'Parcialmente Almacenado';
+        const stillHasPending = finalItemsArray.some(item => item.status === 'Pendiente de almacenar' && item.quantity > 0);
+        const newStatus = stillHasPending ? 'Parcialmente Almacenado' : 'Almacenado';
 
         await updateDoc(doc(firestore, 'otherFruitReceptions', originalReception.id!), {
-            items: updatedItems,
+            items: finalItemsArray,
             status: newStatus
         });
 
@@ -437,7 +510,7 @@ export function OtherFruitReceptionTab({ clientId: fixedClientId }: { clientId?:
             onConfirm={onStoreConfirm}
             allReceptions={allReceptions || []}
             allChamberLots={allChamberLots || []}
-            clientConfig={clientConfigs?.find((c: any) => c.id === itemToStore?.clientId)}
+            clientConfig={resolvedClientConfig}
             lastUsedChamberId={lastUsedChamberId}
             lastUsedCoordinate={lastUsedCoordinate}
         />
@@ -454,15 +527,6 @@ export function OtherFruitReceptionTab({ clientId: fixedClientId }: { clientId?:
             <CardDescription>Registre la entrada de productos de socios comerciales.</CardDescription>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-              <div className="flex items-center space-x-2 bg-[#7aba28]/10 px-4 py-2 rounded-full border border-[#7aba28]/20">
-                  <Label htmlFor="physical-scanner-gen" className="text-xs font-bold uppercase text-[#004b8d] cursor-pointer">Lector / Cámara</Label>
-                  <Switch 
-                      id="physical-scanner-gen" 
-                      checked={usePhysicalScanner} 
-                      onCheckedChange={handleTogglePhysical}
-                      className="data-[state=checked]:bg-[#7aba28]"
-                  />
-              </div>
               <div className="flex items-center space-x-2 bg-[#7aba28]/10 px-4 py-2 rounded-full border border-[#7aba28]/20">
                   <Label htmlFor="direct-storage-gen" className="text-xs font-bold uppercase text-[#004b8d] cursor-pointer">Almacenamiento Directo</Label>
                   <Switch 
@@ -588,15 +652,9 @@ export function OtherFruitReceptionTab({ clientId: fixedClientId }: { clientId?:
                         render={({ field }) => (
                           <FormItem>
                             <FormLabel>Lote Cliente</FormLabel>
-                            <div className="flex items-center gap-2">
-                              <FormControl>
-                                <Input {...field} value={field.value ?? ''} autoComplete="off" />
-                              </FormControl>
-                              <Button type="button" variant="outline" size="icon" className="shrink-0" onClick={() => setScanningIndex(index)}>
-                                <ScanLine className="h-4 w-4" />
-                                <span className="sr-only">Escanear código</span>
-                              </Button>
-                            </div>
+                            <FormControl>
+                              <Input {...field} value={field.value ?? ''} autoComplete="off" />
+                            </FormControl>
                             <FormMessage />
                           </FormItem>
                         )}
@@ -711,7 +769,7 @@ export function OtherFruitReceptionTab({ clientId: fixedClientId }: { clientId?:
           onConfirm={onStoreConfirm}
           allReceptions={allReceptions || []}
           allChamberLots={allChamberLots || []}
-          clientConfig={clientConfigs?.find((c: any) => c.id === itemToStore?.clientId)}
+          clientConfig={resolvedClientConfig}
           lastUsedChamberId={lastUsedChamberId}
           lastUsedCoordinate={lastUsedCoordinate}
       />
