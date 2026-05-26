@@ -58,7 +58,7 @@ export function FallCreekReceptionWorkflow({
     // Filter manifests for Fall Creek that are pending reception
     const pendingManifests = React.useMemo(() => {
         return (allReceptions || []).filter(r => 
-            r.clientName === 'FALL CREEK' && 
+            r.clientName?.toUpperCase() === 'FALL CREEK' && 
             (r.status === 'Pendiente de recibir' || r.items.some(item => item.status === 'Pendiente de recibir'))
         );
     }, [allReceptions]);

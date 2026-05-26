@@ -521,6 +521,20 @@ export default function CamarasPage() {
       }
 
       await batch.commit();
+
+      // Clear localStorage coordinate memory if the cleared chamber matches the last used chamber
+      try {
+        if (typeof window !== 'undefined' && window.localStorage) {
+          const lastChamberId = window.localStorage.getItem('frio_last_chamber_id');
+          if (lastChamberId === chamberId) {
+            window.localStorage.removeItem('frio_last_chamber_id');
+            window.localStorage.removeItem('frio_last_coordinate');
+          }
+        }
+      } catch (err) {
+        console.error('Error clearing localStorage:', err);
+      }
+
       toast({ title: 'Éxito', description: `El stock de la ${chamberName} ha sido eliminado.` });
     } catch (e: any) {
       console.error(`Error al limpiar el stock de la cámara ${chamberId}: `, e);
@@ -699,8 +713,8 @@ export default function CamarasPage() {
                                         gridTemplateRows: `repeat(${config.rows.length}, minmax(0, 1fr))`,
                                         gridAutoFlow: 'column'
                                     }}>
-                                    {config.columns.map(col => {
-                                          return config.rows.map(row => {
+                                        {config.columns.map(col =>
+                                            config.rows.map(row => {
                                           const coord = `${col.name}${row}`;
                                           const itemsInCoord = storedItemsByChamber[chamberId]?.[coord] || [];
                                           const isOccupied = itemsInCoord.length > 0;
@@ -720,6 +734,63 @@ export default function CamarasPage() {
                                             : (firstItem?.unit === 'Pallets' ? 3 : 6);
      
                                           const occupancyPercentage = isOccupied ? (totalBins + totalPallets) / coordCapacity * 100 : 0;
+
+                                          const uniqueLotIds = Array.from(new Set(itemsInCoord.map(item => `${item.type}-${item.lotIdForColor}`)));
+                                          const isMixed = uniqueLotIds.length > 1;
+
+                                          let cellStyle: React.CSSProperties = {};
+                                          let progressStyle: React.CSSProperties = {};
+
+                                          if (isOccupied && firstItem) {
+                                              if (!isMixed) {
+                                                  const color = getColorForLot(`${firstItem.type}-${firstItem.lotIdForColor}`);
+                                                  cellStyle = {
+                                                      '--lot-color': color,
+                                                      '--lot-color-border': color.replace(')', ', 0.5)'),
+                                                      '--lot-color-bg': color.replace(')', ', 0.2)'),
+                                                  } as React.CSSProperties;
+                                                  progressStyle = {
+                                                      backgroundColor: color.replace(')', ', 0.3)'),
+                                                      right: `${Math.max(0, 100 - occupancyPercentage)}%`,
+                                                  };
+                                              } else {
+                                                  // Group quantities by lot to calculate relative slice percentages
+                                                  const lotQuantities = uniqueLotIds.map(lotId => {
+                                                      const itemsForLot = itemsInCoord.filter(item => `${item.type}-${item.lotIdForColor}` === lotId);
+                                                      const totalQty = itemsForLot.reduce((sum, item) => sum + item.quantity, 0);
+                                                      return { lotId, quantity: totalQty, color: getColorForLot(lotId) };
+                                                  });
+                                                  // Sort alphabetically to maintain stable color slice ordering
+                                                  lotQuantities.sort((a, b) => a.lotId.localeCompare(b.lotId));
+                                                  const totalCoordQuantity = lotQuantities.reduce((sum, l) => sum + l.quantity, 0);
+
+                                                  let accumulatedPct = 0;
+                                                  const bgGradients: string[] = [];
+                                                  const progGradients: string[] = [];
+
+                                                  lotQuantities.forEach((l) => {
+                                                      const share = totalCoordQuantity > 0 ? (l.quantity / totalCoordQuantity) * 100 : 0;
+                                                      const start = Math.round(accumulatedPct);
+                                                      accumulatedPct += share;
+                                                      const end = Math.round(accumulatedPct);
+
+                                                      const colorBg = l.color.replace(')', ', 0.2)');
+                                                      const colorProg = l.color.replace(')', ', 0.3)');
+
+                                                      bgGradients.push(`${colorBg} ${start}%, ${colorBg} ${end}%`);
+                                                      progGradients.push(`${colorProg} ${start}%, ${colorProg} ${end}%`);
+                                                  });
+
+                                                  cellStyle = {
+                                                      backgroundImage: `linear-gradient(135deg, ${bgGradients.join(', ')})`,
+                                                      borderColor: lotQuantities[0].color.replace(')', ', 0.5)'), // border color matches first lot's border style
+                                                  };
+                                                  progressStyle = {
+                                                      backgroundImage: `linear-gradient(135deg, ${progGradients.join(', ')})`,
+                                                      right: `${Math.max(0, 100 - occupancyPercentage)}%`,
+                                                  };
+                                              }
+                                          }
     
                                           return (
                                               <Popover key={coord}>
@@ -728,34 +799,65 @@ export default function CamarasPage() {
                                                   className={cn("h-12 w-full min-w-[60px] rounded border-2 flex items-center justify-center text-xs font-mono relative overflow-hidden cursor-pointer",
                                                       isOccupied ? 'border-[var(--lot-color-border)] bg-[var(--lot-color-bg)]' : 'bg-background border-dashed'
                                                   )}
-                                                  style={{
-                                                    '--lot-color': firstItem ? getColorForLot(`${firstItem.type}-${firstItem.lotIdForColor}`) : 'transparent',
-                                                    '--lot-color-border': firstItem ? getColorForLot(`${firstItem.type}-${firstItem.lotIdForColor}`).replace(')', ', 0.5)') : 'transparent',
-                                                    '--lot-color-bg': firstItem ? getColorForLot(`${firstItem.type}-${firstItem.lotIdForColor}`).replace(')', ', 0.2)') : 'transparent',
-                                                    '--lot-color-progress': firstItem ? getColorForLot(`${firstItem.type}-${firstItem.lotIdForColor}`).replace(')', ', 0.3)') : 'transparent',
-                                                  } as React.CSSProperties}
+                                                  style={cellStyle}
                                                   >
-                                                  <div className="absolute bottom-0 left-0 top-0 bg-[var(--lot-color-progress)]" style={{ right: `${100 - occupancyPercentage}%` }} />
+                                                  <div className="absolute bottom-0 left-0 top-0 transition-all duration-300" style={progressStyle} />
                                                   <span className="relative z-10 font-semibold">{coord}</span>
+                                                  {isMixed && (
+                                                      <div className="absolute top-0.5 right-1 z-20 bg-black/60 rounded px-0.5 text-[8px] font-black text-amber-500 leading-none shadow-[0_0_2px_rgba(0,0,0,0.5)]">
+                                                          ⚠
+                                                      </div>
+                                                  )}
                                                   </div>
                                               </PopoverTrigger>
-                                              {isOccupied && firstItem && (
+                                              {isOccupied && (
                                                   <PopoverContent className="p-4 w-60 sm:w-64" side="bottom" align="center">
                                                   <div className="space-y-2">
-                                                      <p className="font-bold">
-                                                      {firstItem.type === 'producerLot' ? `Lote: ${firstItem.displayId}` : `Producto: ${firstItem.displayId}`}
-                                                      </p>
-                                                      {clientLotIds.length > 0 && (
-                                                      <p>Lote Cliente: <span className="font-mono">{clientLotIds.join(', ')}</span></p>
+                                                      <div className="border-b pb-1">
+                                                          <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Ubicación {coord}</p>
+                                                          <p className="text-sm font-semibold">{isMixed ? 'Lotes Mezclados' : firstItem?.type === 'producerLot' ? `Lote: ${firstItem?.displayId}` : `Producto: ${firstItem?.displayId}`}</p>
+                                                      </div>
+
+                                                      {isMixed ? (
+                                                          <div className="space-y-3">
+                                                              <p className="text-xs font-bold text-amber-500 flex items-center gap-1">
+                                                                  <span>⚠ Contiene {uniqueLotIds.length} lotes</span>
+                                                              </p>
+                                                              <div className="space-y-2 max-h-36 overflow-y-auto">
+                                                                  {itemsInCoord.map((item, idx) => (
+                                                                      <div key={idx} className="text-xs border-b border-dashed pb-1.5 last:border-0 last:pb-0">
+                                                                          <div className="flex justify-between items-center">
+                                                                              <span className="font-bold">{item.type === 'producerLot' ? `Lote: ${item.displayId}` : `Prod: ${item.displayId}`}</span>
+                                                                              <Badge variant="outline" className="h-4 text-[9px] px-1 bg-primary/5 text-primary border-primary/20">
+                                                                                  {item.quantity} {item.unit}
+                                                                              </Badge>
+                                                                          </div>
+                                                                          <p className="text-muted-foreground mt-0.5">{item.ownerName} - {item.varietyOrProduct}</p>
+                                                                          {item.clientLotId && <p className="text-muted-foreground font-mono text-[9px]">Lote Cliente: {item.clientLotId}</p>}
+                                                                      </div>
+                                                                  ))}
+                                                              </div>
+                                                          </div>
+                                                      ) : (
+                                                          <>
+                                                              {firstItem && (
+                                                                  <>
+                                                                      {clientLotIds.length > 0 && (
+                                                                      <p>Lote Cliente: <span className="font-mono">{clientLotIds.join(', ')}</span></p>
+                                                                      )}
+                                                                      <p>
+                                                                      {firstItem.type === 'producerLot' ? `Productor: ${firstItem.ownerName}` : `Cliente: ${firstItem.ownerName}`}
+                                                                      </p>
+                                                                      <p>Variedad/Producto: {firstItem.varietyOrProduct}</p>
+                                                                  </>
+                                                              )}
+                                                          </>
                                                       )}
-                                                      <p>
-                                                      {firstItem.type === 'producerLot' ? `Productor: ${firstItem.ownerName}` : `Cliente: ${firstItem.ownerName}`}
-                                                      </p>
-                                                      <p>Variedad/Producto: {firstItem.varietyOrProduct}</p>
-                                                      <div className="grid grid-cols-2 gap-x-4">
+
+                                                      <div className="grid grid-cols-2 gap-x-4 pt-1 text-xs font-semibold border-t">
                                                           <p>Bins: {totalBins}</p>
                                                           <p>Pallets: {totalPallets}</p>
-                                                          {totalNetWeight > 0 && <p className="col-span-2">Peso Neto: {totalNetWeight.toFixed(1)} kg</p>}
+                                                          {totalNetWeight > 0 && <p className="col-span-2 mt-0.5">Peso Neto: {totalNetWeight.toFixed(1)} kg</p>}
                                                       </div>
                                                       <Button size="sm" className="w-full mt-2" onClick={() => handleRelocateClick(chamberId, coord)}>Reubicar</Button>
                                                     </div>
@@ -763,8 +865,8 @@ export default function CamarasPage() {
                                               )}
                                               </Popover>
                                           );
-                                          });
-                                        })}
+                                          })
+                                        )}
                                     </div>
                                 </div>
                             </div>

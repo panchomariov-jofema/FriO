@@ -19,7 +19,7 @@ interface StoreInChamberDialogProps {
   onStore: (data: { chamberId: string, coordinate: string }) => void;
   allChamberLots: ChamberLot[];
   allOtherFruitReceptions: OtherFruitReception[];
-  chamberStrategies?: Record<string, 'secuencial' | 'fifo' | 'aisle-access' | 'serpentina-vertical'>;
+  chamberStrategies?: Record<string, 'secuencial' | 'fifo' | 'aisle-access' | 'serpentina-vertical' | 'modelo-sof'>;
 }
 
 const storeSchema = z.object({

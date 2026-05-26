@@ -21,7 +21,32 @@ export const naturalSort = (a: string, b: string) => {
 };
 
 // Generates coordinates for chamber display, handling sequential, snake (FIFO), and aisle-access layouts.
-export const getSortedCoordinates = (chamberConfig: Chamber, strategy: 'secuencial' | 'fifo' | 'aisle-access' | 'horizontal-secuencial' | 'inverted-secuencial' | 'pareado' | 'serpentina-vertical'): string[] => {
+export const getModeloSofCoordinates = (chamberConfig: Chamber): string[] => {
+    const coords: string[] = [];
+    const columns = chamberConfig.columns.map(c => c.name);
+    const rowsAsc = [...chamberConfig.rows].sort((a, b) => a - b);
+    const rowsDesc = [...rowsAsc].reverse();
+
+    columns.forEach((col, idx) => {
+        // Even index columns (A=0, C=2...) go Fondo -> Puerta (rowsDesc)
+        // Odd index columns (B=1, D=3...) go Puerta -> Fondo (rowsAsc)
+        const rowsToIterate = (idx % 2 === 0) ? rowsDesc : rowsAsc;
+        rowsToIterate.forEach(row => {
+            const coord = `${col}${row}`;
+            if (!chamberConfig.blocked?.includes(coord)) {
+                coords.push(coord);
+            }
+        });
+    });
+
+    return coords;
+};
+
+export const getSortedCoordinates = (chamberConfig: Chamber, strategy: 'secuencial' | 'fifo' | 'aisle-access' | 'horizontal-secuencial' | 'inverted-secuencial' | 'pareado' | 'serpentina-vertical' | 'modelo-sof'): string[] => {
+  if (strategy === 'modelo-sof') {
+    return getModeloSofCoordinates(chamberConfig);
+  }
+
   if (strategy === 'serpentina-vertical') {
     return getSerpentinaVerticalCoordinates(chamberConfig);
   }

@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FriO — Serpentina Vertical Cámara 3</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: #0f1117; color: #e0e0e0;
+  font-family: 'Segoe UI', sans-serif;
+  display: flex; flex-direction: column; align-items: center;
+  min-height: 100vh; padding: 20px;
+}
+h1 { font-size: 1.1rem; color: #4fc3f7; margin-bottom: 4px; letter-spacing: 0.05em; text-transform: uppercase; }
+.subtitle { font-size: 0.72rem; color: #667; margin-bottom: 14px; text-align: center; line-height: 1.8; }
+
+.legend { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; margin-bottom: 14px; font-size: 0.68rem; }
+.legend-item { display: flex; align-items: center; gap: 5px; }
+.legend-box { width: 13px; height: 13px; border-radius: 3px; }
+
+.top-bar {
+  width: 100%; max-width: 920px;
+  display: flex; justify-content: space-between; align-items: center;
+  background: #1a1d26; border: 1px solid #2a2d3a; border-radius: 8px;
+  padding: 8px 16px; margin-bottom: 10px; font-size: 0.72rem;
+}
+.top-bar .cam { color: #4fc3f7; font-weight: 700; font-size: 0.85rem; }
+.top-bar .temp { color: #90caf9; }
+.top-bar .stock { color: #66bb6a; font-weight: 700; }
+
+.camera-wrap {
+  background: #1a1d26; border: 1px solid #2a2d3a; border-radius: 10px;
+  padding: 14px 14px 10px; width: 100%; max-width: 920px;
+}
+.col-headers { display: grid; grid-template-columns: 28px repeat(12, 1fr) 28px; gap: 2px; margin-bottom: 4px; }
+.col-headers span { text-align: center; font-size: 0.6rem; color: #667; font-weight: 700; }
+
+.grid-area { display: flex; flex-direction: column; gap: 2px; }
+.grid-row { display: grid; grid-template-columns: 28px repeat(12, 1fr) 28px; gap: 2px; }
+.row-label { display: flex; align-items: center; justify-content: center; font-size: 0.55rem; color: #556; font-weight: 700; }
+
+.cell {
+  height: 26px; border-radius: 3px;
+  border: 1px dashed #2a2d3a; background: #1e2130;
+  transition: background 0.15s, transform 0.1s, border-color 0.15s;
+  position: relative; cursor: default;
+}
+.cell.active { transform: scale(1.2); border-color: #fff !important; z-index: 10; box-shadow: 0 0 14px rgba(255,255,255,0.6); }
+.cell .snum {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  font-size: 0.38rem; color: rgba(255,255,255,0.55); font-weight: 900; pointer-events: none;
+}
+.cell .coord {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  font-size: 0.45rem; color: #445; pointer-events: none;
+}
+
+.door-indicator { text-align: center; margin-top: 8px; font-size: 0.68rem; color: #ffb74d; font-weight: 700; letter-spacing: 0.08em; }
+
+/* Progress bar */
+.progress-wrap { width: 100%; max-width: 920px; margin-top: 10px; background: #1a1d26; border: 1px solid #2a2d3a; border-radius: 8px; padding: 10px 16px; }
+.progress-label { font-size: 0.65rem; color: #667; margin-bottom: 5px; display: flex; justify-content: space-between; }
+.progress-bar-bg { background: #252836; border-radius: 4px; height: 8px; overflow: hidden; }
+.progress-bar-fill { height: 100%; border-radius: 4px; background: linear-gradient(90deg, #1565c0, #4fc3f7); transition: width 0.15s; width: 0%; }
+
+.phase-banner {
+  margin-top: 10px; width: 100%; max-width: 920px;
+  border-radius: 8px; padding: 9px 16px; text-align: center;
+  font-size: 0.82rem; font-weight: 700; letter-spacing: 0.03em;
+  transition: background 0.3s, color 0.3s;
+  background: #1a1d26; border: 1px solid #2a2d3a; color: #556;
+}
+.phase-banner.active-norte { background: #0d2d6e; border-color: #1976d2; color: #90caf9; }
+.phase-banner.active-sur   { background: #0a2e0a; border-color: #388e3c; color: #a5d6a7; }
+.phase-banner.done  { background: #0a1a2a; border-color: #4fc3f7; color: #4fc3f7; }
+
+.info-bar {
+  margin-top: 10px; background: #1a1d26; border: 1px solid #2a2d3a;
+  border-radius: 8px; padding: 10px 16px; width: 100%; max-width: 920px;
+  display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; text-align: center;
+}
+.info-item label { display: block; font-size: 0.58rem; color: #556; text-transform: uppercase; letter-spacing: 0.07em; }
+.info-item span { font-size: 0.9rem; font-weight: 700; }
+
+.controls { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; justify-content: center; }
+button { padding: 8px 18px; border-radius: 6px; border: none; cursor: pointer; font-size: 0.78rem; font-weight: 600; transition: all 0.2s; }
+.btn-play { background: #1976d2; color: #fff; }
+.btn-reset { background: #37474f; color: #cfd8dc; }
+.btn-speed { background: #1e2130; color: #90a4ae; border: 1px solid #2a2d3a; font-size: 0.7rem; }
+.btn-speed.active { background: #37474f; color: #fff; border-color: #546e7a; }
+</style>
+</head>
+<body>
+
+<h1>FriO — Estrategia Serpentina Vertical</h1>
+<p class="subtitle">
+  A14↑A1 → B1↓B14 → C14↑C1 → D1↓D14 → E14↑E1 → F1↓F14<br>
+  G14↑G1 → H1↓H14 → I14↑I1 → J1↓J14 → K14↑K1 → L1↓L14
+</p>
+
+<div class="legend">
+  <div class="legend-item"><div class="legend-box" style="background:#003c8f"></div> Inicio (A14)</div>
+  <div class="legend-item"><div class="legend-box" style="background:#4fc3f7"></div> Mitad (F14/G1)</div>
+  <div class="legend-item"><div class="legend-box" style="background:#1b5e20"></div> Segunda mitad</div>
+  <div class="legend-item"><div class="legend-box" style="background:#a5d6a7"></div> Final (L14)</div>
+</div>
+
+<div class="top-bar">
+  <span class="cam">CÁMARA 3</span>
+  <span class="temp">🌡️ 1.1°C</span>
+  <span class="stock" id="stock-label">0 / 168 Bins Equiv. (0.0%)</span>
+</div>
+
+<div class="camera-wrap">
+  <div class="col-headers">
+    <span></span>
+    <span>A</span><span>B</span><span>C</span><span>D</span><span>E</span><span>F</span>
+    <span>G</span><span>H</span><span>I</span><span>J</span><span>K</span><span>L</span>
+    <span></span>
+  </div>
+  <div class="grid-area" id="grid"></div>
+  <div class="door-indicator">▲ ACCESO / PUERTA — Fila 1</div>
+</div>
+
+<div class="progress-wrap">
+  <div class="progress-label">
+    <span>Progreso de llenado</span>
+    <span id="pct-label">0%</span>
+  </div>
+  <div class="progress-bar-bg"><div class="progress-bar-fill" id="prog-fill"></div></div>
+</div>
+
+<div class="phase-banner" id="phase-banner">Presiona ▶ Play para iniciar</div>
+
+<div class="info-bar">
+  <div class="info-item"><label>Paso</label><span id="info-step">0</span></div>
+  <div class="info-item"><label>Total</label><span id="info-total">168</span></div>
+  <div class="info-item"><label>Columna</label><span id="info-col">—</span></div>
+  <div class="info-item"><label>Fila</label><span id="info-row">—</span></div>
+  <div class="info-item"><label>Dirección</label><span id="info-dir">—</span></div>
+</div>
+
+<div class="controls">
+  <button class="btn-play" id="btn-play" onclick="togglePlay()">▶ Play</button>
+  <button class="btn-reset" onclick="resetAnim()">↺ Reset</button>
+  <button class="btn-speed active" id="spd-1" onclick="setSpeed(1)">1×</button>
+  <button class="btn-speed" id="spd-2" onclick="setSpeed(2)">2×</button>
+  <button class="btn-speed" id="spd-5" onclick="setSpeed(5)">5×</button>
+  <button class="btn-speed" id="spd-10" onclick="setSpeed(10)">10×</button>
+</div>
+
+<script>
+const COLS = ['A','B','C','D','E','F','G','H','I','J','K','L'];
+const ROWS = 14;
+const TOTAL = COLS.length * ROWS;
+
+// Generar secuencia serpentina: col impar (idx 0,2,4...) = 14→1; col par (idx 1,3,5...) = 1→14
+const sequence = [];
+COLS.forEach((col, idx) => {
+  const rows = (idx % 2 === 0)
+    ? Array.from({length: ROWS}, (_, i) => ROWS - i)   // 14→1
+    : Array.from({length: ROWS}, (_, i) => i + 1);     // 1→14
+  rows.forEach(row => sequence.push({col, row, dir: idx % 2 === 0 ? '↑ Fondo→Puerta' : '↓ Puerta→Fondo'}));
+});
+
+// Color: degradado completo azul oscuro → azul medio → verde claro a lo largo de los 168 pasos
+function getColor(step) {
+  const t = step / (TOTAL - 1);
+  if (t < 0.5) {
+    const s = t / 0.5;
+    const r = Math.round(0   + s * 21);
+    const g = Math.round(60  + s * 86);
+    const b = Math.round(143 + s * 82);
+    return `rgb(${r},${g},${b})`;
+  } else {
+    const s = (t - 0.5) / 0.5;
+    const r = Math.round(21  + s * 144);
+    const g = Math.round(146 + s * 79);
+    const b = Math.round(225 - s * 108);
+    return `rgb(${r},${g},${b})`;
+  }
+}
+
+// Build grid
+const grid = document.getElementById('grid');
+const cells = {};
+for (let row = 1; row <= ROWS; row++) {
+  const rowEl = document.createElement('div'); rowEl.className = 'grid-row';
+  const l1 = document.createElement('div'); l1.className = 'row-label'; l1.textContent = row; rowEl.appendChild(l1);
+  for (const col of COLS) {
+    const cell = document.createElement('div'); cell.className = 'cell';
+    const coord = document.createElement('div'); coord.className = 'coord'; coord.textContent = col + row;
+    const num = document.createElement('div'); num.className = 'snum';
+    cell.appendChild(coord); cell.appendChild(num);
+    rowEl.appendChild(cell);
+    cells[col + '-' + row] = cell;
+  }
+  const l2 = document.createElement('div'); l2.className = 'row-label'; l2.textContent = row === 1 ? '🚪' : row; rowEl.appendChild(l2);
+  grid.appendChild(rowEl);
+}
+
+let curStep = 0, playing = false, timer = null, speed = 1, prevActive = null;
+function getDelay() { return Math.max(20, 200 / speed); }
+
+function tick() {
+  if (prevActive) { prevActive.classList.remove('active'); prevActive = null; }
+  if (curStep >= sequence.length) {
+    playing = false; clearInterval(timer);
+    document.getElementById('btn-play').textContent = '▶ Play';
+    const b = document.getElementById('phase-banner');
+    b.className = 'phase-banner done'; b.textContent = '✓ Cámara llena — 168 posiciones completadas';
+    return;
+  }
+  const s = sequence[curStep];
+  const cell = cells[s.col + '-' + s.row];
+  const color = getColor(curStep);
+  cell.style.background = color;
+  cell.style.borderColor = color;
+  cell.classList.add('active');
+  cell.querySelector('.snum').textContent = curStep + 1;
+  cell.querySelector('.coord').style.display = 'none';
+  prevActive = cell;
+
+  const pct = ((curStep + 1) / TOTAL * 100).toFixed(1);
+  document.getElementById('info-step').textContent = curStep + 1;
+  document.getElementById('info-col').textContent = s.col;
+  document.getElementById('info-row').textContent = s.row;
+  document.getElementById('info-dir').textContent = s.dir;
+  document.getElementById('stock-label').textContent = `${curStep + 1} / ${TOTAL} Bins Equiv. (${pct}%)`;
+  document.getElementById('pct-label').textContent = pct + '%';
+  document.getElementById('prog-fill').style.width = pct + '%';
+
+  const colIdx = COLS.indexOf(s.col);
+  const isFirst = colIdx < 6;
+  const b = document.getElementById('phase-banner');
+  b.className = 'phase-banner ' + (isFirst ? 'active-norte' : 'active-sur');
+  b.textContent = `Columna ${s.col} (col ${colIdx + 1}/12) · Fila ${s.row} · ${s.dir} · Coordenada ${s.col}${s.row}`;
+  curStep++;
+}
+
+function togglePlay() {
+  if (playing) { playing = false; clearInterval(timer); document.getElementById('btn-play').textContent = '▶ Play'; }
+  else { playing = true; document.getElementById('btn-play').textContent = '⏸ Pausa'; timer = setInterval(tick, getDelay()); }
+}
+
+function resetAnim() {
+  playing = false; clearInterval(timer); curStep = 0; prevActive = null;
+  document.getElementById('btn-play').textContent = '▶ Play';
+  for (const col of COLS) for (let r = 1; r <= ROWS; r++) {
+    const c = cells[col + '-' + r];
+    c.style.background = ''; c.style.borderColor = '';
+    c.classList.remove('active');
+    c.querySelector('.snum').textContent = '';
+    c.querySelector('.coord').style.display = '';
+  }
+  document.getElementById('info-step').textContent = '0';
+  document.getElementById('info-col').textContent = '—';
+  document.getElementById('info-row').textContent = '—';
+  document.getElementById('info-dir').textContent = '—';
+  document.getElementById('stock-label').textContent = '0 / 168 Bins Equiv. (0.0%)';
+  document.getElementById('pct-label').textContent = '0%';
+  document.getElementById('prog-fill').style.width = '0%';
+  const b = document.getElementById('phase-banner');
+  b.className = 'phase-banner'; b.textContent = 'Presiona ▶ Play para iniciar';
+}
+
+function setSpeed(s) {
+  speed = s;
+  ['spd-1','spd-2','spd-5','spd-10'].forEach(id => { const el = document.getElementById(id); if (el) el.classList.remove('active'); });
+  document.getElementById('spd-' + s).classList.add('active');
+  if (playing) { clearInterval(timer); timer = setInterval(tick, getDelay()); }
+}
+</script>
+</body>
+</html>

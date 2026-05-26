@@ -31,7 +31,7 @@ interface StoreOtherFruitDialogProps {
   item: PendingItem | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onConfirm: (data: { chamberId: string; coordinate: string; totalQuantity: number; quantityPerLocation: number; strategy: 'secuencial' | 'pareado' | 'aisle-access' | 'inverted-secuencial' | 'horizontal-secuencial' | 'fifo' | 'serpentina-vertical' }) => void;
+  onConfirm: (data: { chamberId: string; coordinate: string; totalQuantity: number; quantityPerLocation: number; strategy: 'secuencial' | 'pareado' | 'aisle-access' | 'inverted-secuencial' | 'horizontal-secuencial' | 'fifo' | 'serpentina-vertical' | 'modelo-sof' }) => void;
   allReceptions: OtherFruitReception[];
   allChamberLots: ChamberLot[];
   clientConfig?: ClientStorageConfig;
@@ -43,11 +43,11 @@ const DEFAULT_BINS_PER_COORDINATE = 6;
 const DEFAULT_PALLETS_PER_COORDINATE = 3; 
 
 const storeSchema = z.object({
-  chamberId: z.string({ required_error: 'Debe seleccionar una cámara.' }),
-  coordinate: z.string({ required_error: 'Debe seleccionar una coordenada de inicio.' }),
+  chamberId: z.string({ required_error: 'Debe seleccionar una cámara.' }).min(1, 'Debe seleccionar una cámara.'),
+  coordinate: z.string({ required_error: 'Debe seleccionar una coordenada de inicio.' }).min(1, 'Debe seleccionar una coordenada de inicio.'),
   totalQuantity: z.coerce.number().positive('La cantidad total debe ser mayor a 0.'),
   quantityPerLocation: z.coerce.number().positive('La cantidad por ubicación debe ser mayor a 0.'),
-  strategy: z.enum(['secuencial', 'pareado', 'aisle-access', 'inverted-secuencial', 'horizontal-secuencial', 'fifo', 'serpentina-vertical']).default('secuencial'),
+  strategy: z.enum(['secuencial', 'pareado', 'aisle-access', 'inverted-secuencial', 'horizontal-secuencial', 'fifo', 'serpentina-vertical', 'modelo-sof']).default('secuencial'),
 });
 
 type StoreFormValues = z.infer<typeof storeSchema>;
@@ -70,6 +70,8 @@ export function StoreOtherFruitDialog({
   const { toast } = useToast();
 
   const selectedChamberId = form.watch('chamberId');
+  const selectedCoordinate = form.watch('coordinate');
+  const isSubmitDisabled = !selectedChamberId || !selectedCoordinate || selectedCoordinate === '';
   
   const capacityPerCoord = useMemo(() => {
     if (!item) return DEFAULT_PALLETS_PER_COORDINATE;
@@ -159,26 +161,36 @@ export function StoreOtherFruitDialog({
         allPossibleCoords = getSortedCoordinates(chamberConfig, 'fifo');
     } else if (formStrategy === 'serpentina-vertical') {
         allPossibleCoords = getSortedCoordinates(chamberConfig, 'serpentina-vertical');
+    } else if (formStrategy === 'modelo-sof') {
+        allPossibleCoords = getSortedCoordinates(chamberConfig, 'modelo-sof');
     } else {
       allPossibleCoords = getSortedCoordinates(chamberConfig, 'secuencial');
     }
     
     const occupancyThreshold = capacityPerCoord;
-    const requiredSpace = item.quantity * ((item.clientName?.toUpperCase() === 'FALL CREEK' && item.unit === 'Pallets') ? 3 : 1);
+    const unitsPerItem = (item.clientName?.toUpperCase() === 'FALL CREEK' && item.unit === 'Pallets') ? 3 : (item.unit === 'Bins' ? 1 : 2);
 
     // Determine the starting point for suggestion search
     let startIndex = 0;
     const effectiveLastChamber = lastUsedChamberId || (typeof window !== 'undefined' ? localStorage.getItem('frio_last_chamber_id') : null);
     const effectiveSessionCoord = lastUsedCoordinate || (typeof window !== 'undefined' ? localStorage.getItem('frio_last_coordinate') : null);
     const isContinuingChamber = selectedChamberId === effectiveLastChamber;
-    const effectiveLastCoord = (isContinuingChamber && effectiveSessionCoord) ? effectiveSessionCoord : null;
+    
+    // We prioritize real DB state (lastCoordInChamber) over localStorage if there's any occupancy.
+    // If the chamber is completely empty in the DB, we ignore all session/localStorage history and start from A1.
+    const hasAnyOccupancy = occupancyMap.size > 0;
+    const effectiveLastCoord = hasAnyOccupancy
+      ? (isContinuingChamber && lastUsedCoordinate 
+          ? lastUsedCoordinate 
+          : (lastCoordInChamber || (isContinuingChamber && effectiveSessionCoord ? effectiveSessionCoord : null)))
+      : null;
     
     if (effectiveLastCoord) {
         const foundIdx = allPossibleCoords.indexOf(effectiveLastCoord);
         if (foundIdx !== -1) {
             const entry = occupancyMap.get(effectiveLastCoord);
             const currentOccupancy = entry ? entry.lots.reduce((sum, l) => sum + l.binCount, 0) : 0;
-            if (currentOccupancy + requiredSpace > occupancyThreshold) {
+            if (currentOccupancy + unitsPerItem > occupancyThreshold) {
                 startIndex = foundIdx + 1;
             } else {
                 startIndex = foundIdx;
@@ -202,7 +214,7 @@ export function StoreOtherFruitDialog({
         if (hasDifferentClient) return false;
 
         const currentOccupancy = entry.lots.reduce((sum, l) => sum + l.binCount, 0);
-        return currentOccupancy + requiredSpace <= occupancyThreshold;
+        return currentOccupancy + unitsPerItem <= occupancyThreshold;
     }) || null;
 
     // Available are all that have ANY space left AND are compatible
@@ -217,7 +229,7 @@ export function StoreOtherFruitDialog({
         if (hasDifferentClient) return false;
 
         const currentOccupancy = entry.lots.reduce((sum, l) => sum + l.binCount, 0);
-        return currentOccupancy < occupancyThreshold;
+        return currentOccupancy + unitsPerItem <= occupancyThreshold;
     });
     
     return { availableCoordinates: available, suggestion: currentSuggestion };
@@ -260,8 +272,66 @@ export function StoreOtherFruitDialog({
     } else if (open) {
         form.resetField('coordinate');
     }
-  }, [suggestion, open, form]);
+  }, [suggestion, open, form, selectedChamberId]);
   
+  const handleQuickConfirm = (e?: React.MouseEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    if (!item || !suggestion || !selectedChamberId) return;
+
+    const values = form.getValues();
+    const qtyPerLocation = values.quantityPerLocation || capacityPerCoord;
+    const totalQuantity = values.totalQuantity || item.quantity;
+
+    if (qtyPerLocation > capacityPerCoord) {
+        toast({ variant: 'destructive', title: 'Límite Excedido', description: `La cantidad por ubicación no puede ser mayor a ${capacityPerCoord} para este cliente.`});
+        return;
+    }
+    if (totalQuantity > item.quantity) {
+        toast({ variant: 'destructive', title: 'Cantidad Inválida', description: `No puede almacenar más de lo pendiente (${item.quantity}).`});
+        return;
+    }
+
+    // Persist last used chamber
+    localStorage.setItem('frio_last_chamber_id', selectedChamberId);
+
+    onConfirm({
+      chamberId: selectedChamberId,
+      coordinate: suggestion,
+      totalQuantity,
+      quantityPerLocation: qtyPerLocation,
+      strategy: values.strategy || 'secuencial'
+    });
+  };
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (open && e.key === 'Enter') {
+        const activeElement = document.activeElement;
+        if (activeElement && (activeElement.tagName === 'BUTTON' || activeElement.tagName === 'A' || activeElement.tagName === 'TEXTAREA')) {
+          return;
+        }
+
+        if (selectedCoordinate && selectedCoordinate !== '') {
+          return;
+        }
+
+        if (suggestion && selectedChamberId) {
+          e.preventDefault();
+          e.stopPropagation();
+          handleQuickConfirm();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [open, suggestion, selectedChamberId, selectedCoordinate, form, item]);
+
   const onSubmit = (values: StoreFormValues) => {
     if (!item) return;
     if (values.quantityPerLocation > capacityPerCoord) {
@@ -291,8 +361,8 @@ export function StoreOtherFruitDialog({
             Almacenar Producto
             {suggestion && (
                 <div className="ml-auto flex items-center gap-2 bg-primary/10 text-primary px-3 py-1 rounded-full text-xs animate-pulse">
-                    <div className="w-2 h-2 bg-primary rounded-full" />
-                    Ubicación Sugerida Lista
+                     <div className="w-2 h-2 bg-primary rounded-full" />
+                     Ubicación Sugerida Lista
                 </div>
             )}
           </DialogTitle>
@@ -313,7 +383,7 @@ export function StoreOtherFruitDialog({
         {suggestion && selectedChamberId && (
             <div 
                 className="bg-gradient-to-r from-primary/10 via-primary/5 to-transparent border-l-4 border-primary rounded-xl p-5 flex items-center justify-between group hover:from-primary/20 hover:via-primary/10 transition-all cursor-pointer shadow-sm relative overflow-hidden" 
-                onClick={form.handleSubmit(onSubmit)}
+                onClick={handleQuickConfirm}
             >
                 <div className="absolute top-0 right-0 p-2 opacity-10 group-hover:opacity-20 transition-opacity">
                     <Zap className="w-16 h-16 text-primary rotate-12" />
@@ -391,6 +461,12 @@ export function StoreOtherFruitDialog({
                                     </FormControl>
                                     <FormLabel className="font-normal cursor-pointer text-xs">Serpentina Vertical</FormLabel>
                                 </FormItem>
+                                <FormItem className="flex items-center space-x-2 space-y-0">
+                                    <FormControl>
+                                        <RadioGroupItem value="modelo-sof" />
+                                    </FormControl>
+                                    <FormLabel className="font-normal cursor-pointer text-xs">Modelo SOF (Serpentina Continua)</FormLabel>
+                                </FormItem>
                             </RadioGroup>
                         </FormControl>
                         <FormMessage />
@@ -444,7 +520,7 @@ export function StoreOtherFruitDialog({
               <DialogClose asChild>
                 <Button type="button" variant="outline">Cancelar</Button>
               </DialogClose>
-              <Button type="submit">Confirmar Almacenamiento</Button>
+              <Button type="submit" disabled={isSubmitDisabled}>Confirmar Almacenamiento</Button>
             </DialogFooter>
           </form>
         </Form>

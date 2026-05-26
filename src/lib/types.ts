@@ -10,7 +10,7 @@ export interface Exporter {
   type: string;
   status?: 'activo' | 'inactivo';
   // Logistics Configuration
-  storageStrategy?: 'secuencial' | 'fifo' | 'aisle-access' | 'horizontal-secuencial' | 'inverted-secuencial' | 'pareado' | 'serpentina-vertical';
+  storageStrategy?: 'secuencial' | 'fifo' | 'aisle-access' | 'horizontal-secuencial' | 'inverted-secuencial' | 'pareado' | 'serpentina-vertical' | 'modelo-sof';
   binsPerCoordinate?: number;
   palletsPerCoordinate?: number;
 }
@@ -76,7 +76,7 @@ export interface OtherClient {
   unit: 'Bins' | 'Pallets';
   status?: 'activo' | 'inactivo';
   // Logistics Configuration
-  storageStrategy?: 'secuencial' | 'fifo' | 'aisle-access' | 'horizontal-secuencial' | 'inverted-secuencial' | 'pareado' | 'serpentina-vertical';
+  storageStrategy?: 'secuencial' | 'fifo' | 'aisle-access' | 'horizontal-secuencial' | 'inverted-secuencial' | 'pareado' | 'serpentina-vertical' | 'modelo-sof';
   binsPerCoordinate?: number;
   palletsPerCoordinate?: number;
 }
@@ -489,7 +489,7 @@ export interface Aisle {
 export interface ClientStorageConfig {
   id: string; // ClientId (Exporter ID or OtherClient ID)
   clientName: string;
-  strategy: 'secuencial' | 'fifo' | 'aisle-access' | 'horizontal-secuencial' | 'inverted-secuencial' | 'pareado' | 'serpentina-vertical';
+  strategy: 'secuencial' | 'fifo' | 'aisle-access' | 'horizontal-secuencial' | 'inverted-secuencial' | 'pareado' | 'serpentina-vertical' | 'modelo-sof';
   binsPerCoordinate: number;
   palletsPerCoordinate: number;
   preferredChamberId?: string;

@@ -61,14 +61,25 @@ export function OtherFruitStorageTab({ clientId: fixedClientId }: { clientId?: s
     coordinate: string;
     totalQuantity: number;
     quantityPerLocation: number;
-    strategy: 'secuencial' | 'pareado' | 'aisle-access' | 'serpentina-vertical';
+    strategy: 'secuencial' | 'pareado' | 'aisle-access' | 'serpentina-vertical' | 'modelo-sof';
   } | null>(null);
   const [selectedClientId, setSelectedClientId] = React.useState<string | null>(null);
   const [isScannerOpen, setIsScannerOpen] = React.useState(false);
   const [scanValue, setScanValue] = React.useState('');
   const [lastUsedChamberId, setLastUsedChamberId] = React.useState<string | null>(null);
   const [lastUsedCoordinate, setLastUsedCoordinate] = React.useState<string | null>(null);
-  const [isDirectMode, setIsDirectMode] = React.useState(false);
+  const [isDirectMode, setIsDirectMode] = React.useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('frio_storage_direct_mode') === 'true';
+    }
+    return false;
+  });
+  const handleToggleDirectMode = (checked: boolean) => {
+    setIsDirectMode(checked);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('frio_storage_direct_mode', String(checked));
+    }
+  };
   const scanInputRef = React.useRef<HTMLInputElement>(null);
   
   const [isInputFocused, setIsInputFocused] = React.useState(false);
@@ -116,7 +127,7 @@ export function OtherFruitStorageTab({ clientId: fixedClientId }: { clientId?: s
     let preferredChamberId = explicitOverride?.preferredChamberId ?? (masterData as any)?.preferredChamberId;
 
     // Hardcoded defaults for Fall Creek
-    if (masterData?.name === 'FALL CREEK' || masterData?.id === 'fallcreek') {
+    if (masterData?.name?.toUpperCase() === 'FALL CREEK' || masterData?.id === 'fallcreek') {
         if (!explicitOverride?.strategy && !masterData?.storageStrategy) strategy = 'aisle-access';
         if (explicitOverride?.binsPerCoordinate === undefined && masterData?.binsPerCoordinate === undefined) binsPerCoordinate = 9;
         if (explicitOverride?.palletsPerCoordinate === undefined && masterData?.palletsPerCoordinate === undefined) palletsPerCoordinate = 3;
@@ -255,7 +266,7 @@ export function OtherFruitStorageTab({ clientId: fixedClientId }: { clientId?: s
     let palletsPerCoordinate = explicitOverride?.palletsPerCoordinate ?? masterData?.palletsPerCoordinate ?? 3;
     let preferredChamberId = lastUsedChamberId || (typeof window !== 'undefined' ? localStorage.getItem('frio_last_chamber_id') : null) || explicitOverride?.preferredChamberId || (masterData as any)?.preferredChamberId;
 
-    if (item.clientName === 'FALL CREEK') {
+    if (item.clientName?.toUpperCase() === 'FALL CREEK') {
         if (!explicitOverride?.strategy && !masterData?.storageStrategy) strategy = 'aisle-access';
         if (explicitOverride?.binsPerCoordinate === undefined && masterData?.binsPerCoordinate === undefined) binsPerCoordinate = 9;
         if (explicitOverride?.palletsPerCoordinate === undefined && masterData?.palletsPerCoordinate === undefined) palletsPerCoordinate = 3;
@@ -268,7 +279,7 @@ export function OtherFruitStorageTab({ clientId: fixedClientId }: { clientId?: s
 
     // Calculate occupancy and find the last used coordinate
     const occupancyMap = new Map<string, number>();
-    let lastCoordInChamber = lastUsedCoordinate || (typeof window !== 'undefined' ? localStorage.getItem('frio_last_coordinate') : null); // Use the session state as primary source
+    let lastCoordInChamber: string | null = null;
     
     // We also cross-reference with stored items to find the truly most recent storage
     let latestTimestamp = 0;
@@ -287,7 +298,7 @@ export function OtherFruitStorageTab({ clientId: fixedClientId }: { clientId?: s
     (otherFruitReceptions || []).forEach(r => {
         r.items.forEach((it) => {
             if (it.status === 'Almacenado' && it.storageLocation && it.storageLocation.chamberId === chamberId && it.storageLocation.coordinate) {
-                const multiplier = (r.clientName === 'FALL CREEK' && r.unit === 'Pallets') ? 3 : (r.unit === 'Bins' ? 1 : 2);
+                const multiplier = (r.clientName?.toUpperCase() === 'FALL CREEK' && r.unit === 'Pallets') ? 3 : (r.unit === 'Bins' ? 1 : 2);
                 const equivalentUnits = it.quantity * multiplier;
                 
                 const coord = it.storageLocation.coordinate;
@@ -310,21 +321,30 @@ export function OtherFruitStorageTab({ clientId: fixedClientId }: { clientId?: s
         allPossibleCoords = getSortedCoordinates(chamberConfig, finalStrategy as any);
     }
 
-    const isFC = item.clientName === 'FALL CREEK';
+    const isFC = item.clientName?.toUpperCase() === 'FALL CREEK';
     const occupancyThreshold = (isFC || item.unit === 'Bins') ? binsPerCoordinate : palletsPerCoordinate * 2;
-    const requiredSpace = item.quantity * ((isFC && item.unit === 'Pallets') ? 3 : (item.unit === 'Bins' ? 1 : 2));
+    const unitsPerItem = (isFC && item.unit === 'Pallets') ? 3 : (item.unit === 'Bins' ? 1 : 2);
 
     // Determine the starting point for suggestion search
     let startIndex = 0;
     const effectiveLastChamber = lastUsedChamberId || (typeof window !== 'undefined' ? localStorage.getItem('frio_last_chamber_id') : null);
     const effectiveSessionCoord = lastUsedCoordinate || (typeof window !== 'undefined' ? localStorage.getItem('frio_last_coordinate') : null);
-    const effectiveLastCoord = (effectiveLastChamber === chamberId && effectiveSessionCoord) ? effectiveSessionCoord : null;
+    const isContinuingChamber = effectiveLastChamber === chamberId;
+    
+    // We prioritize real DB state (lastCoordInChamber) over localStorage if there's any occupancy.
+    // If the chamber is completely empty in the DB, we ignore all session/localStorage history and start from A1.
+    const hasAnyOccupancy = occupancyMap.size > 0;
+    const effectiveLastCoord = hasAnyOccupancy
+      ? (lastUsedCoordinate 
+          ? lastUsedCoordinate 
+          : (lastCoordInChamber || (isContinuingChamber && effectiveSessionCoord ? effectiveSessionCoord : null)))
+      : null;
     
     if (effectiveLastCoord) {
         const foundIdx = allPossibleCoords.indexOf(effectiveLastCoord);
         if (foundIdx !== -1) {
             const currentOccupancy = occupancyMap.get(effectiveLastCoord) || 0;
-            if (currentOccupancy + requiredSpace > occupancyThreshold) {
+            if (currentOccupancy + unitsPerItem > occupancyThreshold) {
                 startIndex = foundIdx + 1;
             } else {
                 startIndex = foundIdx;
@@ -341,7 +361,7 @@ export function OtherFruitStorageTab({ clientId: fixedClientId }: { clientId?: s
     const suggestedCoord = prioritizedCoords.find(coord => {
         if (chamberConfig.blocked?.includes(coord)) return false;
         const currentOccupancy = occupancyMap.get(coord) || 0;
-        return currentOccupancy + requiredSpace <= occupancyThreshold;
+        return currentOccupancy + unitsPerItem <= occupancyThreshold;
     });
     
     if (!suggestedCoord) return null;
@@ -355,7 +375,7 @@ export function OtherFruitStorageTab({ clientId: fixedClientId }: { clientId?: s
     };
   };
 
-  const handleFruitStoreConfirm = async (data: { chamberId: string; coordinate: string; totalQuantity: number; quantityPerLocation: number; strategy: 'secuencial' | 'pareado' | 'aisle-access' | 'inverted-secuencial' | 'horizontal-secuencial' | 'fifo' | 'serpentina-vertical' }, overrideItem?: PendingFruitItem) => {
+  const handleFruitStoreConfirm = async (data: { chamberId: string; coordinate: string; totalQuantity: number; quantityPerLocation: number; strategy: 'secuencial' | 'pareado' | 'aisle-access' | 'inverted-secuencial' | 'horizontal-secuencial' | 'fifo' | 'serpentina-vertical' | 'modelo-sof' }, overrideItem?: PendingFruitItem) => {
     const itemToProcessScope = overrideItem || (selectedItem?.type === 'fruit' ? selectedItem : null);
     if (!itemToProcessScope || !firestore) return;
 
@@ -383,7 +403,7 @@ export function OtherFruitStorageTab({ clientId: fixedClientId }: { clientId?: s
     (otherFruitReceptions || []).forEach(r => {
         r.items.forEach((item) => {
             if (item.status === 'Almacenado' && item.storageLocation?.chamberId === chamberId && item.storageLocation.coordinate) {
-                const multiplier = (r.clientName === 'FALL CREEK' && r.unit === 'Pallets') ? 3 : (r.unit === 'Bins' ? 1 : 2);
+                const multiplier = (r.clientName?.toUpperCase() === 'FALL CREEK' && r.unit === 'Pallets') ? 3 : (r.unit === 'Bins' ? 1 : 2);
                 const equivalentUnits = item.quantity * multiplier;
                 occupancyMap.set(item.storageLocation.coordinate, (occupancyMap.get(item.storageLocation.coordinate) || 0) + equivalentUnits);
             }
@@ -420,12 +440,16 @@ export function OtherFruitStorageTab({ clientId: fixedClientId }: { clientId?: s
     const newStoredItems: OtherFruitReceptionItem[] = [];
     let remainingToStore = totalQuantity;
     const startIndex = allPossibleCoords.indexOf(startCoordinate);
+    if (startIndex === -1) {
+        toast({ variant: 'destructive', title: 'Error de ubicación', description: `La coordenada de inicio (${startCoordinate || 'vacía'}) no es válida para esta cámara.` });
+        return;
+    }
     const coordsToFill = allPossibleCoords.slice(startIndex); // We can fill from startCoordinate onwards in the FULL list
     
     let currentCoordIdx = 0;
     let currentCoord = coordsToFill[currentCoordIdx];
 
-    const isFC = originalReception.clientName === 'FALL CREEK';
+    const isFC = originalReception.clientName?.toUpperCase() === 'FALL CREEK';
     const unitsPerItem = (isFC && originalReception.unit === 'Pallets') ? 3 : (originalReception.unit === 'Bins' ? 1 : 2);
 
     for (const itemToStore of itemsToProcess) {
@@ -697,7 +721,7 @@ export function OtherFruitStorageTab({ clientId: fixedClientId }: { clientId?: s
             </div>
             <Switch 
                 checked={isDirectMode} 
-                onCheckedChange={setIsDirectMode}
+                onCheckedChange={handleToggleDirectMode}
                 className="data-[state=checked]:bg-yellow-500"
             />
           </div>

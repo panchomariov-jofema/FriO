@@ -7,7 +7,7 @@ interface ChambersConfig {
 const columns1to3 = [
     { name: 'A', id: 'A' }, { name: 'B', id: 'B' }, { name: 'C', id: 'C' }, { name: 'D', id: 'D' }, 
     { name: 'E', id: 'E' }, { name: 'F', id: 'F' }, { name: 'G', id: 'G' }, { name: 'H', id: 'H' }, 
-    { name: 'I', id: 'I' }, { name: 'J', id: 'J' }, { name: 'K', id: 'K' }, { name: 'L', id: 'L' }
+    { name: 'I', id: 'I' }, { name: 'J', id: 'J' }
 ];
 const columns4to6 = [
     { name: 'A', id: 'A' }, { name: 'B', id: 'B' }, { name: 'C', id: 'C' }, { name: 'D', id: 'D' }, 
@@ -16,7 +16,7 @@ const columns4to6 = [
     { name: 'M', id: 'M' }, { name: 'N', id: 'N' }, { name: 'O', id: 'O' }
 ];
 
-const rows = Array.from({ length: 14 }, (_, i) => i + 1);
+const rows = Array.from({ length: 12 }, (_, i) => i + 1);
 
 // Todas las ubicaciones están ahora libres por requerimiento del usuario
 const noBlocked: string[] = [];
@@ -25,7 +25,7 @@ export const chambersConfig: ChambersConfig = {
     'CAMARA-1': {
         id: 'CAMARA-1',
         name: 'CÁMARA 1',
-        capacity: 600,
+        capacity: 800,
         columns: columns1to3,
         rows,
         blocked: noBlocked,
@@ -33,7 +33,7 @@ export const chambersConfig: ChambersConfig = {
     'CAMARA-2': {
         id: 'CAMARA-2',
         name: 'CÁMARA 2',
-        capacity: 600,
+        capacity: 800,
         columns: columns1to3,
         rows,
         blocked: noBlocked,
@@ -41,7 +41,7 @@ export const chambersConfig: ChambersConfig = {
     'CAMARA-3': {
         id: 'CAMARA-3',
         name: 'CÁMARA 3',
-        capacity: 600,
+        capacity: 800,
         columns: columns1to3,
         rows,
         blocked: noBlocked,
@@ -49,7 +49,7 @@ export const chambersConfig: ChambersConfig = {
     'CAMARA-4': {
         id: 'CAMARA-4',
         name: 'CÁMARA 4',
-        capacity: 600,
+        capacity: 1500,
         columns: columns4to6,
         rows,
         blocked: noBlocked,
@@ -57,7 +57,7 @@ export const chambersConfig: ChambersConfig = {
     'CAMARA-5': {
         id: 'CAMARA-5',
         name: 'CÁMARA 5',
-        capacity: 600,
+        capacity: 1500,
         columns: columns4to6,
         rows,
         blocked: noBlocked,
@@ -65,7 +65,7 @@ export const chambersConfig: ChambersConfig = {
     'CAMARA-6': {
         id: 'CAMARA-6',
         name: 'CÁMARA 6',
-        capacity: 600,
+        capacity: 1500,
         columns: columns4to6,
         rows,
         blocked: noBlocked,

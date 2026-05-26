@@ -123,6 +123,7 @@ const LogisticsConfigFields = ({ form }: { form: any }) => (
                   <SelectItem value="fifo">Serpiente (Z-pattern)</SelectItem>
                   <SelectItem value="aisle-access">Acceso Pasillos (Fall Creek)</SelectItem>
                   <SelectItem value="serpentina-vertical">Serpentina Vertical</SelectItem>
+                  <SelectItem value="modelo-sof">Modelo SOF (Serpentina Continua)</SelectItem>
                 </SelectContent>
               </Select>
               <FormDescription className="text-[10px]">Define el orden de llenado sugerido por el sistema.</FormDescription>

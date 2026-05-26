@@ -75,7 +75,8 @@ export function RelocateLotDialog({
     allChamberLots.forEach(lot => {
       if (lot.status === 'Almacenado' && lot.chamberId === targetChamberId && lot.coordinate) {
         const current = occupancyMap.get(lot.coordinate) || { quantity: 0, ownerName: lot.producerShortName, unit: 'Bins', documents: new Set<string>() };
-        current.documents.add(lot.document);
+        const lotDoc = lot.displayLotId.split('-').slice(1).join('-');
+        current.documents.add(lotDoc);
         occupancyMap.set(lot.coordinate, { 
             quantity: current.quantity + lot.binCount, 
             ownerName: lot.producerShortName, 
@@ -92,7 +93,7 @@ export function RelocateLotDialog({
                 current.documents.add(reception.document);
                 
                 // Determine units: if it's Fall Creek, 1 pallet = 3 bins.
-                const multiplier = (reception.clientName === 'FALL CREEK' && reception.unit === 'Pallets') ? 3 : (reception.unit === 'Bins' ? 1 : 2);
+                const multiplier = (reception.clientName?.toUpperCase() === 'FALL CREEK' && reception.unit === 'Pallets') ? 3 : (reception.unit === 'Bins' ? 1 : 2);
                 const equivalentUnits = item.quantity * multiplier;
 
                 occupancyMap.set(item.storageLocation.coordinate, { 
@@ -107,7 +108,7 @@ export function RelocateLotDialog({
 
     // 2. Determine quantity and identity of lot to relocate
     const quantityToRelocate = lotsInCoordinate.reduce((sum, item) => {
-        const multiplier = (item.ownerName === 'FALL CREEK' && item.unit === 'Pallets') ? 3 : (item.unit === 'Bins' ? 1 : 2);
+        const multiplier = (item.ownerName?.toUpperCase() === 'FALL CREEK' && item.unit === 'Pallets') ? 3 : (item.unit === 'Bins' ? 1 : 2);
         return sum + (item.quantity * multiplier);
     }, 0);
 
@@ -115,7 +116,7 @@ export function RelocateLotDialog({
     const incomingOwnerName = firstItemToRelocate?.ownerName || '';
     const incomingDocument = firstItemToRelocate?.receptionId ? 
         allOtherFruitReceptions.find(r => r.id === firstItemToRelocate.receptionId)?.document : 
-        allChamberLots.find(l => l.displayLotId === firstItemToRelocate.displayId)?.document;
+        (firstItemToRelocate?.displayId ? firstItemToRelocate.displayId.split('-').slice(1).join('-') : undefined);
 
     // 3. Filter coordinates by capacity and mixing rules
     const available = allPossibleCoords.filter(coord => {

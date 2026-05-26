@@ -95,7 +95,7 @@ export function OtherFruitReceptionTab({ clientId: fixedClientId }: { clientId?:
     let preferredChamberId = explicitOverride?.preferredChamberId ?? (masterData as any)?.preferredChamberId;
 
     // Hardcoded defaults for Fall Creek
-    if (masterData?.name === 'FALL CREEK' || masterData?.id === 'fallcreek' || itemToStore.clientName === 'FALL CREEK') {
+    if (masterData?.name?.toUpperCase() === 'FALL CREEK' || masterData?.id?.toLowerCase() === 'fallcreek' || itemToStore.clientName?.toUpperCase() === 'FALL CREEK') {
         strategy = 'aisle-access';
         binsPerCoordinate = 9;
         palletsPerCoordinate = 3;
@@ -145,7 +145,7 @@ export function OtherFruitReceptionTab({ clientId: fixedClientId }: { clientId?:
     (allReceptions || []).forEach(r => {
         r.items.forEach((item) => {
             if (item.status === 'Almacenado' && item.storageLocation?.chamberId === chamberId && item.storageLocation.coordinate) {
-                const multiplier = (r.clientName === 'FALL CREEK' && r.unit === 'Pallets') ? 3 : (r.unit === 'Bins' ? 1 : 2);
+                const multiplier = (r.clientName?.toUpperCase() === 'FALL CREEK' && r.unit === 'Pallets') ? 3 : (r.unit === 'Bins' ? 1 : 2);
                 const equivalentUnits = item.quantity * multiplier;
                 occupancyMap.set(item.storageLocation.coordinate, (occupancyMap.get(item.storageLocation.coordinate) || 0) + equivalentUnits);
             }
@@ -164,6 +164,10 @@ export function OtherFruitReceptionTab({ clientId: fixedClientId }: { clientId?:
     const newStoredItems: OtherFruitReceptionItem[] = [];
     let remainingToStore = totalQuantity;
     const startIndex = allPossibleCoords.indexOf(startCoordinate);
+    if (startIndex === -1) {
+        toast({ variant: 'destructive', title: 'Error de ubicación', description: `La coordenada de inicio (${startCoordinate || 'vacía'}) no es válida para esta cámara.` });
+        return;
+    }
     const coordsToFill = allPossibleCoords.slice(startIndex);
     
     const occupancyThreshold = quantityPerLocation;
@@ -171,7 +175,7 @@ export function OtherFruitReceptionTab({ clientId: fixedClientId }: { clientId?:
     let currentCoord = coordsToFill[currentCoordIdx];
     let newLastCoord: string | null = null;
 
-    const isFallCreek = originalReception.clientName === 'FALL CREEK';
+    const isFallCreek = originalReception.clientName?.toUpperCase() === 'FALL CREEK';
     const unitsPerItem = (isFallCreek && originalReception.unit === 'Pallets') ? 3 : (originalReception.unit === 'Bins' ? 1 : 2);
 
     for (const itemToProcess of itemsToProcess) {
@@ -444,7 +448,7 @@ export function OtherFruitReceptionTab({ clientId: fixedClientId }: { clientId?:
 
   const gridColsClass = showClientLot ? 'sm:grid-cols-5' : 'sm:grid-cols-4';
 
-  if (selectedClient?.name === 'FALL CREEK') {
+  if (selectedClient?.name?.toUpperCase() === 'FALL CREEK') {
     return (
       <div className="space-y-4 sm:space-y-6">
         <Card className="border-none sm:border shadow-none sm:shadow-md">

@@ -35,12 +35,12 @@ import { StoreOtherFruitDialog } from '@/components/other-fruit/StoreOtherFruitD
 const FALL_CREEK_CLIENT_NAME = 'FALL CREEK';
 
 const lotColorPalette = [
-  '#004b8d', // Corporate Blue
-  '#7aba28', // Corporate Green
-  '#f29100', // Accent Orange
-  '#00a9e0', // Sky Blue
-  '#5c068c', // Deep Purple
-  '#e31c79', // Pink
+  'hsl(208, 100%, 28%)', // Corporate Blue (#004b8d)
+  'hsl(86, 65%, 44%)',  // Corporate Green (#7aba28)
+  'hsl(36, 100%, 47%)', // Accent Orange (#f29100)
+  'hsl(195, 100%, 44%)', // Sky Blue (#00a9e0)
+  'hsl(279, 92%, 29%)',  // Deep Purple (#5c068c)
+  'hsl(332, 79%, 50%)',  // Pink (#e31c79)
 ];
 
 const lotColorMap = new Map<string, string>();
@@ -687,12 +687,46 @@ export default function FallCreekPage() {
                                                             const key = `${chamberId}_${coord}`;
                                                             const isSelected = !!selectedCoords[key];
                                                             const isReserved = reservedCoords.has(key);
-                                                            
-                                                            const lotColor = isOccupied ? getColorForLot(itemsInCoord[0].lotIdForColor) : 'transparent';
-                                                            const cellStyle = { 
-                                                                '--lot-color': lotColor,
-                                                                '--lot-color-bg': lotColor.replace(')', ', 0.15)'),
-                                                            } as React.CSSProperties;
+                                                            const uniqueLotIds = isOccupied ? Array.from(new Set(itemsInCoord.map(item => item.lotIdForColor))) : [];
+                                                            const isMixed = uniqueLotIds.length > 1;
+                                                             
+                                                            let cellStyle: React.CSSProperties = {};
+                                                            if (isOccupied) {
+                                                                if (!isMixed) {
+                                                                    const lotColor = getColorForLot(itemsInCoord[0].lotIdForColor);
+                                                                    cellStyle = { 
+                                                                        '--lot-color': lotColor,
+                                                                        '--lot-color-bg': lotColor.replace(')', ', 0.15)'),
+                                                                    } as React.CSSProperties;
+                                                                } else {
+                                                                    const lotQuantities = uniqueLotIds.map(lotId => {
+                                                                        const itemsForLot = itemsInCoord.filter(item => item.lotIdForColor === lotId);
+                                                                        const totalQty = itemsForLot.reduce((sum, item) => sum + item.quantity, 0);
+                                                                        return { lotId, quantity: totalQty, color: getColorForLot(lotId) };
+                                                                    });
+                                                                    lotQuantities.sort((a, b) => a.lotId.localeCompare(b.lotId));
+                                                                    const totalCoordQuantity = lotQuantities.reduce((sum, l) => sum + l.quantity, 0);
+
+                                                                    let accumulatedPct = 0;
+                                                                    const bgGradients: string[] = [];
+
+                                                                    lotQuantities.forEach((l) => {
+                                                                        const share = totalCoordQuantity > 0 ? (l.quantity / totalCoordQuantity) * 100 : 0;
+                                                                        const start = Math.round(accumulatedPct);
+                                                                        accumulatedPct += share;
+                                                                        const end = Math.round(accumulatedPct);
+
+                                                                        const colorBg = l.color.replace(')', ', 0.15)');
+                                                                        bgGradients.push(`${colorBg} ${start}%, ${colorBg} ${end}%`);
+                                                                    });
+
+                                                                    const firstLotColor = lotQuantities[0].color;
+                                                                    cellStyle = {
+                                                                        backgroundImage: `linear-gradient(135deg, ${bgGradients.join(', ')})`,
+                                                                        '--lot-color': firstLotColor,
+                                                                    } as React.CSSProperties;
+                                                                }
+                                                            }
 
                                                             return (
                                                                 <div key={coord}
@@ -706,7 +740,8 @@ export default function FallCreekPage() {
                                                                     }}
                                                                     className={cn(
                                                                         "h-12 w-full min-w-[60px] rounded border-2 flex items-center justify-center text-xs font-mono relative overflow-hidden transition-all",
-                                                                        isOccupied && "bg-[var(--lot-color-bg)] border-[var(--lot-color)]",
+                                                                        isOccupied && !isMixed && "bg-[var(--lot-color-bg)] border-[var(--lot-color)]",
+                                                                        isOccupied && isMixed && "border-[var(--lot-color)]",
                                                                         !isOccupied && "bg-background border-dashed",
                                                                         selectionMode && isOccupied && !isReserved && "cursor-pointer hover:ring-2 hover:ring-primary",
                                                                         isReserved && "cursor-not-allowed",
@@ -718,6 +753,11 @@ export default function FallCreekPage() {
                                                                     {isOccupied && itemsInCoord.some(i => i.isMixedVariety) && (
                                                                         <div className="absolute top-0 right-0 p-0.5">
                                                                             <div className="h-2 w-2 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.8)]" />
+                                                                        </div>
+                                                                    )}
+                                                                    {isMixed && (
+                                                                        <div className="absolute top-0.5 left-1 z-20 bg-black/60 rounded px-0.5 text-[8px] font-black text-amber-500 leading-none shadow-[0_0_2px_rgba(0,0,0,0.5)]">
+                                                                            ⚠
                                                                         </div>
                                                                     )}
                                                                     {isSelected && <div className="absolute inset-0 bg-[#7aba28]/40 flex items-center justify-center"><CheckCircle2 className="h-6 w-6 text-white" /></div>}

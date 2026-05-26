@@ -104,7 +104,7 @@ export default function RecepcionPage() {
       exporterId: selectedExporter,
       producerId: selectedProducerId,
       status: 'Pendiente de Peso' as const,
-      createdAt: serverTimestamp(),
+      createdAt: serverTimestamp() as any,
       netWeightPerBin: netWeightPerBin > 0 ? netWeightPerBin : 0,
     };
 

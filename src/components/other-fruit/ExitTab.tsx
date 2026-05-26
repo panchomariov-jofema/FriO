@@ -49,7 +49,22 @@ export function OtherFruitExitTab({ clientId: fixedClientId }: { clientId?: stri
   const [quantitiesToDispatch, setQuantitiesToDispatch] = React.useState<Record<string, number>>({});
   const [isDispatching, setIsDispatching] = React.useState(false);
 
-  const fruitClients = React.useMemo(() => (allClients || []).filter(c => c.type.toUpperCase() === 'FRUTA'), [allClients]);
+  const fruitClients = React.useMemo(() => {
+    const rawClients = (allClients || []).filter(c => c.type.toUpperCase() === 'FRUTA');
+    if (!allReceptions) return [];
+
+    const clientsWithStock = new Set<string>();
+    allReceptions.forEach(reception => {
+      const hasStoredItem = reception.items?.some(
+        item => item.status === 'Almacenado' && item.quantity > 0
+      );
+      if (hasStoredItem) {
+        clientsWithStock.add(reception.clientId);
+      }
+    });
+
+    return rawClients.filter(c => clientsWithStock.has(c.clientId));
+  }, [allClients, allReceptions]);
   const loading = loadingClients || loadingReceptions;
   
   React.useEffect(() => {
@@ -255,7 +270,7 @@ export function OtherFruitExitTab({ clientId: fixedClientId }: { clientId?: stri
             unit: client.unit,
             document: document,
             items: movementItems,
-            createdAt: serverTimestamp(),
+            createdAt: serverTimestamp() as any,
         };
 
         batch.set(movementRef, movementData);

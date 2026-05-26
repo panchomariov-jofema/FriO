@@ -95,7 +95,7 @@ export function RelocateOtherFruitDialog({
             if(it.status === 'Almacenado' && it.storageLocation?.chamberId === targetChamberId && it.storageLocation.coordinate) {
                 const current = occupancyMap.get(it.storageLocation.coordinate) || { quantity: 0, ownerName: reception.clientName };
                 // Determine units: if it's Fall Creek, 1 pallet = 3 bins.
-                const multiplier = (reception.clientName === 'FALL CREEK' && reception.unit === 'Pallets') ? 3 : (reception.unit === 'Bins' ? 1 : 2);
+                const multiplier = (reception.clientName?.toUpperCase() === 'FALL CREEK' && reception.unit === 'Pallets') ? 3 : (reception.unit === 'Bins' ? 1 : 2);
                 const equivalentUnits = it.quantity * multiplier;
 
                 occupancyMap.set(it.storageLocation.coordinate, { 
@@ -108,7 +108,7 @@ export function RelocateOtherFruitDialog({
 
     // 2. Determine quantity to relocate
     if (!item) return { availableCoordinates: [] };
-    const multiplier = (item.clientName === 'FALL CREEK' && item.unit === 'Pallets') ? 3 : (item.unit === 'Bins' ? 1 : 2);
+    const multiplier = (item.clientName?.toUpperCase() === 'FALL CREEK' && item.unit === 'Pallets') ? 3 : (item.unit === 'Bins' ? 1 : 2);
     const quantityToRelocate = item.quantity * multiplier;
 
     // 3. Filter coordinates by capacity
