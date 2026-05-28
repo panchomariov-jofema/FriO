@@ -12,7 +12,9 @@ import { Button } from '@/components/ui/button';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
 import type { OtherClient, OtherFruitReceptionItem, OtherFruitReception } from '@/lib/types';
 import { otherFruitReceptionSchema } from '@/lib/schemas';
-import { PlusCircle, ScanLine, Trash2 } from 'lucide-react';
+import { PlusCircle, ScanLine, Trash2, Search, Check, ChevronsUpDown } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { useFirestore } from '@/firebase';
 import { doc, updateDoc, addDoc, collection, serverTimestamp, getDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
@@ -27,15 +29,106 @@ import { chambersConfig } from '@/lib/chambers-config';
 import { getSortedCoordinates, getPairedCoordinates } from '@/lib/utils';
 import { Switch } from '@/components/ui/switch';
 import { StoreOtherFruitDialog } from './StoreOtherFruitDialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 type ReceptionFormValues = z.infer<typeof otherFruitReceptionSchema>;
+
+interface ProductSearchSelectProps {
+  value: string;
+  onSelect: (productCode: string) => void;
+  products: { id: string; code: string; name: string }[];
+  disabled?: boolean;
+}
+
+function ProductSearchSelect({ value, onSelect, products, disabled }: ProductSearchSelectProps) {
+  const [open, setOpen] = React.useState(false);
+  const [search, setSearch] = React.useState('');
+
+  const selectedProduct = React.useMemo(() => {
+    return products.find(p => p.code === value);
+  }, [products, value]);
+
+  const filteredProducts = React.useMemo(() => {
+    if (!search) return products;
+    const lower = search.toLowerCase();
+    return products.filter(p => 
+      p.name.toLowerCase().includes(lower) || 
+      p.code.toLowerCase().includes(lower)
+    );
+  }, [products, search]);
+
+  React.useEffect(() => {
+    if (!open) {
+      setSearch('');
+    }
+  }, [open]);
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          className="w-full justify-between font-normal text-left h-10 border bg-background px-3"
+          disabled={disabled}
+        >
+          <span className="truncate">
+            {selectedProduct ? selectedProduct.name : "Seleccione un producto..."}
+          </span>
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[300px] p-2" align="start">
+        <div className="flex items-center border-b px-2 pb-2 mb-2 gap-2">
+          <Search className="h-4 w-4 text-muted-foreground shrink-0" />
+          <Input
+            placeholder="Buscar por nombre..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="h-8 border-none focus-visible:ring-0 focus-visible:ring-offset-0 p-0"
+          />
+        </div>
+        <ScrollArea className="h-[200px]">
+          {filteredProducts.length === 0 ? (
+            <div className="text-sm text-center py-6 text-muted-foreground">
+              No se encontraron productos.
+            </div>
+          ) : (
+            <div className="space-y-1">
+              {filteredProducts.map((p) => {
+                const isSelected = p.code === value;
+                return (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => {
+                      onSelect(p.code);
+                      setOpen(false);
+                    }}
+                    className={`w-full text-left px-2 py-1.5 rounded-sm text-sm flex items-center justify-between hover:bg-accent hover:text-accent-foreground ${
+                      isSelected ? "bg-accent/50 font-medium" : ""
+                    }`}
+                  >
+                    <span className="truncate">{p.name}</span>
+                    {isSelected && <Check className="h-4 w-4 text-primary shrink-0 ml-2" />}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </ScrollArea>
+      </PopoverContent>
+    </Popover>
+  );
+}
 
 const defaultItem = {
   clientLotId: '',
   productCode: '',
   productName: '',
   quantity: 1,
-  weight: undefined,
+  observation: '',
 };
 
 export function OtherFruitReceptionTab({ clientId: fixedClientId }: { clientId?: string }) {
@@ -73,6 +166,11 @@ export function OtherFruitReceptionTab({ clientId: fixedClientId }: { clientId?:
 
   const [lastUsedChamberId, setLastUsedChamberId] = React.useState<string | null>(null);
   const [lastUsedCoordinate, setLastUsedCoordinate] = React.useState<string | null>(null);
+
+  const [isCreateProductOpen, setIsCreateProductOpen] = React.useState(false);
+  const [newProductName, setNewProductName] = React.useState('');
+  const [newProductCode, setNewProductCode] = React.useState('');
+  const [isCreatingProduct, setIsCreatingProduct] = React.useState(false);
 
   const resolvedClientConfig = React.useMemo(() => {
     if (!itemToStore) return undefined;
@@ -271,9 +369,33 @@ export function OtherFruitReceptionTab({ clientId: fixedClientId }: { clientId?:
             }
         }
 
-        setIsStoreDialogOpen(false);
-        setItemToStore(null);
-        toast({ title: 'Éxito', description: `Ubicación asignada correctamente en ${chamberConfig.name}.` });
+        const isFC = originalReception.clientName?.toUpperCase() === 'FALL CREEK';
+        if (directStorageMode && !isFC) {
+            const nextPendingIndex = finalItemsArray.findIndex(item => item.status === 'Pendiente de almacenar' && item.quantity > 0);
+            if (nextPendingIndex !== -1) {
+                const nextItem = finalItemsArray[nextPendingIndex];
+                setItemToStore({
+                    ...nextItem,
+                    receptionId: originalReception.id!,
+                    clientId: originalReception.clientId,
+                    clientName: originalReception.clientName,
+                    document: originalReception.document,
+                    itemIndices: [nextPendingIndex],
+                    unit: originalReception.unit || 'Bins',
+                    quantity: nextItem.quantity
+                });
+                setIsStoreDialogOpen(true);
+                toast({ title: 'Línea Guardada', description: `Registrado en ${chamberConfig.name}. Cargando siguiente línea...` });
+            } else {
+                setIsStoreDialogOpen(false);
+                setItemToStore(null);
+                toast({ title: 'Éxito', description: 'Todos los ítems del documento fueron almacenados.' });
+            }
+        } else {
+            setIsStoreDialogOpen(false);
+            setItemToStore(null);
+            toast({ title: 'Éxito', description: `Ubicación asignada correctamente en ${chamberConfig.name}.` });
+        }
     } catch (error) {
         console.error("Error storing fruit:", error);
         toast({ variant: 'destructive', title: 'Error', description: 'No se pudo asignar la ubicación.' });
@@ -291,7 +413,17 @@ export function OtherFruitReceptionTab({ clientId: fixedClientId }: { clientId?:
   });
   
   const selectedClientId = form.watch('clientId');
-  const { data: clientProducts, loading: loadingProducts } = usePackagingMastersByClient(selectedClientId);
+
+  const fruitClients = React.useMemo(() => {
+    return (allClients || []).filter(c => c.type.toUpperCase() === 'FRUTA' && c.status !== 'inactivo');
+  }, [allClients]);
+
+  const isFruitAndNotFC = React.useMemo(() => {
+    const client = fruitClients.find(c => c.clientId === selectedClientId);
+    return client ? (client.type.toUpperCase() === 'FRUTA' && client.name.toUpperCase() !== 'FALL CREEK') : false;
+  }, [fruitClients, selectedClientId]);
+
+  const { data: clientProducts, loading: loadingProducts } = usePackagingMastersByClient(selectedClientId, isFruitAndNotFC);
 
   React.useEffect(() => {
     if (!showTemperature) {
@@ -299,15 +431,26 @@ export function OtherFruitReceptionTab({ clientId: fixedClientId }: { clientId?:
     }
   }, [showTemperature, form]);
 
+  React.useEffect(() => {
+    if (!selectedClientId || loadingProducts || clientProducts.length === 0) return;
+
+    const savedProductCode = localStorage.getItem(`frio_last_product_${selectedClientId}`);
+    if (savedProductCode) {
+      const match = clientProducts.find(p => p.code === savedProductCode);
+      if (match) {
+        const currentItem = form.getValues('items.0');
+        if (currentItem && (!currentItem.productCode || currentItem.productCode === '')) {
+          form.setValue('items.0.productCode', match.code);
+          form.setValue('items.0.productName', match.name);
+        }
+      }
+    }
+  }, [selectedClientId, clientProducts, loadingProducts, form]);
 
   const { fields, append, remove } = useFieldArray({
     control: form.control,
     name: 'items',
   });
-
-  const fruitClients = React.useMemo(() => {
-    return (allClients || []).filter(c => c.type.toUpperCase() === 'FRUTA' && c.status !== 'inactivo');
-  }, [allClients]);
 
   React.useEffect(() => {
     if (fixedClientId && fruitClients.length > 0) {
@@ -344,6 +487,71 @@ export function OtherFruitReceptionTab({ clientId: fixedClientId }: { clientId?:
     }
   }, [fixedClientId, fruitClients, form, selectedClient]);
 
+  // Auto-slugify product code as user types product name
+  const handleNameChange = (name: string) => {
+    setNewProductName(name);
+    const cleanCode = name
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "") // remove accents
+      .replace(/[^a-zA-Z0-9\s-]/g, "") // remove special chars
+      .trim()
+      .replace(/\s+/g, "-") // replace spaces with hyphens
+      .toUpperCase();
+    setNewProductCode(cleanCode);
+  };
+
+  const handleCreateProductSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newProductName.trim() || !newProductCode.trim() || !firestore) return;
+
+    setIsCreatingProduct(true);
+    try {
+      const codeExists = clientProducts.some(p => p.code.toUpperCase() === newProductCode.toUpperCase());
+      if (codeExists) {
+        toast({
+          variant: 'destructive',
+          title: 'Código existente',
+          description: `El código de producto "${newProductCode}" ya está registrado.`
+        });
+        setIsCreatingProduct(false);
+        return;
+      }
+
+      await addDoc(collection(firestore, 'packagingMaster'), {
+        code: newProductCode,
+        name: newProductName,
+        clientId: '99999'
+      });
+
+      toast({
+        title: 'Éxito',
+        description: `Producto "${newProductName}" creado exitosamente.`
+      });
+
+      // Auto-select the newly created product in the last line of the form
+      const lastIndex = fields.length - 1;
+      form.setValue(`items.${lastIndex}.productCode`, newProductCode);
+      form.setValue(`items.${lastIndex}.productName`, newProductName);
+
+      if (selectedClientId) {
+        localStorage.setItem(`frio_last_product_${selectedClientId}`, newProductCode);
+      }
+
+      setNewProductName('');
+      setNewProductCode('');
+      setIsCreateProductOpen(false);
+    } catch (error) {
+      console.error("Error creating packaging master:", error);
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'No se pudo crear el producto en la base de datos.'
+      });
+    } finally {
+      setIsCreatingProduct(false);
+    }
+  };
+
   const handleClientChange = (clientId: string) => {
     const client = fruitClients.find(c => c.clientId === clientId);
     setSelectedClient(client || null);
@@ -371,8 +579,8 @@ export function OtherFruitReceptionTab({ clientId: fixedClientId }: { clientId?:
             status: 'Pendiente de almacenar'
         };
 
-        if (typeof item.weight !== 'number' || isNaN(item.weight)) {
-            delete newItem.weight;
+        if (item.observation === undefined || item.observation === '') {
+            delete newItem.observation;
         }
         if (!item.clientLotId) {
             delete newItem.clientLotId;
@@ -402,6 +610,12 @@ export function OtherFruitReceptionTab({ clientId: fixedClientId }: { clientId?:
     try {
         const collRef = collection(firestore, 'otherFruitReceptions');
         const docRef = await addDoc(collRef, receptionData);
+        if (values.clientId && values.items.length > 0) {
+            const firstItemCode = values.items[0].productCode;
+            if (firstItemCode) {
+                localStorage.setItem(`frio_last_product_${values.clientId}`, firstItemCode);
+            }
+        }
         toast({ title: 'Éxito', description: `Recepción de fruta registrada con lote ${displayLotId}.` });
         
         if (directStorageMode) {
@@ -443,10 +657,13 @@ export function OtherFruitReceptionTab({ clientId: fixedClientId }: { clientId?:
     if (product) {
       form.setValue(`items.${index}.productCode`, product.code);
       form.setValue(`items.${index}.productName`, product.name);
+      if (selectedClientId) {
+        localStorage.setItem(`frio_last_product_${selectedClientId}`, product.code);
+      }
     }
   }
 
-  const gridColsClass = showClientLot ? 'sm:grid-cols-5' : 'sm:grid-cols-4';
+  const gridColsClass = showClientLot ? 'sm:grid-cols-4' : 'sm:grid-cols-3';
 
   if (selectedClient?.name?.toUpperCase() === 'FALL CREEK') {
     return (
@@ -508,17 +725,17 @@ export function OtherFruitReceptionTab({ clientId: fixedClientId }: { clientId?:
         </Card>
 
         <StoreOtherFruitDialog
-            item={itemToStore}
-            open={isStoreDialogOpen}
-            onOpenChange={setIsStoreDialogOpen}
-            onConfirm={onStoreConfirm}
-            allReceptions={allReceptions || []}
-            allChamberLots={allChamberLots || []}
-            clientConfig={resolvedClientConfig}
-            lastUsedChamberId={lastUsedChamberId}
-            lastUsedCoordinate={lastUsedCoordinate}
-        />
-      </div>
+           item={itemToStore}
+           open={isStoreDialogOpen}
+           onOpenChange={setIsStoreDialogOpen}
+           onConfirm={onStoreConfirm}
+           allReceptions={allReceptions || []}
+           allChamberLots={allChamberLots || []}
+           clientConfig={resolvedClientConfig}
+           lastUsedChamberId={lastUsedChamberId}
+           lastUsedCoordinate={lastUsedCoordinate}
+       />
+     </div>
     );
   }
 
@@ -664,37 +881,29 @@ export function OtherFruitReceptionTab({ clientId: fixedClientId }: { clientId?:
                         )}
                       />
                       )}
-                      <FormField
-                        control={form.control}
-                        name={`items.${index}.productCode`}
-                        render={({ field: itemField }) => (
-                          <FormItem>
-                            <FormLabel>Cód. Producto</FormLabel>
-                             <Select onValueChange={(value) => handleProductChange(index, value)} value={itemField.value} disabled={!selectedClientId || loadingProducts}>
-                                  <FormControl>
-                                      <SelectTrigger>
-                                          <SelectValue placeholder="Seleccione un producto..." />
-                                      </SelectTrigger>
-                                  </FormControl>
-                                  <SelectContent>
-                                      {clientProducts.map(p => (
-                                          <SelectItem key={p.id} value={p.code}>{p.code}</SelectItem>
-                                      ))}
-                                  </SelectContent>
-                             </Select>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
+                      <div className="hidden">
+                        <FormField
+                          control={form.control}
+                          name={`items.${index}.productCode`}
+                          render={({ field: itemField }) => (
+                            <Input {...itemField} type="hidden" />
+                          )}
+                        />
+                      </div>
                       <FormField
                         control={form.control}
                         name={`items.${index}.productName`}
                         render={({ field: itemField }) => (
-                          <FormItem>
+                          <FormItem className="flex flex-col gap-1.5">
                             <FormLabel>Nombre Producto</FormLabel>
-                             <FormControl>
-                                 <Input {...itemField} autoComplete="off" placeholder="Seleccione un código" readOnly />
-                             </FormControl>
+                            <FormControl>
+                              <ProductSearchSelect
+                                value={form.watch(`items.${index}.productCode`)}
+                                onSelect={(code) => handleProductChange(index, code)}
+                                products={clientProducts}
+                                disabled={!selectedClientId || loadingProducts}
+                              />
+                            </FormControl>
                             <FormMessage />
                           </FormItem>
                         )}
@@ -712,20 +921,17 @@ export function OtherFruitReceptionTab({ clientId: fixedClientId }: { clientId?:
                       />
                       <FormField
                         control={form.control}
-                        name={`items.${index}.weight`}
+                        name={`items.${index}.observation`}
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Peso (kg)</FormLabel>
+                            <FormLabel>Observación</FormLabel>
                             <FormControl>
                               <Input
-                                  type="number"
+                                  type="text"
                                   {...field}
                                   autoComplete="off"
-                                  min="0"
-                                  step="0.01"
-                                  inputMode="decimal"
+                                  placeholder="Ingrese observación..."
                                   value={field.value ?? ''}
-                                  onChange={(e) => field.onChange(e.target.value === '' ? undefined : e.target.value)}
                               />
                             </FormControl>
                             <FormMessage />
@@ -738,16 +944,31 @@ export function OtherFruitReceptionTab({ clientId: fixedClientId }: { clientId?:
                     </Button>
                   </div>
                 ))}
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => append(defaultItem)}
-                  disabled={!selectedClient}
-                >
-                  <PlusCircle className="mr-2 h-4 w-4" />
-                  Agregar Producto
-                </Button>
+                <div className="flex justify-between items-center">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => append(defaultItem)}
+                    disabled={!selectedClient}
+                  >
+                    <PlusCircle className="mr-2 h-4 w-4" />
+                    Agregar Producto
+                  </Button>
+                  
+                  {selectedClient && isFruitAndNotFC && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setIsCreateProductOpen(true)}
+                      className="border-[#7aba28] text-[#7aba28] hover:bg-[#7aba28]/10"
+                    >
+                      <PlusCircle className="mr-2 h-4 w-4" />
+                      Crear Producto
+                    </Button>
+                  )}
+                </div>
               </div>
 
               <div className="flex justify-end">
@@ -777,6 +998,49 @@ export function OtherFruitReceptionTab({ clientId: fixedClientId }: { clientId?:
           lastUsedChamberId={lastUsedChamberId}
           lastUsedCoordinate={lastUsedCoordinate}
       />
+
+      <Dialog open={isCreateProductOpen} onOpenChange={setIsCreateProductOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Crear Nuevo Producto (Embalaje)</DialogTitle>
+            <DialogDescription>
+              Crea un producto global para todos los socios de tipo fruta. Se asociará con el ID "99999".
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleCreateProductSubmit} className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="new-product-name">Nombre del Producto</Label>
+              <Input
+                id="new-product-name"
+                placeholder="Ej: Bins Piñas"
+                value={newProductName}
+                onChange={(e) => handleNameChange(e.target.value)}
+                autoComplete="off"
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="new-product-code">Código del Producto</Label>
+              <Input
+                id="new-product-code"
+                placeholder="Ej: BINS-PINAS"
+                value={newProductCode}
+                onChange={(e) => setNewProductCode(e.target.value.toUpperCase())}
+                autoComplete="off"
+                required
+              />
+            </div>
+            <DialogFooter className="pt-4">
+              <Button type="button" variant="outline" onClick={() => setIsCreateProductOpen(false)} disabled={isCreatingProduct}>
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={isCreatingProduct || !newProductName.trim() || !newProductCode.trim()}>
+                {isCreatingProduct ? 'Creando...' : 'Crear Producto'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

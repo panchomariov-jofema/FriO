@@ -160,7 +160,9 @@ export default function CamarasPage() {
                 id: `${reception.id}-${index}`,
                 type: 'otherFruit' as const,
                 displayId: item.productCode,
-                lotIdForColor: reception.displayLotId || reception.id,
+                lotIdForColor: item.clientLotId 
+                    ? `${reception.displayLotId || reception.id}-${item.clientLotId}` 
+                    : (reception.displayLotId || reception.id),
                 ownerName: reception.clientName,
                 varietyOrProduct: item.productName,
                 quantity: item.quantity,
@@ -369,7 +371,7 @@ export default function CamarasPage() {
     }
   };
 
-  const handleRelocate = async ({ targetChamberId, targetCoordinate }: { targetChamberId: string; targetCoordinate: string}) => {
+  const handleRelocate = async ({ targetChamberId, targetCoordinate, quantityToRelocate }: { targetChamberId: string; targetCoordinate: string; quantityToRelocate: number }) => {
     if (!coordToRelocate || !firestore) return;
 
     const { chamberId: sourceChamberId, coordinate: sourceCoordinate } = coordToRelocate;
@@ -396,31 +398,87 @@ export default function CamarasPage() {
     
     try {
         const batch = writeBatch(firestore);
+        let remaining = quantityToRelocate;
 
-        // Update producer lots
-        lotsToMove.forEach(lot => {
+        // 1. Process Cherry ChamberLots
+        for (const lot of lotsToMove) {
+            if (remaining <= 0) break;
+            const avail = lot.binCount;
+            const amountToMove = Math.min(avail, remaining);
+            if (amountToMove <= 0) continue;
+
             const lotRef = doc(firestore, 'chamberLots', lot.id);
-            batch.update(lotRef, {
-                chamberId: targetChamberId,
-                coordinate: targetCoordinate,
-            });
-        });
-
-        // Update other fruit items
-        const fruitUpdatesByReception: Record<string, any[]> = {};
-        fruitItemsToMove.forEach(({ reception, item, index }) => {
-            if (!fruitUpdatesByReception[reception.id]) {
-                fruitUpdatesByReception[reception.id] = JSON.parse(JSON.stringify(reception.items));
-            }
-            const itemToUpdate = fruitUpdatesByReception[reception.id][index];
-            if (itemToUpdate) {
-                itemToUpdate.storageLocation = {
+            if (amountToMove === avail) {
+                // Move full document
+                batch.update(lotRef, {
                     chamberId: targetChamberId,
                     coordinate: targetCoordinate,
-                };
+                });
+            } else {
+                // Partial split: decrease original
+                batch.update(lotRef, {
+                    binCount: avail - amountToMove,
+                });
+                // Create new fraction document in target
+                const newLotFractionRef = doc(collection(firestore, 'chamberLots'));
+                batch.set(newLotFractionRef, {
+                    ...lot,
+                    id: newLotFractionRef.id,
+                    binCount: amountToMove,
+                    chamberId: targetChamberId,
+                    coordinate: targetCoordinate,
+                    status: 'Almacenado',
+                    storedAt: serverTimestamp()
+                });
             }
-        });
+            remaining -= amountToMove;
+        }
 
+        // 2. Process Other Fruit items
+        const fruitUpdatesByReception: Record<string, any[]> = {};
+        const getReceptionItemsArray = (receptionId: string, initialItems: any[]) => {
+            if (!fruitUpdatesByReception[receptionId]) {
+                fruitUpdatesByReception[receptionId] = JSON.parse(JSON.stringify(initialItems));
+            }
+            return fruitUpdatesByReception[receptionId];
+        };
+
+        for (const { reception, item, index } of fruitItemsToMove) {
+            if (remaining <= 0) break;
+            const avail = item.quantity;
+            const amountToMove = Math.min(avail, remaining);
+            if (amountToMove <= 0) continue;
+
+            const itemsArray = getReceptionItemsArray(reception.id, reception.items);
+            const itemToUpdate = itemsArray[index];
+
+            if (itemToUpdate) {
+                if (amountToMove === avail) {
+                    // Move full item
+                    itemToUpdate.storageLocation = {
+                        chamberId: targetChamberId,
+                        coordinate: targetCoordinate,
+                    };
+                } else {
+                    // Split item: decrease original
+                    itemToUpdate.quantity = avail - amountToMove;
+                    // Add new split item in target
+                    itemsArray.push({
+                        ...itemToUpdate,
+                        quantity: amountToMove,
+                        status: 'Almacenado',
+                        storageLocation: {
+                            chamberId: targetChamberId,
+                            coordinate: targetCoordinate,
+                        },
+                        storedAt: new Date()
+                    });
+                }
+            }
+            remaining -= amountToMove;
+        }
+
+        // Apply all other fruit updates
         Object.entries(fruitUpdatesByReception).forEach(([receptionId, updatedItems]) => {
             const receptionRef = doc(firestore, 'otherFruitReceptions', receptionId);
             batch.update(receptionRef, { items: updatedItems });
@@ -428,7 +486,7 @@ export default function CamarasPage() {
 
         await batch.commit();
         
-        toast({ title: 'Éxito', description: `Coordenada ${sourceCoordinate} reubicada a ${chambersConfig[targetChamberId].name} - ${targetCoordinate}.` });
+        toast({ title: 'Éxito', description: `Se reubicaron ${quantityToRelocate} unidades a ${chambersConfig[targetChamberId].name} - ${targetCoordinate}.` });
 
     } catch (e: any) {
         console.error("Error al reubicar: ", e);

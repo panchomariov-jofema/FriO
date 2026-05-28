@@ -45,7 +45,8 @@ function downloadCSV(csvString: string, filename: string) {
 export default function OtherFruitStockReportPage() {
     const { data: receptions, loading: loadingReceptions } = useFirestoreCollection<OtherFruitReception>('otherFruitReceptions');
     const [clientFilter, setClientFilter] = React.useState('all');
-    const [productFilter, setProductFilter] = React.useState('');
+    const [productFilter, setProductFilter] = React.useState('all');
+    const [chamberFilter, setChamberFilter] = React.useState('all');
 
     const stockData = React.useMemo(() => {
         if (!receptions) return [];
@@ -71,15 +72,71 @@ export default function OtherFruitStockReportPage() {
     
     const filteredData = React.useMemo(() => {
         return stockData.filter(item => {
-            const clientMatch = clientFilter !== 'all' ? item.clientName.toLowerCase().includes(clientFilter.toLowerCase()) : true;
-            const productMatch = productFilter ? item.productCode.toLowerCase().includes(productFilter.toLowerCase()) : true;
-            return clientMatch && productMatch;
+            const clientMatch = clientFilter !== 'all' ? item.clientName === clientFilter : true;
+            const productMatch = productFilter !== 'all' ? item.productName === productFilter : true;
+            const chamberMatch = chamberFilter !== 'all' ? item.chamberName === chamberFilter : true;
+            return clientMatch && productMatch && chamberMatch;
         });
-    }, [stockData, clientFilter, productFilter]);
+    }, [stockData, clientFilter, productFilter, chamberFilter]);
     
     const clientOptions = React.useMemo(() => {
-        return [...new Set(stockData.map(item => item.clientName))];
-    }, [stockData]);
+        const filtered = stockData.filter(item => {
+            const productMatch = productFilter !== 'all' ? item.productName === productFilter : true;
+            const chamberMatch = chamberFilter !== 'all' ? item.chamberName === chamberFilter : true;
+            return productMatch && chamberMatch;
+        });
+        return [...new Set(filtered.map(item => item.clientName))].sort();
+    }, [stockData, productFilter, chamberFilter]);
+
+    const productOptions = React.useMemo(() => {
+        const filtered = stockData.filter(item => {
+            const clientMatch = clientFilter !== 'all' ? item.clientName === clientFilter : true;
+            const chamberMatch = chamberFilter !== 'all' ? item.chamberName === chamberFilter : true;
+            return clientMatch && chamberMatch;
+        });
+        return [...new Set(filtered.map(item => item.productName))].sort();
+    }, [stockData, clientFilter, chamberFilter]);
+
+    const chamberOptions = React.useMemo(() => {
+        const filtered = stockData.filter(item => {
+            const clientMatch = clientFilter !== 'all' ? item.clientName === clientFilter : true;
+            const productMatch = productFilter !== 'all' ? item.productName === productFilter : true;
+            return clientMatch && productMatch;
+        });
+        return [...new Set(filtered.map(item => item.chamberName))].sort();
+    }, [stockData, clientFilter, productFilter]);
+
+    React.useEffect(() => {
+        if (clientFilter !== 'all' && !clientOptions.includes(clientFilter)) {
+            setClientFilter('all');
+        }
+    }, [clientFilter, clientOptions]);
+
+    React.useEffect(() => {
+        if (productFilter !== 'all' && !productOptions.includes(productFilter)) {
+            setProductFilter('all');
+        }
+    }, [productFilter, productOptions]);
+
+    React.useEffect(() => {
+        if (chamberFilter !== 'all' && !chamberOptions.includes(chamberFilter)) {
+            setChamberFilter('all');
+        }
+    }, [chamberFilter, chamberOptions]);
+
+    const totals = React.useMemo(() => {
+        let binsTotal = 0;
+        let palletsTotal = 0;
+        filteredData.forEach(item => {
+            const qty = Number(item.quantity) || 0;
+            if (item.unit?.toLowerCase().includes('pallet')) {
+                palletsTotal += qty;
+            } else {
+                binsTotal += qty;
+            }
+        });
+        return { binsTotal, palletsTotal };
+    }, [filteredData]);
 
     const handleExport = () => {
         const headers = ["Fecha Recepción", "Cliente", "Documento Entrada", "Lote", "Codigo Producto", "Nombre Producto", "Cámara", "Ubicación", "Cantidad", "Unidad"];
@@ -102,24 +159,42 @@ export default function OtherFruitStockReportPage() {
     return (
         <div className="space-y-6">
              <ReportHeader
-                title="Reporte Stock por Ubicacion (Clientes)"
+                title="Reporte Stock por Ubicación Clientes"
                 description="Inventario de fruta de clientes externos detallado por ubicación."
                 onExport={handleExport}
                 isExportDisabled={loadingReceptions || filteredData.length === 0}
             >
-                <div className="flex flex-col sm:flex-row gap-2">
-                    <Select onValueChange={setClientFilter} value={clientFilter}>
-                        <SelectTrigger><SelectValue placeholder="Filtrar por cliente..." /></SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all">Todos los Clientes</SelectItem>
-                            {clientOptions.map(client => <SelectItem key={client} value={client}>{client}</SelectItem>)}
-                        </SelectContent>
-                    </Select>
-                    <Input 
-                        placeholder="Filtrar por código de producto..."
-                        value={productFilter}
-                        onChange={(e) => setProductFilter(e.target.value)}
-                    />
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 w-full max-w-3xl">
+                    <div className="flex flex-col gap-1.5">
+                        <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Cliente</label>
+                        <Select onValueChange={setClientFilter} value={clientFilter}>
+                            <SelectTrigger className="w-full bg-background"><SelectValue placeholder="Todos los Clientes" /></SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">Todos los Clientes</SelectItem>
+                                {clientOptions.map(client => <SelectItem key={client} value={client}>{client}</SelectItem>)}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                        <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Producto</label>
+                        <Select onValueChange={setProductFilter} value={productFilter}>
+                            <SelectTrigger className="w-full bg-background"><SelectValue placeholder="Todos los Productos" /></SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">Todos los Productos</SelectItem>
+                                {productOptions.map(product => <SelectItem key={product} value={product}>{product}</SelectItem>)}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                        <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Cámara</label>
+                        <Select onValueChange={setChamberFilter} value={chamberFilter}>
+                            <SelectTrigger className="w-full bg-background"><SelectValue placeholder="Todas las Cámaras" /></SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">Todas las Cámaras</SelectItem>
+                                {chamberOptions.map(chamber => <SelectItem key={chamber} value={chamber}>{chamber}</SelectItem>)}
+                            </SelectContent>
+                        </Select>
+                    </div>
                 </div>
             </ReportHeader>
 
@@ -145,20 +220,48 @@ export default function OtherFruitStockReportPage() {
                                 {loadingReceptions ? (
                                     Array.from({ length: 5 }).map((_, i) => <TableRow key={i}><TableCell colSpan={10}><Skeleton className="h-4 w-full" /></TableCell></TableRow>)
                                 ) : filteredData.length > 0 ? (
-                                    filteredData.map(item => (
-                                        <TableRow key={item.id}>
-                                            <TableCell>{item.receptionDate?.toDate().toLocaleDateString()}</TableCell>
-                                            <TableCell>{item.clientName}</TableCell>
-                                            <TableCell className="font-mono text-xs">{item.document}</TableCell>
-                                            <TableCell className="font-mono text-xs">{item.clientLotId}</TableCell>
-                                            <TableCell>{item.productCode}</TableCell>
-                                            <TableCell>{item.productName}</TableCell>
-                                            <TableCell className="font-medium">{item.chamberName}</TableCell>
-                                            <TableCell className="font-mono">{item.coordinate}</TableCell>
-                                            <TableCell className="font-semibold">{item.quantity}</TableCell>
-                                            <TableCell>{item.unit}</TableCell>
+                                    <>
+                                        {filteredData.map(item => (
+                                            <TableRow key={item.id}>
+                                                <TableCell>{item.receptionDate?.toDate().toLocaleDateString()}</TableCell>
+                                                <TableCell>{item.clientName}</TableCell>
+                                                <TableCell className="font-mono text-xs">{item.document}</TableCell>
+                                                <TableCell className="font-mono text-xs">{item.clientLotId}</TableCell>
+                                                <TableCell>{item.productCode}</TableCell>
+                                                <TableCell>{item.productName}</TableCell>
+                                                <TableCell className="font-medium">{item.chamberName}</TableCell>
+                                                <TableCell className="font-mono">{item.coordinate}</TableCell>
+                                                <TableCell className="font-semibold">{item.quantity}</TableCell>
+                                                <TableCell>{item.unit}</TableCell>
+                                            </TableRow>
+                                        ))}
+                                        <TableRow className="bg-muted/50 font-semibold hover:bg-muted/50">
+                                            <TableCell colSpan={8} className="text-right font-bold text-muted-foreground uppercase tracking-wider text-xs">Total</TableCell>
+                                            {(() => {
+                                                const uniqueUnits = [...new Set(filteredData.map(item => item.unit))].filter(Boolean);
+                                                if (uniqueUnits.length === 1) {
+                                                    const unit = uniqueUnits[0];
+                                                    const totalQty = filteredData.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0);
+                                                    return (
+                                                        <>
+                                                            <TableCell className="font-bold text-foreground text-sm">{totalQty}</TableCell>
+                                                            <TableCell className="font-bold text-foreground text-sm">{unit}</TableCell>
+                                                        </>
+                                                    );
+                                                } else {
+                                                    const parts = [];
+                                                    if (totals.binsTotal > 0) parts.push(`${totals.binsTotal} Bins`);
+                                                    if (totals.palletsTotal > 0) parts.push(`${totals.palletsTotal} Pallets`);
+                                                    const totalText = parts.length > 0 ? parts.join(' / ') : '0';
+                                                    return (
+                                                        <TableCell colSpan={2} className="font-bold text-foreground text-sm">
+                                                            {totalText}
+                                                        </TableCell>
+                                                    );
+                                                }
+                                            })()}
                                         </TableRow>
-                                    ))
+                                    </>
                                 ) : (
                                     <TableRow><TableCell colSpan={10} className="h-24 text-center">No hay datos de stock para los filtros seleccionados.</TableCell></TableRow>
                                 )}

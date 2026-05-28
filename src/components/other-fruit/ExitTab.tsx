@@ -24,13 +24,12 @@ interface AggregatedLot {
   displayLotId: string;
   unit: 'Bins' | 'Pallets';
   totalQuantity: number;
-  totalWeight: number;
   locations: {
     receptionId: string;
     itemIndex: number;
     coordinate: string;
     quantity: number;
-    weight?: number;
+    observation?: string;
     productName: string;
     productCode: string;
     clientLotId?: string;
@@ -90,25 +89,27 @@ export function OtherFruitExitTab({ clientId: fixedClientId }: { clientId?: stri
 
       reception.items.forEach((item, index) => {
         if (item.status === 'Almacenado' && item.quantity > 0 && item.storageLocation?.coordinate && reception.displayLotId) {
-          if (!lotMap.has(reception.displayLotId)) {
-            lotMap.set(reception.displayLotId, {
-              displayLotId: reception.displayLotId,
+          const displayKey = item.clientLotId 
+            ? `${reception.displayLotId}-${item.clientLotId}` 
+            : reception.displayLotId;
+
+          if (!lotMap.has(displayKey)) {
+            lotMap.set(displayKey, {
+              displayLotId: displayKey,
               unit: reception.unit,
               totalQuantity: 0,
-              totalWeight: 0,
               locations: [],
             });
           }
 
-          const lot = lotMap.get(reception.displayLotId)!;
+          const lot = lotMap.get(displayKey)!;
           lot.totalQuantity += item.quantity;
-          lot.totalWeight += item.weight || 0;
           lot.locations.push({
             receptionId: reception.id,
             itemIndex: index,
             coordinate: item.storageLocation.coordinate,
             quantity: item.quantity,
-            weight: item.weight,
+            observation: item.observation,
             productName: item.productName,
             productCode: item.productCode,
             clientLotId: item.clientLotId,
@@ -240,7 +241,7 @@ export function OtherFruitExitTab({ clientId: fixedClientId }: { clientId?: stri
                     productCode: string;
                     productName: string;
                     quantity: number;
-                    weight?: number;
+                    observation?: string;
                     clientLotId?: string;
                 } = {
                     productCode: itemToUpdate.productCode,
@@ -248,6 +249,9 @@ export function OtherFruitExitTab({ clientId: fixedClientId }: { clientId?: stri
                     quantity: quantityToDispatch,
                 };
 
+                if (typeof itemToUpdate.observation !== 'undefined') {
+                    newItemForMovement.observation = itemToUpdate.observation;
+                }
                 if (typeof itemToUpdate.clientLotId !== 'undefined') {
                     newItemForMovement.clientLotId = itemToUpdate.clientLotId;
                 }
@@ -345,7 +349,6 @@ export function OtherFruitExitTab({ clientId: fixedClientId }: { clientId?: stri
                                 <div className="flex justify-between w-full pr-4">
                                     <span className="font-mono">{lot.displayLotId}</span>
                                     <div className="flex items-center gap-4 text-sm">
-                                      {lot.totalWeight > 0 && <span className="font-semibold text-muted-foreground">{lot.totalWeight.toFixed(2)} kg</span>}
                                       <span className="font-semibold">{lot.totalQuantity} {lot.unit}</span>
                                     </div>
                                 </div>
@@ -364,7 +367,7 @@ export function OtherFruitExitTab({ clientId: fixedClientId }: { clientId?: stri
                                         <TableHead>Coordenada</TableHead>
                                         <TableHead>Producto</TableHead>
                                         <TableHead className="hidden md:table-cell">Lote Cliente</TableHead>
-                                        <TableHead className="hidden md:table-cell">Peso</TableHead>
+                                        <TableHead className="hidden md:table-cell">Observación</TableHead>
                                         <TableHead>Disp.</TableHead>
                                         <TableHead className="w-32">A Despachar</TableHead>
                                     </TableRow>
@@ -383,7 +386,7 @@ export function OtherFruitExitTab({ clientId: fixedClientId }: { clientId?: stri
                                                 <TableCell className="font-mono">{loc.coordinate}</TableCell>
                                                 <TableCell>{loc.productName}</TableCell>
                                                 <TableCell className="font-mono hidden md:table-cell">{loc.clientLotId || '-'}</TableCell>
-                                                <TableCell className="hidden md:table-cell">{loc.weight ? loc.weight.toFixed(2) : '-'}</TableCell>
+                                                <TableCell className="hidden md:table-cell">{loc.observation || '-'}</TableCell>
                                                 <TableCell>{loc.quantity}</TableCell>
                                                 <TableCell>
                                                     <Input

@@ -7,6 +7,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import type { ChamberLot, OtherFruitReception, StoredItem } from '@/lib/types';
 import { chambersConfig } from '@/lib/chambers-config';
@@ -18,7 +19,7 @@ import type { ClientStorageConfig, Exporter } from '@/lib/types';
 interface RelocateLotDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onRelocate: (data: { targetChamberId: string; targetCoordinate: string }) => void;
+  onRelocate: (data: { targetChamberId: string; targetCoordinate: string; quantityToRelocate: number }) => void;
   sourceChamberId: string;
   sourceCoordinate: string;
   lotsInCoordinate: StoredItem[];
@@ -31,6 +32,8 @@ interface RelocateLotDialogProps {
 const relocateSchema = z.object({
   targetChamberId: z.string({ required_error: 'Debe seleccionar una cámara de destino.' }),
   targetCoordinate: z.string({ required_error: 'Debe seleccionar una coordenada de destino.' }),
+  quantityToRelocate: z.coerce.number({ required_error: 'Debe ingresar una cantidad.' })
+    .positive('La cantidad debe ser mayor a 0.'),
 });
 
 type RelocateFormValues = z.infer<typeof relocateSchema>;
@@ -48,21 +51,28 @@ export function RelocateLotDialog({
   exporters,
 }: RelocateLotDialogProps) {
   const { toast } = useToast();
+  
+  const totalQuantityInCoord = React.useMemo(() => {
+    return lotsInCoordinate.reduce((sum, item) => sum + item.quantity, 0);
+  }, [lotsInCoordinate]);
+
   const form = useForm<RelocateFormValues>({
     resolver: zodResolver(relocateSchema),
     defaultValues: {
       targetChamberId: undefined,
       targetCoordinate: undefined,
+      quantityToRelocate: undefined,
     },
   });
   
   const targetChamberId = form.watch('targetChamberId');
+  const watchQuantityToRelocate = form.watch('quantityToRelocate');
 
-  const { availableCoordinates } = React.useMemo(() => {
-    if (!targetChamberId) return { availableCoordinates: [] };
+  const { availableCoordinates, occupancyMap } = React.useMemo(() => {
+    if (!targetChamberId) return { availableCoordinates: [], occupancyMap: new Map() };
 
     const chamberConfig = chambersConfig[targetChamberId];
-    if (!chamberConfig) return { availableCoordinates: [] };
+    if (!chamberConfig) return { availableCoordinates: [], occupancyMap: new Map() };
 
     const allPossibleCoords = chamberConfig.columns
         .flatMap(col => chamberConfig.rows.map(row => `${col.name}${row}`))
@@ -107,10 +117,13 @@ export function RelocateLotDialog({
     });
 
     // 2. Determine quantity and identity of lot to relocate
-    const quantityToRelocate = lotsInCoordinate.reduce((sum, item) => {
-        const multiplier = (item.ownerName?.toUpperCase() === 'FALL CREEK' && item.unit === 'Pallets') ? 3 : (item.unit === 'Bins' ? 1 : 2);
-        return sum + (item.quantity * multiplier);
-    }, 0);
+    const unitType = lotsInCoordinate[0]?.unit || 'Bins';
+    const multiplier = (lotsInCoordinate[0]?.ownerName?.toUpperCase() === 'FALL CREEK' && unitType === 'Pallets') ? 3 : (unitType === 'Bins' ? 1 : 2);
+    
+    const qtyToMove = watchQuantityToRelocate !== undefined && !isNaN(Number(watchQuantityToRelocate)) 
+      ? Number(watchQuantityToRelocate) 
+      : totalQuantityInCoord;
+    const quantityToRelocateInBins = qtyToMove * multiplier;
 
     const firstItemToRelocate = lotsInCoordinate[0];
     const incomingOwnerName = firstItemToRelocate?.ownerName || '';
@@ -128,7 +141,7 @@ export function RelocateLotDialog({
         
         // Rule: Absolute maximum capacity of 9 Bins
         const MAX_CAPACITY = 9;
-        if ((currentOccupancy + quantityToRelocate) > MAX_CAPACITY) return false;
+        if ((currentOccupancy + quantityToRelocateInBins) > MAX_CAPACITY) return false;
 
         // If coordinate is not empty, check mixing rules
         if (occupancyData && occupancyData.quantity > 0) {
@@ -150,8 +163,7 @@ export function RelocateLotDialog({
             else if (existingType === 'EXPORTADOR') {
                 if (existingOwnerName.toUpperCase() !== incomingOwnerName.toUpperCase()) return false;
             }
-            // Fallback for safety: if they are different owners, don't mix unless both are EXPORTADOR and rules say so
-            // But the rule says "no entre exportadores", so same owner is always required.
+            // Fallback for safety: if they are different owners, don't mix
             else {
                 if (existingOwnerName.toUpperCase() !== incomingOwnerName.toUpperCase()) return false;
             }
@@ -162,24 +174,57 @@ export function RelocateLotDialog({
 
     return { 
         availableCoordinates: available,
+        occupancyMap
     };
-  }, [targetChamberId, allChamberLots, allOtherFruitReceptions, sourceChamberId, sourceCoordinate, lotsInCoordinate, clientConfigs, exporters]);
-
+  }, [targetChamberId, allChamberLots, allOtherFruitReceptions, sourceChamberId, sourceCoordinate, lotsInCoordinate, clientConfigs, exporters, watchQuantityToRelocate, totalQuantityInCoord]);
 
   React.useEffect(() => {
     if (open) {
       form.reset({
         targetChamberId: undefined,
         targetCoordinate: undefined,
+        quantityToRelocate: totalQuantityInCoord,
       });
     }
-  }, [open, form]);
+  }, [open, form, totalQuantityInCoord]);
 
   const onSubmit = (values: RelocateFormValues) => {
     if (values.targetChamberId === sourceChamberId && values.targetCoordinate === sourceCoordinate) {
         toast({ variant: 'destructive', title: 'Error', description: 'La ubicación de destino no puede ser la misma que la de origen.'});
         return;
     }
+
+    if (values.quantityToRelocate > totalQuantityInCoord) {
+        form.setError('quantityToRelocate', {
+            type: 'manual',
+            message: `La cantidad no puede ser mayor a la disponible en el origen (${totalQuantityInCoord}).`
+        });
+        return;
+    }
+
+    // Validate the target chamber's capacity conditions
+    const targetCoordinate = values.targetCoordinate;
+    const occupancyData = occupancyMap.get(targetCoordinate);
+    const currentOccupancy = occupancyData?.quantity || 0;
+
+    const unitType = lotsInCoordinate[0]?.unit || 'Bins';
+    const multiplier = (lotsInCoordinate[0]?.ownerName?.toUpperCase() === 'FALL CREEK' && unitType === 'Pallets') ? 3 : (unitType === 'Bins' ? 1 : 2);
+    const quantityToRelocateInBins = values.quantityToRelocate * multiplier;
+
+    const MAX_CAPACITY = 9;
+    if ((currentOccupancy + quantityToRelocateInBins) > MAX_CAPACITY) {
+        toast({
+            variant: 'destructive',
+            title: 'Error de Capacidad',
+            description: 'Límite máximo 9 Bins'
+        });
+        form.setError('targetCoordinate', {
+            type: 'manual',
+            message: 'Límite máximo 9 Bins'
+        });
+        return;
+    }
+
     onRelocate(values);
   };
 
@@ -192,7 +237,7 @@ export function RelocateLotDialog({
         <DialogHeader>
           <DialogTitle>Reubicar Coordenada</DialogTitle>
           <DialogDescription>
-            Mover todo el contenido de la coordenada <span className="font-mono font-semibold">{sourceCoordinate}</span> en <span className="font-semibold">{chambersConfig[sourceChamberId]?.name}</span> a una nueva ubicación.
+            Mover el contenido de la coordenada <span className="font-mono font-semibold">{sourceCoordinate}</span> en <span className="font-semibold">{chambersConfig[sourceChamberId]?.name}</span> a una nueva ubicación.
           </DialogDescription>
         </DialogHeader>
 
@@ -205,13 +250,33 @@ export function RelocateLotDialog({
                     <span>
                       {item.type === 'producerLot' ? 'Productor' : 'Cliente'}: <span className="font-semibold">{item.ownerName}</span>
                     </span>
-                    <span>Cant: <span className="font-semibold">{item.quantity} {item.unit}</span></span>
+                    <span>Cant. Disponible: <span className="font-semibold">{totalQuantityInCoord} {item.unit}</span></span>
                 </div>
              </AlertDescription>
           </Alert>
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-4">
+            <FormField
+              control={form.control}
+              name="quantityToRelocate"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Cantidad a Reubicar ({item.unit})</FormLabel>
+                  <FormControl>
+                    <Input 
+                      type="number" 
+                      min={1} 
+                      max={totalQuantityInCoord} 
+                      placeholder="Ingrese cantidad..." 
+                      {...field} 
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
             <FormField
               control={form.control}
               name="targetChamberId"
@@ -243,7 +308,7 @@ export function RelocateLotDialog({
               name="targetCoordinate"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Coordenada de Destino (Disponibles según reglas)</FormLabel>
+                  <FormLabel>Coordenada de Destino (Disponibles según capacidad y reglas)</FormLabel>
                   <Select onValueChange={field.onChange} value={field.value} disabled={!targetChamberId || availableCoordinates.length === 0}>
                     <FormControl>
                       <SelectTrigger>
@@ -277,3 +342,4 @@ export function RelocateLotDialog({
     </Dialog>
   );
 }
+

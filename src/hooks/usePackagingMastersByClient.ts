@@ -5,7 +5,7 @@ import { collection, onSnapshot, query, where } from 'firebase/firestore';
 import { useFirestore } from '@/firebase';
 import type { PackagingMaster } from '@/lib/types';
 
-export function usePackagingMastersByClient(clientId: string | null) {
+export function usePackagingMastersByClient(clientId: string | null, isFruitAndNotFC?: boolean) {
   const [data, setData] = useState<PackagingMaster[]>([]);
   const [loading, setLoading] = useState(false);
   const firestore = useFirestore();
@@ -20,7 +20,9 @@ export function usePackagingMastersByClient(clientId: string | null) {
     setLoading(true);
     
     const mastersRef = collection(firestore, 'packagingMaster');
-    const q = query(mastersRef, where('clientId', '==', clientId));
+    const q = isFruitAndNotFC
+      ? query(mastersRef, where('clientId', 'in', [clientId, '99999']))
+      : query(mastersRef, where('clientId', '==', clientId));
     
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
       const items: PackagingMaster[] = [];
@@ -36,7 +38,7 @@ export function usePackagingMastersByClient(clientId: string | null) {
     });
 
     return () => unsubscribe();
-  }, [clientId, firestore]);
+  }, [clientId, firestore, isFruitAndNotFC]);
 
   return { data, loading };
 }

@@ -53,7 +53,7 @@ export default function OtherFruitKardexReportPage() {
         if (receptions) {
             receptions.forEach(reception => {
                 const totalQuantity = reception.items.reduce((sum, item) => sum + item.quantity, 0);
-                const totalWeight = reception.items.reduce((sum, item) => sum + (item.weight || 0), 0);
+                const observations = [...new Set(reception.items.map(i => i.observation).filter(Boolean))].join(', ');
 
                 const productNames = [...new Set(reception.items.map(i => i.productName))].join(', ');
                 const productCodes = [...new Set(reception.items.map(i => i.productCode))].join(', ');
@@ -71,7 +71,7 @@ export default function OtherFruitKardexReportPage() {
                     productName: productNames,
                     quantity: totalQuantity,
                     unit: reception.unit,
-                    weight: totalWeight > 0 ? totalWeight : undefined,
+                    observation: observations || '-',
                     userName: reception.userName,
                 });
             });
@@ -82,7 +82,7 @@ export default function OtherFruitKardexReportPage() {
                 if (movement.type !== 'salida') return;
 
                 const totalQuantity = movement.items.reduce((sum, item) => sum + item.quantity, 0);
-                const totalWeight = movement.items.reduce((sum, item) => sum + (item.weight || 0), 0);
+                const observations = [...new Set(movement.items.map(i => i.observation).filter(Boolean))].join(', ');
 
                 const productNames = [...new Set(movement.items.map(i => i.productName))].join(', ');
                 const productCodes = [...new Set(movement.items.map(i => i.productCode))].join(', ');
@@ -99,7 +99,7 @@ export default function OtherFruitKardexReportPage() {
                     productName: productNames,
                     quantity: -totalQuantity,
                     unit: movement.unit,
-                    weight: totalWeight > 0 ? -totalWeight : undefined,
+                    observation: observations || '-',
                     userName: movement.userName,
                 });
             });
@@ -135,10 +135,10 @@ export default function OtherFruitKardexReportPage() {
             "Codigo Producto": item.productCode,
             "Nombre Producto": item.productName,
             "Cantidad": `${item.quantity} ${item.unit}`,
-            "Peso (kg)": item.weight ? item.weight.toFixed(2) : '0.00',
+            "Observación": item.observation || '',
             "Usuario": item.userName || '',
         }));
-        const headers = ["Fecha", "Tipo", "Cliente", "Documento", "Temperatura", "Lote Cliente", "Codigo Producto", "Nombre Producto", "Cantidad", "Peso (kg)", "Usuario"];
+        const headers = ["Fecha", "Tipo", "Cliente", "Documento", "Temperatura", "Lote Cliente", "Codigo Producto", "Nombre Producto", "Cantidad", "Observación", "Usuario"];
         const csv = convertToCSV(dataToExport, headers);
         downloadCSV(csv, 'kardex_fruta_otros_clientes.csv');
     };
@@ -183,7 +183,7 @@ export default function OtherFruitKardexReportPage() {
                                     <TableHead>Cód. Prod.</TableHead>
                                     <TableHead>Producto</TableHead>
                                     <TableHead>Cantidad</TableHead>
-                                    <TableHead>Peso (kg)</TableHead>
+                                    <TableHead>Observación</TableHead>
                                     <TableHead>Usuario</TableHead>
                                 </TableRow>
                             </TableHeader>
@@ -208,8 +208,8 @@ export default function OtherFruitKardexReportPage() {
                                         <TableCell className={item.quantity > 0 ? 'text-green-600' : 'text-red-600'}>
                                             {item.quantity} {item.unit}
                                         </TableCell>
-                                        <TableCell className={item.weight > 0 ? 'text-green-600' : 'text-red-600'}>
-                                            {item.weight ? `${item.weight.toFixed(2)} kg` : '-'}
+                                        <TableCell className="text-muted-foreground text-xs max-w-[200px] truncate">
+                                            {item.observation || '-'}
                                         </TableCell>
                                         <TableCell>{item.userName || 'N/A'}</TableCell>
                                     </TableRow>

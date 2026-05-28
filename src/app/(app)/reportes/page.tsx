@@ -69,7 +69,7 @@ const reportList = [
     },
     { 
         id: 'stock-ubicacion-otros',
-        title: 'Stock por Ubicación (Socios)', 
+        title: 'Stock por Ubicación Clientes', 
         description: 'Ubicación exacta de los Bins de Clientes, especificando la Cámara frigorífica.',
         href: '/reportes/stock-fruta-otros-clientes',
         icon: MapPin,

@@ -119,7 +119,9 @@ export default function FallCreekPage() {
                     id: `${reception.id}-${index}`,
                     type: 'otherFruit' as const,
                     displayId: item.productCode,
-                    lotIdForColor: reception.displayLotId || reception.id,
+                    lotIdForColor: item.clientLotId 
+                        ? `${reception.displayLotId || reception.id}-${item.clientLotId}` 
+                        : (reception.displayLotId || reception.id),
                     ownerName: reception.clientName,
                     varietyOrProduct: item.productName,
                     quantity: item.quantity,

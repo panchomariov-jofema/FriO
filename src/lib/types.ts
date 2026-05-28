@@ -308,7 +308,7 @@ export interface OtherFruitReceptionItem {
     productCode: string;
     productName: string;
     quantity: number;
-    weight?: number;
+    observation?: string;
     status: 'Pendiente de recibir' | 'Recibido' | 'Pendiente de almacenar' | 'Almacenado' | 'Despachado';
     storageLocation?: {
       chamberId: string;
@@ -370,7 +370,7 @@ export interface OtherFruitMovement {
     productCode: string;
     productName: string;
     quantity: number;
-    weight?: number;
+    observation?: string;
     clientLotId?: string;
   }[];
   createdAt: Timestamp;

@@ -174,7 +174,7 @@ export const otherFruitReceptionItemSchema = z.object({
     productCode: z.string().min(1, "El código es obligatorio."),
     productName: z.string().min(1, "El nombre es obligatorio."),
     quantity: z.coerce.number().min(1, "La cantidad debe ser al menos 1."),
-    weight: z.coerce.number({ invalid_type_error: "El peso debe ser un número." }).optional(),
+    observation: z.string().optional(),
 });
 
 export const otherFruitReceptionSchema = z.object({
