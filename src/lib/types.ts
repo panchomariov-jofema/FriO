@@ -10,7 +10,7 @@ export interface Exporter {
   type: string;
   status?: 'activo' | 'inactivo';
   // Logistics Configuration
-  storageStrategy?: 'secuencial' | 'fifo' | 'aisle-access' | 'horizontal-secuencial' | 'inverted-secuencial' | 'pareado' | 'serpentina-vertical' | 'modelo-sof';
+  storageStrategy?: 'secuencial' | 'fifo' | 'aisle-access' | 'horizontal-secuencial' | 'inverted-secuencial' | 'pareado' | 'serpentina-vertical' | 'modelo-sof' | 'fifo-vertical';
   binsPerCoordinate?: number;
   palletsPerCoordinate?: number;
 }
@@ -76,7 +76,7 @@ export interface OtherClient {
   unit: 'Bins' | 'Pallets';
   status?: 'activo' | 'inactivo';
   // Logistics Configuration
-  storageStrategy?: 'secuencial' | 'fifo' | 'aisle-access' | 'horizontal-secuencial' | 'inverted-secuencial' | 'pareado' | 'serpentina-vertical' | 'modelo-sof';
+  storageStrategy?: 'secuencial' | 'fifo' | 'aisle-access' | 'horizontal-secuencial' | 'inverted-secuencial' | 'pareado' | 'serpentina-vertical' | 'modelo-sof' | 'fifo-vertical';
   binsPerCoordinate?: number;
   palletsPerCoordinate?: number;
 }
@@ -274,6 +274,7 @@ export interface ChamberTemperature {
   id: string;
   chamberId: string;
   temperature: number;
+  humidity?: number;
   timestamp: Timestamp;
   userId?: string;
   userName?: string;
@@ -489,7 +490,7 @@ export interface Aisle {
 export interface ClientStorageConfig {
   id: string; // ClientId (Exporter ID or OtherClient ID)
   clientName: string;
-  strategy: 'secuencial' | 'fifo' | 'aisle-access' | 'horizontal-secuencial' | 'inverted-secuencial' | 'pareado' | 'serpentina-vertical' | 'modelo-sof';
+  strategy: 'secuencial' | 'fifo' | 'aisle-access' | 'horizontal-secuencial' | 'inverted-secuencial' | 'pareado' | 'serpentina-vertical' | 'modelo-sof' | 'fifo-vertical';
   binsPerCoordinate: number;
   palletsPerCoordinate: number;
   preferredChamberId?: string;

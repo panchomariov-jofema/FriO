@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { useFirestore } from '@/firebase';
-import { collection, writeBatch, doc, serverTimestamp, addDoc, deleteDoc, updateDoc } from 'firebase/firestore';
+import { collection, writeBatch, doc, setDoc, serverTimestamp, addDoc, deleteDoc, updateDoc } from 'firebase/firestore';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -24,13 +24,76 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
 import { parseFallCreekManifest, decomposePalletsIntoBins, type FallCreekManifestRow, fileToBase64 } from '@/lib/fall-creek-utils';
 import { parseManifestAIAction } from './actions';
-import { FileUp, ClipboardList, Loader2, Search } from 'lucide-react';
+import { FileUp, ClipboardList, Loader2, Search, Printer, Download } from 'lucide-react';
 import type { PendingItem } from '@/lib/types';
 import { StoreOtherFruitDialog } from '@/components/other-fruit/StoreOtherFruitDialog';
+import { ChamberTemperatureInput } from '@/components/camaras/ChamberTemperatureInput';
+import QRCode from 'qrcode';
 
+
+interface QRLabelItemProps {
+    code: string;
+    width?: number;
+    height?: number;
+    showLabelText?: boolean;
+}
+
+function QRLabelItem({ code, width = 100, height = 100, showLabelText = true }: QRLabelItemProps) {
+    const canvasRef = React.useRef<HTMLCanvasElement>(null);
+
+    React.useEffect(() => {
+        if (canvasRef.current) {
+            QRCode.toCanvas(canvasRef.current, code, {
+                width: width,
+                margin: 1,
+                color: {
+                    dark: '#000000',
+                    light: '#ffffff'
+                }
+            }, (error) => {
+                if (error) console.error("Error generating QR code:", error);
+            });
+        }
+    }, [code, width]);
+
+    return (
+        <div className="flex flex-col items-center justify-center p-3 bg-white rounded-lg border border-dashed border-slate-300">
+            <canvas ref={canvasRef} className="max-w-full" style={{ width: `${width}px`, height: `${height}px` }} />
+            {showLabelText && (
+                <span className="mt-2 text-xs font-mono font-bold text-slate-500">{code}</span>
+            )}
+        </div>
+    );
+}
+
+function PrintableQRLabel({ code }: { code: string }) {
+    const canvasRef = React.useRef<HTMLCanvasElement>(null);
+
+    React.useEffect(() => {
+        if (canvasRef.current) {
+            QRCode.toCanvas(canvasRef.current, code, {
+                width: 300,
+                margin: 2,
+                color: {
+                    dark: '#000000',
+                    light: '#ffffff'
+                }
+            }, (error) => {
+                if (error) console.error("Error generating QR code:", error);
+            });
+        }
+    }, [code]);
+
+    return (
+        <div className="print-label">
+            <canvas ref={canvasRef} />
+        </div>
+    );
+}
 
 const FALL_CREEK_CLIENT_NAME = 'FALL CREEK';
 
@@ -61,6 +124,7 @@ export default function FallCreekPage() {
     const { data: allReceptions, loading: loadingReceptions } = useFirestoreCollection<OtherFruitReception>('otherFruitReceptions');
     const { data: allMovements, loading: loadingMovements } = useFirestoreCollection<OtherFruitMovement>('otherFruitMovements');
     const { data: allChamberLots, loading: loadingChamberLots } = useFirestoreCollection<ChamberLot>('chamberLots');
+    const { data: chamberSettings } = useFirestoreCollection<{ id: string; row13Enabled?: boolean }>('chamberSettings');
 
     const { toast } = useToast();
     const firestore = useFirestore();
@@ -95,6 +159,54 @@ export default function FallCreekPage() {
     const [showReceptionDialog, setShowReceptionDialog] = React.useState(false);
     const [storingItem, setStoringItem] = React.useState<PendingItem | null>(null);
     const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+    // States for QR generator
+    const [labelPrefix, setLabelPrefix] = React.useState('BIN-FC-');
+    const [labelStartNum, setLabelStartNum] = React.useState(1);
+    const [labelQuantity, setLabelQuantity] = React.useState(50);
+    const [labelPadding, setLabelPadding] = React.useState(4);
+    const [labelDimensions, setLabelDimensions] = React.useState('100x60');
+    const [customWidth, setCustomWidth] = React.useState(100);
+    const [customHeight, setCustomHeight] = React.useState(60);
+    const [qrPrintSize, setQrPrintSize] = React.useState(30);
+
+    const generatedCodes = React.useMemo(() => {
+        const codes: string[] = [];
+        const start = Number(labelStartNum) || 1;
+        const qty = Number(labelQuantity) || 0;
+        const pad = Number(labelPadding) || 4;
+        for (let i = 0; i < qty; i++) {
+            const num = (start + i).toString().padStart(pad, '0');
+            codes.push(`${labelPrefix}${num}`);
+        }
+        return codes;
+    }, [labelPrefix, labelStartNum, labelQuantity, labelPadding]);
+
+    const handleDownloadCSV = () => {
+        let csvContent = "data:text/csv;charset=utf-8,Codigo,Texto\n";
+        generatedCodes.forEach(code => {
+            csvContent += `"${code}","${code}"\n`;
+        });
+
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        
+        const cleanPrefix = labelPrefix.replace(/[^a-zA-Z0-9]/g, '');
+        link.setAttribute("download", `etiquetas_qr_${cleanPrefix}_x${generatedCodes.length}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        toast({
+            title: "CSV Descargado",
+            description: `Se han exportado ${generatedCodes.length} códigos para BarTender.`
+        });
+    };
+
+    const handlePrintLabels = () => {
+        window.print();
+    };
 
     const handleConfirmStorage = async (data: { chamberId: string; coordinate: string; totalQuantity: number }) => {
         // Logic removed as client doesn't manage physical storage
@@ -197,6 +309,67 @@ export default function FallCreekPage() {
         };
 
     }, [fallCreekClient, allReceptions, allMovements, editingMovement]);
+
+    const getCoordVariety = (cId: string, coordinate: string) => {
+        const items = storedItemsByChamber[cId]?.[coordinate] || [];
+        if (items.length === 0) return null;
+        return items[0].varietyOrProduct || null;
+    };
+
+    const renderVarietyBorders = (cId: string, colIdx: number, rowIdx: number, config: any) => {
+        const currentVariety = getCoordVariety(cId, `${config.columns[colIdx].name}${config.rows[rowIdx]}`);
+        if (!currentVariety) return null;
+
+        let showRight = false;
+        let showLeft = false;
+        let showBottom = false;
+        let showTop = false;
+
+        // Right neighbor
+        if (colIdx < config.columns.length - 1) {
+            const rightCoord = `${config.columns[colIdx + 1].name}${config.rows[rowIdx]}`;
+            const rightVariety = getCoordVariety(cId, rightCoord);
+            if (rightVariety && rightVariety !== currentVariety) {
+                showRight = true;
+            }
+        }
+
+        // Left neighbor
+        if (colIdx > 0) {
+            const leftCoord = `${config.columns[colIdx - 1].name}${config.rows[rowIdx]}`;
+            const leftVariety = getCoordVariety(cId, leftCoord);
+            if (leftVariety && leftVariety !== currentVariety) {
+                showLeft = true;
+            }
+        }
+
+        // Bottom neighbor
+        if (rowIdx < config.rows.length - 1) {
+            const bottomCoord = `${config.columns[colIdx].name}${config.rows[rowIdx + 1]}`;
+            const bottomVariety = getCoordVariety(cId, bottomCoord);
+            if (bottomVariety && bottomVariety !== currentVariety) {
+                showBottom = true;
+            }
+        }
+
+        // Top neighbor
+        if (rowIdx > 0) {
+            const topCoord = `${config.columns[colIdx].name}${config.rows[rowIdx - 1]}`;
+            const topVariety = getCoordVariety(cId, topCoord);
+            if (topVariety && topVariety !== currentVariety) {
+                showTop = true;
+            }
+        }
+
+        return (
+            <>
+                {showRight && <div className="absolute right-0 top-0 bottom-0 w-[4px] bg-[#ef4444] z-30 pointer-events-none" />}
+                {showLeft && <div className="absolute left-0 top-0 bottom-0 w-[4px] bg-[#ef4444] z-30 pointer-events-none" />}
+                {showBottom && <div className="absolute bottom-0 left-0 right-0 h-[4px] bg-[#ef4444] z-30 pointer-events-none" />}
+                {showTop && <div className="absolute top-0 left-0 right-0 h-[4px] bg-[#ef4444] z-30 pointer-events-none" />}
+            </>
+        );
+    };
 
     React.useEffect(() => {
         const handleGlobalMouseUp = () => {
@@ -522,6 +695,23 @@ export default function FallCreekPage() {
             toast({ variant: 'destructive', title: 'Error', description: 'No se pudo eliminar la solicitud.' });
         }
     };
+
+    const handleDeleteManifest = async (receptionToDelete: OtherFruitReception) => {
+        if (!firestore) return;
+        
+        const confirmDelete = window.confirm(
+            `¿Está seguro de que desea eliminar el manifiesto (Pallet Log) "${receptionToDelete.document}"?`
+        );
+        if (!confirmDelete) return;
+
+        try {
+            await deleteDoc(doc(firestore, 'otherFruitReceptions', receptionToDelete.id!));
+            toast({ title: 'Éxito', description: 'El manifiesto (Pallet Log) ha sido eliminado.' });
+        } catch (e) {
+            console.error("Error deleting manifest", e);
+            toast({ variant: 'destructive', title: 'Error', description: 'No se pudo eliminar el manifiesto.' });
+        }
+    };
     
     const selectedSummary = React.useMemo(() => {
         const items = Object.values(selectedCoords).flat();
@@ -606,6 +796,10 @@ export default function FallCreekPage() {
                             <History className="mr-2 h-4 w-4" />
                             Historial
                         </TabsTrigger>
+                        <TabsTrigger value="labels" className="data-[state=active]:bg-[#004b8d] data-[state=active]:text-white">
+                            <QrCode className="mr-2 h-4 w-4" />
+                            Generar Etiquetas
+                        </TabsTrigger>
                     </TabsList>
                 </div>
 
@@ -657,32 +851,48 @@ export default function FallCreekPage() {
                         </div>
                     </CardHeader>
                     <CardContent className="space-y-6">
-                        {/* Bins por Ubicar section removed */}
-
                         <Accordion type="multiple" onValueChange={setOpenAccordions} defaultValue={chambersWithFallCreekStock}>
-                            {Object.keys(chambersConfig).map(chamberId => {
-                                const config = chambersConfig[chamberId];
-                                const occupancy = chamberOccupancy[chamberId];
-                                return (
-                                    <AccordionItem value={chamberId} key={chamberId} className="border rounded-lg mb-2 px-4">
-                                        <AccordionTrigger className="hover:no-underline py-4">
+                            {Object.keys(chambersConfig)
+                                .filter(id => id !== 'CAMARA-1' && id !== 'CAMARA-6')
+                                .map(chamberId => {
+                                    const config = chambersConfig[chamberId];
+                                    const occupancy = chamberOccupancy[chamberId];
+                                    const isRow13Enabled = !!chamberSettings?.find(s => s.id === chamberId)?.row13Enabled;
+                                    const activeRows = isRow13Enabled ? config.rows : config.rows.filter(r => r !== 13);
+                                    return (
+                                        <AccordionItem value={chamberId} key={chamberId} className="border rounded-lg mb-2 px-4">
                                             <div className="flex w-full items-center justify-between pr-4">
-                                                <span className="text-lg font-bold text-[#004b8d]">{config.name}</span>
-                                                <div className="text-right">
-                                                    <Badge variant="secondary" className="font-mono text-sm px-3 py-1 bg-muted">
-                                                        {occupancy?.occupied ?? 0} {fallCreekClient.unit} Almacenados
-                                                    </Badge>
+                                                <AccordionTrigger className="hover:no-underline py-4 flex-1">
+                                                    <span className="text-lg font-bold text-[#004b8d]">{config.name}</span>
+                                                </AccordionTrigger>
+                                                <div className="flex items-center gap-4 py-2 sm:py-0 z-10">
+                                                    <ChamberTemperatureInput chamberId={chamberId} />
+                                                    <div className="flex items-center gap-1.5 ml-2" onClick={(e) => e.stopPropagation()}>
+                                                        <Switch
+                                                            id={`row13-fc-${chamberId}`}
+                                                            checked={isRow13Enabled}
+                                                            onCheckedChange={async (checked) => {
+                                                                await setDoc(doc(firestore, 'chamberSettings', chamberId), { row13Enabled: checked }, { merge: true });
+                                                            }}
+                                                            className="scale-75 data-[state=checked]:bg-amber-500"
+                                                        />
+                                                        <label htmlFor={`row13-fc-${chamberId}`} className="text-[10px] font-black uppercase tracking-wider text-muted-foreground cursor-pointer select-none">Fila 13</label>
+                                                    </div>
+                                                    <div className="text-right">
+                                                        <Badge variant="secondary" className="font-mono text-sm px-3 py-1 bg-muted">
+                                                            {occupancy?.occupied ?? 0} {fallCreekClient.unit} Almacenados
+                                                        </Badge>
+                                                    </div>
                                                 </div>
                                             </div>
-                                        </AccordionTrigger>
-                                        <AccordionContent>
+                                            <AccordionContent>
                                             <div className="p-4 bg-muted/30 rounded-lg border overflow-x-auto" onMouseDown={(e) => e.preventDefault()}>
                                                 <div className="grid gap-1 min-w-[800px]" style={{ 
-                                                    gridTemplateRows: `repeat(${config.rows.length}, minmax(0, 1fr))`,
+                                                    gridTemplateRows: `repeat(${activeRows.length}, minmax(0, 1fr))`,
                                                     gridAutoFlow: 'column'
                                                 }}>
-                                                    {config.columns.map(col =>
-                                                        config.rows.map(row => {
+                                                    {config.columns.map((col, colIdx) =>
+                                                        activeRows.map((row, rowIdx) => {
                                                             const coord = `${col.name}${row}`;
                                                             const itemsInCoord = storedItemsByChamber[chamberId]?.[coord] || [];
                                                             const isOccupied = itemsInCoord.length > 0;
@@ -745,6 +955,7 @@ export default function FallCreekPage() {
                                                                         isOccupied && !isMixed && "bg-[var(--lot-color-bg)] border-[var(--lot-color)]",
                                                                         isOccupied && isMixed && "border-[var(--lot-color)]",
                                                                         !isOccupied && "bg-background border-dashed",
+                                                                        row === 13 && "border-amber-500/40",
                                                                         selectionMode && isOccupied && !isReserved && "cursor-pointer hover:ring-2 hover:ring-primary",
                                                                         isReserved && "cursor-not-allowed",
                                                                         isSelected && "ring-4 ring-[#7aba28] ring-offset-2 z-10"
@@ -752,6 +963,9 @@ export default function FallCreekPage() {
                                                                     style={cellStyle}
                                                                 >
                                                                     <span className={cn("relative z-10 font-bold", isReserved && "opacity-40")}>{coord}</span>
+                                                                    {row === 13 && (
+                                                                        <div className="absolute inset-0 bg-repeat bg-[length:12px_12px] opacity-25 z-0 pointer-events-none" style={{backgroundImage: "repeating-linear-gradient(-45deg, #f59e0b, #f59e0b 1px, transparent 1px, transparent 6px)"}} />
+                                                                    )}
                                                                     {isOccupied && itemsInCoord.some(i => i.isMixedVariety) && (
                                                                         <div className="absolute top-0 right-0 p-0.5">
                                                                             <div className="h-2 w-2 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.8)]" />
@@ -762,7 +976,13 @@ export default function FallCreekPage() {
                                                                             ⚠
                                                                         </div>
                                                                     )}
+                                                                    {row === 13 && (
+                                                                        <div className="absolute bottom-0.5 right-1 z-20 bg-amber-500 text-white rounded px-0.5 text-[8px] font-black leading-none shadow-[0_0_2px_rgba(0,0,0,0.5)]">
+                                                                            SOS
+                                                                        </div>
+                                                                    )}
                                                                     {isSelected && <div className="absolute inset-0 bg-[#7aba28]/40 flex items-center justify-center"><CheckCircle2 className="h-6 w-6 text-white" /></div>}
+                                                                    {renderVarietyBorders(chamberId, colIdx, rowIdx, config)}
                                                                     {isReserved && (
                                                                         <div className="absolute inset-0 bg-destructive/10">
                                                                            <div className="absolute inset-0 bg-repeat bg-[length:10px_10px]" style={{backgroundImage: "repeating-linear-gradient(-45deg, hsl(var(--destructive)/0.2), hsl(var(--destructive)/0.2) 1px, transparent 1px, transparent 5px)"}} />
@@ -829,9 +1049,17 @@ export default function FallCreekPage() {
                                                                 {reception.status}
                                                             </Badge>
                                                         </TableCell>
-                                                        <TableCell className="text-right">
+                                                        <TableCell className="text-right flex items-center justify-end gap-1">
                                                             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setReceptionToView(reception)}>
                                                                 <Eye className="h-4 w-4" />
+                                                            </Button>
+                                                            <Button 
+                                                                variant="ghost" 
+                                                                size="icon" 
+                                                                className="h-8 w-8 text-destructive hover:bg-destructive/10 hover:text-destructive" 
+                                                                onClick={() => handleDeleteManifest(reception)}
+                                                            >
+                                                                <Trash2 className="h-4 w-4" />
                                                             </Button>
                                                         </TableCell>
                                                     </TableRow>
@@ -898,6 +1126,197 @@ export default function FallCreekPage() {
                             </Card>
                         </TabsContent>
                     </Tabs>
+                </TabsContent>
+
+                <TabsContent value="labels" className="space-y-6">
+                    <Card className="border-t-4 border-t-[#004b8d]">
+                        <CardHeader>
+                            <CardTitle className="text-xl text-[#004b8d] flex items-center gap-2">
+                                <QrCode className="h-5 w-5" />
+                                Generador Masivo de Etiquetas QR
+                            </CardTitle>
+                            <CardDescription>
+                                Configure la numeración secuencial de los Bins para generar los códigos de barra correspondientes.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-6">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-6 gap-4 p-4 bg-muted/30 rounded-lg border">
+                                <div className="space-y-1">
+                                    <Label htmlFor="label-prefix">Prefijo</Label>
+                                    <Input 
+                                        id="label-prefix" 
+                                        value={labelPrefix} 
+                                        onChange={e => setLabelPrefix(e.target.value)} 
+                                        placeholder="Ej: BIN-FC-" 
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label htmlFor="label-start">N° Inicial</Label>
+                                    <Input 
+                                        id="label-start" 
+                                        type="number" 
+                                        value={labelStartNum} 
+                                        onChange={e => setLabelStartNum(parseInt(e.target.value) || 1)} 
+                                        min="1" 
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label htmlFor="label-qty">Cantidad</Label>
+                                    <Input 
+                                        id="label-qty" 
+                                        type="number" 
+                                        value={labelQuantity} 
+                                        onChange={e => setLabelQuantity(parseInt(e.target.value) || 0)} 
+                                        min="1" 
+                                        max="500" 
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label htmlFor="label-pad">Padding (Dígitos)</Label>
+                                    <Input 
+                                        id="label-pad" 
+                                        type="number" 
+                                        value={labelPadding} 
+                                        onChange={e => setLabelPadding(parseInt(e.target.value) || 1)} 
+                                        min="1" 
+                                        max="10" 
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label htmlFor="label-dim">Dimensiones</Label>
+                                    <select 
+                                        id="label-dim" 
+                                        value={labelDimensions} 
+                                        onChange={e => setLabelDimensions(e.target.value)}
+                                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                    >
+                                        <option value="60x100">PP 60x100 mm (Vertical)</option>
+                                        <option value="100x60">PP 100x60 mm (Horizontal)</option>
+                                        <option value="custom">Personalizado (mm)</option>
+                                    </select>
+                                </div>
+                                <div className="space-y-1">
+                                    <Label htmlFor="qr-size">Tamaño QR (mm)</Label>
+                                    <Input 
+                                        id="qr-size" 
+                                        type="number" 
+                                        value={qrPrintSize} 
+                                        onChange={e => setQrPrintSize(parseInt(e.target.value) || 30)} 
+                                        min="10" 
+                                        max="150" 
+                                    />
+                                </div>
+                                {labelDimensions === 'custom' && (
+                                    <div className="grid grid-cols-2 gap-2 md:col-span-6 pt-2">
+                                        <div className="space-y-1">
+                                            <Label htmlFor="custom-w">Ancho (mm)</Label>
+                                            <Input 
+                                                id="custom-w" 
+                                                type="number" 
+                                                value={customWidth} 
+                                                onChange={e => setCustomWidth(parseInt(e.target.value) || 100)} 
+                                            />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <Label htmlFor="custom-h">Alto (mm)</Label>
+                                            <Input 
+                                                id="custom-h" 
+                                                type="number" 
+                                                value={customHeight} 
+                                                onChange={e => setCustomHeight(parseInt(e.target.value) || 60)} 
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="flex flex-wrap justify-end gap-3">
+                                <Button 
+                                    onClick={handleDownloadCSV} 
+                                    variant="outline" 
+                                    className="border-[#7aba28] text-[#7aba28] hover:bg-[#7aba28]/10 font-medium"
+                                >
+                                    <Download className="mr-2 h-4 w-4" />
+                                    Descargar CSV para BarTender
+                                </Button>
+                                <Button 
+                                    onClick={handlePrintLabels} 
+                                    className="bg-[#004b8d] hover:bg-[#003b70] text-white font-semibold"
+                                >
+                                    <Printer className="mr-2 h-4 w-4" />
+                                    Imprimir Etiquetas (Solo QR)
+                                </Button>
+                            </div>
+
+                            <div className="space-y-3">
+                                <div className="flex justify-between items-center border-b pb-2">
+                                    <h3 className="font-semibold text-slate-700">Vista Previa de Códigos</h3>
+                                    <Badge variant="secondary" className="bg-[#004b8d]/10 text-[#004b8d] font-mono">
+                                        {generatedCodes.length} etiquetas
+                                    </Badge>
+                                </div>
+                                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-6 gap-3 max-h-[300px] overflow-y-auto p-2 bg-slate-50 border rounded-md">
+                                    {generatedCodes.map((code) => (
+                                        <QRLabelItem key={code} code={code} />
+                                    ))}
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    {/* Print area container with isolated stylesheets dynamically applied on printing */}
+                    <div className="hidden print:block" style={{
+                        ['--page-width' as any]: labelDimensions === '60x100' ? '60mm' : labelDimensions === '100x60' ? '100mm' : `${customWidth}mm`,
+                        ['--page-height' as any]: labelDimensions === '60x100' ? '100mm' : labelDimensions === '100x60' ? '60mm' : `${customHeight}mm`,
+                        ['--qr-size' as any]: `${qrPrintSize}mm`,
+                    }}>
+                        <style dangerouslySetInnerHTML={{ __html: `
+                            @media print {
+                                body * {
+                                    visibility: hidden !important;
+                                }
+                                #react-print-area, #react-print-area * {
+                                    visibility: visible !important;
+                                }
+                                #react-print-area {
+                                    position: absolute !important;
+                                    left: 0 !important;
+                                    top: 0 !important;
+                                    width: 100% !important;
+                                    margin: 0 !important;
+                                    padding: 0 !important;
+                                }
+                                @page {
+                                    size: var(--page-width, 100mm) var(--page-height, 60mm);
+                                    margin: 0 !important;
+                                }
+                                .print-label {
+                                    width: var(--page-width, 100mm) !important;
+                                    height: var(--page-height, 60mm) !important;
+                                    display: flex !important;
+                                    align-items: center !important;
+                                    justify-content: center !important;
+                                    page-break-after: always !important;
+                                    page-break-inside: avoid !important;
+                                    box-sizing: border-box !important;
+                                    margin: 0 !important;
+                                    padding: 0 !important;
+                                    background: white !important;
+                                }
+                                .print-label canvas {
+                                    width: var(--qr-size, 30mm) !important;
+                                    height: var(--qr-size, 30mm) !important;
+                                    display: block !important;
+                                    margin: auto !important;
+                                }
+                            }
+                        `}} />
+                        <div id="react-print-area">
+                            {generatedCodes.map((code) => (
+                                <PrintableQRLabel key={code} code={code} />
+                            ))}
+                        </div>
+                    </div>
                 </TabsContent>
             </Tabs>
 

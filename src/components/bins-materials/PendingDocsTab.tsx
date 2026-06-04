@@ -27,7 +27,7 @@ export function PendingDocsTab() {
     return query(collection(firestore, 'documentosPendientes'), where('estado', '==', 'PENDIENTE'));
   }, [firestore]);
 
-  const { data: pendingDocs, loading } = useCollection<DTEGuiaDespacho>(pendingDocsQuery);
+  const { data: pendingDocs, isLoading: loading } = useCollection<DTEGuiaDespacho>(pendingDocsQuery);
   
   const handleGenerateXml = async (docToProcess: DTEGuiaDespacho) => {
     const xmlString = generateDteXml(docToProcess);

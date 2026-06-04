@@ -13,6 +13,7 @@ import type { ChamberLot, OtherFruitReception, StoredItem } from '@/lib/types';
 import { chambersConfig } from '@/lib/chambers-config';
 import { Alert, AlertDescription } from '../ui/alert';
 import { useToast } from '@/hooks/use-toast';
+import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
 import { naturalSort } from '@/lib/utils';
 import type { ClientStorageConfig, Exporter } from '@/lib/types';
 
@@ -52,6 +53,7 @@ export function RelocateLotDialog({
 }: RelocateLotDialogProps) {
   const { toast } = useToast();
   
+  const { data: chamberSettings } = useFirestoreCollection<{ id: string; row13Enabled?: boolean }>('chamberSettings');
   const totalQuantityInCoord = React.useMemo(() => {
     return lotsInCoordinate.reduce((sum, item) => sum + item.quantity, 0);
   }, [lotsInCoordinate]);
@@ -74,10 +76,16 @@ export function RelocateLotDialog({
     const chamberConfig = chambersConfig[targetChamberId];
     if (!chamberConfig) return { availableCoordinates: [], occupancyMap: new Map() };
 
-    const allPossibleCoords = chamberConfig.columns
+    let allPossibleCoords = chamberConfig.columns
         .flatMap(col => chamberConfig.rows.map(row => `${col.name}${row}`))
         .filter(coord => !chamberConfig.blocked?.includes(coord))
         .sort(naturalSort);
+
+    const isChamberRow13Enabled = !!chamberSettings?.find(s => s.id === targetChamberId)?.row13Enabled;
+    if (isChamberRow13Enabled) {
+      const row13Coords = chamberConfig.columns.map(col => `${col.name}13`);
+      allPossibleCoords = [...allPossibleCoords, ...row13Coords].sort(naturalSort);
+    }
 
     // 1. Calculate current occupancy and document set for all coordinates in target chamber
     const occupancyMap = new Map<string, { quantity: number; ownerName: string; unit: string; documents: Set<string> }>();
@@ -176,7 +184,7 @@ export function RelocateLotDialog({
         availableCoordinates: available,
         occupancyMap
     };
-  }, [targetChamberId, allChamberLots, allOtherFruitReceptions, sourceChamberId, sourceCoordinate, lotsInCoordinate, clientConfigs, exporters, watchQuantityToRelocate, totalQuantityInCoord]);
+  }, [targetChamberId, allChamberLots, allOtherFruitReceptions, sourceChamberId, sourceCoordinate, lotsInCoordinate, clientConfigs, exporters, watchQuantityToRelocate, totalQuantityInCoord, chamberSettings]);
 
   React.useEffect(() => {
     if (open) {

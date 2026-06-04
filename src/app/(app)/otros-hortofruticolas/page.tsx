@@ -78,7 +78,7 @@ export default function OtrosHortofruticolasPage() {
                         {visibleTabs.map(tab => (
                             <TabsTrigger key={tab.value} value={tab.value} className="flex items-center gap-2">
                             {tab.label}
-                            {tab.badge > 0 && (
+                            {tab.badge !== undefined && tab.badge > 0 && (
                                 <Badge className="h-5 w-5 p-0 flex items-center justify-center">{tab.badge}</Badge>
                             )}
                             </TabsTrigger>

@@ -54,6 +54,7 @@ export default function TemperatureLogReportPage() {
             { key: 'timestamp', label: 'Fecha y Hora' },
             { key: 'chamberName', label: 'Cámara' },
             { key: 'temperature', label: 'Temperatura (°C)' },
+            { key: 'humidity', label: 'Humedad (%)' },
             { key: 'userName', label: 'Usuario' }
         ];
 
@@ -84,23 +85,25 @@ export default function TemperatureLogReportPage() {
                                     <TableHead>Fecha y Hora</TableHead>
                                     <TableHead>Cámara</TableHead>
                                     <TableHead>Temperatura</TableHead>
+                                    <TableHead>Humedad</TableHead>
                                     <TableHead>Usuario</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
                                 {loading ? (
-                                    Array.from({ length: 10 }).map((_, i) => <TableRow key={i}><TableCell colSpan={4}><Skeleton className="h-4 w-full" /></TableCell></TableRow>)
+                                    Array.from({ length: 10 }).map((_, i) => <TableRow key={i}><TableCell colSpan={5}><Skeleton className="h-4 w-full" /></TableCell></TableRow>)
                                 ) : sortedData && sortedData.length > 0 ? (
                                     sortedData.map(temp => (
                                         <TableRow key={temp.id}>
                                             <TableCell>{temp.timestamp?.toDate().toLocaleString('es-CL')}</TableCell>
                                             <TableCell>{chambersConfig[temp.chamberId]?.name || temp.chamberId}</TableCell>
                                             <TableCell>{temp.temperature.toFixed(1)} °C</TableCell>
+                                            <TableCell>{temp.humidity !== undefined ? `${temp.humidity}%` : '-'}</TableCell>
                                             <TableCell>{temp.userName || (temp.userId ? 'Usuario Desconocido' : 'N/A')}</TableCell>
                                         </TableRow>
                                     ))
                                 ) : (
-                                    <TableRow><TableCell colSpan={4} className="h-24 text-center">No hay temperaturas registradas.</TableCell></TableRow>
+                                    <TableRow><TableCell colSpan={5} className="h-24 text-center">No hay temperaturas registradas.</TableCell></TableRow>
                                 )}
                             </TableBody>
                         </Table>

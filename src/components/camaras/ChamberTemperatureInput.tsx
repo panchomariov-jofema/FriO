@@ -7,7 +7,7 @@ import { z } from 'zod';
 import { Input } from '@/components/ui/input';
 import { buttonVariants } from '@/components/ui/button';
 import { Form, FormControl, FormField, FormItem, FormMessage } from '@/components/ui/form';
-import { Thermometer, Save } from 'lucide-react';
+import { Thermometer, Save, Droplets } from 'lucide-react';
 import { useFirestore, useUser } from '@/firebase';
 import { collection, addDoc, serverTimestamp, query, onSnapshot, where } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
@@ -20,6 +20,9 @@ import { Button } from '../ui/button';
 
 const tempSchema = z.object({
   temperature: z.coerce.number({ invalid_type_error: 'Inválido' }),
+  humidity: z.coerce.number({ invalid_type_error: 'Inválido' })
+    .min(0, 'Mínimo 0%')
+    .max(100, 'Máximo 100%'),
 });
 
 type TempFormValues = z.infer<typeof tempSchema>;
@@ -39,6 +42,7 @@ export function ChamberTemperatureInput({ chamberId }: ChamberTemperatureInputPr
     resolver: zodResolver(tempSchema),
     defaultValues: {
         temperature: undefined,
+        humidity: undefined,
     }
   });
   
@@ -60,7 +64,7 @@ export function ChamberTemperatureInput({ chamberId }: ChamberTemperatureInputPr
     },
     (error) => {
         console.error(`Error fetching temperature for ${chamberId}:`, error);
-        toast({ variant: 'destructive', title: 'Error de Temperatura', description: 'No se pudo cargar la última temperatura.'});
+        toast({ variant: 'destructive', title: 'Error de Temperatura', description: 'No se pudo cargar la última temperatura y humedad.'});
     });
     return () => unsubscribe();
   }, [firestore, chamberId, toast]);
@@ -72,6 +76,7 @@ export function ChamberTemperatureInput({ chamberId }: ChamberTemperatureInputPr
     const tempData = {
       chamberId,
       temperature: values.temperature,
+      humidity: values.humidity,
       timestamp: serverTimestamp(),
       userId: user?.uid,
       userName: user?.email || (user?.isAnonymous ? 'Anónimo' : user?.displayName),
@@ -79,11 +84,11 @@ export function ChamberTemperatureInput({ chamberId }: ChamberTemperatureInputPr
 
     try {
       await addDoc(collection(firestore, 'chamberTemperatures'), tempData);
-      toast({ title: 'Éxito', description: `Temperatura para ${chamberId} guardada.` });
+      toast({ title: 'Éxito', description: `Temperatura y humedad para ${chamberId} guardadas.` });
       setPopoverOpen(false);
     } catch (error) {
-      console.error('Error saving temperature:', error);
-      toast({ variant: 'destructive', title: 'Error', description: 'No se pudo guardar la temperatura.' });
+      console.error('Error saving temperature/humidity:', error);
+      toast({ variant: 'destructive', title: 'Error', description: 'No se pudo guardar la temperatura y humedad.' });
       errorEmitter.emit('permission-error', new FirestorePermissionError({
         path: 'chamberTemperatures',
         operation: 'create',
@@ -94,7 +99,7 @@ export function ChamberTemperatureInput({ chamberId }: ChamberTemperatureInputPr
   
   React.useEffect(() => {
     if (!isPopoverOpen) {
-      form.reset({ temperature: undefined });
+      form.reset({ temperature: undefined, humidity: undefined });
     }
   }, [isPopoverOpen, form]);
 
@@ -106,37 +111,65 @@ export function ChamberTemperatureInput({ chamberId }: ChamberTemperatureInputPr
           onClick={(e) => { e.stopPropagation(); setPopoverOpen(true); }}
           className={cn(
             buttonVariants({ variant: 'ghost', size: 'sm' }),
-            'flex items-center gap-2 text-muted-foreground'
+            'flex items-center gap-4 text-muted-foreground'
           )}
         >
-          <Thermometer className="h-4 w-4" />
-          <span className="font-mono text-sm">{latestTemp ? `${latestTemp.temperature.toFixed(1)}°C` : '--.- °C'}</span>
+          <div className="flex items-center gap-1">
+            <Thermometer className="h-4 w-4 text-blue-500" />
+            <span className="font-mono text-sm">{latestTemp ? `${latestTemp.temperature.toFixed(1)}°C` : '--.- °C'}</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <Droplets className="h-4 w-4 text-sky-500" />
+            <span className="font-mono text-sm">{latestTemp && latestTemp.humidity !== undefined ? `${latestTemp.humidity}% HR` : '--% HR'}</span>
+          </div>
         </div>
       </PopoverTrigger>
-      <PopoverContent className="w-48 p-2" onClick={(e) => e.stopPropagation()}>
+      <PopoverContent className="w-56 p-3" onClick={(e) => e.stopPropagation()}>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="flex items-center gap-2">
-            <FormField
-              control={form.control}
-              name="temperature"
-              render={({ field }) => (
-                <FormItem className="flex-1">
-                  <FormControl>
-                    <Input
-                      type="number"
-                      step="0.1"
-                      placeholder="Temp °C"
-                      className="h-8"
-                      {...field}
-                      value={field.value ?? ''}
-                    />
-                  </FormControl>
-                  <FormMessage className="text-xs" />
-                </FormItem>
-              )}
-            />
-            <Button type="submit" size="icon" className="h-8 w-8">
-              <Save className="h-4 w-4" />
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-3">
+            <div className="grid grid-cols-2 gap-2">
+              <FormField
+                control={form.control}
+                name="temperature"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        step="0.1"
+                        placeholder="Temp °C"
+                        className="h-8"
+                        {...field}
+                        value={field.value ?? ''}
+                      />
+                    </FormControl>
+                    <FormMessage className="text-xs" />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="humidity"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        step="1"
+                        placeholder="Humedad %"
+                        className="h-8"
+                        {...field}
+                        value={field.value ?? ''}
+                      />
+                    </FormControl>
+                    <FormMessage className="text-xs" />
+                  </FormItem>
+                )}
+              />
+            </div>
+            <Button type="submit" size="sm" className="w-full h-8">
+              <Save className="h-4 w-4 mr-2" />
+              Guardar Registro
             </Button>
           </form>
         </Form>

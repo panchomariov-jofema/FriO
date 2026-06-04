@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/button';
 import { OtherFruitReception, ChamberLot, OtherFruitReceptionItem, Chamber, ClientStorageConfig } from '@/lib/types';
 import { chambersConfig } from '@/lib/chambers-config';
 import { useToast } from '@/hooks/use-toast';
+import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
 import { getSortedCoordinates, getPairedCoordinates } from '@/lib/utils';
 import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
 import { Zap } from 'lucide-react';
@@ -31,7 +32,7 @@ interface StoreOtherFruitDialogProps {
   item: PendingItem | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onConfirm: (data: { chamberId: string; coordinate: string; totalQuantity: number; quantityPerLocation: number; strategy: 'secuencial' | 'pareado' | 'aisle-access' | 'inverted-secuencial' | 'horizontal-secuencial' | 'fifo' | 'serpentina-vertical' | 'modelo-sof' }) => void;
+  onConfirm: (data: { chamberId: string; coordinate: string; totalQuantity: number; quantityPerLocation: number; strategy: 'secuencial' | 'pareado' | 'aisle-access' | 'inverted-secuencial' | 'horizontal-secuencial' | 'fifo' | 'serpentina-vertical' | 'modelo-sof' | 'fifo-vertical' }) => void;
   allReceptions: OtherFruitReception[];
   allChamberLots: ChamberLot[];
   clientConfig?: ClientStorageConfig;
@@ -47,7 +48,7 @@ const storeSchema = z.object({
   coordinate: z.string({ required_error: 'Debe seleccionar una coordenada de inicio.' }).min(1, 'Debe seleccionar una coordenada de inicio.'),
   totalQuantity: z.coerce.number().positive('La cantidad total debe ser mayor a 0.'),
   quantityPerLocation: z.coerce.number().positive('La cantidad por ubicación debe ser mayor a 0.'),
-  strategy: z.enum(['secuencial', 'pareado', 'aisle-access', 'inverted-secuencial', 'horizontal-secuencial', 'fifo', 'serpentina-vertical', 'modelo-sof']).default('secuencial'),
+  strategy: z.enum(['secuencial', 'pareado', 'aisle-access', 'inverted-secuencial', 'horizontal-secuencial', 'fifo', 'serpentina-vertical', 'modelo-sof', 'fifo-vertical']).default('secuencial'),
 });
 
 type StoreFormValues = z.infer<typeof storeSchema>;
@@ -69,6 +70,7 @@ export function StoreOtherFruitDialog({
   });
   const { toast } = useToast();
 
+  const { data: chamberSettings } = useFirestoreCollection<{ id: string; row13Enabled?: boolean }>('chamberSettings');
   const selectedChamberId = form.watch('chamberId');
   const selectedCoordinate = form.watch('coordinate');
   const isSubmitDisabled = !selectedChamberId || !selectedCoordinate || selectedCoordinate === '';
@@ -146,7 +148,7 @@ export function StoreOtherFruitDialog({
         });
     });
 
-    const formStrategy = form.getValues('strategy');
+    const formStrategy = form.watch('strategy') || 'secuencial';
 
     let allPossibleCoords;
     if (formStrategy === 'pareado') {
@@ -163,6 +165,8 @@ export function StoreOtherFruitDialog({
         allPossibleCoords = getSortedCoordinates(chamberConfig, 'serpentina-vertical');
     } else if (formStrategy === 'modelo-sof') {
         allPossibleCoords = getSortedCoordinates(chamberConfig, 'modelo-sof');
+    } else if (formStrategy === 'fifo-vertical') {
+        allPossibleCoords = getSortedCoordinates(chamberConfig, 'fifo-vertical');
     } else {
       allPossibleCoords = getSortedCoordinates(chamberConfig, 'secuencial');
     }
@@ -185,7 +189,7 @@ export function StoreOtherFruitDialog({
           : (lastCoordInChamber || (isContinuingChamber && effectiveSessionCoord ? effectiveSessionCoord : null)))
       : null;
     
-    if (effectiveLastCoord) {
+    if (effectiveLastCoord && formStrategy !== 'modelo-sof' && formStrategy !== 'serpentina-vertical' && formStrategy !== 'fifo-vertical') {
         const foundIdx = allPossibleCoords.indexOf(effectiveLastCoord);
         if (foundIdx !== -1) {
             const entry = occupancyMap.get(effectiveLastCoord);
@@ -217,8 +221,7 @@ export function StoreOtherFruitDialog({
         return currentOccupancy + unitsPerItem <= occupancyThreshold;
     }) || null;
 
-    // Available are all that have ANY space left AND are compatible
-    const available = allPossibleCoords.filter(coord => {
+    let available = allPossibleCoords.filter(coord => {
         if (chamberConfig.blocked?.includes(coord)) return false;
         
         const entry = occupancyMap.get(coord);
@@ -231,10 +234,26 @@ export function StoreOtherFruitDialog({
         const currentOccupancy = entry.lots.reduce((sum, l) => sum + l.binCount, 0);
         return currentOccupancy + unitsPerItem <= occupancyThreshold;
     });
+
+    const isChamberRow13Enabled = !!chamberSettings?.find(s => s.id === selectedChamberId)?.row13Enabled;
+    if (isChamberRow13Enabled) {
+        const row13Coords = chamberConfig.columns.map(col => `${col.name}13`);
+        const availableRow13 = row13Coords.filter(coord => {
+            const entry = occupancyMap.get(coord);
+            if (!entry || entry.lots.length === 0) return true; // Empty
+
+            const hasDifferentClient = entry.lots.some(l => l.clientId !== item.clientId);
+            if (hasDifferentClient) return false;
+
+            const currentOccupancy = entry.lots.reduce((sum, l) => sum + l.binCount, 0);
+            return currentOccupancy + unitsPerItem <= occupancyThreshold;
+        });
+        available = [...available, ...availableRow13];
+    }
     
     return { availableCoordinates: available, suggestion: currentSuggestion };
 
-  }, [selectedChamberId, item, allReceptions, allChamberLots, form.watch('strategy'), capacityPerCoord, lastUsedChamberId, lastUsedCoordinate]);
+  }, [selectedChamberId, item, allReceptions, allChamberLots, form.watch('strategy'), capacityPerCoord, lastUsedChamberId, lastUsedCoordinate, chamberSettings]);
 
   useEffect(() => {
     if (open && item) {
@@ -466,6 +485,12 @@ export function StoreOtherFruitDialog({
                                         <RadioGroupItem value="modelo-sof" />
                                     </FormControl>
                                     <FormLabel className="font-normal cursor-pointer text-xs">Modelo SOF (Serpentina Continua)</FormLabel>
+                                </FormItem>
+                                <FormItem className="flex items-center space-x-2 space-y-0">
+                                    <FormControl>
+                                        <RadioGroupItem value="fifo-vertical" />
+                                    </FormControl>
+                                    <FormLabel className="font-normal cursor-pointer text-xs">FIFO Vertical</FormLabel>
                                 </FormItem>
                             </RadioGroup>
                         </FormControl>

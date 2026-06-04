@@ -11,7 +11,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { StoreInChamberDialog } from '@/components/hidrocooler/StoreInChamberDialog';
-import { collection, doc, writeBatch, getDocs, updateDoc, getDoc, serverTimestamp, query, orderBy, limit, onSnapshot, where, getCountFromServer } from 'firebase/firestore';
+import { collection, doc, setDoc, writeBatch, getDocs, updateDoc, getDoc, serverTimestamp, query, orderBy, limit, onSnapshot, where, getCountFromServer } from 'firebase/firestore';
 import { useFirestore, useCollection, useMemoFirebase, useUser } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { errorEmitter } from '@/firebase/error-emitter';
@@ -71,6 +71,7 @@ export default function CamarasPage() {
   const { data: exporters, loading: loadingExporters } = useFirestoreCollection<Exporter>('exporters');
   const { data: otherFruitReceptions, loading: loadingOtherFruit } = useFirestoreCollection<OtherFruitReception>('otherFruitReceptions');
   const { data: clientConfigs, loading: loadingConfigs } = useFirestoreCollection<ClientStorageConfig>('clientStorageConfigs');
+  const { data: chamberSettings } = useFirestoreCollection<{ id: string; row13Enabled?: boolean }>('chamberSettings');
 
   const pendingLotsQuery = useMemoFirebase(() => {
     if (!firestore) return null;
@@ -230,6 +231,66 @@ export default function CamarasPage() {
     };
   }, [pendingLots, storedLots, otherFruitReceptions, exporters]);
 
+  const getCoordVariety = (cId: string, coordinate: string) => {
+      const items = storedItemsByChamber[cId]?.[coordinate] || [];
+      if (items.length === 0) return null;
+      return items[0].varietyOrProduct || null;
+  };
+
+  const renderVarietyBorders = (cId: string, colIdx: number, rowIdx: number, config: any) => {
+      const currentVariety = getCoordVariety(cId, `${config.columns[colIdx].name}${config.rows[rowIdx]}`);
+      if (!currentVariety) return null;
+
+      let showRight = false;
+      let showLeft = false;
+      let showBottom = false;
+      let showTop = false;
+
+      // Right neighbor
+      if (colIdx < config.columns.length - 1) {
+          const rightCoord = `${config.columns[colIdx + 1].name}${config.rows[rowIdx]}`;
+          const rightVariety = getCoordVariety(cId, rightCoord);
+          if (rightVariety && rightVariety !== currentVariety) {
+              showRight = true;
+          }
+      }
+
+      // Left neighbor
+      if (colIdx > 0) {
+          const leftCoord = `${config.columns[colIdx - 1].name}${config.rows[rowIdx]}`;
+          const leftVariety = getCoordVariety(cId, leftCoord);
+          if (leftVariety && leftVariety !== currentVariety) {
+              showLeft = true;
+          }
+      }
+
+      // Bottom neighbor
+      if (rowIdx < config.rows.length - 1) {
+          const bottomCoord = `${config.columns[colIdx].name}${config.rows[rowIdx + 1]}`;
+          const bottomVariety = getCoordVariety(cId, bottomCoord);
+          if (bottomVariety && bottomVariety !== currentVariety) {
+              showBottom = true;
+          }
+      }
+
+      // Top neighbor
+      if (rowIdx > 0) {
+          const topCoord = `${config.columns[colIdx].name}${config.rows[rowIdx - 1]}`;
+          const topVariety = getCoordVariety(cId, topCoord);
+          if (topVariety && topVariety !== currentVariety) {
+              showTop = true;
+          }
+      }
+
+      return (
+          <>
+              {showRight && <div className="absolute right-0 top-0 bottom-0 w-[4px] bg-[#ef4444] z-30 pointer-events-none" />}
+              {showLeft && <div className="absolute left-0 top-0 bottom-0 w-[4px] bg-[#ef4444] z-30 pointer-events-none" />}
+              {showBottom && <div className="absolute bottom-0 left-0 right-0 h-[4px] bg-[#ef4444] z-30 pointer-events-none" />}
+              {showTop && <div className="absolute top-0 left-0 right-0 h-[4px] bg-[#ef4444] z-30 pointer-events-none" />}
+          </>
+      );
+  };
 
   const handleStoreClick = (lot: ChamberLot) => {
     setLotToStore(lot);
@@ -721,60 +782,76 @@ export default function CamarasPage() {
             </CardHeader>
             <CardContent>
             <Accordion type="single" collapsible className="w-full">
-                {Object.entries(chambersConfig).map(([chamberId, config]) => (
-                    <AccordionItem value={chamberId} key={chamberId}>
-                        <AccordionTrigger>
-                            <div className="flex flex-col sm:flex-row w-full items-start sm:items-center justify-between gap-2 sm:gap-4 pr-4 text-left">
-                                <div className="flex items-center gap-2 sm:gap-4">
+                {Object.entries(chambersConfig).map(([chamberId, config]) => {
+                    const isRow13Enabled = !!chamberSettings?.find(s => s.id === chamberId)?.row13Enabled;
+                    const activeRows = isRow13Enabled ? config.rows : config.rows.filter(r => r !== 13);
+                    return (
+                        <AccordionItem value={chamberId} key={chamberId}>
+                            <div className="flex flex-col sm:flex-row w-full items-start sm:items-center justify-between pr-4">
+                                <AccordionTrigger className="hover:no-underline py-4 flex-1">
                                     <span className="text-md sm:text-lg font-semibold">{config.name}</span>
-                                    <ChamberTemperatureInput chamberId={chamberId} />
-                                </div>
-                                <div className="text-left sm:text-right w-full sm:w-auto">
-                                    <p className={cn("font-mono font-semibold text-sm", (chamberOccupancy[chamberId]?.percentage ?? 0) > 50 ? 'text-destructive' : 'text-foreground')}>
-                                        {chamberOccupancy[chamberId]?.occupied ?? 0} / {chamberOccupancy[chamberId]?.total ?? 0} Bins Equiv.
-                                        ({(chamberOccupancy[chamberId]?.percentage ?? 0).toFixed(1)}%)
-                                    </p>
-                                    <Progress value={chamberOccupancy[chamberId]?.percentage ?? 0} className="w-full sm:w-48 h-2 mt-1" />
+                                </AccordionTrigger>
+                                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4 py-2 sm:py-0 w-full sm:w-auto z-10">
+                                    <div className="flex items-center gap-2 sm:gap-4">
+                                        <ChamberTemperatureInput chamberId={chamberId} />
+                                        <div className="flex items-center gap-1.5 ml-2">
+                                            <Switch
+                                                id={`row13-${chamberId}`}
+                                                checked={isRow13Enabled}
+                                                onCheckedChange={async (checked) => {
+                                                    await setDoc(doc(firestore, 'chamberSettings', chamberId), { row13Enabled: checked }, { merge: true });
+                                                }}
+                                                className="scale-75 data-[state=checked]:bg-amber-500"
+                                            />
+                                            <label htmlFor={`row13-${chamberId}`} className="text-[10px] font-black uppercase tracking-wider text-muted-foreground cursor-pointer select-none">Fila 13</label>
+                                        </div>
+                                    </div>
+                                    <div className="text-left sm:text-right w-full sm:w-auto">
+                                        <p className={cn("font-mono font-semibold text-sm", (chamberOccupancy[chamberId]?.percentage ?? 0) > 50 ? 'text-destructive' : 'text-foreground')}>
+                                            {chamberOccupancy[chamberId]?.occupied ?? 0} / {chamberOccupancy[chamberId]?.total ?? 0} Bins Equiv.
+                                            ({(chamberOccupancy[chamberId]?.percentage ?? 0).toFixed(1)}%)
+                                        </p>
+                                        <Progress value={chamberOccupancy[chamberId]?.percentage ?? 0} className="w-full sm:w-48 h-2 mt-1" />
+                                    </div>
                                 </div>
                             </div>
-                        </AccordionTrigger>
-                        <AccordionContent>
-                            <div className="p-2 sm:p-4 bg-muted/50 rounded-b-lg border border-t-0">
-                                {isAdmin && (
-                                    <div className="flex justify-end mb-4">
-                                        <AlertDialog>
-                                            <AlertDialogTrigger asChild>
-                                                <Button variant="destructive" size="sm">
-                                                    <Trash2 className="mr-2 h-4 w-4" />
-                                                    Limpiar Stock Cámara
-                                                </Button>
-                                            </AlertDialogTrigger>
-                                            <AlertDialogContent>
-                                                <AlertDialogHeader>
-                                                    <AlertDialogTitle>¿Está seguro de limpiar el stock de la {config.name}?</AlertDialogTitle>
-                                                    <AlertDialogDescription>
-                                                    Esta acción eliminará permanentemente todos los lotes almacenados en esta cámara (productores y clientes). Esta acción no se puede deshacer.
-                                                    </AlertDialogDescription>
-                                                </AlertDialogHeader>
-                                                <AlertDialogFooter>
-                                                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                                    <AlertDialogAction onClick={() => handleClearChamberStock(chamberId)} className="bg-destructive hover:bg-destructive/90">
-                                                    Sí, Limpiar Cámara
-                                                    </AlertDialogAction>
-                                                </AlertDialogFooter>
-                                            </AlertDialogContent>
-                                        </AlertDialog>
-                                    </div>
-                                )}
-                                <div className="overflow-x-auto">
-                                    <div className="grid gap-1" style={{ 
-                                        gridTemplateRows: `repeat(${config.rows.length}, minmax(0, 1fr))`,
-                                        gridAutoFlow: 'column'
-                                    }}>
-                                        {config.columns.map(col =>
-                                            config.rows.map(row => {
-                                          const coord = `${col.name}${row}`;
-                                          const itemsInCoord = storedItemsByChamber[chamberId]?.[coord] || [];
+                            <AccordionContent>
+                                <div className="p-2 sm:p-4 bg-muted/50 rounded-b-lg border border-t-0">
+                                    {isAdmin && (
+                                        <div className="flex justify-end mb-4">
+                                            <AlertDialog>
+                                                <AlertDialogTrigger asChild>
+                                                    <Button variant="destructive" size="sm">
+                                                        <Trash2 className="mr-2 h-4 w-4" />
+                                                        Limpiar Stock Cámara
+                                                    </Button>
+                                                </AlertDialogTrigger>
+                                                <AlertDialogContent>
+                                                    <AlertDialogHeader>
+                                                        <AlertDialogTitle>¿Está seguro de limpiar el stock de la {config.name}?</AlertDialogTitle>
+                                                        <AlertDialogDescription>
+                                                        Esta acción eliminará permanentemente todos los lotes almacenados en esta cámara (productores y clientes). Esta acción no se puede deshacer.
+                                                        </AlertDialogDescription>
+                                                    </AlertDialogHeader>
+                                                    <AlertDialogFooter>
+                                                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                                        <AlertDialogAction onClick={() => handleClearChamberStock(chamberId)} className="bg-destructive hover:bg-destructive/90">
+                                                        Sí, Limpiar Cámara
+                                                        </AlertDialogAction>
+                                                    </AlertDialogFooter>
+                                                </AlertDialogContent>
+                                            </AlertDialog>
+                                        </div>
+                                    )}
+                                    <div className="overflow-x-auto">
+                                        <div className="grid gap-1" style={{ 
+                                            gridTemplateRows: `repeat(${activeRows.length}, minmax(0, 1fr))`,
+                                            gridAutoFlow: 'column'
+                                        }}>
+                                            {config.columns.map((col, colIdx) =>
+                                                activeRows.map((row, rowIdx) => {
+                                            const coord = `${col.name}${row}`;
+                                            const itemsInCoord = storedItemsByChamber[chamberId]?.[coord] || [];
                                           const isOccupied = itemsInCoord.length > 0;
                                         
                                           const totalBins = itemsInCoord.filter(i => i.unit === 'Bins').reduce((s, i) => s + i.quantity, 0);
@@ -855,15 +932,25 @@ export default function CamarasPage() {
                                               <PopoverTrigger asChild>
                                                   <div 
                                                   className={cn("h-12 w-full min-w-[60px] rounded border-2 flex items-center justify-center text-xs font-mono relative overflow-hidden cursor-pointer",
-                                                      isOccupied ? 'border-[var(--lot-color-border)] bg-[var(--lot-color-bg)]' : 'bg-background border-dashed'
+                                                      isOccupied ? 'border-[var(--lot-color-border)] bg-[var(--lot-color-bg)]' : 'bg-background border-dashed',
+                                                      row === 13 && "border-amber-500/40"
                                                   )}
                                                   style={cellStyle}
                                                   >
                                                   <div className="absolute bottom-0 left-0 top-0 transition-all duration-300" style={progressStyle} />
+                                                  {row === 13 && (
+                                                      <div className="absolute inset-0 bg-repeat bg-[length:12px_12px] opacity-25 z-0 pointer-events-none" style={{backgroundImage: "repeating-linear-gradient(-45deg, #f59e0b, #f59e0b 1px, transparent 1px, transparent 6px)"}} />
+                                                  )}
+                                                  {renderVarietyBorders(chamberId, colIdx, rowIdx, config)}
                                                   <span className="relative z-10 font-semibold">{coord}</span>
                                                   {isMixed && (
                                                       <div className="absolute top-0.5 right-1 z-20 bg-black/60 rounded px-0.5 text-[8px] font-black text-amber-500 leading-none shadow-[0_0_2px_rgba(0,0,0,0.5)]">
                                                           ⚠
+                                                      </div>
+                                                  )}
+                                                  {row === 13 && (
+                                                      <div className="absolute top-0.5 left-1 z-20 bg-amber-500 text-white rounded px-0.5 text-[8px] font-black leading-none shadow-[0_0_2px_rgba(0,0,0,0.5)]">
+                                                          SOS
                                                       </div>
                                                   )}
                                                   </div>
@@ -930,8 +1017,9 @@ export default function CamarasPage() {
                             </div>
                         </AccordionContent>
                     </AccordionItem>
-                ))}
-            </Accordion>
+                );
+            })}
+        </Accordion>
             </CardContent>
         </Card>
       )}

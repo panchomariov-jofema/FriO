@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import type { ChamberLot, OtherFruitReception } from '@/lib/types';
 import { chambersConfig } from '@/lib/chambers-config';
 import { useToast } from '@/hooks/use-toast';
+import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
 import { naturalSort } from '@/lib/utils';
 import type { ClientStorageConfig } from '@/lib/types';
 
@@ -56,6 +57,7 @@ export function RelocateOtherFruitDialog({
   clientConfigs,
 }: RelocateOtherFruitDialogProps) {
   const { toast } = useToast();
+  const { data: chamberSettings } = useFirestoreCollection<{ id: string; row13Enabled?: boolean }>('chamberSettings');
   const form = useForm<RelocateFormValues>({
     resolver: zodResolver(relocateSchema),
     defaultValues: {
@@ -72,10 +74,16 @@ export function RelocateOtherFruitDialog({
     const chamberConfig = chambersConfig[targetChamberId];
     if (!chamberConfig) return { availableCoordinates: [] };
 
-    const allPossibleCoords = chamberConfig.columns
+    let allPossibleCoords = chamberConfig.columns
         .flatMap(col => chamberConfig.rows.map(row => `${col.name}${row}`))
         .filter(coord => !chamberConfig.blocked?.includes(coord))
         .sort(naturalSort);
+
+    const isChamberRow13Enabled = !!chamberSettings?.find(s => s.id === targetChamberId)?.row13Enabled;
+    if (isChamberRow13Enabled) {
+      const row13Coords = chamberConfig.columns.map(col => `${col.name}13`);
+      allPossibleCoords = [...allPossibleCoords, ...row13Coords].sort(naturalSort);
+    }
 
     // 1. Calculate current occupancy for all coordinates in target chamber
     const occupancyMap = new Map<string, { quantity: number; ownerName: string }>();
@@ -132,7 +140,7 @@ export function RelocateOtherFruitDialog({
     return { 
         availableCoordinates: available,
     };
-  }, [targetChamberId, allChamberLots, allOtherFruitReceptions, item, clientConfigs]);
+  }, [targetChamberId, allChamberLots, allOtherFruitReceptions, item, clientConfigs, chamberSettings]);
 
 
   React.useEffect(() => {

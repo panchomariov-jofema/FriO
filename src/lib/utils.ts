@@ -42,7 +42,28 @@ export const getModeloSofCoordinates = (chamberConfig: Chamber): string[] => {
     return coords;
 };
 
-export const getSortedCoordinates = (chamberConfig: Chamber, strategy: 'secuencial' | 'fifo' | 'aisle-access' | 'horizontal-secuencial' | 'inverted-secuencial' | 'pareado' | 'serpentina-vertical' | 'modelo-sof'): string[] => {
+export const getFifoVerticalCoordinates = (chamberConfig: Chamber): string[] => {
+    const coords: string[] = [];
+    const columns = chamberConfig.columns.map(c => c.name);
+    const rowsDesc = [...chamberConfig.rows].sort((a, b) => b - a);
+
+    columns.forEach(col => {
+        rowsDesc.forEach(row => {
+            const coord = `${col}${row}`;
+            if (!chamberConfig.blocked?.includes(coord)) {
+                coords.push(coord);
+            }
+        });
+    });
+
+    return coords;
+};
+
+export const getSortedCoordinates = (chamberConfig: Chamber, strategy: 'secuencial' | 'fifo' | 'aisle-access' | 'horizontal-secuencial' | 'inverted-secuencial' | 'pareado' | 'serpentina-vertical' | 'modelo-sof' | 'fifo-vertical'): string[] => {
+  if (strategy === 'fifo-vertical') {
+    return getFifoVerticalCoordinates(chamberConfig);
+  }
+
   if (strategy === 'modelo-sof') {
     return getModeloSofCoordinates(chamberConfig);
   }

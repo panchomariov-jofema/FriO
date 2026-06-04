@@ -1,0 +1,760 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manual Detallado de Usuario - Gestión de Socios Comerciales (Otros Hortofrutícolas)</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #004b8d;
+            --primary-light: rgba(0, 75, 141, 0.08);
+            --secondary: #7aba28;
+            --secondary-light: rgba(122, 186, 40, 0.1);
+            --text-dark: #1f2937;
+            --text-light: #4b5563;
+            --bg-main: #f9fafb;
+            --bg-card: #ffffff;
+            --border-color: #e5e7eb;
+            --alert-note-border: #3b82f6;
+            --alert-note-bg: #eff6ff;
+            --alert-warn-border: #f59e0b;
+            --alert-warn-bg: #fffbeb;
+            --alert-important-border: #ef4444;
+            --alert-important-bg: #fef2f2;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-main);
+            color: var(--text-dark);
+            line-height: 1.6;
+            display: flex;
+        }
+
+        /* Sidebar navigation */
+        aside {
+            width: 280px;
+            background-color: var(--bg-card);
+            border-right: 1px solid var(--border-color);
+            position: fixed;
+            top: 0;
+            bottom: 0;
+            left: 0;
+            overflow-y: auto;
+            padding: 2rem 1.5rem;
+            z-index: 100;
+        }
+
+        .logo-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 2rem;
+            padding-bottom: 1rem;
+            border-bottom: 2px solid var(--primary-light);
+        }
+
+        .logo-dot {
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background-color: var(--secondary);
+            box-shadow: 0 0 8px var(--secondary);
+        }
+
+        .logo-text {
+            font-size: 1.25rem;
+            font-weight: 800;
+            color: var(--primary);
+            letter-spacing: -0.025em;
+        }
+
+        .logo-text span {
+            color: var(--secondary);
+        }
+
+        aside h3 {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #9ca3af;
+            margin-bottom: 1rem;
+            font-weight: 700;
+        }
+
+        aside ul {
+            list-style: none;
+        }
+
+        aside li {
+            margin-bottom: 0.5rem;
+        }
+
+        aside a {
+            color: var(--text-light);
+            text-decoration: none;
+            font-size: 0.9rem;
+            font-weight: 500;
+            display: block;
+            padding: 0.5rem 0.75rem;
+            border-radius: 6px;
+            transition: all 0.2s ease;
+        }
+
+        aside a:hover {
+            color: var(--primary);
+            background-color: var(--primary-light);
+            transform: translateX(3px);
+        }
+
+        /* Main Content Container */
+        main {
+            margin-left: 280px;
+            padding: 3rem 4rem;
+            max-width: 1100px;
+            width: calc(100% - 280px);
+        }
+
+        header {
+            margin-bottom: 3rem;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 1.5rem;
+        }
+
+        header h1 {
+            font-size: 2.25rem;
+            font-weight: 800;
+            color: var(--primary);
+            letter-spacing: -0.03em;
+            margin-bottom: 0.5rem;
+        }
+
+        header p {
+            font-size: 1.1rem;
+            color: var(--text-light);
+            font-weight: 400;
+        }
+
+        section {
+            margin-bottom: 4rem;
+            scroll-margin-top: 2rem;
+        }
+
+        h2 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--primary);
+            margin-bottom: 1.5rem;
+            border-bottom: 2px solid var(--primary-light);
+            padding-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        h3 {
+            font-size: 1.15rem;
+            font-weight: 600;
+            color: var(--text-dark);
+            margin-top: 1.5rem;
+            margin-bottom: 0.75rem;
+        }
+
+        p {
+            margin-bottom: 1.25rem;
+            color: var(--text-light);
+        }
+
+        /* Numbered lists / Steps */
+        ol, ul {
+            margin-left: 1.5rem;
+            margin-bottom: 1.5rem;
+            color: var(--text-light);
+        }
+
+        li {
+            margin-bottom: 0.5rem;
+        }
+
+        strong {
+            color: var(--text-dark);
+            font-weight: 600;
+        }
+
+        /* Callout blocks (Alerts) */
+        .callout {
+            border-left: 4px solid;
+            padding: 1rem 1.25rem;
+            border-radius: 0 8px 8px 0;
+            margin-bottom: 1.5rem;
+            font-size: 0.95rem;
+        }
+
+        .callout-note {
+            border-color: var(--alert-note-border);
+            background-color: var(--alert-note-bg);
+            color: #1e3a8a;
+        }
+
+        .callout-warning {
+            border-color: var(--alert-warn-border);
+            background-color: var(--alert-warn-bg);
+            color: #78350f;
+        }
+
+        .callout-important {
+            border-color: var(--alert-important-border);
+            background-color: var(--alert-important-bg);
+            color: #7f1d1d;
+        }
+
+        .callout-title {
+            font-weight: 700;
+            margin-bottom: 0.25rem;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            text-transform: uppercase;
+            font-size: 0.8rem;
+            letter-spacing: 0.05em;
+        }
+
+        /* Diagrams card */
+        .diagram-card {
+            background-color: #ffffff;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin: 1.5rem 0;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .diagram-title {
+            font-size: 0.85rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            color: var(--primary);
+            letter-spacing: 0.05em;
+            margin-bottom: 1.5rem;
+            align-self: flex-start;
+        }
+
+        /* Tables */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 1.5rem;
+            font-size: 0.9rem;
+            background-color: var(--bg-card);
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid var(--border-color);
+        }
+
+        th, td {
+            padding: 0.75rem 1rem;
+            text-align: left;
+        }
+
+        th {
+            background-color: var(--primary-light);
+            color: var(--primary);
+            font-weight: 600;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        tr:not(:last-child) td {
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        /* Print utility button */
+        .print-btn {
+            background-color: var(--secondary);
+            color: white;
+            border: none;
+            padding: 0.6rem 1.2rem;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 2rem;
+        }
+
+        .print-btn:hover {
+            background-color: #6aa423;
+        }
+
+        @media print {
+            aside, .print-btn {
+                display: none !important;
+            }
+            main {
+                margin-left: 0 !important;
+                width: 100% !important;
+                padding: 0 !important;
+            }
+            body {
+                background: white;
+            }
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            body {
+                flex-direction: column;
+            }
+            aside {
+                position: relative;
+                width: 100%;
+                height: auto;
+                border-right: none;
+                border-bottom: 1px solid var(--border-color);
+            }
+            main {
+                margin-left: 0;
+                width: 100%;
+                padding: 2rem;
+            }
+        }
+    </style>
+    <!-- Load Mermaid.js via CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+    <script>
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'neutral',
+            securityLevel: 'loose',
+            themeVariables: {
+                primaryColor: '#004b8d',
+                edgeLabelBackground: '#ffffff',
+                clusterBkg: '#f9fafb'
+            }
+        });
+    </script>
+</head>
+<body>
+
+    <aside>
+        <div class="logo-container">
+            <div class="logo-dot"></div>
+            <div class="logo-text">Frigo<span>Manager</span></div>
+        </div>
+        <h3>Navegación</h3>
+        <ul>
+            <li><a href="#introduccion">1. Introducción</a></li>
+            <li><a href="#recepcion">2. Recepción de Fruta</a></li>
+            <li><a href="#crear-producto">3. Crear Productos</a></li>
+            <li><a href="#almacenamiento">4. Almacenamiento</a></li>
+            <li><a href="#reubicacion">5. Reubicación Parcial</a></li>
+            <li><a href="#despacho">6. Despacho de Fruta</a></li>
+            <li><a href="#reportes">7. Reportes y Stock</a></li>
+            <li><a href="#faqs">8. Preguntas Frecuentes</a></li>
+        </ul>
+    </aside>
+
+    <main>
+        <header>
+            <button class="print-btn" onclick="window.print()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+                Imprimir / Guardar como PDF
+            </button>
+            <h1>Manual Detallado de Operación: Socios Comerciales</h1>
+            <p>Guía de uso detallada con flujos y diagramas para la administración de frutas de terceros (Otros Hortofrutícolas) - No Fall Creek</p>
+        </header>
+
+        <section id="introduccion">
+            <h2>1. Introducción y Conceptos Básicos</h2>
+            <p>Este manual está diseñado para enseñar de forma detallada y paso a paso cómo operar el módulo de <strong>Otros Hortofrutícolas</strong> (también conocido como <strong>Gestión de Socios Comerciales</strong>) en el sistema <strong>FrigoManager</strong>. Es apto para cualquier persona que se incorpore a la operación sin conocimientos previos del sistema.</p>
+            
+            <div class="callout callout-note">
+                <div class="callout-title">Nota Importante</div>
+                <p>Este manual aplica de forma exclusiva a los clientes hortofrutícolas generales (como exportadoras o productores de manzanas, peras, naranjas, paltas, piñas, etc.) y <strong>excluye</strong> el flujo específico del portal de Fall Creek, el cual cuenta con sus propias reglas de negocio y carga de manifiestos.</p>
+            </div>
+
+            <h3>Conceptos Clave:</h3>
+            <ul>
+                <li><strong>Bin:</strong> Caja plástica o de madera grande utilizada para transportar y almacenar fruta a granel.</li>
+                <li><strong>Pallet:</strong> Plataforma de madera sobre la cual se apilan cajas terminadas de fruta.</li>
+                <li><strong>Guía de Despacho (Documento):</strong> El número del documento legal físico con el que llega el camión cargado de fruta a la planta.</li>
+                <li><strong>Lote de Cliente:</strong> Un código alfanumérico que el cliente asigna a su fruta para diferenciar parcelas, fechas de cosecha o calidades.</li>
+                <li><strong>ID de Cliente 99999:</strong> Un código interno del sistema que agrupa a todos los <strong>productos globales</strong>. Si creas un producto bajo este ID, estará disponible para todos los clientes de fruta del sistema.</li>
+            </ul>
+        </section>
+
+        <section id="recepcion">
+            <h2>2. Paso 1: Recepción de Fruta (Ingreso)</h2>
+            <p>Este proceso registra la llegada física de la fruta al andén de recepción de la planta.</p>
+            
+            <ol>
+                <li><strong>Ingresa al Módulo:</strong> En el menú lateral izquierdo, haz clic en <strong>Otros Hortofrutícolas</strong>. Asegúrate de estar en la pestaña <strong>Recepción</strong>.</li>
+                <li><strong>Selecciona al Socio Comercial (Cliente):</strong> Haz clic en el menú desplegable y selecciona el cliente que envía la fruta.
+                    <div class="callout callout-important" style="margin-top: 10px;">
+                        <div class="callout-title">Importante</div>
+                        <p>Al seleccionar el cliente, el sistema detecta automáticamente su unidad de medida configurada (ya sea <strong>Bins</strong> o <strong>Pallets</strong>). Toda la interfaz y los textos de cantidades se adaptarán dinámicamente a esta unidad.</p>
+                    </div>
+                </li>
+                <li><strong>Indica el Documento de Entrada:</strong> Escribe el número de la <strong>Guía de Despacho</strong> en el campo Documento.</li>
+                <li><strong>Registra la Temperatura (Opcional):</strong> Si la fruta viene con termómetro, activa el interruptor <strong>Capturar Temperatura</strong> e ingresa el valor en grados Celsius (°C).</li>
+                <li><strong>Completa las Líneas de Detalle:</strong>
+                    <ul>
+                        <li><strong>Lote Cliente:</strong> Identificador provisto por tu cliente. Si no cuenta con uno, puedes dejarlo vacío o usar un guion (<code>-</code>).</li>
+                        <li><strong>Nombre Producto (Buscador Combobox):</strong> Haz clic en el botón de selección y escribe parte de la descripción del producto (ej: <code>"Manzana"</code> o <code>"Pera"</code>). El sistema filtrará de inmediato la lista. Haz clic en la opción deseada.</li>
+                        <li><strong>Cantidad:</strong> Digita el número de Bins o Pallets que ingresan. Debe ser mayor a cero.</li>
+                        <li><strong>Observación:</strong> Ingresa cualquier comentario alfanumérico importante en lugar de peso (ej: <code>"Fruta madura"</code>, <code>"Cajas húmedas"</code>).</li>
+                    </ul>
+                </li>
+                <li><strong>Confirmar Recepción:</strong> Revisa los datos y haz clic en <strong>Confirmar Recepción</strong>. Si la opción de <strong>Almacenamiento Directo</strong> está activada, se abrirá de inmediato la asignación de cámaras de frío.</li>
+            </ol>
+
+            <div class="diagram-card">
+                <div class="diagram-title">Esquema de Interfaz: Formulario de Recepción</div>
+                <div class="mermaid">
+                    graph TD
+                        classDef window fill:#ffffff,stroke:#004b8d,stroke-width:2px;
+                        classDef title fill:#004b8d,color:#ffffff,stroke:none,font-weight:bold;
+                        classDef input fill:#f9fafb,stroke:#d1d5db,stroke-width:1px,color:#1f2937;
+                        classDef btnGreen fill:#7aba28,stroke:none,color:#ffffff,font-weight:bold;
+                        classDef btnBlue fill:#004b8d,stroke:none,color:#ffffff,font-weight:bold;
+                        classDef label fill:none,stroke:none,color:#4b5563;
+
+                        subgraph FormWindow["Formulario de Recepción (Vista de Operador)"]
+                            direction TB
+                            Title["RECEPTOR DE FRUTA - OTROS HORTOFRUTÍCOLAS"]:::title
+                            
+                            subgraph HeaderSec["1. Cabecera del Documento"]
+                                direction LR
+                                DropSocio["Cliente: Agrícola Sofruco Ltda. ▾"]:::input
+                                InputGuia["Guía Despacho: 154820"]:::input
+                            end
+
+                            subgraph TempSec["2. Captura Opcional de Parámetros"]
+                                direction LR
+                                ToggleTemp["[X] Registrar Temp/Humedad"]:::btnGreen
+                                InputTemp["Temp: 4.5 °C  |  HR: 85%"]:::input
+                            end
+
+                            subgraph GridSec["3. Grilla de Detalles"]
+                                direction TB
+                                ColHeaders["Columnas: Lote Cliente | Producto Seleccionado | Cantidad | Observaciones"]:::title
+                                Row1["Lote: LOTE-A | Producto: Bins Manzanas Royal Gala 🔎 | Cantidad: 45 | Obs: Fruta madura"]:::input
+                                Row2["Lote: LOTE-B | Producto: Bins Manzanas Fuji 🔎 | Cantidad: 20 | Obs: Envase madera"]:::input
+                                ColHeaders --> Row1 --> Row2
+                            end
+
+                            subgraph ControlsSec["4. Controles Inferiores"]
+                                direction LR
+                                BtnAdd["+ Agregar Producto"]:::btnBlue
+                                BtnCreate["✚ Crear Producto Nuevo"]:::btnGreen
+                                CheckDirect["[✔] Almacenamiento Directo"]:::label
+                            end
+
+                            BtnSubmit["CONFIRMAR RECEPCIÓN E INICIAR ALMACENAMIENTO"]:::btnBlue
+                        end
+
+                        class FormWindow window;
+                </div>
+            </div>
+
+            <div class="diagram-card">
+                <div class="diagram-title">Flujo Lógico de Recepción e Ingresos</div>
+                <div class="mermaid">
+                    graph TD
+                        Start([Inicio: Camión en Andén]) --> SelectClient[Seleccionar Socio Comercial]
+                        SelectClient --> UnitCheck{¿Su Unidad es Bins o Pallets?}
+                        UnitCheck -->|Cambia Textos Dinámicamente| FillDoc[Digitar Guía de Despacho]
+                        FillDoc --> TempCheck{¿Capturar Temp y Humedad?}
+                        TempCheck -->|Sí| InputTH[Registrar Temp °C e HR %]
+                        TempCheck -->|No| FillItems[Completar Detalle de Fruta]
+                        InputTH --> FillItems
+                        FillItems --> ProdSearch{¿Producto Existe en Lista?}
+                        ProdSearch -->|No| CreateProd[Crear Producto Global - ID 99999]
+                        CreateProd --> AutoSelect[Auto-selección en Formulario]
+                        ProdSearch -->|Sí| AutoSelect
+                        AutoSelect --> SubmitRec[Confirmar Recepción]
+                        SubmitRec --> DirectCheck{¿Modo Almacenamiento Directo?}
+                        DirectCheck -->|Sí| GoStore[Abrir Diálogo de Almacenamiento]
+                        DirectCheck -->|No| EndStore([Fin: Fruta en Tránsito])
+                </div>
+            </div>
+        </section>
+
+        <section id="crear-producto">
+            <h2>3. Paso 2: Creación Dinámica de Productos</h2>
+            <p>Si llega una fruta nueva (por ejemplo, <em>Piñas</em>) y el producto no existe en la lista preestablecida, puedes crearlo de inmediato desde la misma ventana de recepción.</p>
+            
+            <ol>
+                <li>Haz clic en el botón <strong>Crear Producto</strong> (color verde distintivo abajo de la grilla de ítems).</li>
+                <li>Se abrirá una ventana emergente. Escribe el <strong>Nombre del Producto</strong> (ej: <code>Bins Piñas</code>).</li>
+                <li>El sistema generará el <strong>Código del Producto</strong> automáticamente (limpiando espacios y acentos, ej: <code>BINS-PINAS</code>). Puedes modificarlo si lo requieres.</li>
+                <li>Haz clic en <strong>Crear Producto</strong>.</li>
+            </ol>
+            
+            <div class="diagram-card">
+                <div class="diagram-title">Esquema de Interfaz: Creación Dinámica de Producto</div>
+                <div class="mermaid">
+                    graph TD
+                        classDef modal fill:#ffffff,stroke:#7aba28,stroke-width:2.5px;
+                        classDef title fill:#7aba28,color:#ffffff,stroke:none,font-weight:bold;
+                        classDef input fill:#f9fafb,stroke:#d1d5db,stroke-width:1px,color:#1f2937;
+                        classDef btnGreen fill:#7aba28,stroke:none,color:#ffffff,font-weight:bold;
+                        classDef btnGray fill:#9ca3af,stroke:none,color:#ffffff,font-weight:bold;
+                        classDef label fill:none,stroke:none,color:#4b5563;
+
+                        subgraph ModalWindow["Ventana Emergente: Crear Nuevo Producto"]
+                            direction TB
+                            MTitle["CREAR NUEVO PRODUCTO (GLOBAL - ID 99999)"]:::title
+                            
+                            subgraph Fields["Campos del Formulario"]
+                                direction TB
+                                LName["Nombre del Producto (ej: Bins Piñas)"]:::label
+                                IName["Nombre: Bins Nectarines Exportación"]:::input
+                                
+                                LCod["Código de Producto (Auto-slugify)"]:::label
+                                ICod["Código: BINS-NECTARINES-EXPORTACION"]:::input
+                            end
+
+                            subgraph MAction["Acciones"]
+                                direction LR
+                                BtnCancel["Cancelar"]:::btnGray
+                                BtnSave["Guardar y Seleccionar"]:::btnGreen
+                            end
+                            
+                            Fields --> MAction
+                        end
+
+                        class ModalWindow modal;
+                </div>
+            </div>
+
+            <div class="callout callout-note">
+                <div class="callout-title">¿Qué ocurre tras guardar?</div>
+                <p>El producto se registra de forma automática en Datos Maestros con el ID de cliente <code>99999</code>. Al finalizar, el formulario **pre-selecciona** el nuevo producto en la línea actual y lo almacena en la memoria local para futuros ingresos.</p>
+            </div>
+        </section>
+
+        <section id="almacenamiento">
+            <h2>4. Paso 3: Almacenamiento en Cámaras de Frío</h2>
+            <p>La fruta confirmada en recepción debe ser almacenada en la cámara de frío correspondiente.</p>
+            
+            <h3>Almacenamiento Secuencial (en Cascada):</h3>
+            <p>Si la recepción cuenta con múltiples líneas de fruta, al confirmar la primera ubicación el diálogo no se cerrará; cargará automáticamente la siguiente línea pendiente en orden correlativo, permitiendo completar el almacenamiento de toda la guía en una sola secuencia.</p>
+
+            <h3>Métodos de Confirmación:</h3>
+            <ul>
+                <li><strong>Método A: Confirmación Rápida (Recomendado):</strong> El sistema te sugerirá una Cámara y Coordenada óptima basada en las variedades y capacidad. Para guardarlo en esa ubicación recomendada, solo debes presionar la tecla <strong>Enter</strong> o hacer clic en la tarjeta de sugerencia.</li>
+                <li><strong>Método B: Selección Manual:</strong> Si necesitas cambiar de destino, selecciona manualmente la <strong>Cámara</strong> (de la 2 a la 5) y la <strong>Coordenada</strong> en los menús desplegables, y haz clic en <strong>Confirmar Almacenamiento</strong>.
+                    <div class="callout callout-warning" style="margin-top: 10px;">
+                        <div class="callout-title">Atención</div>
+                        <p>El botón de confirmación manual se deshabilitará si dejas los desplegables en la opción "Seleccione..." para evitar guardar en ubicaciones vacías o erróneas.</p>
+                    </div>
+                </li>
+            </ul>
+
+            <div class="diagram-card">
+                <div class="diagram-title">Esquema de Interfaz: Diálogo de Almacenamiento Directo en Cascada</div>
+                <div class="mermaid">
+                    graph TD
+                        classDef dialog fill:#ffffff,stroke:#004b8d,stroke-width:2px;
+                        classDef title fill:#004b8d,color:#ffffff,stroke:none,font-weight:bold;
+                        classDef input fill:#f9fafb,stroke:#d1d5db,stroke-width:1px;
+                        classDef suggCard fill:#eff6ff,stroke:#3b82f6,stroke-width:2px;
+                        classDef btnBlue fill:#004b8d,stroke:none,color:#ffffff,font-weight:bold;
+                        classDef label fill:none,stroke:none,color:#4b5563;
+
+                        subgraph DialogStore["Ventana de Almacenamiento (Cascada)"]
+                            direction TB
+                            DTitle["UBICAR FRUTA EN CÁMARA DE FRÍO"]:::title
+                            
+                            ItemTxt["Lote: LOTE-A  |  Producto: Bins Manzanas Royal Gala  |  Por Almacenar: 45 Bins"]:::label
+
+                            subgraph Sugerencia["Método Sugerido (Confirmación Rápida)"]
+                                SuggCard["⭐ RECOMENDADO: CÁMARA 3 - COORDENADA D4 (Clic o presionar ENTER)"]:::suggCard
+                            end
+
+                            subgraph Manual["Método Manual (Alternativo)"]
+                                direction TB
+                                subgraph Selectors["Filtros de Ubicación"]
+                                    direction LR
+                                    DropCam["Cámara: Cámara 3 ▾"]:::input
+                                    DropCoord["Coordenada: D4 (9/9 disponible) ▾"]:::input
+                                end
+                                BtnManualConfirm["Confirmar Almacenamiento Manual"]:::btnBlue
+                            end
+
+                            ItemTxt --> Sugerencia --> Manual
+                        end
+
+                        class DialogStore dialog;
+                </div>
+            </div>
+
+            <div class="diagram-card">
+                <div class="diagram-title">Flujo de Almacenamiento en Cascada</div>
+                <div class="mermaid">
+                    graph TD
+                        StartCascada[Cargar Línea de Recepción] --> Suggestion[IA Sugiere Coordenada Óptima]
+                        Suggestion --> UserDecision{¿Usar Sugerencia?}
+                        UserDecision -->|Sí| KeyEnter[Presionar Enter o Clic en Tarjeta]
+                        UserDecision -->|No| SelectManual[Seleccionar Cámara y Coordenada Manual]
+                        KeyEnter --> SaveDB[Registrar Ubicación en Firestore]
+                        SelectManual --> CheckSelect{¿Cámara y Coord Seleccionadas?}
+                        CheckSelect -->|No| DisableBtn[Botón Confirmar Bloqueado]
+                        CheckSelect -->|Sí| ClickStore[Hacer Clic en Confirmar]
+                        ClickStore --> SaveDB
+                        SaveDB --> CheckNextLine{¿Existen más Líneas Pendientes?}
+                        CheckNextLine -->|Sí| NextLine[Cargar Siguiente Ítem en el Diálogo]
+                        NextLine --> Suggestion
+                        CheckNextLine -->|No| CloseDialog([Cerrar Diálogo: Operación Completa])
+                </div>
+            </div>
+        </section>
+
+        <section id="reubicacion">
+            <h2>5. Paso 4: Reubicación Parcial de Bins o Pallets</h2>
+            <p>Si necesitas mover fruta de una coordenada a otra para reordenar el stock o dar paso a inspecciones de calidad, puedes reubicar fracciones del stock.</p>
+            
+            <ol>
+                <li>Ve al módulo de <strong>Cámaras</strong> en el menú lateral.</li>
+                <li>Haz clic en la coordenada de origen (ej: <code>C3</code>) y haz clic en <strong>Reubicar Lote</strong>.</li>
+                <li>En el campo <strong>Cantidad a Reubicar</strong>, digita el número exacto de bins que vas a mover (por defecto se carga el total disponible).</li>
+                <li>Selecciona la cámara y coordenada de destino.
+                    <div class="callout callout-important" style="margin-top: 10px;">
+                        <div class="callout-title">Control de Capacidad</div>
+                        <p>La capacidad máxima estricta por coordenada es de <strong>9 Bins</strong>. El sistema validará en tiempo real y solo te mostrará en el desplegable aquellas coordenadas de destino que cuenten con el espacio suficiente para albergar la cantidad ingresada.</p>
+                    </div>
+                </li>
+                <li>Haz clic en <strong>Confirmar Reubicación</strong>. El sistema fraccionará el stock actual de manera limpia.</li>
+            </ol>
+
+            <div class="diagram-card">
+                <div class="diagram-title">Esquema de Interfaz: Diálogo de Reubicación Parcial</div>
+                <div class="mermaid">
+                    graph TD
+                        classDef dialog fill:#ffffff,stroke:#004b8d,stroke-width:2px;
+                        classDef title fill:#004b8d,color:#ffffff,stroke:none,font-weight:bold;
+                        classDef input fill:#f9fafb,stroke:#d1d5db,stroke-width:1px;
+                        classDef btnBlue fill:#004b8d,stroke:none,color:#ffffff,font-weight:bold;
+                        classDef label fill:none,stroke:none,color:#4b5563;
+
+                        subgraph DialogReloc["Ventana de Reubicación de Stock"]
+                            direction TB
+                            DTitle["REUBICACIÓN PARCIAL DE CÁMARA"]:::title
+                            
+                            SrcTxt["Origen: Cámara 2  |  Coordenada: C3  |  Lote: LOTE-A  |  Stock actual: 9 Bins"]:::label
+
+                            subgraph RelocForm["Ajuste de Movimiento"]
+                                direction TB
+                                InputQty["Cantidad a Mover: 3 Bins"]:::input
+                                
+                                subgraph DestSelects["Selección de Destino"]
+                                    direction LR
+                                    DropDestCam["Cámara Destino: Cámara 4 ▾"]:::input
+                                    DropDestCoord["Coordenada Destino: B12 (6/9 disponible) ▾"]:::input
+                                end
+                            end
+
+                            BtnRelocConfirm["CONFIRMAR REUBICACIÓN PARCIAL"]:::btnBlue
+
+                            SrcTxt --> RelocForm --> BtnRelocConfirm
+                        end
+
+                        class DialogReloc dialog;
+                </div>
+            </div>
+        </section>
+
+        <section id="despacho">
+            <h2>6. Paso 5: Despacho de Fruta (Salida)</h2>
+            <p>Este proceso da salida del inventario a la fruta que retira el cliente de la planta de frío.</p>
+            
+            <ol>
+                <li>En el módulo <strong>Otros Hortofrutícolas</strong>, haz clic en la pestaña <strong>Salida</strong>.</li>
+                <li>Selecciona al <strong>Socio Comercial</strong>. El sistema listará inmediatamente su stock actual en cámaras.</li>
+                <li><strong>Identificación de Lotes:</strong> Para facilitar el retiro, la fruta se agrupa bajo la clave compuesta <code>[Guía de Entrada] - [Lote Cliente]</code>. Esto te permite despachar exactamente las guías o lotes específicos que solicita tu cliente de forma selectiva.</li>
+                <li>Escribe el número de la <strong>Guía de Despacho de Salida</strong>.</li>
+                <li>Ingresa la cantidad a despachar en el lote seleccionado, añade una <strong>Observación</strong> de salida y haz clic en <strong>Confirmar Salida</strong>.</li>
+            </ol>
+
+            <div class="diagram-card">
+                <div class="diagram-title">Esquema de Interfaz: Formulario de Despacho (Salida)</div>
+                <div class="mermaid">
+                    graph TD
+                        classDef window fill:#ffffff,stroke:#004b8d,stroke-width:2px;
+                        classDef title fill:#004b8d,color:#ffffff,stroke:none,font-weight:bold;
+                        classDef input fill:#f9fafb,stroke:#d1d5db,stroke-width:1px;
+                        classDef btnBlue fill:#004b8d,stroke:none,color:#ffffff,font-weight:bold;
+                        classDef label fill:none,stroke:none,color:#4b5563;
+
+                        subgraph ExitWindow["Módulo de Despacho (Vista Operador)"]
+                            direction TB
+                            ETitle["DESPACHO DE SOCIOS COMERCIALES"]:::title
+                            
+                            subgraph ExitHeader["1. Cabecera del Despacho"]
+                                direction LR
+                                EDropSocio["Cliente: Agrícola Sofruco Ltda. ▾"]:::input
+                                EInputGuia["Guía Despacho Salida: 894551"]:::input
+                            end
+
+                            subgraph ExitGrid["2. Selección de Stock en Cámaras (Agrupado)"]
+                                direction TB
+                                EColHeaders["Origen: [Guía Entrada] - Lote | Producto | Stock Disp | Cámara | Despachar"]:::title
+                                ERow1["Lote: [Guía 154820] - LOTE-A | Royal Gala | Stock: 45 Bins | Cámara 3 | Cantidad: 25 Bins"]:::input
+                                ERow2["Lote: [Guía 154820] - LOTE-B | Fuji       | Stock: 20 Bins | Cámara 3 | Cantidad: 0 Bins"]:::input
+                                EColHeaders --> ERow1 --> ERow2
+                            end
+
+                            EInputObs["Observaciones del despacho: Despacho parcial en camión patente AA-BB-12"]:::input
+
+                            EBtnSubmit["CONFIRMAR SALIDA / REALIZAR DESPACHO"]:::btnBlue
+                        end
+
+                        class ExitWindow window;
+                </div>
+            </div>
+        </section>
+
+        <section id="reportes">
+            <h2>7. Paso 6: Reportes de Stock e Historial</h2>
+            <p>El sistema provee dos reportes dedicados a la fruta de terceros:</p>
+
+            <h3>A. Reporte de Stock por Ubicación</h3>
+            <p>Muestra el stock físico actual en cámaras.</p>
+            <ul>
+                <li><strong>Ubicación:</strong> Reportes $\rightarrow$ Stock por Ubicación Clientes.</li>
+                <li><strong>Filtros en Cascada:</strong> Al elegir un Cliente, los desplegables de Producto y Cámara se reducen dinámicamente para mostrar únicamente opciones con stock de ese cliente. Si una selección previa queda obsoleta al cambiar de cliente, el sistema la reajustará de forma automática.</li>
+                <li><strong>Fila de Totales:</strong> Suma automáticamente el stock de la tabla. Si la fruta del reporte comparte la misma unidad, se muestra alíneado (ej: <code>1.200 Bins</code>). Si hay mezcla de unidades, se desglosará (ej: <code>1.100 Bins / 10 Pallets</code>).</li>
+            </ul>
+
+            <h3>B. Reporte Kardex de Fruta</h3>
+            <p>Muestra la bitácora cronológica de todas las transacciones históricas (Ingresos y Salidas), detallando fechas, guías de despacho, lotes de cliente, cantidades y las observaciones registradas.</p>
+        </section>
+
+        <section id="faqs">
+            <h2>8. Preguntas Frecuentes y Mensajes del Sistema</h2>
+            
+            <h3>¿Qué significa el ícono de advertencia "⚠" en una celda de cámara?</h3>
+            <p>Indica que esa coordenada contiene **lotes mezclados** (por ejemplo, bins de diferentes guías o lotes del cliente). El sistema la dibuja con un gradiente de colores para alertar que es una celda mixta y que se debe tener precaución al retirar la fruta.</p>
+
+            <h3>¿Por qué no veo las Cámaras 1 ni 6 en el módulo de Fall Creek?</h3>
+            <p>Porque operativamente la fruta de Fall Creek se restringe únicamente a las cámaras **2, 3, 4 y 5**. El sistema las oculta de manera automática para simplificar la vista.</p>
+
+            <h3>¿Cómo ingreso la temperatura y humedad medidos?</h3>
+            <p>Al lado del nombre de cada cámara verás las mediciones vigentes (ej. <code>T: 1.0°C / H: 85%</code>). Haz clic en ese indicador para abrir el popover, digita las nuevas mediciones manuales tomadas y haz clic en guardar.</p>
+        </section>
+    </main>
+
+</body>
+</html>

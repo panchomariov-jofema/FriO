@@ -61,7 +61,7 @@ export function OtherFruitStorageTab({ clientId: fixedClientId }: { clientId?: s
     coordinate: string;
     totalQuantity: number;
     quantityPerLocation: number;
-    strategy: 'secuencial' | 'pareado' | 'aisle-access' | 'serpentina-vertical' | 'modelo-sof';
+    strategy: 'secuencial' | 'pareado' | 'aisle-access' | 'serpentina-vertical' | 'modelo-sof' | 'fifo-vertical';
   } | null>(null);
   const [selectedClientId, setSelectedClientId] = React.useState<string | null>(null);
   const [isScannerOpen, setIsScannerOpen] = React.useState(false);
@@ -86,13 +86,6 @@ export function OtherFruitStorageTab({ clientId: fixedClientId }: { clientId?: s
   const firestore = useFirestore();
   const { user } = useUser();
   const { toast } = useToast();
-
-  // Auto-open scanner when a client is selected
-  React.useEffect(() => {
-    if (selectedClientId && !selectedItem && !quickStoreItem && !isDirectMode) {
-      setIsScannerOpen(true);
-    }
-  }, [selectedClientId, selectedItem, quickStoreItem, isDirectMode]);
 
   // Focus input when scanner closes
   React.useEffect(() => {
@@ -340,7 +333,7 @@ export function OtherFruitStorageTab({ clientId: fixedClientId }: { clientId?: s
           : (lastCoordInChamber || (isContinuingChamber && effectiveSessionCoord ? effectiveSessionCoord : null)))
       : null;
     
-    if (effectiveLastCoord) {
+    if (effectiveLastCoord && finalStrategy !== 'modelo-sof' && finalStrategy !== 'serpentina-vertical' && finalStrategy !== 'fifo-vertical') {
         const foundIdx = allPossibleCoords.indexOf(effectiveLastCoord);
         if (foundIdx !== -1) {
             const currentOccupancy = occupancyMap.get(effectiveLastCoord) || 0;
@@ -375,7 +368,7 @@ export function OtherFruitStorageTab({ clientId: fixedClientId }: { clientId?: s
     };
   };
 
-  const handleFruitStoreConfirm = async (data: { chamberId: string; coordinate: string; totalQuantity: number; quantityPerLocation: number; strategy: 'secuencial' | 'pareado' | 'aisle-access' | 'inverted-secuencial' | 'horizontal-secuencial' | 'fifo' | 'serpentina-vertical' | 'modelo-sof' }, overrideItem?: PendingFruitItem) => {
+  const handleFruitStoreConfirm = async (data: { chamberId: string; coordinate: string; totalQuantity: number; quantityPerLocation: number; strategy: 'secuencial' | 'pareado' | 'aisle-access' | 'inverted-secuencial' | 'horizontal-secuencial' | 'fifo' | 'serpentina-vertical' | 'modelo-sof' | 'fifo-vertical' }, overrideItem?: PendingFruitItem) => {
     const itemToProcessScope = overrideItem || (selectedItem?.type === 'fruit' ? selectedItem : null);
     if (!itemToProcessScope || !firestore) return;
 
@@ -739,7 +732,6 @@ export function OtherFruitStorageTab({ clientId: fixedClientId }: { clientId?: s
             clients={clientsWithPending}
             onSelect={(id) => {
                 setSelectedClientId(id);
-                if (!isDirectMode) setIsScannerOpen(true);
             }}
         />
       ) : (

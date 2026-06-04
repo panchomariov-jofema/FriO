@@ -99,7 +99,7 @@ function DespachosPageContent() {
     return query(collRef, orderBy('createdAt', 'desc'));
   }, [firestore, showOnlyPending, user]);
   
-  const { data: dispatches, loading: loadingDispatches } = useCollection<Dispatch>(dispatchesQuery);
+  const { data: dispatches, isLoading: loadingDispatches } = useCollection<Dispatch>(dispatchesQuery);
 
   const filteredDispatches = React.useMemo(() => {
     if (!dispatches) return [];

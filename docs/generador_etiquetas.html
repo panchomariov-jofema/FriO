@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generador de Etiquetas QR - FrigoManager</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono&display=swap" rel="stylesheet">
+    
+    <!-- QRCode Generator CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script>
+
+    <style>
+        :root {
+            --primary: #004b8d;
+            --primary-light: #e6f0f8;
+            --secondary: #7aba28;
+            --secondary-light: #f1f8e9;
+            --bg: #f8fafc;
+            --card-bg: #ffffff;
+            --text: #1e293b;
+            --text-muted: #64748b;
+            --border: #e2e8f0;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            padding: 40px 20px;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 900px;
+            background: var(--card-bg);
+            padding: 40px;
+            border-radius: 24px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05);
+            border: 1px solid var(--border);
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid var(--primary-light);
+        }
+
+        .logo-area {
+            font-weight: 700;
+            color: var(--primary);
+            font-size: 1.8rem;
+            margin-bottom: 5px;
+            letter-spacing: -0.5px;
+        }
+
+        .logo-area span {
+            color: var(--secondary);
+        }
+
+        h1 {
+            font-size: 1.5rem;
+            color: var(--primary);
+            margin-bottom: 8px;
+        }
+
+        .subtitle {
+            color: var(--text-muted);
+            font-size: 0.95rem;
+        }
+
+        /* Config Form */
+        .config-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+            background: #f1f5f9;
+            padding: 24px;
+            border-radius: 16px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        label {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text);
+        }
+
+        input, select {
+            width: 100%;
+            padding: 10px 14px;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+            background-color: white;
+            font-family: inherit;
+            font-size: 0.95rem;
+            color: var(--text);
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        input:focus, select:focus {
+            border-color: var(--primary);
+        }
+
+        .button-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            justify-content: center;
+            margin-bottom: 40px;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border-radius: 12px;
+            font-weight: 600;
+            font-size: 0.95rem;
+            cursor: pointer;
+            border: none;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background-color: var(--primary);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background-color: #003b70;
+            transform: translateY(-1px);
+        }
+
+        .btn-secondary {
+            background-color: var(--secondary);
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background-color: #6da722;
+            transform: translateY(-1px);
+        }
+
+        /* Preview Grid */
+        .preview-header {
+            margin-bottom: 15px;
+            font-weight: 600;
+            color: var(--text);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .preview-count {
+            background-color: var(--primary-light);
+            color: var(--primary);
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+            gap: 16px;
+            max-height: 400px;
+            overflow-y: auto;
+            padding: 10px;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            background: #fafafa;
+        }
+
+        .qr-card-preview {
+            border: 1px dashed #cbd5e1;
+            background: white;
+            padding: 12px;
+            border-radius: 10px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+
+        .qr-card-preview canvas, .qr-card-preview img {
+            width: 90px;
+            height: 90px;
+        }
+
+        .qr-card-preview .code-label {
+            margin-top: 8px;
+            font-size: 0.75rem;
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--text-muted);
+        }
+
+        /* Error Banner */
+        .error-banner {
+            background-color: #fee2e2;
+            border: 1px solid #fecaca;
+            color: #b91c1c;
+            padding: 12px 16px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            display: none;
+            font-size: 0.9rem;
+            text-align: left;
+        }
+
+        /* Print Container (Hidden on screen) */
+        #print-area {
+            display: none;
+        }
+
+        /* Offline status indicator */
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.8rem;
+            padding: 4px 10px;
+            border-radius: 12px;
+            background: #f1f5f9;
+            color: #475569;
+        }
+
+        /* PRINT STYLES */
+        @media print {
+            body, .container {
+                background: white !important;
+                padding: 0 !important;
+                margin: 0 !important;
+                box-shadow: none !important;
+                border: none !important;
+                width: auto !important;
+                height: auto !important;
+            }
+
+            .container > *:not(#print-area) {
+                display: none !important;
+            }
+
+            #print-area {
+                display: block !important;
+            }
+
+            /* Configure page margins and size */
+            @page {
+                size: var(--page-width, 60mm) var(--page-height, 100mm);
+                margin: 0;
+            }
+
+            .print-label {
+                width: var(--page-width, 100mm);
+                height: var(--page-height, 60mm);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                page-break-after: always;
+                page-break-inside: avoid;
+                box-sizing: border-box;
+                position: relative;
+                overflow: hidden;
+            }
+
+            /* Render only the QR code at center */
+            .print-label canvas, .print-label img {
+                width: var(--qr-size, 30mm) !important;
+                height: var(--qr-size, 30mm) !important;
+                display: block;
+                margin: auto;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div class="header">
+            <div class="logo-area">Fri<span>O</span> Manager</div>
+            <h1>Generador de Etiquetas QR</h1>
+            <p class="subtitle">Utilidad autónoma de impresión para Bins de Fall Creek</p>
+        </div>
+
+        <div id="error-box" class="error-banner"></div>
+
+        <div class="config-grid">
+            <div class="form-group">
+                <label for="prefix">Prefijo del Código</label>
+                <input type="text" id="prefix" value="BIN-FC-" placeholder="Ej: BIN-FC-">
+            </div>
+            <div class="form-group">
+                <label for="start-num">Número Inicial</label>
+                <input type="number" id="start-num" value="1" min="1">
+            </div>
+            <div class="form-group">
+                <label for="quantity">Cantidad a Generar</label>
+                <input type="number" id="quantity" value="50" min="1" max="500">
+            </div>
+            <div class="form-group">
+                <label for="padding">Dígitos (Padding)</label>
+                <input type="number" id="padding" value="4" min="1" max="10">
+            </div>
+            <div class="form-group">
+                <label for="dimensions">Dimensiones de Etiqueta</label>
+                <select id="dimensions" onchange="toggleDimensions()">
+                    <option value="60x100">PP 60x100 mm (Vertical)</option>
+                    <option value="100x60" selected>PP 100x60 mm (Horizontal)</option>
+                    <option value="custom">Personalizado (mm)</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="qr-size">Tamaño QR en Impresión (mm)</label>
+                <input type="number" id="qr-size" value="30" min="10" max="150" placeholder="Ej: 30">
+            </div>
+            <div class="form-group" id="custom-dims" style="display: none; grid-column: span 2; display: flex; gap: 10px;">
+                <div style="flex: 1;">
+                    <label for="custom-w">Ancho (mm)</label>
+                    <input type="number" id="custom-w" value="100">
+                </div>
+                <div style="flex: 1;">
+                    <label for="custom-h">Alto (mm)</label>
+                    <input type="number" id="custom-h" value="60">
+                </div>
+            </div>
+        </div>
+
+        <div class="button-group">
+            <button class="btn btn-secondary" onclick="downloadCSV()">
+                <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                Descargar CSV para BarTender
+            </button>
+            <button class="btn btn-primary" onclick="printLabels()">
+                <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
+                Imprimir QR (Solo QR)
+            </button>
+        </div>
+
+        <div>
+            <div class="preview-header">
+                <span>Vista Previa del Diseño</span>
+                <span class="preview-count" id="badge-count">0 etiquetas</span>
+            </div>
+            <div class="grid" id="preview-grid">
+                <!-- Preview items load here -->
+            </div>
+        </div>
+
+        <!-- Print Area -->
+        <div id="print-area"></div>
+    </div>
+
+    <script>
+        // Check if qrcode library is loaded
+        window.addEventListener('DOMContentLoaded', () => {
+            const errorBox = document.getElementById('error-box');
+            if (typeof QRCode === 'undefined') {
+                errorBox.style.display = 'block';
+                errorBox.innerHTML = `<strong>Atención:</strong> La librería de códigos QR no se pudo cargar del CDN. Por favor, conéctate a internet para cargarla por primera vez o asegúrate de que el archivo <code>qrcode.min.js</code> local esté disponible en el servidor.`;
+            } else {
+                generatePreview();
+            }
+
+            // Bind inputs to regenerate preview
+            ['prefix', 'start-num', 'quantity', 'padding', 'custom-w', 'custom-h', 'qr-size'].forEach(id => {
+                document.getElementById(id).addEventListener('input', generatePreview);
+            });
+        });
+
+        function toggleDimensions() {
+            const select = document.getElementById('dimensions');
+            const customDiv = document.getElementById('custom-dims');
+            if (select.value === 'custom') {
+                customDiv.style.display = 'flex';
+            } else {
+                customDiv.style.display = 'none';
+            }
+            generatePreview();
+        }
+
+        function getDimensions() {
+            const select = document.getElementById('dimensions').value;
+            if (select === '60x100') {
+                return { width: 60, height: 100 };
+            } else if (select === '100x60') {
+                return { width: 100, height: 60 };
+            } else {
+                const w = parseFloat(document.getElementById('custom-w').value) || 100;
+                const h = parseFloat(document.getElementById('custom-h').value) || 60;
+                return { width: w, height: h };
+            }
+        }
+
+        function generateCodes() {
+            const prefix = document.getElementById('prefix').value;
+            const startNum = parseInt(document.getElementById('start-num').value) || 1;
+            const quantity = parseInt(document.getElementById('quantity').value) || 50;
+            const padding = parseInt(document.getElementById('padding').value) || 4;
+
+            const codes = [];
+            for (let i = 0; i < quantity; i++) {
+                const num = (startNum + i).toString().padStart(padding, '0');
+                codes.push(`${prefix}${num}`);
+            }
+            return codes;
+        }
+
+        async function generatePreview() {
+            const grid = document.getElementById('preview-grid');
+            grid.innerHTML = '';
+            
+            if (typeof QRCode === 'undefined') return;
+
+            const codes = generateCodes();
+            document.getElementById('badge-count').innerText = `${codes.length} etiquetas`;
+
+            for (const code of codes) {
+                const card = document.createElement('div');
+                card.className = 'qr-card-preview';
+                
+                const canvas = document.createElement('canvas');
+                card.appendChild(canvas);
+                
+                const label = document.createElement('div');
+                label.className = 'code-label';
+                label.innerText = code;
+                card.appendChild(label);
+                
+                grid.appendChild(card);
+                
+                // Draw QR Code
+                QRCode.toCanvas(canvas, code, {
+                    width: 120,
+                    margin: 1,
+                    color: {
+                        dark: '#000000',
+                        light: '#ffffff'
+                    }
+                }, (err) => {
+                    if (err) console.error(err);
+                });
+            }
+        }
+
+        function downloadCSV() {
+            const codes = generateCodes();
+            let csvContent = "data:text/csv;charset=utf-8,Codigo,Texto\n";
+            codes.forEach(code => {
+                csvContent += `"${code}","${code}"\n`;
+            });
+
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            
+            const prefix = document.getElementById('prefix').value.replace(/[^a-zA-Z0-9]/g, '');
+            const quantity = codes.length;
+            link.setAttribute("download", `etiquetas_qr_${prefix}_x${quantity}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        async function printLabels() {
+            if (typeof QRCode === 'undefined') {
+                alert("No se puede imprimir porque la librería de códigos QR no está cargada.");
+                return;
+            }
+
+            const printArea = document.getElementById('print-area');
+            printArea.innerHTML = '';
+
+            const codes = generateCodes();
+            const { width, height } = getDimensions();
+
+            // Set document print CSS variables dynamically
+            const root = document.documentElement;
+            root.style.setProperty('--page-width', `${width}mm`);
+            root.style.setProperty('--page-height', `${height}mm`);
+            const qrSize = parseFloat(document.getElementById('qr-size').value) || 30;
+            root.style.setProperty('--qr-size', `${qrSize}mm`);
+
+            for (const code of codes) {
+                const label = document.createElement('div');
+                label.className = 'print-label';
+                
+                const canvas = document.createElement('canvas');
+                label.appendChild(canvas);
+                printArea.appendChild(label);
+
+                // Wait for render
+                await new Promise((resolve) => {
+                    QRCode.toCanvas(canvas, code, {
+                        width: 400, // High-res canvas for printing
+                        margin: 2,
+                        color: {
+                            dark: '#000000',
+                            light: '#ffffff'
+                        }
+                    }, (err) => {
+                        if (err) console.error(err);
+                        resolve();
+                    });
+                });
+            }
+
+            // Trigger Browser Print Dialog
+            window.print();
+        }
+    </script>
+</body>
+</html>

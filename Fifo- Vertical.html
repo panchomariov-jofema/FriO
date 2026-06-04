@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FriO — Serpentina Vertical · Acceso desde Abajo</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: #0f1117; color: #e0e0e0;
+  font-family: 'Segoe UI', sans-serif;
+  display: flex; flex-direction: column; align-items: center;
+  min-height: 100vh; padding: 20px;
+}
+h1 { font-size: 1.05rem; color: #4fc3f7; margin-bottom: 4px; letter-spacing: 0.05em; text-transform: uppercase; }
+.subtitle { font-size: 0.7rem; color: #778; margin-bottom: 12px; text-align: center; line-height: 1.8; }
+
+.top-bar {
+  width: 100%; max-width: 1020px;
+  display: flex; justify-content: space-between; align-items: center;
+  background: #1a1d26; border: 1px solid #2a2d3a; border-radius: 8px;
+  padding: 8px 16px; margin-bottom: 10px; font-size: 0.72rem;
+}
+.top-bar .cam { color: #4fc3f7; font-weight: 700; font-size: 0.85rem; }
+.top-bar .stock { color: #66bb6a; font-weight: 700; }
+
+.legend-wrap {
+  width: 100%; max-width: 1020px; background: #1a1d26; border: 1px solid #2a2d3a;
+  border-radius: 8px; padding: 10px 14px; margin-bottom: 10px;
+  display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+}
+.legend-title { font-size: 0.62rem; color: #556; text-transform: uppercase; letter-spacing: 0.08em; }
+.gradient-bar {
+  height: 12px; flex: 1; min-width: 120px; border-radius: 4px;
+  background: linear-gradient(90deg, rgb(21,101,192), rgb(21,201,242), rgb(150,255,90));
+}
+.legend-labels { display: flex; justify-content: space-between; font-size: 0.6rem; color: #667; }
+
+.camera-wrap {
+  background: #1a1d26; border: 1px solid #2a2d3a; border-radius: 10px;
+  padding: 14px 14px 6px; width: 100%; max-width: 1020px;
+}
+.col-headers { display: grid; grid-template-columns: 26px repeat(15, 1fr) 26px; gap: 2px; margin-bottom: 4px; }
+.col-headers span { text-align: center; font-size: 0.6rem; color: #667; font-weight: 700; }
+
+.grid-area { display: flex; flex-direction: column; gap: 2px; }
+.grid-row { display: grid; grid-template-columns: 26px repeat(15, 1fr) 26px; gap: 2px; }
+.row-label { display: flex; align-items: center; justify-content: center; font-size: 0.52rem; color: #556; font-weight: 700; }
+
+.cell {
+  height: 30px; border-radius: 4px;
+  border: 1px dashed #2a2d3a; background: #1e2130;
+  transition: transform 0.1s, box-shadow 0.1s;
+  position: relative; overflow: hidden;
+}
+.cell .coord-label {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  font-size: 0.42rem; color: #3a3d4a; font-weight: 700; pointer-events: none; z-index: 2;
+  transition: opacity 0.2s;
+}
+.cell .fill {
+  position: absolute; inset: 0; opacity: 0; transition: opacity 0.3s;
+}
+.cell .step-num {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  font-size: 0.38rem; color: rgba(255,255,255,0.75); font-weight: 900;
+  text-shadow: 0 0 4px rgba(0,0,0,0.9); pointer-events: none; z-index: 3;
+}
+.cell.active {
+  transform: scale(1.18);
+  box-shadow: 0 0 16px rgba(255,255,255,0.65);
+  z-index: 10;
+  border-color: #fff !important;
+}
+.cell.filled .coord-label { opacity: 0.25; }
+
+/* Arrow row at bottom */
+.arrow-row {
+  display: grid; grid-template-columns: 26px repeat(15, 1fr) 26px;
+  gap: 2px; margin-top: 6px; margin-bottom: 2px;
+}
+.arrow-cell {
+  text-align: center; font-size: 0.85rem; color: #4fc3f7;
+  animation: bounce 1.2s infinite;
+}
+.arrow-cell:nth-child(odd) { animation-delay: 0.2s; }
+@keyframes bounce {
+  0%,100% { transform: translateY(0); opacity:0.6; }
+  50% { transform: translateY(4px); opacity:1; }
+}
+
+.access-label { text-align: center; font-size: 0.68rem; color: #4fc3f7; font-weight: 700; margin-bottom: 10px; letter-spacing: 0.06em; }
+
+/* Progress */
+.progress-wrap { width: 100%; max-width: 1020px; margin-top: 10px; background: #1a1d26; border: 1px solid #2a2d3a; border-radius: 8px; padding: 10px 16px; }
+.progress-label { font-size: 0.65rem; color: #667; margin-bottom: 5px; display: flex; justify-content: space-between; }
+.progress-bar-bg { background: #252836; border-radius: 4px; height: 8px; overflow: hidden; }
+.progress-bar-fill { height: 100%; border-radius: 4px; background: linear-gradient(90deg,#1565c0,#4fc3f7,#66bb6a); transition: width 0.15s; width: 0%; }
+
+.phase-banner {
+  margin-top: 10px; width: 100%; max-width: 1020px;
+  border-radius: 8px; padding: 9px 16px; text-align: center;
+  font-size: 0.8rem; font-weight: 700;
+  background: #1a1d26; border: 1px solid #2a2d3a; color: #556;
+  transition: background 0.3s, border-color 0.3s, color 0.3s;
+}
+.phase-banner.col-change { background: #0d2d6e; border-color: #1976d2; color: #90caf9; }
+.phase-banner.done { background: #0a1a2a; border-color: #4fc3f7; color: #4fc3f7; }
+
+.info-bar {
+  margin-top: 10px; background: #1a1d26; border: 1px solid #2a2d3a;
+  border-radius: 8px; padding: 10px 16px; width: 100%; max-width: 1020px;
+  display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; text-align: center;
+}
+.info-item label { display: block; font-size: 0.58rem; color: #556; text-transform: uppercase; }
+.info-item span { font-size: 0.9rem; font-weight: 700; }
+
+.controls { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; justify-content: center; }
+button { padding: 8px 18px; border-radius: 6px; border: none; cursor: pointer; font-size: 0.78rem; font-weight: 600; }
+.btn-play { background: #1976d2; color: #fff; }
+.btn-reset { background: #37474f; color: #cfd8dc; }
+.btn-speed { background: #1e2130; color: #90a4ae; border: 1px solid #2a2d3a; font-size: 0.7rem; }
+.btn-speed.active { background: #37474f; color: #fff; border-color: #546e7a; }
+</style>
+</head>
+<body>
+
+<h1>FriO — Serpentina Vertical · Acceso desde Abajo</h1>
+<p class="subtitle">
+  Estrategia: A12→A1 · B12→B1 · C12→C1 · … · O12→O1<br>
+  15 columnas × 12 filas = <strong>180 coordenadas</strong> · Llenado columna por columna desde el acceso
+</p>
+
+<div class="top-bar">
+  <span class="cam">CÁMARA TIPO</span>
+  <span style="font-size:0.7rem;color:#90a4ae;">15 cols × 12 filas</span>
+  <span class="stock" id="stock-label">0 / 180 coordenadas (0.0%)</span>
+</div>
+
+<div class="legend-wrap">
+  <div>
+    <div class="legend-title">Orden de llenado</div>
+    <div style="display:flex;gap:6px;align-items:center;margin-top:4px;">
+      <span style="font-size:0.6rem;color:#667;">Inicio A12</span>
+      <div class="gradient-bar"></div>
+      <span style="font-size:0.6rem;color:#667;">Fin O1</span>
+    </div>
+  </div>
+</div>
+
+<div class="camera-wrap">
+  <div class="col-headers">
+    <span></span>
+    <span>A</span><span>B</span><span>C</span><span>D</span><span>E</span><span>F</span><span>G</span>
+    <span>H</span><span>I</span><span>J</span><span>K</span><span>L</span><span>M</span><span>N</span><span>O</span>
+    <span></span>
+  </div>
+  <div class="grid-area" id="grid"></div>
+  <div class="arrow-row" id="arrow-row"></div>
+  <div class="access-label">▲ ACCESO / PUERTA — Fila 12 (base)</div>
+</div>
+
+<div class="progress-wrap">
+  <div class="progress-label"><span>Progreso de llenado</span><span id="pct-label">0%</span></div>
+  <div class="progress-bar-bg"><div class="progress-bar-fill" id="prog-fill"></div></div>
+</div>
+
+<div class="phase-banner" id="phase-banner">Presiona ▶ Play para iniciar</div>
+
+<div class="info-bar">
+  <div class="info-item"><label>Coordenada</label><span id="info-coord">—</span></div>
+  <div class="info-item"><label>Columna</label><span id="info-col">—</span></div>
+  <div class="info-item"><label>Fila</label><span id="info-row">—</span></div>
+  <div class="info-item"><label>Paso</label><span id="info-step">0/180</span></div>
+  <div class="info-item"><label>% Lleno</label><span id="info-pct">0%</span></div>
+</div>
+
+<div class="controls">
+  <button class="btn-play" id="btn-play" onclick="togglePlay()">▶ Play</button>
+  <button class="btn-reset" onclick="resetAnim()">↺ Reset</button>
+  <button class="btn-speed active" id="spd-1" onclick="setSpeed(1)">1×</button>
+  <button class="btn-speed" id="spd-2" onclick="setSpeed(2)">2×</button>
+  <button class="btn-speed" id="spd-5" onclick="setSpeed(5)">5×</button>
+  <button class="btn-speed" id="spd-10" onclick="setSpeed(10)">10×</button>
+</div>
+
+<script>
+const COLS = ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O'];
+const ROWS = 12;
+const SEQUENCE = [["A", 12], ["A", 11], ["A", 10], ["A", 9], ["A", 8], ["A", 7], ["A", 6], ["A", 5], ["A", 4], ["A", 3], ["A", 2], ["A", 1], ["B", 12], ["B", 11], ["B", 10], ["B", 9], ["B", 8], ["B", 7], ["B", 6], ["B", 5], ["B", 4], ["B", 3], ["B", 2], ["B", 1], ["C", 12], ["C", 11], ["C", 10], ["C", 9], ["C", 8], ["C", 7], ["C", 6], ["C", 5], ["C", 4], ["C", 3], ["C", 2], ["C", 1], ["D", 12], ["D", 11], ["D", 10], ["D", 9], ["D", 8], ["D", 7], ["D", 6], ["D", 5], ["D", 4], ["D", 3], ["D", 2], ["D", 1], ["E", 12], ["E", 11], ["E", 10], ["E", 9], ["E", 8], ["E", 7], ["E", 6], ["E", 5], ["E", 4], ["E", 3], ["E", 2], ["E", 1], ["F", 12], ["F", 11], ["F", 10], ["F", 9], ["F", 8], ["F", 7], ["F", 6], ["F", 5], ["F", 4], ["F", 3], ["F", 2], ["F", 1], ["G", 12], ["G", 11], ["G", 10], ["G", 9], ["G", 8], ["G", 7], ["G", 6], ["G", 5], ["G", 4], ["G", 3], ["G", 2], ["G", 1], ["H", 12], ["H", 11], ["H", 10], ["H", 9], ["H", 8], ["H", 7], ["H", 6], ["H", 5], ["H", 4], ["H", 3], ["H", 2], ["H", 1], ["I", 12], ["I", 11], ["I", 10], ["I", 9], ["I", 8], ["I", 7], ["I", 6], ["I", 5], ["I", 4], ["I", 3], ["I", 2], ["I", 1], ["J", 12], ["J", 11], ["J", 10], ["J", 9], ["J", 8], ["J", 7], ["J", 6], ["J", 5], ["J", 4], ["J", 3], ["J", 2], ["J", 1], ["K", 12], ["K", 11], ["K", 10], ["K", 9], ["K", 8], ["K", 7], ["K", 6], ["K", 5], ["K", 4], ["K", 3], ["K", 2], ["K", 1], ["L", 12], ["L", 11], ["L", 10], ["L", 9], ["L", 8], ["L", 7], ["L", 6], ["L", 5], ["L", 4], ["L", 3], ["L", 2], ["L", 1], ["M", 12], ["M", 11], ["M", 10], ["M", 9], ["M", 8], ["M", 7], ["M", 6], ["M", 5], ["M", 4], ["M", 3], ["M", 2], ["M", 1], ["N", 12], ["N", 11], ["N", 10], ["N", 9], ["N", 8], ["N", 7], ["N", 6], ["N", 5], ["N", 4], ["N", 3], ["N", 2], ["N", 1], ["O", 12], ["O", 11], ["O", 10], ["O", 9], ["O", 8], ["O", 7], ["O", 6], ["O", 5], ["O", 4], ["O", 3], ["O", 2], ["O", 1]];
+const COORD_DATA = {"A12": {"step": 1, "color": "rgb(21,101,192)", "col": "A", "row": 12}, "A11": {"step": 2, "color": "rgb(21,102,192)", "col": "A", "row": 11}, "A10": {"step": 3, "color": "rgb(21,103,193)", "col": "A", "row": 10}, "A9": {"step": 4, "color": "rgb(21,104,193)", "col": "A", "row": 9}, "A8": {"step": 5, "color": "rgb(21,105,194)", "col": "A", "row": 8}, "A7": {"step": 6, "color": "rgb(21,106,194)", "col": "A", "row": 7}, "A6": {"step": 7, "color": "rgb(21,107,195)", "col": "A", "row": 6}, "A5": {"step": 8, "color": "rgb(21,108,195)", "col": "A", "row": 5}, "A4": {"step": 9, "color": "rgb(21,109,196)", "col": "A", "row": 4}, "A3": {"step": 10, "color": "rgb(21,111,197)", "col": "A", "row": 3}, "A2": {"step": 11, "color": "rgb(21,112,197)", "col": "A", "row": 2}, "A1": {"step": 12, "color": "rgb(21,113,198)", "col": "A", "row": 1}, "B12": {"step": 13, "color": "rgb(21,114,198)", "col": "B", "row": 12}, "B11": {"step": 14, "color": "rgb(21,115,199)", "col": "B", "row": 11}, "B10": {"step": 15, "color": "rgb(21,116,199)", "col": "B", "row": 10}, "B9": {"step": 16, "color": "rgb(21,117,200)", "col": "B", "row": 9}, "B8": {"step": 17, "color": "rgb(21,118,200)", "col": "B", "row": 8}, "B7": {"step": 18, "color": "rgb(21,119,201)", "col": "B", "row": 7}, "B6": {"step": 19, "color": "rgb(21,121,202)", "col": "B", "row": 6}, "B5": {"step": 20, "color": "rgb(21,122,202)", "col": "B", "row": 5}, "B4": {"step": 21, "color": "rgb(21,123,203)", "col": "B", "row": 4}, "B3": {"step": 22, "color": "rgb(21,124,203)", "col": "B", "row": 3}, "B2": {"step": 23, "color": "rgb(21,125,204)", "col": "B", "row": 2}, "B1": {"step": 24, "color": "rgb(21,126,204)", "col": "B", "row": 1}, "C12": {"step": 25, "color": "rgb(21,127,205)", "col": "C", "row": 12}, "C11": {"step": 26, "color": "rgb(21,128,205)", "col": "C", "row": 11}, "C10": {"step": 27, "color": "rgb(21,130,206)", "col": "C", "row": 10}, "C9": {"step": 28, "color": "rgb(21,131,207)", "col": "C", "row": 9}, "C8": {"step": 29, "color": "rgb(21,132,207)", "col": "C", "row": 8}, "C7": {"step": 30, "color": "rgb(21,133,208)", "col": "C", "row": 7}, "C6": {"step": 31, "color": "rgb(21,134,208)", "col": "C", "row": 6}, "C5": {"step": 32, "color": "rgb(21,135,209)", "col": "C", "row": 5}, "C4": {"step": 33, "color": "rgb(21,136,209)", "col": "C", "row": 4}, "C3": {"step": 34, "color": "rgb(21,137,210)", "col": "C", "row": 3}, "C2": {"step": 35, "color": "rgb(21,138,210)", "col": "C", "row": 2}, "C1": {"step": 36, "color": "rgb(21,140,211)", "col": "C", "row": 1}, "D12": {"step": 37, "color": "rgb(21,141,212)", "col": "D", "row": 12}, "D11": {"step": 38, "color": "rgb(21,142,212)", "col": "D", "row": 11}, "D10": {"step": 39, "color": "rgb(21,143,213)", "col": "D", "row": 10}, "D9": {"step": 40, "color": "rgb(21,144,213)", "col": "D", "row": 9}, "D8": {"step": 41, "color": "rgb(21,145,214)", "col": "D", "row": 8}, "D7": {"step": 42, "color": "rgb(21,146,214)", "col": "D", "row": 7}, "D6": {"step": 43, "color": "rgb(21,147,215)", "col": "D", "row": 6}, "D5": {"step": 44, "color": "rgb(21,149,216)", "col": "D", "row": 5}, "D4": {"step": 45, "color": "rgb(21,150,216)", "col": "D", "row": 4}, "D3": {"step": 46, "color": "rgb(21,151,217)", "col": "D", "row": 3}, "D2": {"step": 47, "color": "rgb(21,152,217)", "col": "D", "row": 2}, "D1": {"step": 48, "color": "rgb(21,153,218)", "col": "D", "row": 1}, "E12": {"step": 49, "color": "rgb(21,154,218)", "col": "E", "row": 12}, "E11": {"step": 50, "color": "rgb(21,155,219)", "col": "E", "row": 11}, "E10": {"step": 51, "color": "rgb(21,156,219)", "col": "E", "row": 10}, "E9": {"step": 52, "color": "rgb(21,157,220)", "col": "E", "row": 9}, "E8": {"step": 53, "color": "rgb(21,159,221)", "col": "E", "row": 8}, "E7": {"step": 54, "color": "rgb(21,160,221)", "col": "E", "row": 7}, "E6": {"step": 55, "color": "rgb(21,161,222)", "col": "E", "row": 6}, "E5": {"step": 56, "color": "rgb(21,162,222)", "col": "E", "row": 5}, "E4": {"step": 57, "color": "rgb(21,163,223)", "col": "E", "row": 4}, "E3": {"step": 58, "color": "rgb(21,164,223)", "col": "E", "row": 3}, "E2": {"step": 59, "color": "rgb(21,165,224)", "col": "E", "row": 2}, "E1": {"step": 60, "color": "rgb(21,166,224)", "col": "E", "row": 1}, "F12": {"step": 61, "color": "rgb(21,168,225)", "col": "F", "row": 12}, "F11": {"step": 62, "color": "rgb(21,169,226)", "col": "F", "row": 11}, "F10": {"step": 63, "color": "rgb(21,170,226)", "col": "F", "row": 10}, "F9": {"step": 64, "color": "rgb(21,171,227)", "col": "F", "row": 9}, "F8": {"step": 65, "color": "rgb(21,172,227)", "col": "F", "row": 8}, "F7": {"step": 66, "color": "rgb(21,173,228)", "col": "F", "row": 7}, "F6": {"step": 67, "color": "rgb(21,174,228)", "col": "F", "row": 6}, "F5": {"step": 68, "color": "rgb(21,175,229)", "col": "F", "row": 5}, "F4": {"step": 69, "color": "rgb(21,176,229)", "col": "F", "row": 4}, "F3": {"step": 70, "color": "rgb(21,178,230)", "col": "F", "row": 3}, "F2": {"step": 71, "color": "rgb(21,179,231)", "col": "F", "row": 2}, "F1": {"step": 72, "color": "rgb(21,180,231)", "col": "F", "row": 1}, "G12": {"step": 73, "color": "rgb(21,181,232)", "col": "G", "row": 12}, "G11": {"step": 74, "color": "rgb(21,182,232)", "col": "G", "row": 11}, "G10": {"step": 75, "color": "rgb(21,183,233)", "col": "G", "row": 10}, "G9": {"step": 76, "color": "rgb(21,184,233)", "col": "G", "row": 9}, "G8": {"step": 77, "color": "rgb(21,185,234)", "col": "G", "row": 8}, "G7": {"step": 78, "color": "rgb(21,187,235)", "col": "G", "row": 7}, "G6": {"step": 79, "color": "rgb(21,188,235)", "col": "G", "row": 6}, "G5": {"step": 80, "color": "rgb(21,189,236)", "col": "G", "row": 5}, "G4": {"step": 81, "color": "rgb(21,190,236)", "col": "G", "row": 4}, "G3": {"step": 82, "color": "rgb(21,191,237)", "col": "G", "row": 3}, "G2": {"step": 83, "color": "rgb(21,192,237)", "col": "G", "row": 2}, "G1": {"step": 84, "color": "rgb(21,193,238)", "col": "G", "row": 1}, "H12": {"step": 85, "color": "rgb(21,194,238)", "col": "H", "row": 12}, "H11": {"step": 86, "color": "rgb(21,195,239)", "col": "H", "row": 11}, "H10": {"step": 87, "color": "rgb(21,197,240)", "col": "H", "row": 10}, "H9": {"step": 88, "color": "rgb(21,198,240)", "col": "H", "row": 9}, "H8": {"step": 89, "color": "rgb(21,199,241)", "col": "H", "row": 8}, "H7": {"step": 90, "color": "rgb(21,200,241)", "col": "H", "row": 7}, "H6": {"step": 91, "color": "rgb(21,201,241)", "col": "H", "row": 6}, "H5": {"step": 92, "color": "rgb(23,201,239)", "col": "H", "row": 5}, "H4": {"step": 93, "color": "rgb(24,202,237)", "col": "H", "row": 4}, "H3": {"step": 94, "color": "rgb(26,203,236)", "col": "H", "row": 3}, "H2": {"step": 95, "color": "rgb(27,203,234)", "col": "H", "row": 2}, "H1": {"step": 96, "color": "rgb(28,204,232)", "col": "H", "row": 1}, "I12": {"step": 97, "color": "rgb(30,204,230)", "col": "I", "row": 12}, "I11": {"step": 98, "color": "rgb(31,205,229)", "col": "I", "row": 11}, "I10": {"step": 99, "color": "rgb(33,206,227)", "col": "I", "row": 10}, "I9": {"step": 100, "color": "rgb(34,206,225)", "col": "I", "row": 9}, "I8": {"step": 101, "color": "rgb(36,207,224)", "col": "I", "row": 8}, "I7": {"step": 102, "color": "rgb(37,207,222)", "col": "I", "row": 7}, "I6": {"step": 103, "color": "rgb(39,208,220)", "col": "I", "row": 6}, "I5": {"step": 104, "color": "rgb(40,209,219)", "col": "I", "row": 5}, "I4": {"step": 105, "color": "rgb(41,209,217)", "col": "I", "row": 4}, "I3": {"step": 106, "color": "rgb(43,210,215)", "col": "I", "row": 3}, "I2": {"step": 107, "color": "rgb(44,210,213)", "col": "I", "row": 2}, "I1": {"step": 108, "color": "rgb(46,211,212)", "col": "I", "row": 1}, "J12": {"step": 109, "color": "rgb(47,212,210)", "col": "J", "row": 12}, "J11": {"step": 110, "color": "rgb(49,212,208)", "col": "J", "row": 11}, "J10": {"step": 111, "color": "rgb(50,213,207)", "col": "J", "row": 10}, "J9": {"step": 112, "color": "rgb(51,213,205)", "col": "J", "row": 9}, "J8": {"step": 113, "color": "rgb(53,214,203)", "col": "J", "row": 8}, "J7": {"step": 114, "color": "rgb(54,215,202)", "col": "J", "row": 7}, "J6": {"step": 115, "color": "rgb(56,215,200)", "col": "J", "row": 6}, "J5": {"step": 116, "color": "rgb(57,216,198)", "col": "J", "row": 5}, "J4": {"step": 117, "color": "rgb(59,216,196)", "col": "J", "row": 4}, "J3": {"step": 118, "color": "rgb(60,217,195)", "col": "J", "row": 3}, "J2": {"step": 119, "color": "rgb(62,218,193)", "col": "J", "row": 2}, "J1": {"step": 120, "color": "rgb(63,218,191)", "col": "J", "row": 1}, "K12": {"step": 121, "color": "rgb(64,219,190)", "col": "K", "row": 12}, "K11": {"step": 122, "color": "rgb(66,220,188)", "col": "K", "row": 11}, "K10": {"step": 123, "color": "rgb(67,220,186)", "col": "K", "row": 10}, "K9": {"step": 124, "color": "rgb(69,221,185)", "col": "K", "row": 9}, "K8": {"step": 125, "color": "rgb(70,221,183)", "col": "K", "row": 8}, "K7": {"step": 126, "color": "rgb(72,222,181)", "col": "K", "row": 7}, "K6": {"step": 127, "color": "rgb(73,223,180)", "col": "K", "row": 6}, "K5": {"step": 128, "color": "rgb(75,223,178)", "col": "K", "row": 5}, "K4": {"step": 129, "color": "rgb(76,224,176)", "col": "K", "row": 4}, "K3": {"step": 130, "color": "rgb(77,224,174)", "col": "K", "row": 3}, "K2": {"step": 131, "color": "rgb(79,225,173)", "col": "K", "row": 2}, "K1": {"step": 132, "color": "rgb(80,226,171)", "col": "K", "row": 1}, "L12": {"step": 133, "color": "rgb(82,226,169)", "col": "L", "row": 12}, "L11": {"step": 134, "color": "rgb(83,227,168)", "col": "L", "row": 11}, "L10": {"step": 135, "color": "rgb(85,227,166)", "col": "L", "row": 10}, "L9": {"step": 136, "color": "rgb(86,228,164)", "col": "L", "row": 9}, "L8": {"step": 137, "color": "rgb(88,229,163)", "col": "L", "row": 8}, "L7": {"step": 138, "color": "rgb(89,229,161)", "col": "L", "row": 7}, "L6": {"step": 139, "color": "rgb(90,230,159)", "col": "L", "row": 6}, "L5": {"step": 140, "color": "rgb(92,230,157)", "col": "L", "row": 5}, "L4": {"step": 141, "color": "rgb(93,231,156)", "col": "L", "row": 4}, "L3": {"step": 142, "color": "rgb(95,232,154)", "col": "L", "row": 3}, "L2": {"step": 143, "color": "rgb(96,232,152)", "col": "L", "row": 2}, "L1": {"step": 144, "color": "rgb(98,233,151)", "col": "L", "row": 1}, "M12": {"step": 145, "color": "rgb(99,233,149)", "col": "M", "row": 12}, "M11": {"step": 146, "color": "rgb(100,234,147)", "col": "M", "row": 11}, "M10": {"step": 147, "color": "rgb(102,235,146)", "col": "M", "row": 10}, "M9": {"step": 148, "color": "rgb(103,235,144)", "col": "M", "row": 9}, "M8": {"step": 149, "color": "rgb(105,236,142)", "col": "M", "row": 8}, "M7": {"step": 150, "color": "rgb(106,236,140)", "col": "M", "row": 7}, "M6": {"step": 151, "color": "rgb(108,237,139)", "col": "M", "row": 6}, "M5": {"step": 152, "color": "rgb(109,238,137)", "col": "M", "row": 5}, "M4": {"step": 153, "color": "rgb(111,238,135)", "col": "M", "row": 4}, "M3": {"step": 154, "color": "rgb(112,239,134)", "col": "M", "row": 3}, "M2": {"step": 155, "color": "rgb(113,239,132)", "col": "M", "row": 2}, "M1": {"step": 156, "color": "rgb(115,240,130)", "col": "M", "row": 1}, "N12": {"step": 157, "color": "rgb(116,241,129)", "col": "N", "row": 12}, "N11": {"step": 158, "color": "rgb(118,241,127)", "col": "N", "row": 11}, "N10": {"step": 159, "color": "rgb(119,242,125)", "col": "N", "row": 10}, "N9": {"step": 160, "color": "rgb(121,242,123)", "col": "N", "row": 9}, "N8": {"step": 161, "color": "rgb(122,243,122)", "col": "N", "row": 8}, "N7": {"step": 162, "color": "rgb(124,244,120)", "col": "N", "row": 7}, "N6": {"step": 163, "color": "rgb(125,244,118)", "col": "N", "row": 6}, "N5": {"step": 164, "color": "rgb(126,245,117)", "col": "N", "row": 5}, "N4": {"step": 165, "color": "rgb(128,245,115)", "col": "N", "row": 4}, "N3": {"step": 166, "color": "rgb(129,246,113)", "col": "N", "row": 3}, "N2": {"step": 167, "color": "rgb(131,247,112)", "col": "N", "row": 2}, "N1": {"step": 168, "color": "rgb(132,247,110)", "col": "N", "row": 1}, "O12": {"step": 169, "color": "rgb(134,248,108)", "col": "O", "row": 12}, "O11": {"step": 170, "color": "rgb(135,248,106)", "col": "O", "row": 11}, "O10": {"step": 171, "color": "rgb(137,249,105)", "col": "O", "row": 10}, "O9": {"step": 172, "color": "rgb(138,250,103)", "col": "O", "row": 9}, "O8": {"step": 173, "color": "rgb(139,250,101)", "col": "O", "row": 8}, "O7": {"step": 174, "color": "rgb(141,251,100)", "col": "O", "row": 7}, "O6": {"step": 175, "color": "rgb(142,251,98)", "col": "O", "row": 6}, "O5": {"step": 176, "color": "rgb(144,252,96)", "col": "O", "row": 5}, "O4": {"step": 177, "color": "rgb(145,253,95)", "col": "O", "row": 4}, "O3": {"step": 178, "color": "rgb(147,253,93)", "col": "O", "row": 3}, "O2": {"step": 179, "color": "rgb(148,254,91)", "col": "O", "row": 2}, "O1": {"step": 180, "color": "rgb(150,255,90)", "col": "O", "row": 1}};
+const TOTAL = SEQUENCE.length;
+
+// Build grid
+const grid = document.getElementById('grid');
+const cells = {};
+for (let row = 1; row <= ROWS; row++) {
+  const rowEl = document.createElement('div'); rowEl.className = 'grid-row';
+  const l1 = document.createElement('div'); l1.className = 'row-label'; l1.textContent = row; rowEl.appendChild(l1);
+  for (const col of COLS) {
+    const cell = document.createElement('div'); cell.className = 'cell';
+    const coordLbl = document.createElement('div'); coordLbl.className = 'coord-label'; coordLbl.textContent = col + row;
+    const fill = document.createElement('div'); fill.className = 'fill';
+    const stepNum = document.createElement('div'); stepNum.className = 'step-num';
+    cell.appendChild(coordLbl); cell.appendChild(fill); cell.appendChild(stepNum);
+    rowEl.appendChild(cell);
+    cells[col + row] = cell;
+  }
+  const l2 = document.createElement('div'); l2.className = 'row-label'; l2.textContent = row; rowEl.appendChild(l2);
+  grid.appendChild(rowEl);
+}
+
+// Arrow row
+const arrowRow = document.getElementById('arrow-row');
+const emptyArrow = document.createElement('div'); emptyArrow.className = 'arrow-cell'; arrowRow.appendChild(emptyArrow);
+COLS.forEach(() => {
+  const a = document.createElement('div'); a.className = 'arrow-cell'; a.textContent = '↑'; arrowRow.appendChild(a);
+});
+const emptyArrow2 = document.createElement('div'); emptyArrow2.className = 'arrow-cell'; arrowRow.appendChild(emptyArrow2);
+
+let curStep = 0, playing = false, timer = null, speed = 1, prevActive = null, lastCol = null;
+function getDelay() { return Math.max(20, 220 / speed); }
+
+function tick() {
+  if (prevActive) { prevActive.classList.remove('active'); prevActive = null; }
+  if (curStep >= TOTAL) {
+    playing = false; clearInterval(timer);
+    document.getElementById('btn-play').textContent = '▶ Play';
+    const b = document.getElementById('phase-banner');
+    b.className = 'phase-banner done';
+    b.textContent = '✓ Cámara llena — 180 coordenadas completadas · A12→O1';
+    return;
+  }
+  const [col, row] = SEQUENCE[curStep];
+  const key = col + row;
+  const data = COORD_DATA[key];
+  const cell = cells[key];
+
+  cell.querySelector('.fill').style.background = data.color;
+  cell.querySelector('.fill').style.opacity = '1';
+  cell.querySelector('.step-num').textContent = data.step;
+  cell.classList.add('active', 'filled');
+  prevActive = cell;
+
+  const pct = (data.step / TOTAL * 100).toFixed(1);
+  document.getElementById('info-coord').textContent = key;
+  document.getElementById('info-col').textContent = col;
+  document.getElementById('info-row').textContent = row;
+  document.getElementById('info-step').textContent = data.step + '/180';
+  document.getElementById('info-pct').textContent = pct + '%';
+  document.getElementById('stock-label').textContent = data.step + ' / 180 coordenadas (' + pct + '%)';
+  document.getElementById('pct-label').textContent = pct + '%';
+  document.getElementById('prog-fill').style.width = pct + '%';
+
+  const b = document.getElementById('phase-banner');
+  const colIdx = COLS.indexOf(col) + 1;
+  if (col !== lastCol) {
+    b.className = 'phase-banner col-change';
+    b.textContent = `▶ Nueva columna: ${col} (col ${colIdx}/15) — llenando de fila 12 hacia fila 1`;
+    lastCol = col;
+  } else {
+    b.className = 'phase-banner';
+    b.style.borderColor = data.color + '88';
+    b.style.color = data.color;
+    b.style.background = '#1a1d26';
+    b.textContent = `Coordenada ${key} · Columna ${col} (${colIdx}/15) · Fila ${row} · Paso ${data.step}`;
+  }
+  curStep++;
+}
+
+function togglePlay() {
+  if (playing) { playing = false; clearInterval(timer); document.getElementById('btn-play').textContent = '▶ Play'; }
+  else { playing = true; document.getElementById('btn-play').textContent = '⏸ Pausa'; timer = setInterval(tick, getDelay()); }
+}
+
+function resetAnim() {
+  playing = false; clearInterval(timer); curStep = 0; prevActive = null; lastCol = null;
+  document.getElementById('btn-play').textContent = '▶ Play';
+  for (const key in cells) {
+    const c = cells[key];
+    c.classList.remove('active','filled');
+    c.querySelector('.fill').style.opacity = '0';
+    c.querySelector('.step-num').textContent = '';
+    c.querySelector('.coord-label').style.opacity = '';
+  }
+  ['info-coord','info-col','info-row','info-pct'].forEach(id => document.getElementById(id).textContent = '—');
+  document.getElementById('info-step').textContent = '0/180';
+  document.getElementById('stock-label').textContent = '0 / 180 coordenadas (0.0%)';
+  document.getElementById('pct-label').textContent = '0%';
+  document.getElementById('prog-fill').style.width = '0%';
+  const b = document.getElementById('phase-banner');
+  b.className = 'phase-banner'; b.style.cssText = '';
+  b.textContent = 'Presiona ▶ Play para iniciar';
+}
+
+function setSpeed(s) {
+  speed = s;
+  ['spd-1','spd-2','spd-5','spd-10'].forEach(id => { const el = document.getElementById(id); if(el) el.classList.remove('active'); });
+  document.getElementById('spd-'+s).classList.add('active');
+  if (playing) { clearInterval(timer); timer = setInterval(tick, getDelay()); }
+}
+</script>
+</body>
+</html>

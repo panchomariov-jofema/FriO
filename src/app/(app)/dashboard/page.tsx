@@ -309,13 +309,13 @@ export default function DashboardPage() {
     }, [firestore]);
 
 
-    const { data: chamberLots, loading: loadingChamber } = useCollection<ChamberLot>(chamberLotsQuery);
-    const { data: otherFruitReceptions, loading: loadingOtherFruit } = useCollection<OtherFruitReception>(createDateFilteredQuery('otherFruitReceptions', 'createdAt'));
-    const { data: otherFruitMovements, loading: loadingOtherFruitMovements } = useCollection<OtherFruitMovement>(createDateFilteredQuery('otherFruitMovements', 'createdAt'));
-    const { data: processingLots, loading: loadingProcessing } = useCollection<ProcessingLot>(createDateFilteredQuery('processingLots', 'createdAt'));
-    const { data: dispatches, loading: loadingDispatches } = useCollection<Dispatch>(createDateFilteredQuery('dispatches', 'createdAt'));
-    const { data: receptionLots, loading: loadingReception } = useCollection<ReceptionLot>(createDateFilteredQuery('receptionLots', 'createdAt'));
-    const { data: hidrocoolerLots, loading: loadingHidroLots } = useCollection<HidrocoolerLot>(createDateFilteredQuery('hidrocoolerLots', 'receptionDate'));
+    const { data: chamberLots, isLoading: loadingChamber } = useCollection<ChamberLot>(chamberLotsQuery);
+    const { data: otherFruitReceptions, isLoading: loadingOtherFruit } = useCollection<OtherFruitReception>(createDateFilteredQuery('otherFruitReceptions', 'createdAt'));
+    const { data: otherFruitMovements, isLoading: loadingOtherFruitMovements } = useCollection<OtherFruitMovement>(createDateFilteredQuery('otherFruitMovements', 'createdAt'));
+    const { data: processingLots, isLoading: loadingProcessing } = useCollection<ProcessingLot>(createDateFilteredQuery('processingLots', 'createdAt'));
+    const { data: dispatches, isLoading: loadingDispatches } = useCollection<Dispatch>(createDateFilteredQuery('dispatches', 'createdAt'));
+    const { data: receptionLots, isLoading: loadingReception } = useCollection<ReceptionLot>(createDateFilteredQuery('receptionLots', 'createdAt'));
+    const { data: hidrocoolerLots, isLoading: loadingHidroLots } = useCollection<HidrocoolerLot>(createDateFilteredQuery('hidrocoolerLots', 'receptionDate'));
     
     React.useEffect(() => {
         if (!firestore) return;
@@ -850,8 +850,9 @@ export default function DashboardPage() {
                                 {loading ? (
                                     <Skeleton className="h-8 w-3/4" />
                                 ) : (
-                                    <div className="text-xl font-bold">
-                                        {latestTemp ? `${latestTemp.temperature.toFixed(1)}°C` : '--.-°C'}
+                                    <div className="text-lg font-bold flex flex-col leading-tight">
+                                        <span className="text-base">T: {latestTemp ? `${latestTemp.temperature.toFixed(1)}°C` : '--.-°C'}</span>
+                                        <span className="text-xs text-muted-foreground font-normal">H: {latestTemp && latestTemp.humidity !== undefined ? `${latestTemp.humidity}%` : '--%'}</span>
                                     </div>
                                 )}
                             </CardContent>

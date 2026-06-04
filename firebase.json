@@ -1,10 +1,12 @@
 {
   "firestore": {
-    "rules": "firestore.rules"
+    "rules": "firestore.rules",
+    "database": "(default)"
   },
   "apphosting": {
-    "backendId": "studio",
-    "rootDir": "./"
+    "backendId": "frigomanager",
+    "rootDir": "./",
+    "alwaysDeployFromSource": true
   },
   "auth": {
     "providers": {
