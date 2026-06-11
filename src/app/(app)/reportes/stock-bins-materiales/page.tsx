@@ -100,6 +100,10 @@ export default function BinMaterialStockReportPage() {
             .sort((a, b) => a.exporterName.localeCompare(b.exporterName) || a.materialCode.localeCompare(b.materialCode));
     }, [loading, exporters, movements, chamberLots, dispatches, materials]);
 
+    const totalStockQuantity = React.useMemo(() => {
+        return stockData.reduce((sum, item) => sum + item.quantity, 0);
+    }, [stockData]);
+
     const handleExport = () => {
         const headers = [
             { key: 'exporterName', label: 'Exportador' },
@@ -135,14 +139,20 @@ export default function BinMaterialStockReportPage() {
                                 {loading ? (
                                     Array.from({ length: 5 }).map((_, i) => <TableRow key={i}><TableCell colSpan={4}><Skeleton className="h-4 w-full" /></TableCell></TableRow>)
                                 ) : stockData.length > 0 ? (
-                                    stockData.map((item, idx) => (
-                                        <TableRow key={idx}>
-                                            <TableCell className="text-sm">{item.exporterName}</TableCell>
-                                            <TableCell className="font-mono text-xs">{item.materialCode}</TableCell>
-                                            <TableCell className="font-medium text-sm">{item.materialName}</TableCell>
-                                            <TableCell className="text-right font-bold text-sm">{item.quantity.toLocaleString('es-CL')}</TableCell>
+                                    <>
+                                        {stockData.map((item, idx) => (
+                                            <TableRow key={idx}>
+                                                <TableCell className="text-sm">{item.exporterName}</TableCell>
+                                                <TableCell className="font-mono text-xs">{item.materialCode}</TableCell>
+                                                <TableCell className="font-medium text-sm">{item.materialName}</TableCell>
+                                                <TableCell className="text-right font-bold text-sm">{item.quantity.toLocaleString('es-CL')}</TableCell>
+                                            </TableRow>
+                                        ))}
+                                        <TableRow className="bg-muted/30 font-bold border-t-2">
+                                            <TableCell colSpan={3} className="text-sm font-bold">Total General</TableCell>
+                                            <TableCell className="text-right font-black text-sm">{totalStockQuantity.toLocaleString('es-CL')}</TableCell>
                                         </TableRow>
-                                    ))
+                                    </>
                                 ) : (
                                     <TableRow><TableCell colSpan={4} className="h-24 text-center">No hay datos de stock registrados.</TableCell></TableRow>
                                 )}

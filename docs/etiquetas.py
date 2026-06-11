@@ -33,10 +33,6 @@ def generar_etiquetas():
         for index, row in df.iterrows():
             codigo = str(row['Codigo'])
             
-            # Dibujar Texto Superior
-            c.setFont("Helvetica-Bold", 16)
-            c.drawCentredString(50*mm, 52*mm, "FriO - WMS")
-            
             # Generar QR
             qr_code = qr.QrCodeWidget(codigo)
             bounds = qr_code.getBounds()
@@ -48,12 +44,8 @@ def generar_etiquetas():
             d = Drawing(size_mm, size_mm, transform=[factor, 0, 0, factor, 0, 0])
             d.add(qr_code)
             
-            # Dibujar el QR en el PDF usando el motor renderPDF
-            renderPDF.draw(d, c, 32.5*mm, 12*mm)
-            
-            # Dibujar Texto Inferior (ID)
-            c.setFont("Helvetica-Bold", 12)
-            c.drawCentredString(50*mm, 6*mm, f"BIN: {codigo}")
+            # Dibujar el QR centrado en el PDF usando el motor renderPDF (32.5mm horizontal, 12.5mm vertical)
+            renderPDF.draw(d, c, 32.5*mm, 12.5*mm)
             
             c.showPage()
             

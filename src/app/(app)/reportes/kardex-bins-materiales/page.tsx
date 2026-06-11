@@ -63,6 +63,7 @@ const editMovementSchema = z.object({
   documento: z.string().min(1, 'Obligatorio'),
   driverName: z.string().optional(),
   cantidad: z.coerce.number().positive('Debe ser mayor a 0'),
+  producerId: z.string().min(1, 'Obligatorio'),
 });
 
 function convertToCSV(data: any[], headers: {key: string, label: string}[]) {
@@ -151,13 +152,15 @@ export default function BinMaterialKardexReportPage() {
 
     React.useEffect(() => {
         if (itemToEdit) {
+            const movSnap = (movements || []).find(m => m.id === itemToEdit.movementId);
             editForm.reset({
                 documento: itemToEdit.documento || '',
                 driverName: itemToEdit.driverName || '',
                 cantidad: itemToEdit.cantidad,
+                producerId: movSnap?.producerId || '',
             });
         }
-    }, [itemToEdit, editForm]);
+    }, [itemToEdit, editForm, movements]);
 
     const loading = loadingMovements || loadingChamberLots || loadingDispatches || loadingExporters || loadingProducers || loadingReceptions;
 
@@ -496,6 +499,7 @@ export default function BinMaterialKardexReportPage() {
             await updateDoc(movementRef, {
                 document: values.documento,
                 driverName: values.driverName,
+                producerId: values.producerId,
                 items: newItems,
             });
 
@@ -737,6 +741,44 @@ export default function BinMaterialKardexReportPage() {
                                     <FormItem>
                                         <FormLabel>N° Documento</FormLabel>
                                         <FormControl><Input {...field} /></FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                            <FormField
+                                control={editForm.control}
+                                name="producerId"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Productor</FormLabel>
+                                        <Select onValueChange={field.onChange} value={field.value}>
+                                            <FormControl>
+                                                <SelectTrigger>
+                                                    <SelectValue placeholder="Seleccione un productor" />
+                                                </SelectTrigger>
+                                            </FormControl>
+                                            <SelectContent>
+                                                {(() => {
+                                                    const uniqueProdsMap = new Map<string, typeof producers[0]>();
+                                                    (producers || []).forEach(p => {
+                                                        if (!uniqueProdsMap.has(p.producerId) || p.status !== 'inactivo') {
+                                                            uniqueProdsMap.set(p.producerId, p);
+                                                        }
+                                                    });
+                                                    const currentProd = (producers || []).find(p => p.producerId === field.value);
+                                                    if (currentProd && !uniqueProdsMap.has(field.value)) {
+                                                        uniqueProdsMap.set(field.value, currentProd);
+                                                    }
+                                                    return Array.from(uniqueProdsMap.values())
+                                                        .filter(p => p.status !== 'inactivo' || p.producerId === field.value)
+                                                        .map((prod) => (
+                                                            <SelectItem key={prod.id} value={prod.producerId}>
+                                                                {prod.shortName} ({prod.producerId})
+                                                            </SelectItem>
+                                                        ));
+                                                })()}
+                                            </SelectContent>
+                                        </Select>
                                         <FormMessage />
                                     </FormItem>
                                 )}

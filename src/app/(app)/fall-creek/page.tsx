@@ -19,7 +19,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { cn } from '@/lib/utils';
 import { chambersConfig } from '@/lib/chambers-config';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { CheckCircle2, CircleDot, Eye, Pencil, Trash2, X, Move, QrCode, ClipboardCheck, History, PackageCheck } from 'lucide-react';
+import { CheckCircle2, CircleDot, Eye, Pencil, Trash2, X, Move, ClipboardCheck, History, PackageCheck } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -32,68 +32,9 @@ import { FileUp, ClipboardList, Loader2, Search, Printer, Download } from 'lucid
 import type { PendingItem } from '@/lib/types';
 import { StoreOtherFruitDialog } from '@/components/other-fruit/StoreOtherFruitDialog';
 import { ChamberTemperatureInput } from '@/components/camaras/ChamberTemperatureInput';
-import QRCode from 'qrcode';
+import { mockStoredItems } from '@/lib/mock-chamber5';
 
 
-interface QRLabelItemProps {
-    code: string;
-    width?: number;
-    height?: number;
-    showLabelText?: boolean;
-}
-
-function QRLabelItem({ code, width = 100, height = 100, showLabelText = true }: QRLabelItemProps) {
-    const canvasRef = React.useRef<HTMLCanvasElement>(null);
-
-    React.useEffect(() => {
-        if (canvasRef.current) {
-            QRCode.toCanvas(canvasRef.current, code, {
-                width: width,
-                margin: 1,
-                color: {
-                    dark: '#000000',
-                    light: '#ffffff'
-                }
-            }, (error) => {
-                if (error) console.error("Error generating QR code:", error);
-            });
-        }
-    }, [code, width]);
-
-    return (
-        <div className="flex flex-col items-center justify-center p-3 bg-white rounded-lg border border-dashed border-slate-300">
-            <canvas ref={canvasRef} className="max-w-full" style={{ width: `${width}px`, height: `${height}px` }} />
-            {showLabelText && (
-                <span className="mt-2 text-xs font-mono font-bold text-slate-500">{code}</span>
-            )}
-        </div>
-    );
-}
-
-function PrintableQRLabel({ code }: { code: string }) {
-    const canvasRef = React.useRef<HTMLCanvasElement>(null);
-
-    React.useEffect(() => {
-        if (canvasRef.current) {
-            QRCode.toCanvas(canvasRef.current, code, {
-                width: 300,
-                margin: 2,
-                color: {
-                    dark: '#000000',
-                    light: '#ffffff'
-                }
-            }, (error) => {
-                if (error) console.error("Error generating QR code:", error);
-            });
-        }
-    }, [code]);
-
-    return (
-        <div className="print-label">
-            <canvas ref={canvasRef} />
-        </div>
-    );
-}
 
 const FALL_CREEK_CLIENT_NAME = 'FALL CREEK';
 
@@ -160,53 +101,7 @@ export default function FallCreekPage() {
     const [storingItem, setStoringItem] = React.useState<PendingItem | null>(null);
     const fileInputRef = React.useRef<HTMLInputElement>(null);
 
-    // States for QR generator
-    const [labelPrefix, setLabelPrefix] = React.useState('BIN-FC-');
-    const [labelStartNum, setLabelStartNum] = React.useState(1);
-    const [labelQuantity, setLabelQuantity] = React.useState(50);
-    const [labelPadding, setLabelPadding] = React.useState(4);
-    const [labelDimensions, setLabelDimensions] = React.useState('100x60');
-    const [customWidth, setCustomWidth] = React.useState(100);
-    const [customHeight, setCustomHeight] = React.useState(60);
-    const [qrPrintSize, setQrPrintSize] = React.useState(30);
 
-    const generatedCodes = React.useMemo(() => {
-        const codes: string[] = [];
-        const start = Number(labelStartNum) || 1;
-        const qty = Number(labelQuantity) || 0;
-        const pad = Number(labelPadding) || 4;
-        for (let i = 0; i < qty; i++) {
-            const num = (start + i).toString().padStart(pad, '0');
-            codes.push(`${labelPrefix}${num}`);
-        }
-        return codes;
-    }, [labelPrefix, labelStartNum, labelQuantity, labelPadding]);
-
-    const handleDownloadCSV = () => {
-        let csvContent = "data:text/csv;charset=utf-8,Codigo,Texto\n";
-        generatedCodes.forEach(code => {
-            csvContent += `"${code}","${code}"\n`;
-        });
-
-        const encodedUri = encodeURI(csvContent);
-        const link = document.createElement("a");
-        link.setAttribute("href", encodedUri);
-        
-        const cleanPrefix = labelPrefix.replace(/[^a-zA-Z0-9]/g, '');
-        link.setAttribute("download", `etiquetas_qr_${cleanPrefix}_x${generatedCodes.length}.csv`);
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        
-        toast({
-            title: "CSV Descargado",
-            description: `Se han exportado ${generatedCodes.length} códigos para BarTender.`
-        });
-    };
-
-    const handlePrintLabels = () => {
-        window.print();
-    };
 
     const handleConfirmStorage = async (data: { chamberId: string; coordinate: string; totalQuantity: number }) => {
         // Logic removed as client doesn't manage physical storage
@@ -232,8 +127,8 @@ export default function FallCreekPage() {
                     type: 'otherFruit' as const,
                     displayId: item.productCode,
                     lotIdForColor: item.clientLotId 
-                        ? `${reception.displayLotId || reception.id}-${item.clientLotId}` 
-                        : (reception.displayLotId || reception.id),
+                        ? `${reception.displayLotId || reception.id}-${item.clientLotId}-${item.productName}` 
+                        : `${reception.displayLotId || reception.id}-${item.productName}`,
                     ownerName: reception.clientName,
                     varietyOrProduct: item.productName,
                     quantity: item.quantity,
@@ -245,8 +140,13 @@ export default function FallCreekPage() {
                     clientLotId: item.clientLotId,
                     netWeightPerBin: 0,
                     isMixedVariety: item.isMixedVariety,
+                    observation: item.observation,
                 }))
             );
+
+        if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
+            fallCreekStoredItems.push(...mockStoredItems);
+        }
         
         const pendingItems: PendingItem[] = (allReceptions || [])
             .filter(r => r.clientId === fallCreekClient.clientId && (r.status === 'Recibido' || r.status === 'Parcialmente Almacenado'))
@@ -796,10 +696,6 @@ export default function FallCreekPage() {
                             <History className="mr-2 h-4 w-4" />
                             Historial
                         </TabsTrigger>
-                        <TabsTrigger value="labels" className="data-[state=active]:bg-[#004b8d] data-[state=active]:text-white">
-                            <QrCode className="mr-2 h-4 w-4" />
-                            Generar Etiquetas
-                        </TabsTrigger>
                     </TabsList>
                 </div>
 
@@ -1128,196 +1024,6 @@ export default function FallCreekPage() {
                     </Tabs>
                 </TabsContent>
 
-                <TabsContent value="labels" className="space-y-6">
-                    <Card className="border-t-4 border-t-[#004b8d]">
-                        <CardHeader>
-                            <CardTitle className="text-xl text-[#004b8d] flex items-center gap-2">
-                                <QrCode className="h-5 w-5" />
-                                Generador Masivo de Etiquetas QR
-                            </CardTitle>
-                            <CardDescription>
-                                Configure la numeración secuencial de los Bins para generar los códigos de barra correspondientes.
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-6">
-                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-6 gap-4 p-4 bg-muted/30 rounded-lg border">
-                                <div className="space-y-1">
-                                    <Label htmlFor="label-prefix">Prefijo</Label>
-                                    <Input 
-                                        id="label-prefix" 
-                                        value={labelPrefix} 
-                                        onChange={e => setLabelPrefix(e.target.value)} 
-                                        placeholder="Ej: BIN-FC-" 
-                                    />
-                                </div>
-                                <div className="space-y-1">
-                                    <Label htmlFor="label-start">N° Inicial</Label>
-                                    <Input 
-                                        id="label-start" 
-                                        type="number" 
-                                        value={labelStartNum} 
-                                        onChange={e => setLabelStartNum(parseInt(e.target.value) || 1)} 
-                                        min="1" 
-                                    />
-                                </div>
-                                <div className="space-y-1">
-                                    <Label htmlFor="label-qty">Cantidad</Label>
-                                    <Input 
-                                        id="label-qty" 
-                                        type="number" 
-                                        value={labelQuantity} 
-                                        onChange={e => setLabelQuantity(parseInt(e.target.value) || 0)} 
-                                        min="1" 
-                                        max="500" 
-                                    />
-                                </div>
-                                <div className="space-y-1">
-                                    <Label htmlFor="label-pad">Padding (Dígitos)</Label>
-                                    <Input 
-                                        id="label-pad" 
-                                        type="number" 
-                                        value={labelPadding} 
-                                        onChange={e => setLabelPadding(parseInt(e.target.value) || 1)} 
-                                        min="1" 
-                                        max="10" 
-                                    />
-                                </div>
-                                <div className="space-y-1">
-                                    <Label htmlFor="label-dim">Dimensiones</Label>
-                                    <select 
-                                        id="label-dim" 
-                                        value={labelDimensions} 
-                                        onChange={e => setLabelDimensions(e.target.value)}
-                                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                                    >
-                                        <option value="60x100">PP 60x100 mm (Vertical)</option>
-                                        <option value="100x60">PP 100x60 mm (Horizontal)</option>
-                                        <option value="custom">Personalizado (mm)</option>
-                                    </select>
-                                </div>
-                                <div className="space-y-1">
-                                    <Label htmlFor="qr-size">Tamaño QR (mm)</Label>
-                                    <Input 
-                                        id="qr-size" 
-                                        type="number" 
-                                        value={qrPrintSize} 
-                                        onChange={e => setQrPrintSize(parseInt(e.target.value) || 30)} 
-                                        min="10" 
-                                        max="150" 
-                                    />
-                                </div>
-                                {labelDimensions === 'custom' && (
-                                    <div className="grid grid-cols-2 gap-2 md:col-span-6 pt-2">
-                                        <div className="space-y-1">
-                                            <Label htmlFor="custom-w">Ancho (mm)</Label>
-                                            <Input 
-                                                id="custom-w" 
-                                                type="number" 
-                                                value={customWidth} 
-                                                onChange={e => setCustomWidth(parseInt(e.target.value) || 100)} 
-                                            />
-                                        </div>
-                                        <div className="space-y-1">
-                                            <Label htmlFor="custom-h">Alto (mm)</Label>
-                                            <Input 
-                                                id="custom-h" 
-                                                type="number" 
-                                                value={customHeight} 
-                                                onChange={e => setCustomHeight(parseInt(e.target.value) || 60)} 
-                                            />
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-
-                            <div className="flex flex-wrap justify-end gap-3">
-                                <Button 
-                                    onClick={handleDownloadCSV} 
-                                    variant="outline" 
-                                    className="border-[#7aba28] text-[#7aba28] hover:bg-[#7aba28]/10 font-medium"
-                                >
-                                    <Download className="mr-2 h-4 w-4" />
-                                    Descargar CSV para BarTender
-                                </Button>
-                                <Button 
-                                    onClick={handlePrintLabels} 
-                                    className="bg-[#004b8d] hover:bg-[#003b70] text-white font-semibold"
-                                >
-                                    <Printer className="mr-2 h-4 w-4" />
-                                    Imprimir Etiquetas (Solo QR)
-                                </Button>
-                            </div>
-
-                            <div className="space-y-3">
-                                <div className="flex justify-between items-center border-b pb-2">
-                                    <h3 className="font-semibold text-slate-700">Vista Previa de Códigos</h3>
-                                    <Badge variant="secondary" className="bg-[#004b8d]/10 text-[#004b8d] font-mono">
-                                        {generatedCodes.length} etiquetas
-                                    </Badge>
-                                </div>
-                                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-6 gap-3 max-h-[300px] overflow-y-auto p-2 bg-slate-50 border rounded-md">
-                                    {generatedCodes.map((code) => (
-                                        <QRLabelItem key={code} code={code} />
-                                    ))}
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    {/* Print area container with isolated stylesheets dynamically applied on printing */}
-                    <div className="hidden print:block" style={{
-                        ['--page-width' as any]: labelDimensions === '60x100' ? '60mm' : labelDimensions === '100x60' ? '100mm' : `${customWidth}mm`,
-                        ['--page-height' as any]: labelDimensions === '60x100' ? '100mm' : labelDimensions === '100x60' ? '60mm' : `${customHeight}mm`,
-                        ['--qr-size' as any]: `${qrPrintSize}mm`,
-                    }}>
-                        <style dangerouslySetInnerHTML={{ __html: `
-                            @media print {
-                                body * {
-                                    visibility: hidden !important;
-                                }
-                                #react-print-area, #react-print-area * {
-                                    visibility: visible !important;
-                                }
-                                #react-print-area {
-                                    position: absolute !important;
-                                    left: 0 !important;
-                                    top: 0 !important;
-                                    width: 100% !important;
-                                    margin: 0 !important;
-                                    padding: 0 !important;
-                                }
-                                @page {
-                                    size: var(--page-width, 100mm) var(--page-height, 60mm);
-                                    margin: 0 !important;
-                                }
-                                .print-label {
-                                    width: var(--page-width, 100mm) !important;
-                                    height: var(--page-height, 60mm) !important;
-                                    display: flex !important;
-                                    align-items: center !important;
-                                    justify-content: center !important;
-                                    page-break-after: always !important;
-                                    page-break-inside: avoid !important;
-                                    box-sizing: border-box !important;
-                                    margin: 0 !important;
-                                    padding: 0 !important;
-                                    background: white !important;
-                                }
-                                .print-label canvas {
-                                    width: var(--qr-size, 30mm) !important;
-                                    height: var(--qr-size, 30mm) !important;
-                                    display: block !important;
-                                    margin: auto !important;
-                                }
-                            }
-                        `}} />
-                        <div id="react-print-area">
-                            {generatedCodes.map((code) => (
-                                <PrintableQRLabel key={code} code={code} />
-                            ))}
-                        </div>
-                    </div>
-                </TabsContent>
             </Tabs>
 
             {selectionMode && (

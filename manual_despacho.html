@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manual de Usuario - Despacho de Socios Comerciales (FriO)</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #004b8d;
+            --primary-light: rgba(0, 75, 141, 0.08);
+            --secondary: #7aba28;
+            --secondary-light: rgba(122, 186, 40, 0.1);
+            --text-dark: #1f2937;
+            --text-light: #4b5563;
+            --bg-main: #f9fafb;
+            --bg-card: #ffffff;
+            --border-color: #e5e7eb;
+            --alert-note-border: #3b82f6;
+            --alert-note-bg: #eff6ff;
+            --alert-warn-border: #f59e0b;
+            --alert-warn-bg: #fffbeb;
+            --alert-important-border: #ef4444;
+            --alert-important-bg: #fef2f2;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-main);
+            color: var(--text-dark);
+            line-height: 1.6;
+            display: flex;
+        }
+
+        /* Sidebar navigation */
+        aside {
+            width: 280px;
+            background-color: var(--bg-card);
+            border-right: 1px solid var(--border-color);
+            position: fixed;
+            top: 0;
+            bottom: 0;
+            left: 0;
+            overflow-y: auto;
+            padding: 2rem 1.5rem;
+            z-index: 100;
+        }
+
+        .logo-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 2rem;
+            padding-bottom: 1rem;
+            border-bottom: 2px solid var(--primary-light);
+        }
+
+        .logo-dot {
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background-color: var(--secondary);
+            box-shadow: 0 0 8px var(--secondary);
+        }
+
+        .logo-text {
+            font-size: 1.25rem;
+            font-weight: 800;
+            color: var(--primary);
+            letter-spacing: -0.025em;
+        }
+
+        .logo-text span {
+            color: var(--secondary);
+        }
+
+        aside h3 {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #9ca3af;
+            margin-bottom: 1rem;
+            font-weight: 700;
+        }
+
+        aside ul {
+            list-style: none;
+        }
+
+        aside li {
+            margin-bottom: 0.5rem;
+        }
+
+        aside a {
+            color: var(--text-light);
+            text-decoration: none;
+            font-size: 0.9rem;
+            font-weight: 500;
+            display: block;
+            padding: 0.5rem 0.75rem;
+            border-radius: 6px;
+            transition: all 0.2s ease;
+        }
+
+        aside a:hover {
+            color: var(--primary);
+            background-color: var(--primary-light);
+            transform: translateX(3px);
+        }
+
+        /* Main Content Container */
+        main {
+            margin-left: 280px;
+            padding: 3rem 4rem;
+            max-width: 1100px;
+            width: calc(100% - 280px);
+        }
+
+        header {
+            margin-bottom: 3rem;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 1.5rem;
+        }
+
+        header h1 {
+            font-size: 2.25rem;
+            font-weight: 800;
+            color: var(--primary);
+            letter-spacing: -0.03em;
+            margin-bottom: 0.5rem;
+        }
+
+        header p {
+            font-size: 1.1rem;
+            color: var(--text-light);
+            font-weight: 400;
+        }
+
+        section {
+            margin-bottom: 4rem;
+            scroll-margin-top: 2rem;
+        }
+
+        h2 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--primary);
+            margin-bottom: 1.5rem;
+            border-bottom: 2px solid var(--primary-light);
+            padding-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        h3 {
+            font-size: 1.15rem;
+            font-weight: 600;
+            color: var(--text-dark);
+            margin-top: 1.5rem;
+            margin-bottom: 0.75rem;
+        }
+
+        p {
+            margin-bottom: 1.25rem;
+            color: var(--text-light);
+        }
+
+        /* Numbered lists / Steps */
+        ol, ul {
+            margin-left: 1.5rem;
+            margin-bottom: 1.5rem;
+            color: var(--text-light);
+        }
+
+        li {
+            margin-bottom: 0.5rem;
+        }
+
+        strong {
+            color: var(--text-dark);
+            font-weight: 600;
+        }
+
+        /* Callout blocks (Alerts) */
+        .callout {
+            border-left: 4px solid;
+            padding: 1rem 1.25rem;
+            border-radius: 0 8px 8px 0;
+            margin-bottom: 1.5rem;
+            font-size: 0.95rem;
+        }
+
+        .callout-note {
+            border-color: var(--alert-note-border);
+            background-color: var(--alert-note-bg);
+            color: #1e3a8a;
+        }
+
+        .callout-warning {
+            border-color: var(--alert-warn-border);
+            background-color: var(--alert-warn-bg);
+            color: #78350f;
+        }
+
+        .callout-important {
+            border-color: var(--alert-important-border);
+            background-color: var(--alert-important-bg);
+            color: #7f1d1d;
+        }
+
+        .callout-title {
+            font-weight: 700;
+            margin-bottom: 0.25rem;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            text-transform: uppercase;
+            font-size: 0.8rem;
+            letter-spacing: 0.05em;
+        }
+
+        /* Tables */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 1.5rem;
+            font-size: 0.9rem;
+            background-color: var(--bg-card);
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid var(--border-color);
+        }
+
+        th, td {
+            padding: 0.75rem 1rem;
+            text-align: left;
+        }
+
+        th {
+            background-color: var(--primary-light);
+            color: var(--primary);
+            font-weight: 600;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        tr:not(:last-child) td {
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        /* Print utility button */
+        .print-btn {
+            background-color: var(--secondary);
+            color: white;
+            border: none;
+            padding: 0.6rem 1.2rem;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 2rem;
+        }
+
+        .print-btn:hover {
+            background-color: #6aa423;
+        }
+
+        @media print {
+            aside, .print-btn {
+                display: none !important;
+            }
+            main {
+                margin-left: 0 !important;
+                width: 100% !important;
+                padding: 0 !important;
+            }
+            body {
+                background: white;
+            }
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            body {
+                flex-direction: column;
+            }
+            aside {
+                position: relative;
+                width: 100%;
+                height: auto;
+                border-right: none;
+                border-bottom: 1px solid var(--border-color);
+                padding: 1.5rem;
+            }
+            main {
+                margin-left: 0;
+                width: 100%;
+                padding: 2rem 1.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <aside>
+        <div class="logo-container">
+            <div class="logo-dot"></div>
+            <div class="logo-text">Fri<span>O</span></div>
+        </div>
+        <h3>Contenidos</h3>
+        <ul>
+            <li><a href="#introduccion">1. Introducción</a></li>
+            <li><a href="#filtros">2. Filtros y Documento</a></li>
+            <li><a href="#acordeon">3. Acordeón de Lotes</a></li>
+            <li><a href="#tabla-seleccion">4. Ubicaciones físicas</a></li>
+            <li><a href="#confirmacion">5. Registro y Salida</a></li>
+        </ul>
+    </aside>
+
+    <main>
+        <header>
+            <h1>Manual de Usuario - Despacho de Socios Comerciales</h1>
+            <p>Operación de la pestaña Despacho (Otros Hortofrutícolas) para el retiro inmediato de stock en FriO.</p>
+        </header>
+
+        <button class="print-btn" onclick="window.print()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+            Imprimir Manual
+        </button>
+
+        <section id="introduccion">
+            <h2>1. Introducción y Concepto Clave</h2>
+            <p>La pestaña **Despacho** dentro del módulo de **Socios Comerciales** (Otros Hortofrutícolas) gestiona la salida física de fruta de terceros (por ejemplo, bins de plantas de Fall Creek) almacenada en las cámaras de frío de la planta.</p>
+            
+            <div class="callout callout-important">
+                <div class="callout-title">Diferencia con el Flujo de Cerezas</div>
+                A diferencia del flujo estándar de cerezas (el cual genera una solicitud en espera que requiere una validación y picking posterior por parte de los grueros), el despacho de Socios Comerciales realiza una <strong>rebaja directa e inmediata del stock</strong> en la base de datos al momento de presionar "Confirmar Despacho". No hay estados intermedios.
+            </div>
+        </section>
+
+        <section id="filtros">
+            <h2>2. Filtros de Búsqueda y Datos de Salida</h2>
+            <p>Al ingresar a la pestaña, la parte superior presenta tres campos esenciales para delimitar el stock y autorizar el despacho:</p>
+            <ul>
+                <li><strong>Cliente:</strong> Menú desplegable para seleccionar el socio comercial (ej. Fall Creek). Para evitar búsquedas vacías, el sistema solo listará aquellos clientes de tipo "FRUTA" que tengan bins actualmente en estado <em>"Almacenado"</em> y con cantidades mayores a cero.</li>
+                <li><strong>Filtrar por Lote:</strong> Buscador predictivo. Permite escribir parte del lote del sistema (ej: <code>LOT-FC-123</code>) o el código de lote del cliente para aislar rápidamente la variedad requerida.</li>
+                <li><strong>Documento de Despacho:</strong> Campo de texto obligatorio donde se debe digitar el número de la guía de despacho física o documento legal que autoriza la salida del camión. El sistema mantendrá bloqueada la confirmación final del despacho hasta que se ingrese este número.</li>
+            </ul>
+        </section>
+
+        <section id="acordeon">
+            <h2>3. Acordeón de Lotes Consolidados</h2>
+            <p>Una vez seleccionado el cliente exportador, los lotes de fruta que se encuentran guardados en las cámaras se muestran agrupados en una lista interactiva de acordeones. Esto permite una vista limpia antes de definir el detalle del despacho.</p>
+            <p>Cada encabezado de acordeón muestra de un vistazo:</p>
+            <ul>
+                <li>El identificador del lote en el sistema (ej. <code>LOT-FC-2026-06</code>) y el lote cliente.</li>
+                <li>La cantidad total de bins o pallets disponibles de ese lote.</li>
+                <li>La unidad de medida del stock (ej: <code>Bins</code> o <code>Pallets</code>).</li>
+            </ul>
+            <p>Al hacer clic en cualquier lote de la lista, este se expandirá para revelar la tabla con el desglose físico de las ubicaciones.</p>
+        </section>
+
+        <section id="tabla-seleccion">
+            <h2>4. Desglose de Ubicaciones y Despachos Parciales</h2>
+            <p>Al expandir un lote, se abre una tabla donde cada fila representa una coordenada física en una cámara de frío. El despachador debe utilizar esta grilla para registrar exactamente qué bins saldrán físicamente de la planta.</p>
+
+            <h3>Campos de la Tabla de Ubicaciones:</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Columna</th>
+                        <th>Función y Comportamiento</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Casilla de Selección (Checkbox)</strong></td>
+                        <td>Al marcarla, el sistema selecciona el lote en esa coordenada y carga por defecto el total de bins disponibles en el campo "A Despachar". En la cabecera hay un checkbox global para marcar todas las ubicaciones del lote simultáneamente.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Coordenada</strong></td>
+                        <td>Ubicación física exacta de los bins (ej: <code>A1</code>, <code>B4</code>).</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Producto</strong></td>
+                        <td>Nombre de la variedad de la fruta (ej: <code>Sekoya Crunch</code>).</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Lote Cliente</strong></td>
+                        <td>Código secundario provisto por el dueño del producto.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Observación</strong></td>
+                        <td>Notas tomadas en la recepción o reubicación (ej: "Lote de descarte").</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Disp. (Disponible)</strong></td>
+                        <td>Muestra el total de bins reales que existen en esa coordenada.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>A Despachar</strong></td>
+                        <td>Casilla numérica donde se ingresa la cantidad exacta a retirar del stock.</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>Cómo realizar un Despacho Parcial:</h3>
+            <p>Si un cliente posee 9 bins en la coordenada <code>B4</code>, pero solo se cargarán 5 bins en el transporte:</p>
+            <ol>
+                <li>Haga clic en el checkbox de la coordenada <code>B4</code>. El sistema sugerirá despachar los 9 bins.</li>
+                <li>Haga clic en el cuadro de texto de la columna <strong>"A Despachar"</strong> de esa fila.</li>
+                <li>Reemplace el número 9 por un <code>5</code>.</li>
+                <li>El sistema registrará que se retirarán 5 bins. Al confirmar la salida, el saldo de la coordenada <code>B4</code> en la cámara se actualizará automáticamente a 4 bins, manteniendo la fruta disponible en el sistema.</li>
+            </ol>
+        </section>
+
+        <section id="confirmacion">
+            <h2>5. Confirmación y Registro de Salida en Base de Datos</h2>
+            <p>Al seleccionar cantidades a despachar, se activará una barra de resumen y confirmación en la zona inferior de la pantalla.</p>
+            <ul>
+                <li><strong>Resumen de Salida:</strong> Indica el total de unidades que se están despachando consolidando todas las coordenadas (ej. <em>"Total a despachar: 24 Bins"</em>).</li>
+                <li><strong>Confirmación de Despacho:</strong> Al presionar el botón <strong>"Confirmar Despacho"</strong> (que se muestra con el texto <em>"Despachando..."</em> durante el procesamiento), el sistema ejecuta dos acciones inmediatas en la base de datos de FriO:
+                    <ol>
+                        <li><strong>Rebaja de Stock:</strong> Se actualiza el documento de ingreso del socio comercial en la colección <code>otherFruitReceptions</code>, rebajando las cantidades directamente de los ítems en las coordenadas correspondientes.</li>
+                        <li><strong>Registro de Movimiento:</strong> Se inserta un documento en la colección <code>otherFruitMovements</code> de tipo <code>'salida'</code>, vinculando el número de guía ingresado, el cliente, las variedades y las cantidades retiradas para el historial del Kardex.</li>
+                    </ol>
+                </li>
+            </ul>
+
+            <div class="callout callout-note">
+                <div class="callout-title">Respaldo en Kardex</div>
+                Una vez confirmado, el movimiento quedará registrado inmediatamente en el reporte del Kardex de Movimientos para auditorías de saldo e inventario de terceros.
+            </div>
+        </section>
+    </main>
+
+</body>
+</html>

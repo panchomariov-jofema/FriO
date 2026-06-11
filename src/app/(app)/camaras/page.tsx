@@ -28,6 +28,8 @@ import { ExternalReceptionUploader } from '@/components/hidrocooler/ExternalRece
 import { ChamberTemperatureInput } from '@/components/camaras/ChamberTemperatureInput';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { mockStoredItems } from '@/lib/mock-chamber5';
+
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 
@@ -60,6 +62,28 @@ const getColorForLot = (lotId: string) => {
         nextColorIndex = (nextColorIndex + 1) % lotColorPalette.length;
     }
     return lotColorMap.get(lotId)!;
+};
+
+const isFallCreekItem = (item: StoredItem) => {
+  if (item.type === 'otherFruit') {
+    return item.ownerName?.toUpperCase() === 'FALL CREEK';
+  }
+  if (item.type === 'producerLot') {
+    return item.exporterId === 'EXP004';
+  }
+  return false;
+};
+
+const getItemColorKey = (item: StoredItem) => {
+  if (isFallCreekItem(item)) {
+    return `${item.type}-${item.lotIdForColor}`;
+  } else {
+    if (item.type === 'otherFruit') {
+      return `client-${item.ownerName}`;
+    } else {
+      return `exporter-${item.exporterId || 'default'}`;
+    }
+  }
 };
 
 
@@ -152,6 +176,7 @@ export default function CamarasPage() {
             itemIndex: -1, // Not applicable
             netWeightPerBin: lot.netWeightPerBin || 0,
             clientLotId: undefined,
+            exporterId: lot.exporterId,
         })),
       ...allOtherFruitReceptions
         .flatMap(reception => reception.items
@@ -162,8 +187,8 @@ export default function CamarasPage() {
                 type: 'otherFruit' as const,
                 displayId: item.productCode,
                 lotIdForColor: item.clientLotId 
-                    ? `${reception.displayLotId || reception.id}-${item.clientLotId}` 
-                    : (reception.displayLotId || reception.id),
+                    ? `${reception.displayLotId || reception.id}-${item.clientLotId}-${item.productName}` 
+                    : `${reception.displayLotId || reception.id}-${item.productName}`,
                 ownerName: reception.clientName,
                 varietyOrProduct: item.productName,
                 quantity: item.quantity,
@@ -174,9 +199,15 @@ export default function CamarasPage() {
                 itemIndex: index, // This is now the correct original index
                 netWeightPerBin: 0,
                 clientLotId: item.clientLotId,
+                observation: item.observation,
+                exporterId: reception.clientId,
             }))
         )
     ];
+
+    if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
+        allStoredItems.push(...mockStoredItems);
+    }
     
     const calculatedTotalNetWeight = allStoredItems
         .filter(item => item.type === 'producerLot')
@@ -871,14 +902,16 @@ export default function CamarasPage() {
                                           const occupancyPercentage = isOccupied ? (totalBins + totalPallets) / coordCapacity * 100 : 0;
 
                                           const uniqueLotIds = Array.from(new Set(itemsInCoord.map(item => `${item.type}-${item.lotIdForColor}`)));
-                                          const isMixed = uniqueLotIds.length > 1;
+                                          const uniqueColorKeys = Array.from(new Set(itemsInCoord.map(item => getItemColorKey(item))));
+                                          const isMixed = uniqueColorKeys.length > 1;
 
                                           let cellStyle: React.CSSProperties = {};
                                           let progressStyle: React.CSSProperties = {};
 
                                           if (isOccupied && firstItem) {
                                               if (!isMixed) {
-                                                  const color = getColorForLot(`${firstItem.type}-${firstItem.lotIdForColor}`);
+                                                  const colorKey = getItemColorKey(firstItem);
+                                                  const color = getColorForLot(colorKey);
                                                   cellStyle = {
                                                       '--lot-color': color,
                                                       '--lot-color-border': color.replace(')', ', 0.5)'),
@@ -889,11 +922,11 @@ export default function CamarasPage() {
                                                       right: `${Math.max(0, 100 - occupancyPercentage)}%`,
                                                   };
                                               } else {
-                                                  // Group quantities by lot to calculate relative slice percentages
-                                                  const lotQuantities = uniqueLotIds.map(lotId => {
-                                                      const itemsForLot = itemsInCoord.filter(item => `${item.type}-${item.lotIdForColor}` === lotId);
+                                                  // Group quantities by color key to calculate relative slice percentages
+                                                  const lotQuantities = uniqueColorKeys.map(colorKey => {
+                                                      const itemsForLot = itemsInCoord.filter(item => getItemColorKey(item) === colorKey);
                                                       const totalQty = itemsForLot.reduce((sum, item) => sum + item.quantity, 0);
-                                                      return { lotId, quantity: totalQty, color: getColorForLot(lotId) };
+                                                      return { lotId: colorKey, quantity: totalQty, color: getColorForLot(colorKey) };
                                                   });
                                                   // Sort alphabetically to maintain stable color slice ordering
                                                   lotQuantities.sort((a, b) => a.lotId.localeCompare(b.lotId));
@@ -960,10 +993,10 @@ export default function CamarasPage() {
                                                   <div className="space-y-2">
                                                       <div className="border-b pb-1">
                                                           <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Ubicación {coord}</p>
-                                                          <p className="text-sm font-semibold">{isMixed ? 'Lotes Mezclados' : firstItem?.type === 'producerLot' ? `Lote: ${firstItem?.displayId}` : `Producto: ${firstItem?.displayId}`}</p>
+                                                          <p className="text-sm font-semibold">{uniqueLotIds.length > 1 ? 'Lotes Mezclados' : firstItem?.type === 'producerLot' ? `Lote: ${firstItem?.displayId}` : `Producto: ${firstItem?.displayId}`}</p>
                                                       </div>
 
-                                                      {isMixed ? (
+                                                      {uniqueLotIds.length > 1 ? (
                                                           <div className="space-y-3">
                                                               <p className="text-xs font-bold text-amber-500 flex items-center gap-1">
                                                                   <span>⚠ Contiene {uniqueLotIds.length} lotes</span>
@@ -979,6 +1012,7 @@ export default function CamarasPage() {
                                                                           </div>
                                                                           <p className="text-muted-foreground mt-0.5">{item.ownerName} - {item.varietyOrProduct}</p>
                                                                           {item.clientLotId && <p className="text-muted-foreground font-mono text-[9px]">Lote Cliente: {item.clientLotId}</p>}
+                                                                          {item.observation && <p className="text-muted-foreground italic text-[10px] mt-0.5">Obs: {item.observation}</p>}
                                                                       </div>
                                                                   ))}
                                                               </div>
@@ -994,6 +1028,9 @@ export default function CamarasPage() {
                                                                       {firstItem.type === 'producerLot' ? `Productor: ${firstItem.ownerName}` : `Cliente: ${firstItem.ownerName}`}
                                                                       </p>
                                                                       <p>Variedad/Producto: {firstItem.varietyOrProduct}</p>
+                                                                      {firstItem.observation && (
+                                                                        <p className="text-muted-foreground italic text-xs mt-0.5">Obs: {firstItem.observation}</p>
+                                                                      )}
                                                                   </>
                                                               )}
                                                           </>

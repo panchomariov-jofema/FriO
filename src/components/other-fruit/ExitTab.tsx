@@ -5,8 +5,10 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
-import type { OtherClient, OtherFruitReception, OtherFruitReceptionItem, OtherFruitMovement } from '@/lib/types';
+import type { OtherClient, OtherFruitReception, OtherFruitReceptionItem, OtherFruitMovement, Producer } from '@/lib/types';
 import { useFirestore } from '@/firebase';
+import { mockOtherClients, mockOtherFruitReceptions, mockProducers } from '@/lib/mock-chamber5';
+
 import { addDoc, collection, doc, writeBatch, serverTimestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { errorEmitter } from '@/firebase/error-emitter';
@@ -17,6 +19,8 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '..
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Label } from '../ui/label';
 import { Checkbox } from '../ui/checkbox';
+import { cn } from '@/lib/utils';
+
 
 const getLocationKey = (receptionId: string, itemIndex: number) => `${receptionId}_${itemIndex}`;
 
@@ -39,21 +43,63 @@ interface AggregatedLot {
 export function OtherFruitExitTab({ clientId: fixedClientId }: { clientId?: string }) {
   const { data: allClients, loading: loadingClients } = useFirestoreCollection<OtherClient>('otherClients');
   const { data: allReceptions, loading: loadingReceptions } = useFirestoreCollection<OtherFruitReception>('otherFruitReceptions');
+  const { data: allProducers } = useFirestoreCollection<Producer>('producers');
   const firestore = useFirestore();
   const { toast } = useToast();
 
   const [selectedClientId, setSelectedClientId] = React.useState('');
+  const [selectedSubClientId, setSelectedSubClientId] = React.useState('');
   const [document, setDocument] = React.useState('');
   const [lotFilter, setLotFilter] = React.useState('');
   const [quantitiesToDispatch, setQuantitiesToDispatch] = React.useState<Record<string, number>>({});
   const [isDispatching, setIsDispatching] = React.useState(false);
 
+  const clients = React.useMemo(() => {
+    const raw = allClients || [];
+    if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
+      const merged = [...raw];
+      mockOtherClients.forEach(mockC => {
+        if (!merged.some(c => c.clientId === mockC.clientId)) {
+          merged.push(mockC);
+        }
+      });
+      return merged;
+    }
+    return raw;
+  }, [allClients]);
+
+  const receptions = React.useMemo(() => {
+    const raw = allReceptions || [];
+    if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
+      return [...raw, ...mockOtherFruitReceptions];
+    }
+    return raw;
+  }, [allReceptions]);
+
+  const producers = React.useMemo(() => {
+    const raw = allProducers || [];
+    if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
+      return [...raw, ...mockProducers];
+    }
+    return raw;
+  }, [allProducers]);
+
+  const subClients = React.useMemo(() => {
+    return producers.filter(p => {
+      if (p.status === 'inactivo') return false;
+      if (Array.isArray(p.exporterId)) {
+        return p.exporterId.includes('EXP004');
+      }
+      return p.exporterId === 'EXP004';
+    });
+  }, [producers]);
+
   const fruitClients = React.useMemo(() => {
-    const rawClients = (allClients || []).filter(c => c.type.toUpperCase() === 'FRUTA');
-    if (!allReceptions) return [];
+    const rawClients = (clients || []).filter(c => c.type.toUpperCase() === 'FRUTA');
+    if (!receptions) return [];
 
     const clientsWithStock = new Set<string>();
-    allReceptions.forEach(reception => {
+    receptions.forEach(reception => {
       const hasStoredItem = reception.items?.some(
         item => item.status === 'Almacenado' && item.quantity > 0
       );
@@ -63,13 +109,13 @@ export function OtherFruitExitTab({ clientId: fixedClientId }: { clientId?: stri
     });
 
     return rawClients.filter(c => clientsWithStock.has(c.clientId));
-  }, [allClients, allReceptions]);
+  }, [clients, receptions]);
   const loading = loadingClients || loadingReceptions;
   
   React.useEffect(() => {
     if (fixedClientId) {
       setSelectedClientId(fixedClientId);
-      // Also reset state when client changes
+      setSelectedSubClientId('');
       setQuantitiesToDispatch({});
       setDocument('');
       setLotFilter('');
@@ -78,11 +124,11 @@ export function OtherFruitExitTab({ clientId: fixedClientId }: { clientId?: stri
 
 
   const aggregatedStockByLot = React.useMemo(() => {
-    if (!selectedClientId || !allReceptions) return [];
+    if (!selectedClientId || !receptions) return [];
 
     const lotMap = new Map<string, AggregatedLot>();
 
-    allReceptions.forEach(reception => {
+    receptions.forEach(reception => {
       if (reception.clientId !== selectedClientId) return;
 
       if (!reception.displayLotId) return;
@@ -118,7 +164,7 @@ export function OtherFruitExitTab({ clientId: fixedClientId }: { clientId?: stri
       });
     });
     return Array.from(lotMap.values()).filter(lot => lot.totalQuantity > 0);
-  }, [selectedClientId, allReceptions]);
+  }, [selectedClientId, receptions]);
   
   const filteredLots = React.useMemo(() => {
     if (!lotFilter) {
@@ -126,13 +172,11 @@ export function OtherFruitExitTab({ clientId: fixedClientId }: { clientId?: stri
     }
     const lowercasedFilter = lotFilter.toLowerCase();
     return aggregatedStockByLot.filter(lot => {
-        // Check if the main displayLotId matches
         const displayIdMatch = lot.displayLotId.toLowerCase().includes(lowercasedFilter);
         if (displayIdMatch) {
             return true;
         }
 
-        // Also check if any of the clientLotIds within this aggregated lot match
         const clientLotIdMatch = lot.locations.some(
             loc => loc.clientLotId && loc.clientLotId.toLowerCase().includes(lowercasedFilter)
         );
@@ -142,6 +186,7 @@ export function OtherFruitExitTab({ clientId: fixedClientId }: { clientId?: stri
 
   const handleClientChange = (val: string) => {
     setSelectedClientId(val);
+    setSelectedSubClientId('');
     setQuantitiesToDispatch({});
     setDocument('');
     setLotFilter('');
@@ -194,8 +239,7 @@ export function OtherFruitExitTab({ clientId: fixedClientId }: { clientId?: stri
       return newQuantities;
     });
   };
-
-  const handleDispatch = async () => {
+  const handleDispatch = async () => {
     const itemsToDispatch = Object.entries(quantitiesToDispatch).filter(([, qty]) => qty > 0);
     if (itemsToDispatch.length === 0) {
       toast({ variant: 'destructive', title: 'Error', description: 'Debe ingresar una cantidad para al menos una ubicación.' });
@@ -207,11 +251,20 @@ export function OtherFruitExitTab({ clientId: fixedClientId }: { clientId?: stri
         return;
     }
     
+    if (selectedClientId === 'EXP004' && !selectedSubClientId) {
+        toast({ variant: 'destructive', title: 'Error', description: 'Debe seleccionar un SubCliente para despachar a Fall Creek.' });
+        return;
+    }
+
     const client = fruitClients.find(c => c.clientId === selectedClientId);
     if (!client) {
       toast({ variant: 'destructive', title: 'Error', description: 'Cliente no encontrado.' });
       return;
     }
+
+    const selectedSubClient = selectedClientId === 'EXP004'
+      ? producers.find(p => p.id === selectedSubClientId)
+      : null;
 
     setIsDispatching(true);
 
@@ -224,7 +277,7 @@ export function OtherFruitExitTab({ clientId: fixedClientId }: { clientId?: stri
             const [receptionId, itemIndexStr] = key.split('_');
             const itemIndex = parseInt(itemIndexStr, 10);
             
-            const originalReception = allReceptions.find(r => r.id === receptionId);
+            const originalReception = receptions.find(r => r.id === receptionId);
             if (!originalReception) continue;
             
             if (!receptionUpdates.has(receptionId)) {
@@ -260,26 +313,34 @@ export function OtherFruitExitTab({ clientId: fixedClientId }: { clientId?: stri
             }
         }
 
+        let hasRealWrites = false;
         receptionUpdates.forEach((items, receptionId) => {
-            const receptionRef = doc(firestore, 'otherFruitReceptions', receptionId);
-            batch.update(receptionRef, { items, updatedAt: serverTimestamp() });
+            if (!receptionId.startsWith('mock-')) {
+                const receptionRef = doc(firestore, 'otherFruitReceptions', receptionId);
+                batch.update(receptionRef, { items, updatedAt: serverTimestamp() });
+                hasRealWrites = true;
+            }
         });
 
-        const movementRef = doc(collection(firestore, 'otherFruitMovements'));
-        
         const movementData: Partial<OtherFruitMovement> = {
             type: 'salida',
             clientId: client.clientId,
             clientName: client.name,
             unit: client.unit,
             document: document,
+            destinationClientName: selectedSubClient ? selectedSubClient.name : undefined,
+            destinationClientRUT: selectedSubClient ? selectedSubClient.rut : undefined,
             items: movementItems,
             createdAt: serverTimestamp() as any,
         };
 
-        batch.set(movementRef, movementData);
-        
-        await batch.commit();
+        if (hasRealWrites) {
+            const movementRef = doc(collection(firestore, 'otherFruitMovements'));
+            batch.set(movementRef, movementData);
+            await batch.commit();
+        } else {
+            console.log("Mock dispatch successful (skipped Firestore writes):", movementData);
+        }
         toast({ title: 'Éxito', description: 'Despacho registrado y stock actualizado.' });
         setQuantitiesToDispatch({});
         setDocument('');
@@ -310,7 +371,7 @@ export function OtherFruitExitTab({ clientId: fixedClientId }: { clientId?: stri
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="grid md:grid-cols-3 gap-4">
+        <div className={cn("grid gap-4", selectedClientId === 'EXP004' ? "grid-cols-1 md:grid-cols-4" : "grid-cols-1 md:grid-cols-3")}>
             {!fixedClientId && (
               <div>
                 <Label>Cliente</Label>
@@ -318,6 +379,17 @@ export function OtherFruitExitTab({ clientId: fixedClientId }: { clientId?: stri
                   <SelectTrigger><SelectValue placeholder="Seleccione un cliente..." /></SelectTrigger>
                   <SelectContent>
                     {fruitClients.map(c => <SelectItem key={c.id} value={c.clientId}>{c.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            {selectedClientId === 'EXP004' && (
+              <div>
+                <Label>SubCliente</Label>
+                <Select value={selectedSubClientId} onValueChange={setSelectedSubClientId}>
+                  <SelectTrigger><SelectValue placeholder="Seleccione un subcliente..." /></SelectTrigger>
+                  <SelectContent>
+                    {subClients.map(sc => <SelectItem key={sc.id} value={sc.id}>{sc.shortName || sc.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>

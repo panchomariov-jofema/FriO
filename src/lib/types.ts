@@ -453,6 +453,8 @@ export type StoredItem = {
   netWeightPerBin?: number;
   clientLotId?: string;
   isMixedVariety?: boolean;
+  observation?: string;
+  exporterId?: string;
 }
 
 export interface BusinessEntity {
