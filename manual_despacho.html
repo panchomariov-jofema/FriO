@@ -3,279 +3,489 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Manual de Usuario - Despacho de Socios Comerciales (FriO)</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <title>Manual de Usuario: Módulo de Despacho - Socios Comerciales (FriO)</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
         :root {
-            --primary: #004b8d;
-            --primary-light: rgba(0, 75, 141, 0.08);
-            --secondary: #7aba28;
-            --secondary-light: rgba(122, 186, 40, 0.1);
-            --text-dark: #1f2937;
-            --text-light: #4b5563;
-            --bg-main: #f9fafb;
+            /* Palette HSL Tailored Colors */
+            --bg-base: #f8fafc;
             --bg-card: #ffffff;
-            --border-color: #e5e7eb;
-            --alert-note-border: #3b82f6;
-            --alert-note-bg: #eff6ff;
-            --alert-warn-border: #f59e0b;
-            --alert-warn-bg: #fffbeb;
-            --alert-important-border: #ef4444;
-            --alert-important-bg: #fef2f2;
+            --primary: #0f172a;
+            --primary-accent: #1e293b;
+            --brand: #0284c7;
+            --brand-light: #e0f2fe;
+            --brand-hover: #0369a1;
+            --success: #10b981;
+            --success-light: #d1fae5;
+            --warning: #f59e0b;
+            --warning-light: #fef3c7;
+            --danger: #ef4444;
+            --danger-light: #fee2e2;
+            --border: #e2e8f0;
+            --text-main: #334155;
+            --text-heading: #0f172a;
+            --text-muted: #64748b;
+            --sidebar-width: 320px;
+            --radius-lg: 16px;
+            --radius-md: 12px;
+            --radius-sm: 8px;
+            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05), 0 2px 4px -2px rgb(0 0 0 / 0.05);
+            --shadow-md: 0 10px 15px -3px rgb(0 0 0 / 0.05), 0 4px 6px -4px rgb(0 0 0 / 0.05);
         }
 
         * {
             box-sizing: border-box;
             margin: 0;
             padding: 0;
+            scroll-behavior: smooth;
         }
 
         body {
-            font-family: 'Inter', sans-serif;
-            background-color: var(--bg-main);
-            color: var(--text-dark);
-            line-height: 1.6;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: var(--bg-base);
+            color: var(--text-main);
+            line-height: 1.7;
             display: flex;
+            min-height: 100vh;
         }
 
-        /* Sidebar navigation */
+        /* Sidebar Navigation with glassmorphism */
         aside {
-            width: 280px;
-            background-color: var(--bg-card);
-            border-right: 1px solid var(--border-color);
+            width: var(--sidebar-width);
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(16px);
+            border-right: 1px solid var(--border);
             position: fixed;
             top: 0;
             bottom: 0;
             left: 0;
             overflow-y: auto;
-            padding: 2rem 1.5rem;
+            padding: 2.5rem 2rem;
             z-index: 100;
+            display: flex;
+            flex-direction: column;
+            gap: 2rem;
         }
 
         .logo-container {
             display: flex;
             align-items: center;
-            gap: 10px;
-            margin-bottom: 2rem;
-            padding-bottom: 1rem;
-            border-bottom: 2px solid var(--primary-light);
+            gap: 12px;
+            padding-bottom: 1.5rem;
+            border-bottom: 1px solid var(--border);
         }
 
-        .logo-dot {
-            width: 14px;
-            height: 14px;
-            border-radius: 50%;
-            background-color: var(--secondary);
-            box-shadow: 0 0 8px var(--secondary);
+        .logo-box {
+            background: linear-gradient(135deg, var(--brand) 0%, #0c4a6e 100%);
+            width: 38px;
+            height: 38px;
+            border-radius: var(--radius-md);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 12px rgba(2, 132, 199, 0.3);
+            color: white;
+            font-weight: 800;
+            font-size: 1.2rem;
+            font-family: 'Outfit', sans-serif;
         }
 
         .logo-text {
-            font-size: 1.25rem;
-            font-weight: 800;
-            color: var(--primary);
-            letter-spacing: -0.025em;
+            font-family: 'Outfit', sans-serif;
+            font-size: 1.4rem;
+            font-weight: 900;
+            color: var(--text-heading);
+            letter-spacing: -0.03em;
         }
 
         .logo-text span {
-            color: var(--secondary);
+            color: var(--brand);
         }
 
-        aside h3 {
+        .nav-section h3 {
             font-size: 0.75rem;
             text-transform: uppercase;
-            letter-spacing: 0.05em;
-            color: #9ca3af;
+            letter-spacing: 0.1em;
+            color: var(--text-muted);
             margin-bottom: 1rem;
-            font-weight: 700;
+            font-weight: 800;
         }
 
-        aside ul {
+        .nav-list {
             list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
         }
 
-        aside li {
-            margin-bottom: 0.5rem;
-        }
-
-        aside a {
-            color: var(--text-light);
+        .nav-item a {
+            color: var(--text-main);
             text-decoration: none;
-            font-size: 0.9rem;
-            font-weight: 500;
-            display: block;
-            padding: 0.5rem 0.75rem;
-            border-radius: 6px;
-            transition: all 0.2s ease;
+            font-size: 0.95rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 0.75rem 1rem;
+            border-radius: var(--radius-md);
+            transition: var(--transition);
         }
 
-        aside a:hover {
-            color: var(--primary);
-            background-color: var(--primary-light);
-            transform: translateX(3px);
+        .nav-item a:hover {
+            color: var(--brand);
+            background-color: var(--brand-light);
+            transform: translateX(4px);
+        }
+
+        .nav-item.active a {
+            color: white;
+            background: linear-gradient(135deg, var(--brand) 0%, #0284c7 100%);
+            box-shadow: 0 4px 12px rgba(2, 132, 199, 0.2);
         }
 
         /* Main Content Container */
         main {
-            margin-left: 280px;
-            padding: 3rem 4rem;
-            max-width: 1100px;
-            width: calc(100% - 280px);
+            margin-left: var(--sidebar-width);
+            padding: 4rem 5rem;
+            max-width: 1200px;
+            width: calc(100% - var(--sidebar-width));
         }
 
         header {
-            margin-bottom: 3rem;
-            border-bottom: 1px solid var(--border-color);
-            padding-bottom: 1.5rem;
+            margin-bottom: 4rem;
+            position: relative;
+        }
+
+        .badge-version {
+            background-color: var(--brand-light);
+            color: var(--brand);
+            padding: 0.35rem 0.85rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            margin-bottom: 1.5rem;
+            border: 1px solid rgba(2, 132, 199, 0.15);
+        }
+
+        .badge-version .pulse-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: var(--brand);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(0.9); opacity: 0.6; }
+            50% { transform: scale(1.15); opacity: 1; }
+            100% { transform: scale(0.9); opacity: 0.6; }
         }
 
         header h1 {
-            font-size: 2.25rem;
+            font-family: 'Outfit', sans-serif;
+            font-size: 2.75rem;
             font-weight: 800;
-            color: var(--primary);
-            letter-spacing: -0.03em;
-            margin-bottom: 0.5rem;
+            color: var(--text-heading);
+            letter-spacing: -0.04em;
+            margin-bottom: 0.75rem;
+            line-height: 1.15;
         }
 
         header p {
-            font-size: 1.1rem;
-            color: var(--text-light);
+            font-size: 1.25rem;
+            color: var(--text-muted);
             font-weight: 400;
+            max-width: 800px;
         }
 
         section {
-            margin-bottom: 4rem;
-            scroll-margin-top: 2rem;
+            background-color: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            padding: 3rem;
+            margin-bottom: 3rem;
+            box-shadow: var(--shadow);
+            scroll-margin-top: 3rem;
+            transition: var(--transition);
+        }
+
+        section:hover {
+            box-shadow: var(--shadow-md);
         }
 
         h2 {
-            font-size: 1.5rem;
-            font-weight: 700;
-            color: var(--primary);
+            font-family: 'Outfit', sans-serif;
+            font-size: 1.75rem;
+            font-weight: 800;
+            color: var(--text-heading);
             margin-bottom: 1.5rem;
-            border-bottom: 2px solid var(--primary-light);
-            padding-bottom: 0.5rem;
+            letter-spacing: -0.02em;
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 12px;
+        }
+
+        h2::before {
+            content: '';
+            display: inline-block;
+            width: 6px;
+            height: 28px;
+            background: linear-gradient(to bottom, var(--brand) 0%, #38bdf8 100%);
+            border-radius: 99px;
         }
 
         h3 {
-            font-size: 1.15rem;
-            font-weight: 600;
-            color: var(--text-dark);
-            margin-top: 1.5rem;
-            margin-bottom: 0.75rem;
+            font-family: 'Outfit', sans-serif;
+            font-size: 1.3rem;
+            font-weight: 700;
+            color: var(--text-heading);
+            margin-top: 2rem;
+            margin-bottom: 1rem;
         }
 
         p {
-            margin-bottom: 1.25rem;
-            color: var(--text-light);
+            margin-bottom: 1.5rem;
+            color: var(--text-main);
         }
 
-        /* Numbered lists / Steps */
+        /* Numbered lists / Steps styling */
         ol, ul {
-            margin-left: 1.5rem;
+            margin-left: 1.75rem;
             margin-bottom: 1.5rem;
-            color: var(--text-light);
+            color: var(--text-main);
         }
 
         li {
-            margin-bottom: 0.5rem;
+            margin-bottom: 0.75rem;
+            padding-left: 0.25rem;
         }
 
         strong {
-            color: var(--text-dark);
-            font-weight: 600;
+            color: var(--text-heading);
+            font-weight: 700;
         }
 
         /* Callout blocks (Alerts) */
         .callout {
-            border-left: 4px solid;
-            padding: 1rem 1.25rem;
-            border-radius: 0 8px 8px 0;
-            margin-bottom: 1.5rem;
-            font-size: 0.95rem;
+            border-left: 5px solid;
+            padding: 1.5rem 1.75rem;
+            border-radius: 0 var(--radius-md) var(--radius-md) 0;
+            margin: 2rem 0;
+            font-size: 1rem;
         }
 
         .callout-note {
-            border-color: var(--alert-note-border);
-            background-color: var(--alert-note-bg);
-            color: #1e3a8a;
+            border-color: var(--brand);
+            background-color: var(--brand-light);
+            color: #0c4a6e;
         }
 
         .callout-warning {
-            border-color: var(--alert-warn-border);
-            background-color: var(--alert-warn-bg);
+            border-color: var(--warning);
+            background-color: var(--warning-light);
             color: #78350f;
         }
 
-        .callout-important {
-            border-color: var(--alert-important-border);
-            background-color: var(--alert-important-bg);
+        .callout-danger {
+            border-color: var(--danger);
+            background-color: var(--danger-light);
             color: #7f1d1d;
         }
 
         .callout-title {
-            font-weight: 700;
-            margin-bottom: 0.25rem;
+            font-family: 'Outfit', sans-serif;
+            font-weight: 800;
+            margin-bottom: 0.5rem;
             display: flex;
             align-items: center;
+            gap: 8px;
+            text-transform: uppercase;
+            font-size: 0.85rem;
+            letter-spacing: 0.05em;
+        }
+
+        /* Interactive mockup wrapper */
+        .mockup-container {
+            background-color: #0f172a;
+            border-radius: var(--radius-lg);
+            padding: 2rem;
+            color: #e2e8f0;
+            margin: 2.5rem 0;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: var(--shadow-md);
+        }
+
+        .mockup-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            padding-bottom: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .mockup-dots {
+            display: flex;
             gap: 6px;
+        }
+
+        .mockup-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+        }
+
+        .mockup-dot.red { background-color: #ef4444; }
+        .mockup-dot.yellow { background-color: #f59e0b; }
+        .mockup-dot.green { background-color: #10b981; }
+
+        .mockup-title {
+            font-size: 0.85rem;
+            color: #94a3b8;
+            font-weight: 500;
+            font-family: monospace;
+        }
+
+        /* Form UI mockup elements */
+        .mockup-grid {
+            display: grid;
+            grid-template-cols: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .mockup-field {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .mockup-label {
+            font-size: 0.8rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            color: #94a3b8;
+            letter-spacing: 0.025em;
+        }
+
+        .mockup-select, .mockup-input {
+            background-color: #1e293b;
+            border: 1px solid #334155;
+            color: #f8fafc;
+            padding: 0.75rem 1rem;
+            border-radius: var(--radius-md);
+            font-size: 0.95rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .mockup-select.active {
+            border-color: var(--brand);
+            box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.2);
+        }
+
+        .mockup-select.highlight {
+            border-color: var(--success);
+            box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2);
+        }
+
+        .mockup-chevron {
+            width: 14px;
+            height: 14px;
+            border-left: 2px solid #64748b;
+            border-bottom: 2px solid #64748b;
+            transform: rotate(-45deg);
+            margin-top: -4px;
+        }
+
+        /* Tables style */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 2rem 0;
+            font-size: 0.95rem;
+            background-color: var(--bg-card);
+            border-radius: var(--radius-md);
+            overflow: hidden;
+            border: 1px solid var(--border);
+        }
+
+        th, td {
+            padding: 1rem 1.25rem;
+            text-align: left;
+        }
+
+        th {
+            background-color: #f1f5f9;
+            color: var(--text-heading);
+            font-weight: 700;
+            border-bottom: 2px solid var(--border);
             text-transform: uppercase;
             font-size: 0.8rem;
             letter-spacing: 0.05em;
         }
 
-        /* Tables */
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-bottom: 1.5rem;
-            font-size: 0.9rem;
-            background-color: var(--bg-card);
-            border-radius: 8px;
-            overflow: hidden;
-            border: 1px solid var(--border-color);
-        }
-
-        th, td {
-            padding: 0.75rem 1rem;
-            text-align: left;
-        }
-
-        th {
-            background-color: var(--primary-light);
-            color: var(--primary);
-            font-weight: 600;
-            border-bottom: 1px solid var(--border-color);
-        }
-
         tr:not(:last-child) td {
-            border-bottom: 1px solid var(--border-color);
+            border-bottom: 1px solid var(--border);
+        }
+
+        tr:hover td {
+            background-color: #f8fafc;
         }
 
         /* Print utility button */
-        .print-btn {
-            background-color: var(--secondary);
-            color: white;
-            border: none;
-            padding: 0.6rem 1.2rem;
-            border-radius: 6px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: background 0.2s;
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            margin-bottom: 2rem;
+        .action-bar {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 3rem;
         }
 
-        .print-btn:hover {
-            background-color: #6aa423;
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border-radius: var(--radius-md);
+            font-weight: 700;
+            cursor: pointer;
+            transition: var(--transition);
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            text-decoration: none;
+            font-size: 0.95rem;
+            border: none;
+        }
+
+        .btn-primary {
+            background-color: var(--brand);
+            color: white;
+            box-shadow: 0 4px 12px rgba(2, 132, 199, 0.2);
+        }
+
+        .btn-primary:hover {
+            background-color: var(--brand-hover);
+            transform: translateY(-2px);
+        }
+
+        .btn-outline {
+            background-color: var(--bg-card);
+            color: var(--text-heading);
+            border: 1px solid var(--border);
+        }
+
+        .btn-outline:hover {
+            background-color: #f1f5f9;
+            transform: translateY(-2px);
         }
 
         @media print {
-            aside, .print-btn {
+            aside, .action-bar {
                 display: none !important;
             }
             main {
@@ -286,10 +496,20 @@
             body {
                 background: white;
             }
+            section {
+                box-shadow: none !important;
+                border: none !important;
+                padding: 0 !important;
+                margin-bottom: 4rem;
+                page-break-inside: avoid;
+            }
+            h2::before {
+                display: none;
+            }
         }
 
-        /* Responsive */
-        @media (max-width: 768px) {
+        /* Responsive design */
+        @media (max-width: 1024px) {
             body {
                 flex-direction: column;
             }
@@ -298,13 +518,13 @@
                 width: 100%;
                 height: auto;
                 border-right: none;
-                border-bottom: 1px solid var(--border-color);
-                padding: 1.5rem;
+                border-bottom: 1px solid var(--border);
+                padding: 2rem;
             }
             main {
                 margin-left: 0;
                 width: 100%;
-                padding: 2rem 1.5rem;
+                padding: 3rem 2rem;
             }
         }
     </style>
@@ -313,132 +533,256 @@
 
     <aside>
         <div class="logo-container">
-            <div class="logo-dot"></div>
+            <div class="logo-box">F</div>
             <div class="logo-text">Fri<span>O</span></div>
         </div>
-        <h3>Contenidos</h3>
-        <ul>
-            <li><a href="#introduccion">1. Introducción</a></li>
-            <li><a href="#filtros">2. Filtros y Documento</a></li>
-            <li><a href="#acordeon">3. Acordeón de Lotes</a></li>
-            <li><a href="#tabla-seleccion">4. Ubicaciones físicas</a></li>
-            <li><a href="#confirmacion">5. Registro y Salida</a></li>
-        </ul>
+        <div class="nav-section">
+            <h3>Contenidos del Manual</h3>
+            <ul class="nav-list">
+                <li class="nav-item"><a href="#introduccion">1. Introducción</a></li>
+                <li class="nav-item"><a href="#flujo-general">2. Flujo General</a></li>
+                <li class="nav-item"><a href="#subcliente-fallcreek">3. Selector de SubCliente</a></li>
+                <li class="nav-item"><a href="#tabla-ubicaciones">4. Ubicaciones Físicas</a></li>
+                <li class="nav-item"><a href="#despacho-parcial">5. Despachos Parciales</a></li>
+                <li class="nav-item"><a href="#registro-base-datos">6. Impacto en Base de Datos</a></li>
+            </ul>
+        </div>
     </aside>
 
     <main>
         <header>
-            <h1>Manual de Usuario - Despacho de Socios Comerciales</h1>
-            <p>Operación de la pestaña Despacho (Otros Hortofrutícolas) para el retiro inmediato de stock en FriO.</p>
+            <div class="badge-version">
+                <span class="pulse-dot"></span>
+                Versión 2.1 • Fall Creek Enabled
+            </div>
+            <h1>Manual de Usuario: Módulo de Despacho</h1>
+            <p>Salida directa e inmediata de inventario para Socios Comerciales (Otros Hortofrutícolas), incluyendo el nuevo flujo de SubClientes para Fall Creek.</p>
         </header>
 
-        <button class="print-btn" onclick="window.print()">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
-            Imprimir Manual
-        </button>
+        <div class="action-bar">
+            <button class="btn btn-primary" onclick="window.print()">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+                Imprimir Manual
+            </button>
+            <a href="manual_detallado_socios_comerciales.html" class="btn btn-outline">
+                Manual Socios Comerciales Completo
+            </a>
+        </div>
 
         <section id="introduccion">
-            <h2>1. Introducción y Concepto Clave</h2>
-            <p>La pestaña **Despacho** dentro del módulo de **Socios Comerciales** (Otros Hortofrutícolas) gestiona la salida física de fruta de terceros (por ejemplo, bins de plantas de Fall Creek) almacenada en las cámaras de frío de la planta.</p>
+            <h2>1. Introducción y Conceptos Clave</h2>
+            <p>La pestaña <strong>Despacho</strong> del módulo de <strong>Socios Comerciales (Otros Hortofrutícolas)</strong> gestiona la salida física de fruta de terceros (ej. plantas de Fall Creek o arándanos) almacenada en las cámaras de frío de la planta.</p>
             
-            <div class="callout callout-important">
-                <div class="callout-title">Diferencia con el Flujo de Cerezas</div>
-                A diferencia del flujo estándar de cerezas (el cual genera una solicitud en espera que requiere una validación y picking posterior por parte de los grueros), el despacho de Socios Comerciales realiza una <strong>rebaja directa e inmediata del stock</strong> en la base de datos al momento de presionar "Confirmar Despacho". No hay estados intermedios.
+            <div class="callout callout-note">
+                <div class="callout-title">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                    Rebaja Directa vs Flujo de Cerezas
+                </div>
+                A diferencia del flujo de cerezas (el cual genera una solicitud en espera que requiere la validación y picking posterior de los grueros), el despacho de Socios Comerciales realiza una <strong>rebaja directa e inmediata del stock</strong> en la base de datos en el instante en que el operador confirma la transacción. No existen estados pendientes intermedios.
             </div>
         </section>
 
-        <section id="filtros">
-            <h2>2. Filtros de Búsqueda y Datos de Salida</h2>
-            <p>Al ingresar a la pestaña, la parte superior presenta tres campos esenciales para delimitar el stock y autorizar el despacho:</p>
+        <section id="flujo-general">
+            <h2>2. Configuración de la Cabecera de Despacho</h2>
+            <p>Al acceder a la interfaz de despacho, la cabecera presenta campos dinámicos que cambian según el cliente seleccionado. A continuación, se presenta la representación visual de estos campos en la interfaz actual:</p>
+
+            <div class="mockup-container">
+                <div class="mockup-header">
+                    <div class="mockup-dots">
+                        <div class="mockup-dot red"></div>
+                        <div class="mockup-dot yellow"></div>
+                        <div class="mockup-dot green"></div>
+                    </div>
+                    <div class="mockup-title">Formulario de Cabecera (Socio Comercial: Fall Creek)</div>
+                </div>
+                <div class="mockup-grid">
+                    <div class="mockup-field">
+                        <span class="mockup-label">Cliente</span>
+                        <div class="mockup-select">
+                            <span>Fall Creek</span>
+                            <div class="mockup-chevron"></div>
+                        </div>
+                    </div>
+                    <div class="mockup-field">
+                        <span class="mockup-label" style="color: #10b981;">SubCliente (Destinatario)</span>
+                        <div class="mockup-select highlight">
+                            <span>Seleccione un subcliente...</span>
+                            <div class="mockup-chevron"></div>
+                        </div>
+                    </div>
+                    <div class="mockup-field">
+                        <span class="mockup-label">Filtrar por Lote</span>
+                        <div class="mockup-input">
+                            <span style="color: #64748b;">Escriba para filtrar...</span>
+                        </div>
+                    </div>
+                    <div class="mockup-field">
+                        <span class="mockup-label">Documento de Despacho</span>
+                        <div class="mockup-input">
+                            <span style="color: #64748b;">Ej: 12345</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <h3>Descripción de los Campos:</h3>
             <ul>
-                <li><strong>Cliente:</strong> Menú desplegable para seleccionar el socio comercial (ej. Fall Creek). Para evitar búsquedas vacías, el sistema solo listará aquellos clientes de tipo "FRUTA" que tengan bins actualmente en estado <em>"Almacenado"</em> y con cantidades mayores a cero.</li>
-                <li><strong>Filtrar por Lote:</strong> Buscador predictivo. Permite escribir parte del lote del sistema (ej: <code>LOT-FC-123</code>) o el código de lote del cliente para aislar rápidamente la variedad requerida.</li>
-                <li><strong>Documento de Despacho:</strong> Campo de texto obligatorio donde se debe digitar el número de la guía de despacho física o documento legal que autoriza la salida del camión. El sistema mantendrá bloqueada la confirmación final del despacho hasta que se ingrese este número.</li>
+                <li><strong>Cliente (Obligatorio):</strong> Permite seleccionar la entidad dueña del stock. Para evitar pantallas vacías, el sistema solo lista aquellos clientes de tipo "FRUTA" que tengan al menos 1 bin o pallet en estado <em>"Almacenado"</em> y con cantidades mayores a cero.</li>
+                <li><strong>Filtrar por Lote:</strong> Permite ingresar parte del lote del sistema (ej. <code>LOT-FC-123</code>) o lote del cliente para aislar rápidamente la variedad o el cargamento específico que se desea retirar.</li>
+                <li><strong>Documento de Despacho (Obligatorio):</strong> Campo numérico o de texto donde se digita la guía de despacho física que acompaña al camión. El sistema mantendrá deshabilitado el botón de confirmar hasta que se ingrese este número.</li>
             </ul>
         </section>
 
-        <section id="acordeon">
-            <h2>3. Acordeón de Lotes Consolidados</h2>
-            <p>Una vez seleccionado el cliente exportador, los lotes de fruta que se encuentran guardados en las cámaras se muestran agrupados en una lista interactiva de acordeones. Esto permite una vista limpia antes de definir el detalle del despacho.</p>
-            <p>Cada encabezado de acordeón muestra de un vistazo:</p>
-            <ul>
-                <li>El identificador del lote en el sistema (ej. <code>LOT-FC-2026-06</code>) y el lote cliente.</li>
-                <li>La cantidad total de bins o pallets disponibles de ese lote.</li>
-                <li>La unidad de medida del stock (ej: <code>Bins</code> o <code>Pallets</code>).</li>
-            </ul>
-            <p>Al hacer clic en cualquier lote de la lista, este se expandirá para revelar la tabla con el desglose físico de las ubicaciones.</p>
+        <section id="subcliente-fallcreek">
+            <h2>3. Selector de SubCliente (Caso Especial: Fall Creek)</h2>
+            <p>La última actualización incorpora un campo condicional y obligatorio denominado <strong>"SubCliente"</strong>, aplicable exclusivamente cuando el cliente seleccionado es <strong>Fall Creek (código <code>EXP004</code>)</strong>.</p>
+
+            <div class="callout callout-warning">
+                <div class="callout-title">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+                    Regla de validación de Fall Creek
+                </div>
+                Si se selecciona a Fall Creek como el exportador y se intenta confirmar un despacho sin elegir un SubCliente, el sistema bloqueará la operación inmediatamente y mostrará un mensaje emergente de alerta:
+                <br><strong>"Debe seleccionar un SubCliente para despachar a Fall Creek."</strong>
+            </div>
+
+            <h3>Funcionamiento del Selector:</h3>
+            <ol>
+                <li><strong>Filtro Automático:</strong> El listado de subclientes se genera automáticamente en tiempo real. Filtra a los productores del sistema que cumplen con dos condiciones simultáneas:
+                    <ul>
+                        <li>Su estado es <code>activo</code> en la base de datos.</li>
+                        <li>Tienen asignado o vinculado el exportador <code>EXP004</code> (Fall Creek) en su ficha maestro de socios comerciales.</li>
+                    </ul>
+                </li>
+                <li><strong>Identificación Visual:</strong> El selector muestra el nombre abreviado (<em>shortName</em>) si existe, o el nombre completo del productor para facilitar la búsqueda al operador.</li>
+                <li><strong>Destino de Datos:</strong> Al seleccionar un subcliente, el sistema asocia de forma permanente el despacho a este productor. Esto se registra en la base de datos en los campos <code>destinationClientName</code> y <code>destinationClientRUT</code> para auditorías de destino.</li>
+            </ol>
         </section>
 
-        <section id="tabla-seleccion">
-            <h2>4. Desglose de Ubicaciones y Despachos Parciales</h2>
-            <p>Al expandir un lote, se abre una tabla donde cada fila representa una coordenada física en una cámara de frío. El despachador debe utilizar esta grilla para registrar exactamente qué bins saldrán físicamente de la planta.</p>
+        <section id="tabla-ubicaciones">
+            <h2>4. Acordeón de Lotes y Desglose de Ubicaciones</h2>
+            <p>Al ingresar el cliente, se despliega una lista en formato de acordeón agrupando el stock por su identificador de lote de sistema y lote cliente. Al hacer clic en un acordeón se abre la tabla detallada del lote:</p>
 
-            <h3>Campos de la Tabla de Ubicaciones:</h3>
             <table>
                 <thead>
                     <tr>
-                        <th>Columna</th>
-                        <th>Función y Comportamiento</th>
+                        <th style="width: 5%">SELECCIÓN</th>
+                        <th style="width: 15%">COORDENADA</th>
+                        <th style="width: 20%">PRODUCTO (VARIEDAD)</th>
+                        <th style="width: 25%">LOTE CLIENTE</th>
+                        <th style="width: 10%">DISP.</th>
+                        <th style="width: 25%">A DESPACHAR</th>
                     </tr>
                 </thead>
                 <tbody>
                     <tr>
-                        <td><strong>Casilla de Selección (Checkbox)</strong></td>
-                        <td>Al marcarla, el sistema selecciona el lote en esa coordenada y carga por defecto el total de bins disponibles en el campo "A Despachar". En la cabecera hay un checkbox global para marcar todas las ubicaciones del lote simultáneamente.</td>
+                        <td style="text-align: center;"><input type="checkbox" checked disabled></td>
+                        <td><strong>C3 - Nivel 2</strong></td>
+                        <td>Sekoya Crunch</td>
+                        <td>LOTE-FC-MAYO-26</td>
+                        <td><strong>12</strong></td>
+                        <td><input type="number" value="12" style="width: 80px; padding: 0.35rem; border: 1px solid var(--border); border-radius: var(--radius-sm); font-weight: bold; text-align: center;" disabled> Bins</td>
                     </tr>
                     <tr>
-                        <td><strong>Coordenada</strong></td>
-                        <td>Ubicación física exacta de los bins (ej: <code>A1</code>, <code>B4</code>).</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Producto</strong></td>
-                        <td>Nombre de la variedad de la fruta (ej: <code>Sekoya Crunch</code>).</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Lote Cliente</strong></td>
-                        <td>Código secundario provisto por el dueño del producto.</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Observación</strong></td>
-                        <td>Notas tomadas en la recepción o reubicación (ej: "Lote de descarte").</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Disp. (Disponible)</strong></td>
-                        <td>Muestra el total de bins reales que existen en esa coordenada.</td>
-                    </tr>
-                    <tr>
-                        <td><strong>A Despachar</strong></td>
-                        <td>Casilla numérica donde se ingresa la cantidad exacta a retirar del stock.</td>
+                        <td style="text-align: center;"><input type="checkbox" checked disabled></td>
+                        <td><strong>C5 - Nivel 1</strong></td>
+                        <td>Sekoya Grande</td>
+                        <td>LOTE-FC-MIXTO-A</td>
+                        <td><strong>8</strong></td>
+                        <td><input type="number" value="5" style="width: 80px; padding: 0.35rem; border: 2px solid var(--brand); border-radius: var(--radius-sm); font-weight: bold; text-align: center; color: var(--brand);" disabled> Bins</td>
                     </tr>
                 </tbody>
             </table>
 
-            <h3>Cómo realizar un Despacho Parcial:</h3>
-            <p>Si un cliente posee 9 bins en la coordenada <code>B4</code>, pero solo se cargarán 5 bins en el transporte:</p>
+            <h3>Columnas Clave:</h3>
+            <ul>
+                <li><strong>Ubicación Física (Coordenada):</strong> Muestra la celda exacta de la cámara donde se localiza el producto (ej. <code>C3</code>, <code>C5</code>).</li>
+                <li><strong>Disp. (Disponible):</strong> Representa el saldo total actual registrado de ese lote en esa coordenada física exacta.</li>
+                <li><strong>A Despachar:</strong> Campo numérico editable donde se define la cantidad a retirar del inventario. Por defecto, al marcar la casilla de selección, el sistema llena este campo con el total disponible (despacho total).</li>
+            </ul>
+        </section>
+
+        <section id="despacho-parcial">
+            <h2>5. Cómo Realizar un Despacho Parcial</h2>
+            <p>El sistema soporta el retiro fraccionado de stock en una misma coordenada para adaptarse a la capacidad del camión o solicitudes especiales del cliente. Para realizar un despacho parcial, siga estas instrucciones:</p>
+
             <ol>
-                <li>Haga clic en el checkbox de la coordenada <code>B4</code>. El sistema sugerirá despachar los 9 bins.</li>
-                <li>Haga clic en el cuadro de texto de la columna <strong>"A Despachar"</strong> de esa fila.</li>
-                <li>Reemplace el número 9 por un <code>5</code>.</li>
-                <li>El sistema registrará que se retirarán 5 bins. Al confirmar la salida, el saldo de la coordenada <code>B4</code> en la cámara se actualizará automáticamente a 4 bins, manteniendo la fruta disponible en el sistema.</li>
+                <li>Haga clic en la casilla de selección de la fila correspondiente a la coordenada. El campo <strong>A Despachar</strong> se completará automáticamente con el stock máximo disponible.</li>
+                <li>Haga clic sobre el campo numérico de la columna <strong>"A Despachar"</strong>.</li>
+                <li>Reemplace el valor sugerido por la cantidad real que se subirá al transporte (ej: si hay 12 disponibles, ingrese <code>5</code>).</li>
+                <li>El sistema calculará automáticamente la suma final en la barra inferior (ej. <em>"Total a despachar: 5 Bins"</em>).</li>
+                <li>Al presionar "Confirmar Despacho", el sistema descontará únicamente 5 unidades de la coordenada seleccionada. La base de datos mantendrá los 7 bins restantes en la cámara en perfecto estado <code>Almacenado</code> para futuras operaciones.</li>
             </ol>
         </section>
 
-        <section id="confirmacion">
-            <h2>5. Confirmación y Registro de Salida en Base de Datos</h2>
-            <p>Al seleccionar cantidades a despachar, se activará una barra de resumen y confirmación en la zona inferior de la pantalla.</p>
-            <ul>
-                <li><strong>Resumen de Salida:</strong> Indica el total de unidades que se están despachando consolidando todas las coordenadas (ej. <em>"Total a despachar: 24 Bins"</em>).</li>
-                <li><strong>Confirmación de Despacho:</strong> Al presionar el botón <strong>"Confirmar Despacho"</strong> (que se muestra con el texto <em>"Despachando..."</em> durante el procesamiento), el sistema ejecuta dos acciones inmediatas en la base de datos de FriO:
-                    <ol>
-                        <li><strong>Rebaja de Stock:</strong> Se actualiza el documento de ingreso del socio comercial en la colección <code>otherFruitReceptions</code>, rebajando las cantidades directamente de los ítems en las coordenadas correspondientes.</li>
-                        <li><strong>Registro de Movimiento:</strong> Se inserta un documento en la colección <code>otherFruitMovements</code> de tipo <code>'salida'</code>, vinculando el número de guía ingresado, el cliente, las variedades y las cantidades retiradas para el historial del Kardex.</li>
-                    </ol>
-                </li>
-            </ul>
+        <section id="registro-base-datos">
+            <h2>6. Registro Técnico e Impacto en Firestore</h2>
+            <p>Al presionar el botón <strong>"Confirmar Despacho"</strong> en la barra inferior, el sistema procesa una transacción por lotes (<em>Write Batch</em>) en la base de datos de FriO que ejecuta los siguientes cambios de forma segura:</p>
 
-            <div class="callout callout-note">
-                <div class="callout-title">Respaldo en Kardex</div>
-                Una vez confirmado, el movimiento quedará registrado inmediatamente en el reporte del Kardex de Movimientos para auditorías de saldo e inventario de terceros.
+            <h3>1. Colección <code>otherFruitReceptions</code> (Recepción Origen)</h3>
+            <p>Se localiza el documento de ingreso del lote y se actualiza la cantidad disponible del ítem en la coordenada restando el valor ingresado. Si la cantidad llega a <code>0</code>, el ítem permanece en el historial pero con stock nulo.</p>
+
+            <h3>2. Colección <code>otherFruitMovements</code> (Historial de Transacciones)</h3>
+            <p>Se crea un nuevo documento de movimiento con la siguiente estructura de campos (con soporte para subcliente):</p>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Campo Firestore</th>
+                        <th>Tipo</th>
+                        <th>Descripción</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>type</code></td>
+                        <td>string</td>
+                        <td>Tipo de movimiento. Siempre se registra como <code>'salida'</code>.</td>
+                    </tr>
+                    <tr>
+                        <td><code>clientId</code></td>
+                        <td>string</td>
+                        <td>Identificador del socio comercial principal (ej. <code>EXP004</code>).</td>
+                    </tr>
+                    <tr>
+                        <td><code>clientName</code></td>
+                        <td>string</td>
+                        <td>Nombre del socio comercial principal (ej. <code>Fall Creek</code>).</td>
+                    </tr>
+                    <tr>
+                        <td><code>document</code></td>
+                        <td>string</td>
+                        <td>Número de guía de despacho física ingresado por el operador.</td>
+                    </tr>
+                    <tr style="background-color: var(--brand-light);">
+                        <td><code>destinationClientName</code></td>
+                        <td>string</td>
+                        <td><strong>Nombre del SubCliente receptor (solo Fall Creek).</strong> Ej: <code>Agrícola El Vergel</code>.</td>
+                    </tr>
+                    <tr style="background-color: var(--brand-light);">
+                        <td><code>destinationClientRUT</code></td>
+                        <td>string</td>
+                        <td><strong>RUT del SubCliente receptor (solo Fall Creek).</strong> Ej: <code>77.654.321-K</code>.</td>
+                    </tr>
+                    <tr>
+                        <td><code>createdAt</code></td>
+                        <td>timestamp</td>
+                        <td>Fecha y hora del servidor al momento del despacho.</td>
+                    </tr>
+                    <tr>
+                        <td><code>items</code></td>
+                        <td>array</td>
+                        <td>Lista de los ítems despachados, incluyendo código, nombre del producto, lote cliente y cantidad.</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="callout callout-danger">
+                <div class="callout-title">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="7.86 2 16.14 2 22 7.86 22 16.14 16.14 22 7.86 22 2 16.14 2 7.86 7.86 2"></polygon><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                    Importante
+                </div>
+                Estos movimientos son irreversibles de forma automática desde la interfaz del operador. Cualquier anulación de despacho o error en la digitación del número de guía o subcliente debe ser corregida o auditada por un administrador del sistema directamente en el panel de control o colecciones del Kardex.
             </div>
         </section>
     </main>
