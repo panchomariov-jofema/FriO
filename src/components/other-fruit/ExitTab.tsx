@@ -40,6 +40,8 @@ interface AggregatedLot {
   }[];
 }
 
+const isFallCreekClient = (id: string) => id === 'EXP004' || id === '76361536-7';
+
 export function OtherFruitExitTab({ clientId: fixedClientId }: { clientId?: string }) {
   const { data: allClients, loading: loadingClients } = useFirestoreCollection<OtherClient>('otherClients');
   const { data: allReceptions, loading: loadingReceptions } = useFirestoreCollection<OtherFruitReception>('otherFruitReceptions');
@@ -88,9 +90,9 @@ export function OtherFruitExitTab({ clientId: fixedClientId }: { clientId?: stri
     return producers.filter(p => {
       if (p.status === 'inactivo') return false;
       if (Array.isArray(p.exporterId)) {
-        return p.exporterId.includes('EXP004');
+        return p.exporterId.includes('EXP004') || p.exporterId.includes('76361536-7');
       }
-      return p.exporterId === 'EXP004';
+      return p.exporterId === 'EXP004' || p.exporterId === '76361536-7';
     });
   }, [producers]);
 
@@ -131,13 +133,14 @@ export function OtherFruitExitTab({ clientId: fixedClientId }: { clientId?: stri
     receptions.forEach(reception => {
       if (reception.clientId !== selectedClientId) return;
 
-      if (!reception.displayLotId) return;
+      const lotId = reception.displayLotId || reception.document || reception.id;
+      if (!lotId) return;
 
       reception.items.forEach((item, index) => {
-        if (item.status === 'Almacenado' && item.quantity > 0 && item.storageLocation?.coordinate && reception.displayLotId) {
+        if (item.status === 'Almacenado' && item.quantity > 0 && item.storageLocation?.coordinate) {
           const displayKey = item.clientLotId 
-            ? `${reception.displayLotId}-${item.clientLotId}` 
-            : reception.displayLotId;
+            ? `${lotId}-${item.clientLotId}` 
+            : lotId;
 
           if (!lotMap.has(displayKey)) {
             lotMap.set(displayKey, {
@@ -251,7 +254,7 @@ export function OtherFruitExitTab({ clientId: fixedClientId }: { clientId?: stri
         return;
     }
     
-    if (selectedClientId === 'EXP004' && !selectedSubClientId) {
+    if (isFallCreekClient(selectedClientId) && !selectedSubClientId) {
         toast({ variant: 'destructive', title: 'Error', description: 'Debe seleccionar un SubCliente para despachar a Fall Creek.' });
         return;
     }
@@ -262,7 +265,7 @@ export function OtherFruitExitTab({ clientId: fixedClientId }: { clientId?: stri
       return;
     }
 
-    const selectedSubClient = selectedClientId === 'EXP004'
+    const selectedSubClient = isFallCreekClient(selectedClientId)
       ? producers.find(p => p.id === selectedSubClientId)
       : null;
 
@@ -371,7 +374,7 @@ export function OtherFruitExitTab({ clientId: fixedClientId }: { clientId?: stri
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className={cn("grid gap-4", selectedClientId === 'EXP004' ? "grid-cols-1 md:grid-cols-4" : "grid-cols-1 md:grid-cols-3")}>
+        <div className={cn("grid gap-4", isFallCreekClient(selectedClientId) ? "grid-cols-1 md:grid-cols-4" : "grid-cols-1 md:grid-cols-3")}>
             {!fixedClientId && (
               <div>
                 <Label>Cliente</Label>
@@ -383,7 +386,7 @@ export function OtherFruitExitTab({ clientId: fixedClientId }: { clientId?: stri
                 </Select>
               </div>
             )}
-            {selectedClientId === 'EXP004' && (
+            {isFallCreekClient(selectedClientId) && (
               <div>
                 <Label>SubCliente</Label>
                 <Select value={selectedSubClientId} onValueChange={setSelectedSubClientId}>
