@@ -96,7 +96,7 @@ export default function ReceptionLogReportPage() {
 
                                         return (
                                         <TableRow key={lot.id}>
-                                            <TableCell>{lot.createdAt?.toDate().toLocaleString()}</TableCell>
+                                            <TableCell>{lot.createdAt?.toDate()?.toLocaleString() ?? 'Sin fecha'}</TableCell>
                                             <TableCell>{lot.displayLotId}</TableCell>
                                             <TableCell>{lot.producerId}</TableCell>
                                             <TableCell>{lot.variety}</TableCell>

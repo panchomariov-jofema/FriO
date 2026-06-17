@@ -272,7 +272,7 @@ function HidrocoolerPageContent() {
                           <div className="mt-4 text-sm grid grid-cols-2 gap-2">
                               <p><strong>Bins:</strong> {lot.binCount}</p>
                               <p><strong>Peso/Bin:</strong> {lot.netWeightPerBin?.toFixed(2) ?? '-'} kg</p>
-                              <p className="col-span-2"><strong>Fecha Recepción:</strong> {lot.receptionDate?.toDate().toLocaleString('es-CL')}</p>
+                              <p className="col-span-2"><strong>Fecha Recepción:</strong> {lot.receptionDate?.toDate()?.toLocaleString('es-CL') ?? 'Sin fecha'}</p>
                           </div>
                       </Card>
                   ))
@@ -303,7 +303,7 @@ function HidrocoolerPageContent() {
                 ) : sortedPendingLots.length > 0 ? (
                   sortedPendingLots.map((lot) => (
                     <TableRow key={lot.id}>
-                      <TableCell className="text-sm">{lot.receptionDate?.toDate().toLocaleString('es-CL', { year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute:'2-digit' })}</TableCell>
+                      <TableCell className="text-sm">{lot.receptionDate?.toDate()?.toLocaleString('es-CL', { year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute:'2-digit' }) ?? 'Sin fecha'}</TableCell>
                       <TableCell className="font-medium">{lot.displayLotId}</TableCell>
                       <TableCell>{lot.producerShortName}</TableCell>
                       <TableCell>{lot.binCount}</TableCell>

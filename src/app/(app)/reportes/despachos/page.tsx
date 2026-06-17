@@ -127,7 +127,7 @@ export default function DispatchReportPage() {
                                 ) : reportData && reportData.length > 0 ? (
                                     reportData.map(dispatch => (
                                         <TableRow key={dispatch.id}>
-                                            <TableCell>{dispatch.createdAt?.toDate().toLocaleString()}</TableCell>
+                                            <TableCell>{dispatch.createdAt?.toDate()?.toLocaleString() ?? 'Sin fecha'}</TableCell>
                                             <TableCell>{dispatch.exporterName}</TableCell>
                                             <TableCell>{dispatch.producers.join(', ')}</TableCell>
                                             <TableCell>{dispatch.varieties.join(', ')}</TableCell>

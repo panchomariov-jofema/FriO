@@ -120,7 +120,7 @@ export function PendingPickingTab() {
                 ) : pendingMovements.length > 0 ? (
                   pendingMovements.map((mov) => (
                     <TableRow key={mov.id}>
-                      <TableCell>{mov.createdAt?.toDate().toLocaleString() ?? 'N/A'}</TableCell>
+                      <TableCell>{mov.createdAt?.toDate()?.toLocaleString() ?? 'Sin fecha'}</TableCell>
                       <TableCell>{clientMap[mov.clientId] || mov.clientId}</TableCell>
                       <TableCell className="hidden sm:table-cell">{mov.document}</TableCell>
                       <TableCell>{mov.items.reduce((sum, item) => sum + item.palletCount, 0)} pallets</TableCell>

@@ -683,7 +683,7 @@ export default function BinMaterialKardexReportPage() {
                                 ) : filteredKardexData.length > 0 ? (
                                     filteredKardexData.map(item => (
                                         <TableRow key={item.key}>
-                                            <TableCell className="text-xs">{item.fecha?.toDate().toLocaleString('es-CL', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })}</TableCell>
+                                            <TableCell className="text-xs">{item.fecha?.toDate()?.toLocaleString('es-CL', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' }) ?? 'Sin fecha'}</TableCell>
                                             <TableCell className="font-mono text-xs">{item.documento || '-'}</TableCell>
                                             <TableCell className="text-xs">{item.exportador}</TableCell>
                                             <TableCell className="text-xs">{item.productor}</TableCell>

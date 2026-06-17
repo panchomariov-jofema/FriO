@@ -95,7 +95,7 @@ export default function TemperatureLogReportPage() {
                                 ) : sortedData && sortedData.length > 0 ? (
                                     sortedData.map(temp => (
                                         <TableRow key={temp.id}>
-                                            <TableCell>{temp.timestamp?.toDate().toLocaleString('es-CL')}</TableCell>
+                                            <TableCell>{temp.timestamp?.toDate()?.toLocaleString('es-CL') ?? 'Sin fecha'}</TableCell>
                                             <TableCell>{chambersConfig[temp.chamberId]?.name || temp.chamberId}</TableCell>
                                             <TableCell>{temp.temperature.toFixed(1)} °C</TableCell>
                                             <TableCell>{temp.humidity !== undefined ? `${temp.humidity}%` : '-'}</TableCell>

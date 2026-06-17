@@ -729,7 +729,7 @@ export default function CamarasPage() {
                           </div>
                           <div className="mt-4 text-sm">
                               <p><strong>Bins:</strong> {lot.binCount}</p>
-                              <p><strong>Fecha Recepción:</strong> {lot.receptionDate?.toDate().toLocaleString('es-CL')}</p>
+                              <p><strong>Fecha Recepción:</strong> {lot.receptionDate?.toDate()?.toLocaleString('es-CL') ?? 'Sin fecha'}</p>
                           </div>
                       </Card>
                   ))
@@ -759,7 +759,7 @@ export default function CamarasPage() {
                 ) : (sortedPendingLots || []).length > 0 ? (
                   sortedPendingLots.map((lot) => (
                     <TableRow key={lot.id}>
-                      <TableCell className="text-sm">{lot.receptionDate?.toDate().toLocaleString('es-CL', { year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute:'2-digit' })}</TableCell>
+                      <TableCell className="text-sm">{lot.receptionDate?.toDate()?.toLocaleString('es-CL', { year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute:'2-digit' }) ?? 'Sin fecha'}</TableCell>
                       <TableCell className="font-medium">{lot.displayLotId}</TableCell>
                       <TableCell className="hidden md:table-cell">{lot.producerShortName}</TableCell>
                       <TableCell>{lot.binCount}</TableCell>

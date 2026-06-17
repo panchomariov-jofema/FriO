@@ -193,7 +193,7 @@ export default function OtherFruitKardexReportPage() {
                                 ) : filteredData.length > 0 ? (
                                     filteredData.map((item) => (
                                     <TableRow key={item.key}>
-                                        <TableCell>{item.date?.toDate().toLocaleString() ?? 'N/A'}</TableCell>
+                                        <TableCell>{item.date?.toDate()?.toLocaleString() ?? 'Sin fecha'}</TableCell>
                                         <TableCell>
                                             <Badge variant={item.type === 'entrada' ? 'default' : 'secondary'}>
                                                 {item.type.charAt(0).toUpperCase() + item.type.slice(1)}

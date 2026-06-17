@@ -223,7 +223,7 @@ export default function OtherFruitStockReportPage() {
                                     <>
                                         {filteredData.map(item => (
                                             <TableRow key={item.id}>
-                                                <TableCell>{item.receptionDate?.toDate().toLocaleDateString()}</TableCell>
+                                                <TableCell>{item.receptionDate?.toDate()?.toLocaleDateString() ?? 'Sin fecha'}</TableCell>
                                                 <TableCell>{item.clientName}</TableCell>
                                                 <TableCell className="font-mono text-xs">{item.document}</TableCell>
                                                 <TableCell className="font-mono text-xs">{item.clientLotId}</TableCell>

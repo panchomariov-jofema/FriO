@@ -290,7 +290,7 @@ export function OtherFruitPickingTab() {
                               <div className="flex justify-between items-start gap-4">
                                   <div>
                                       <CardTitle className="text-lg">{clientName}</CardTitle>
-                                      <CardDescription>{mov.createdAt?.toDate().toLocaleString() ?? 'N/A'}</CardDescription>
+                                      <CardDescription>{mov.createdAt?.toDate()?.toLocaleString() ?? 'Sin fecha'}</CardDescription>
                                       <div className="mt-2">
                                           <Badge variant={mov.taskType === 'fruit' ? 'outline' : mov.taskType === 'packaging' ? 'default' : 'secondary'}>
                                               {typeLabel}
@@ -343,7 +343,7 @@ export function OtherFruitPickingTab() {
 
                      return (
                         <TableRow key={mov.id}>
-                          <TableCell>{mov.createdAt?.toDate().toLocaleString() ?? 'N/A'}</TableCell>
+                          <TableCell>{mov.createdAt?.toDate()?.toLocaleString() ?? 'Sin fecha'}</TableCell>
                           <TableCell>
                             <Badge variant={mov.taskType === 'fruit' ? 'outline' : mov.taskType === 'packaging' ? 'default' : 'secondary'}>
                                 {mov.taskType === 'fruit' ? 'Fruta (Socio)' : mov.taskType === 'packaging' ? 'Embalaje' : 'Fruta (Productor)'}

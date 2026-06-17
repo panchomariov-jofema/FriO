@@ -930,7 +930,7 @@ export default function FallCreekPage() {
                                                 .sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0))
                                                 .map(reception => (
                                                     <TableRow key={reception.id}>
-                                                        <TableCell>{reception.createdAt?.toDate().toLocaleDateString()}</TableCell>
+                                                        <TableCell>{reception.createdAt?.toDate()?.toLocaleDateString() ?? 'Sin fecha'}</TableCell>
                                                         <TableCell className="font-mono font-bold">{reception.document}</TableCell>
                                                         <TableCell>{reception.items.length}</TableCell>
                                                         <TableCell>
@@ -994,7 +994,7 @@ export default function FallCreekPage() {
                                                 const status = mov.status === 'Completado' ? 'Completado' : 'En Proceso';
                                                 return (
                                                     <TableRow key={mov.id}>
-                                                        <TableCell className="text-xs">{mov.createdAt?.toDate().toLocaleString('es-CL')}</TableCell>
+                                                        <TableCell className="text-xs">{mov.createdAt?.toDate()?.toLocaleString('es-CL') ?? 'Sin fecha'}</TableCell>
                                                         <TableCell className="font-mono font-bold">{mov.document || '-'}</TableCell>
                                                         <TableCell className="font-mono text-[10px] max-w-[250px] truncate">{mov.lotes}</TableCell>
                                                         <TableCell className="font-semibold">{mov.totalQuantity} {mov.unit}</TableCell>
@@ -1145,7 +1145,7 @@ export default function FallCreekPage() {
                          <DialogHeader>
                              <DialogTitle className="text-[#004b8d]">Detalle de Manifiesto (Pallet Log)</DialogTitle>
                              <DialogDescription>
-                                 Documento: {receptionToView.document} - Fecha: {receptionToView.createdAt?.toDate().toLocaleDateString()}
+                                 Documento: {receptionToView.document} - Fecha: {receptionToView.createdAt?.toDate()?.toLocaleDateString() ?? 'Sin fecha'}
                              </DialogDescription>
                          </DialogHeader>
                          <div className="max-h-96 overflow-y-auto">

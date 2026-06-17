@@ -143,8 +143,8 @@ function FallCreekExecutiveView({ dashboardData, clientName }: { dashboardData: 
                                 <TableBody>
                                     {summaryData && summaryData.length > 0 ? summaryData.map((item: any) => (
                                         <TableRow key={item.id}>
-                                            <TableCell>{item.receptionDate?.toDate().toLocaleDateString('es-CL')}</TableCell>
-                                            <TableCell className="font-mono">{item.lot}</TableCell>
+                                             <TableCell>{item.receptionDate?.toDate()?.toLocaleDateString('es-CL') ?? 'Sin fecha'}</TableCell>
+                                             <TableCell className="font-mono">{item.lot}</TableCell>
                                             <TableCell>{item.quantity} {item.unit}</TableCell>
                                             <TableCell>{item.chamber}</TableCell>
                                         </TableRow>
@@ -243,9 +243,9 @@ function FallCreekExecutiveView({ dashboardData, clientName }: { dashboardData: 
                             <TableBody>
                                 {dispatchReportData && dispatchReportData.length > 0 ? (
                                     dispatchReportData.map((dispatch: any) => (
-                                    <TableRow key={dispatch.id}>
-                                        <TableCell>{dispatch.dispatchDate?.toDate().toLocaleString('es-CL')}</TableCell>
-                                        <TableCell className="font-mono">{dispatch.document}</TableCell>
+                                     <TableRow key={dispatch.id}>
+                                         <TableCell>{dispatch.dispatchDate?.toDate()?.toLocaleString('es-CL') ?? 'Sin fecha'}</TableCell>
+                                         <TableCell className="font-mono">{dispatch.document}</TableCell>
                                         <TableCell className="font-mono">{dispatch.clientLotIds}</TableCell>
                                         <TableCell>{dispatch.productNames}</TableCell>
                                         <TableCell className="font-semibold">{dispatch.totalQuantity} {dispatch.unit}</TableCell>
@@ -608,7 +608,7 @@ export default function DashboardPage() {
         );
 
         const groupedSummary = summaryItems.reduce((acc, item) => {
-            const dateString = item.receptionDate?.toDate().toLocaleDateString('es-CL');
+            const dateString = item.receptionDate?.toDate()?.toLocaleDateString('es-CL') || 'Sin fecha';
             const key = `${dateString}-${item.lot}-${item.chamber}`;
             
             if (!acc[key]) {
@@ -965,7 +965,7 @@ export default function DashboardPage() {
                                         <Badge variant="secondary">{lot.status}</Badge>
                                     </div>
                                     <div className="mt-2 text-sm grid grid-cols-2 gap-x-4">
-                                        <p><strong>Fecha:</strong> {lot.createdAt?.toDate().toLocaleString()}</p>
+                                         <p><strong>Fecha:</strong> {lot.createdAt?.toDate()?.toLocaleString() ?? 'Sin fecha'}</p>
                                         <p><strong>Bins:</strong> {lot.binCount}</p>
                                     </div>
                                 </Card>
@@ -994,7 +994,7 @@ export default function DashboardPage() {
                                 ) : latestReceptions.length > 0 ? (
                                     latestReceptions.map(lot => (
                                         <TableRow key={lot.id}>
-                                            <TableCell>{lot.createdAt?.toDate().toLocaleString()}</TableCell>
+                                             <TableCell>{lot.createdAt?.toDate()?.toLocaleString() ?? 'Sin fecha'}</TableCell>
                                             <TableCell className="font-mono">{lot.displayLotId}</TableCell>
                                             <TableCell className="hidden sm:table-cell">{lot.producerId}</TableCell>
                                             <TableCell className="hidden md:table-cell">{lot.variety}</TableCell>
