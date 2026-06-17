@@ -63,76 +63,87 @@ export function BarcodeScanner({
     }
     
     let html5QrCode: any = null;
+    let isMounted = true;
+    let timerId: any = null;
 
-    // Dynamically import the library only on the client-side
-    import('html5-qrcode').then(({ Html5Qrcode }) => {
-        // Ensure the element exists in DOM before creating instance
-        const el = document.getElementById(qrcodeRegionId);
-        if (!el) return;
+    timerId = setTimeout(() => {
+      if (!isMounted) return;
 
-        html5QrCode = new Html5Qrcode(qrcodeRegionId);
-        let isScanning = true;
+      // Dynamically import the library only on the client-side
+      import('html5-qrcode').then(({ Html5Qrcode }) => {
+          if (!isMounted) return;
+          // Ensure the element exists in DOM before creating instance
+          const el = document.getElementById(qrcodeRegionId);
+          if (!el) return;
 
-        const qrCodeSuccessCallback = (decodedText: string, decodedResult: any) => {
-          if (isScanning) {
-            isScanning = false; // Prevent multiple calls
-            onScan(decodedText);
-            if (closeOnScan) {
+          html5QrCode = new Html5Qrcode(qrcodeRegionId);
+          let isScanning = true;
+
+          const qrCodeSuccessCallback = (decodedText: string, decodedResult: any) => {
+            if (isScanning) {
+              isScanning = false; // Prevent multiple calls
+              onScan(decodedText);
+              if (closeOnScan) {
+                onOpenChange(false);
+              } else {
+                // If not closing, allow scanning again after a short delay
+                setTimeout(() => {
+                  isScanning = true;
+                }, 1000);
+              }
+            }
+          };
+
+          const config = { 
+              fps: 10, 
+              qrbox: (viewfinderWidth: number, viewfinderHeight: number) => {
+                  const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
+                  // Sensible minimum size of 250px if viewfinder size is 0 or too small
+                  const qrboxSize = minEdge > 120 ? Math.floor(minEdge * 0.7) : 250;
+                  return {
+                      width: qrboxSize,
+                      height: qrboxSize,
+                  };
+              },
+              aspectRatio: 1.0
+          };
+          
+          html5QrCode.start(
+              { facingMode: "environment" }, 
+              config, 
+              qrCodeSuccessCallback, 
+              undefined
+          ).catch((err: any) => {
+              console.error("Failed to start html5-qrcode scanner", err);
+              
+              // Contexto seguro check (Camera requires HTTPS or Localhost)
+              const isNotSecure = typeof window !== 'undefined' && !window.isSecureContext;
+              
+              toast({
+                  variant: "destructive",
+                  title: "Error de Cámara",
+                  description: isNotSecure 
+                      ? "La cámara requiere una conexión segura (HTTPS). Chrome bloquea la cámara en IPs locales (192.168.x.x) sin SSL."
+                      : "No se pudo iniciar el escáner. Verifique los permisos o si otra app usa la cámara.",
+              });
               onOpenChange(false);
-            } else {
-              // If not closing, allow scanning again after a short delay
-              setTimeout(() => {
-                isScanning = true;
-              }, 1000);
-            }
-          }
-        };
+          });
 
-        const config = { 
-            fps: 10, 
-            qrbox: (viewfinderWidth: number, viewfinderHeight: number) => {
-                const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
-                const qrboxSize = Math.floor(minEdge * 0.8);
-                return {
-                    width: qrboxSize,
-                    height: qrboxSize,
-                };
-            }
-        };
-        
-        html5QrCode.start(
-            { facingMode: "environment" }, 
-            config, 
-            qrCodeSuccessCallback, 
-            undefined
-        ).catch((err: any) => {
-            console.error("Failed to start html5-qrcode scanner", err);
-            
-            // Contexto seguro check (Camera requires HTTPS or Localhost)
-            const isNotSecure = typeof window !== 'undefined' && !window.isSecureContext;
-            
-            toast({
-                variant: "destructive",
-                title: "Error de Cámara",
-                description: isNotSecure 
-                    ? "La cámara requiere una conexión segura (HTTPS). Chrome bloquea la cámara en IPs locales (192.168.x.x) sin SSL."
-                    : "No se pudo iniciar el escáner. Verifique los permisos o si otra app usa la cámara.",
-            });
-            onOpenChange(false);
-        });
-
-    }).catch((error) => {
-        console.error("Failed to load html5-qrcode library", error);
-        toast({
-            variant: "destructive",
-            title: "Error de Carga",
-            description: "No se pudo cargar la biblioteca de escaneo.",
-        });
-        onOpenChange(false);
-    });
+      }).catch((error) => {
+          console.error("Failed to load html5-qrcode library", error);
+          toast({
+              variant: "destructive",
+              title: "Error de Carga",
+              description: "No se pudo cargar la biblioteca de escaneo.",
+          });
+          onOpenChange(false);
+      });
+    }, 350); // 350ms delay to allow Dialog animation to finish
 
     // Cleanup function to stop the scanner when the component unmounts or dialog closes.
     return () => {
+      isMounted = false;
+      if (timerId) clearTimeout(timerId);
       const el = document.getElementById(qrcodeRegionId);
       if (el && html5QrCode && html5QrCode.isScanning) {
         html5QrCode.stop().catch((err: any) => {
