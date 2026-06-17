@@ -9,7 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { useFirestore } from '@/firebase';
+import { useFirestore, useUser } from '@/firebase';
 import { collection, writeBatch, doc, setDoc, serverTimestamp, addDoc, deleteDoc, updateDoc } from 'firebase/firestore';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
@@ -69,6 +69,7 @@ export default function FallCreekPage() {
 
     const { toast } = useToast();
     const firestore = useFirestore();
+    const { user } = useUser();
 
     const [selectionMode, setSelectionMode] = React.useState(false);
     const [selectedCoords, setSelectedCoords] = React.useState<Record<string, StoredItem[]>>({});
@@ -443,6 +444,8 @@ export default function FallCreekPage() {
                 items: movementItems,
                 locations: locationsToPick,
                 status: 'Pendiente de Picking' as const,
+                userId: user?.uid || null,
+                userName: user?.email || (user?.isAnonymous ? 'Anónimo' : user?.displayName || 'N/A'),
             };
 
             if (documentoDespacho) movementData.document = documentoDespacho;

@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
 import type { OtherClient, OtherFruitReception, OtherFruitReceptionItem, OtherFruitMovement, Producer } from '@/lib/types';
-import { useFirestore } from '@/firebase';
+import { useFirestore, useUser } from '@/firebase';
 import { mockOtherClients, mockOtherFruitReceptions, mockProducers } from '@/lib/mock-chamber5';
 
 import { addDoc, collection, doc, writeBatch, serverTimestamp } from 'firebase/firestore';
@@ -48,6 +48,7 @@ export function OtherFruitExitTab({ clientId: fixedClientId }: { clientId?: stri
   const { data: allProducers } = useFirestoreCollection<Producer>('producers');
   const firestore = useFirestore();
   const { toast } = useToast();
+  const { user } = useUser();
 
   const [selectedClientId, setSelectedClientId] = React.useState('');
   const [selectedSubClientId, setSelectedSubClientId] = React.useState('');
@@ -331,10 +332,12 @@ export function OtherFruitExitTab({ clientId: fixedClientId }: { clientId?: stri
             clientName: client.name,
             unit: client.unit,
             document: document,
-            destinationClientName: selectedSubClient ? selectedSubClient.name : undefined,
-            destinationClientRUT: selectedSubClient ? selectedSubClient.rut : undefined,
+            destinationClientName: selectedSubClient ? selectedSubClient.name : null,
+            destinationClientRUT: selectedSubClient ? selectedSubClient.rut : null,
             items: movementItems,
             createdAt: serverTimestamp() as any,
+            userId: user?.uid || null,
+            userName: user?.email || (user?.isAnonymous ? 'Anónimo' : user?.displayName || 'N/A'),
         };
 
         if (hasRealWrites) {

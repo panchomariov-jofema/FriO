@@ -15,7 +15,7 @@ import { otherFruitReceptionSchema } from '@/lib/schemas';
 import { PlusCircle, ScanLine, Trash2, Search, Check, ChevronsUpDown } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { useFirestore } from '@/firebase';
+import { useFirestore, useUser } from '@/firebase';
 import { doc, updateDoc, addDoc, collection, serverTimestamp, getDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { errorEmitter } from '@/firebase/error-emitter';
@@ -135,6 +135,7 @@ export function OtherFruitReceptionTab({ clientId: fixedClientId }: { clientId?:
   const { data: allClients, loading: loadingClients } = useFirestoreCollection<OtherClient>('otherClients');
   const firestore = useFirestore();
   const { toast } = useToast();
+  const { user } = useUser();
   
   const { data: exporters } = useFirestoreCollection<any>('exporters');
   const { data: otherClients } = useFirestoreCollection<any>('otherClients');
@@ -601,6 +602,8 @@ export function OtherFruitReceptionTab({ clientId: fixedClientId }: { clientId?:
         items: itemsWithStatus,
         status: 'Pendiente de almacenar' as const,
         createdAt: serverTimestamp(),
+        userId: user?.uid || null,
+        userName: user?.email || (user?.isAnonymous ? 'Anónimo' : user?.displayName || 'N/A'),
     };
 
     if (showTemperature && typeof values.temperature === 'number' && !isNaN(values.temperature)) {
