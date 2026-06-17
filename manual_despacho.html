@@ -3,15 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Manual de Usuario: Módulo de Despacho - Socios Comerciales (FriO)</title>
+    <title>Guía Paso a Paso: Despacho de Socios Comerciales (Otros Clientes) - FriO</title>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
         :root {
-            /* Palette HSL Tailored Colors */
             --bg-base: #f8fafc;
             --bg-card: #ffffff;
             --primary: #0f172a;
-            --primary-accent: #1e293b;
             --brand: #0284c7;
             --brand-light: #e0f2fe;
             --brand-hover: #0369a1;
@@ -138,12 +136,6 @@
             transform: translateX(4px);
         }
 
-        .nav-item.active a {
-            color: white;
-            background: linear-gradient(135deg, var(--brand) 0%, #0284c7 100%);
-            box-shadow: 0 4px 12px rgba(2, 132, 199, 0.2);
-        }
-
         /* Main Content Container */
         main {
             margin-left: var(--sidebar-width);
@@ -153,7 +145,7 @@
         }
 
         header {
-            margin-bottom: 4rem;
+            margin-bottom: 3.5rem;
             position: relative;
         }
 
@@ -187,7 +179,7 @@
 
         header h1 {
             font-family: 'Outfit', sans-serif;
-            font-size: 2.75rem;
+            font-size: 2.5rem;
             font-weight: 800;
             color: var(--text-heading);
             letter-spacing: -0.04em;
@@ -196,72 +188,68 @@
         }
 
         header p {
-            font-size: 1.25rem;
+            font-size: 1.2rem;
             color: var(--text-muted);
             font-weight: 400;
             max-width: 800px;
         }
 
-        section {
+        /* Step Card Styling */
+        .step-card {
             background-color: var(--bg-card);
             border: 1px solid var(--border);
             border-radius: var(--radius-lg);
-            padding: 3rem;
-            margin-bottom: 3rem;
+            padding: 2.5rem;
+            margin-bottom: 2.5rem;
             box-shadow: var(--shadow);
             scroll-margin-top: 3rem;
+            position: relative;
             transition: var(--transition);
         }
 
-        section:hover {
+        .step-card:hover {
             box-shadow: var(--shadow-md);
+            border-color: #cbd5e1;
+        }
+
+        .step-badge {
+            background: linear-gradient(135deg, var(--brand) 0%, #0369a1 100%);
+            color: white;
+            font-family: 'Outfit', sans-serif;
+            font-weight: 800;
+            font-size: 0.9rem;
+            padding: 0.4rem 1.2rem;
+            border-radius: 9999px;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            margin-bottom: 1.25rem;
+            box-shadow: 0 4px 10px rgba(2, 132, 199, 0.25);
         }
 
         h2 {
             font-family: 'Outfit', sans-serif;
-            font-size: 1.75rem;
+            font-size: 1.6rem;
             font-weight: 800;
             color: var(--text-heading);
-            margin-bottom: 1.5rem;
+            margin-bottom: 1.25rem;
             letter-spacing: -0.02em;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
-        h2::before {
-            content: '';
-            display: inline-block;
-            width: 6px;
-            height: 28px;
-            background: linear-gradient(to bottom, var(--brand) 0%, #38bdf8 100%);
-            border-radius: 99px;
-        }
-
-        h3 {
-            font-family: 'Outfit', sans-serif;
-            font-size: 1.3rem;
-            font-weight: 700;
-            color: var(--text-heading);
-            margin-top: 2rem;
-            margin-bottom: 1rem;
         }
 
         p {
-            margin-bottom: 1.5rem;
+            margin-bottom: 1.25rem;
             color: var(--text-main);
         }
 
-        /* Numbered lists / Steps styling */
+        /* Bullets */
         ol, ul {
-            margin-left: 1.75rem;
-            margin-bottom: 1.5rem;
+            margin-left: 1.5rem;
+            margin-bottom: 1.25rem;
             color: var(--text-main);
         }
 
         li {
-            margin-bottom: 0.75rem;
-            padding-left: 0.25rem;
+            margin-bottom: 0.5rem;
         }
 
         strong {
@@ -272,10 +260,10 @@
         /* Callout blocks (Alerts) */
         .callout {
             border-left: 5px solid;
-            padding: 1.5rem 1.75rem;
+            padding: 1.25rem 1.5rem;
             border-radius: 0 var(--radius-md) var(--radius-md) 0;
-            margin: 2rem 0;
-            font-size: 1rem;
+            margin: 1.5rem 0;
+            font-size: 0.95rem;
         }
 
         .callout-note {
@@ -299,126 +287,108 @@
         .callout-title {
             font-family: 'Outfit', sans-serif;
             font-weight: 800;
-            margin-bottom: 0.5rem;
+            margin-bottom: 0.35rem;
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 6px;
             text-transform: uppercase;
-            font-size: 0.85rem;
+            font-size: 0.8rem;
             letter-spacing: 0.05em;
         }
 
-        /* Interactive mockup wrapper */
-        .mockup-container {
+        /* Visual mockup elements for operators */
+        .ui-mockup {
             background-color: #0f172a;
-            border-radius: var(--radius-lg);
-            padding: 2rem;
+            border-radius: var(--radius-md);
+            padding: 1.5rem;
             color: #e2e8f0;
-            margin: 2.5rem 0;
+            margin: 1.5rem 0;
             border: 1px solid rgba(255, 255, 255, 0.08);
-            box-shadow: var(--shadow-md);
+            box-shadow: var(--shadow);
         }
 
-        .mockup-header {
+        .ui-mockup-header {
             display: flex;
             align-items: center;
             justify-content: space-between;
             border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-            padding-bottom: 1rem;
-            margin-bottom: 1.5rem;
+            padding-bottom: 0.75rem;
+            margin-bottom: 1.25rem;
         }
 
-        .mockup-dots {
+        .ui-mockup-dots {
             display: flex;
-            gap: 6px;
+            gap: 5px;
         }
 
-        .mockup-dot {
-            width: 10px;
-            height: 10px;
+        .ui-mockup-dot {
+            width: 8px;
+            height: 8px;
             border-radius: 50%;
         }
+        .ui-mockup-dot.red { background-color: #ef4444; }
+        .ui-mockup-dot.yellow { background-color: #f59e0b; }
+        .ui-mockup-dot.green { background-color: #10b981; }
 
-        .mockup-dot.red { background-color: #ef4444; }
-        .mockup-dot.yellow { background-color: #f59e0b; }
-        .mockup-dot.green { background-color: #10b981; }
-
-        .mockup-title {
-            font-size: 0.85rem;
-            color: #94a3b8;
-            font-weight: 500;
-            font-family: monospace;
-        }
-
-        /* Form UI mockup elements */
-        .mockup-grid {
-            display: grid;
-            grid-template-cols: repeat(auto-fit, minmax(220px, 1fr));
-            gap: 1.5rem;
-            margin-bottom: 1.5rem;
-        }
-
-        .mockup-field {
-            display: flex;
-            flex-direction: column;
-            gap: 0.5rem;
-        }
-
-        .mockup-label {
-            font-size: 0.8rem;
+        .ui-mockup-label {
+            font-size: 0.75rem;
             font-weight: 700;
             text-transform: uppercase;
             color: #94a3b8;
-            letter-spacing: 0.025em;
+            margin-bottom: 0.35rem;
+            display: block;
         }
 
-        .mockup-select, .mockup-input {
+        .ui-mockup-select, .ui-mockup-input {
             background-color: #1e293b;
             border: 1px solid #334155;
             color: #f8fafc;
-            padding: 0.75rem 1rem;
-            border-radius: var(--radius-md);
-            font-size: 0.95rem;
+            padding: 0.6rem 0.85rem;
+            border-radius: var(--radius-sm);
+            font-size: 0.9rem;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            cursor: pointer;
-            transition: var(--transition);
         }
 
-        .mockup-select.active {
+        .ui-mockup-highlight {
             border-color: var(--brand);
-            box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.2);
+            box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.25);
         }
 
-        .mockup-select.highlight {
+        .ui-mockup-success {
             border-color: var(--success);
-            box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2);
+            box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.25);
         }
 
-        .mockup-chevron {
-            width: 14px;
-            height: 14px;
-            border-left: 2px solid #64748b;
-            border-bottom: 2px solid #64748b;
-            transform: rotate(-45deg);
-            margin-top: -4px;
+        /* Mockup button styling */
+        .mockup-button {
+            padding: 0.6rem 1.25rem;
+            border-radius: var(--radius-sm);
+            font-weight: 700;
+            font-size: 0.9rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background-color: var(--brand);
+            color: white;
+            border: none;
         }
 
-        /* Tables style */
+        /* Table design */
         table {
             width: 100%;
             border-collapse: collapse;
-            margin: 2rem 0;
-            font-size: 0.95rem;
+            margin: 1.5rem 0;
+            font-size: 0.9rem;
             background-color: var(--bg-card);
-            border-radius: var(--radius-md);
+            border-radius: var(--radius-sm);
             overflow: hidden;
             border: 1px solid var(--border);
         }
 
         th, td {
-            padding: 1rem 1.25rem;
+            padding: 0.85rem 1rem;
             text-align: left;
         }
 
@@ -428,7 +398,7 @@
             font-weight: 700;
             border-bottom: 2px solid var(--border);
             text-transform: uppercase;
-            font-size: 0.8rem;
+            font-size: 0.75rem;
             letter-spacing: 0.05em;
         }
 
@@ -436,11 +406,7 @@
             border-bottom: 1px solid var(--border);
         }
 
-        tr:hover td {
-            background-color: #f8fafc;
-        }
-
-        /* Print utility button */
+        /* Actions bar */
         .action-bar {
             display: flex;
             gap: 1rem;
@@ -473,17 +439,6 @@
             transform: translateY(-2px);
         }
 
-        .btn-outline {
-            background-color: var(--bg-card);
-            color: var(--text-heading);
-            border: 1px solid var(--border);
-        }
-
-        .btn-outline:hover {
-            background-color: #f1f5f9;
-            transform: translateY(-2px);
-        }
-
         @media print {
             aside, .action-bar {
                 display: none !important;
@@ -496,19 +451,15 @@
             body {
                 background: white;
             }
-            section {
+            .step-card {
                 box-shadow: none !important;
                 border: none !important;
                 padding: 0 !important;
                 margin-bottom: 4rem;
                 page-break-inside: avoid;
             }
-            h2::before {
-                display: none;
-            }
         }
 
-        /* Responsive design */
         @media (max-width: 1024px) {
             body {
                 flex-direction: column;
@@ -537,14 +488,16 @@
             <div class="logo-text">Fri<span>O</span></div>
         </div>
         <div class="nav-section">
-            <h3>Contenidos del Manual</h3>
+            <h3>Pasos para Despachar</h3>
             <ul class="nav-list">
-                <li class="nav-item"><a href="#introduccion">1. Introducción</a></li>
-                <li class="nav-item"><a href="#flujo-general">2. Flujo General</a></li>
-                <li class="nav-item"><a href="#subcliente-fallcreek">3. Selector de SubCliente</a></li>
-                <li class="nav-item"><a href="#tabla-ubicaciones">4. Ubicaciones Físicas</a></li>
-                <li class="nav-item"><a href="#despacho-parcial">5. Despachos Parciales</a></li>
-                <li class="nav-item"><a href="#registro-base-datos">6. Impacto en Base de Datos</a></li>
+                <li class="nav-item"><a href="#paso1">Paso 1: Seleccionar Cliente</a></li>
+                <li class="nav-item"><a href="#paso2">Paso 2: Selector SubCliente</a></li>
+                <li class="nav-item"><a href="#paso3">Paso 3: Guía de Despacho</a></li>
+                <li class="nav-item"><a href="#paso4">Paso 4: Buscar Lotes</a></li>
+                <li class="nav-item"><a href="#paso5">Paso 5: Seleccionar Stock</a></li>
+                <li class="nav-item"><a href="#paso6">Paso 6: Cantidades Parciales</a></li>
+                <li class="nav-item"><a href="#paso7">Paso 7: Confirmar Salida</a></li>
+                <li class="nav-item"><a href="#preguntas-frecuentes">Preguntas Frecuentes</a></li>
             </ul>
         </div>
     </aside>
@@ -553,238 +506,269 @@
         <header>
             <div class="badge-version">
                 <span class="pulse-dot"></span>
-                Versión 2.1 • Fall Creek Enabled
+                Operación en Pantalla
             </div>
-            <h1>Manual de Usuario: Módulo de Despacho</h1>
-            <p>Salida directa e inmediata de inventario para Socios Comerciales (Otros Hortofrutícolas), incluyendo el nuevo flujo de SubClientes para Fall Creek.</p>
+            <h1>Guía Paso a Paso: Registro de Despacho</h1>
+            <p>Aprende a realizar retiros físicos de fruta para terceros de forma rápida, directa y sin errores en las cámaras de frío de la planta.</p>
         </header>
 
         <div class="action-bar">
             <button class="btn btn-primary" onclick="window.print()">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
-                Imprimir Manual
+                Imprimir Guía de Operación
             </button>
-            <a href="manual_detallado_socios_comerciales.html" class="btn btn-outline">
-                Manual Socios Comerciales Completo
-            </a>
         </div>
 
-        <section id="introduccion">
-            <h2>1. Introducción y Conceptos Clave</h2>
-            <p>La pestaña <strong>Despacho</strong> del módulo de <strong>Socios Comerciales (Otros Hortofrutícolas)</strong> gestiona la salida física de fruta de terceros (ej. plantas de Fall Creek o arándanos) almacenada en las cámaras de frío de la planta.</p>
+        <!-- PASO 1 -->
+        <div class="step-card" id="paso1">
+            <div class="step-badge">Paso 1</div>
+            <h2>Seleccionar al Cliente Principal</h2>
+            <p>El primer paso es indicarle al sistema de qué exportador o cliente dueño de la fruta se realizará el despacho.</p>
+            
+            <div class="ui-mockup">
+                <div class="ui-mockup-header">
+                    <div class="ui-mockup-dots"><div class="ui-mockup-dot red"></div><div class="ui-mockup-dot yellow"></div><div class="ui-mockup-dot green"></div></div>
+                    <span style="font-size: 0.8rem; color: #64748b;">Pantalla de Despacho</span>
+                </div>
+                <div style="max-width: 300px;">
+                    <span class="ui-mockup-label">Cliente</span>
+                    <div class="ui-mockup-select ui-mockup-highlight">
+                        <span>Fall Creek</span>
+                        <span style="color: #64748b;">▼</span>
+                    </div>
+                </div>
+            </div>
+
+            <p><strong>Instrucciones:</strong></p>
+            <ul>
+                <li>Haz clic en el selector <strong>"Cliente"</strong>.</li>
+                <li>Selecciona el cliente del listado (por ejemplo, <strong>Fall Creek</strong>).</li>
+            </ul>
             
             <div class="callout callout-note">
                 <div class="callout-title">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
-                    Rebaja Directa vs Flujo de Cerezas
+                    Dato útil
                 </div>
-                A diferencia del flujo de cerezas (el cual genera una solicitud en espera que requiere la validación y picking posterior de los grueros), el despacho de Socios Comerciales realiza una <strong>rebaja directa e inmediata del stock</strong> en la base de datos en el instante en que el operador confirma la transacción. No existen estados pendientes intermedios.
+                El sistema es inteligente: solo mostrará en la lista a aquellos clientes de tipo fruta que actualmente tengan bins o pallets guardados en las cámaras. Si un cliente no tiene stock, no aparecerá en el selector.
             </div>
-        </section>
+        </div>
 
-        <section id="flujo-general">
-            <h2>2. Configuración de la Cabecera de Despacho</h2>
-            <p>Al acceder a la interfaz de despacho, la cabecera presenta campos dinámicos que cambian según el cliente seleccionado. A continuación, se presenta la representación visual de estos campos en la interfaz actual:</p>
+        <!-- PASO 2 -->
+        <div class="step-card" id="paso2">
+            <div class="step-badge" style="background: linear-gradient(135deg, var(--success) 0%, #047857 100%); box-shadow: 0 4px 10px rgba(16, 185, 129, 0.25);">Paso 2 (Caso Fall Creek)</div>
+            <h2>Seleccionar el SubCliente Destinatario</h2>
+            <p>Si elegiste a <strong>Fall Creek</strong> como el cliente principal, el sistema te pedirá obligatoriamente indicar cuál de sus productores autorizados retira el producto.</p>
 
-            <div class="mockup-container">
-                <div class="mockup-header">
-                    <div class="mockup-dots">
-                        <div class="mockup-dot red"></div>
-                        <div class="mockup-dot yellow"></div>
-                        <div class="mockup-dot green"></div>
-                    </div>
-                    <div class="mockup-title">Formulario de Cabecera (Socio Comercial: Fall Creek)</div>
+            <div class="ui-mockup">
+                <div class="ui-mockup-header">
+                    <div class="ui-mockup-dots"><div class="ui-mockup-dot red"></div><div class="ui-mockup-dot yellow"></div><div class="ui-mockup-dot green"></div></div>
+                    <span style="font-size: 0.8rem; color: #64748b;">Filtro por Cliente Asociado</span>
                 </div>
-                <div class="mockup-grid">
-                    <div class="mockup-field">
-                        <span class="mockup-label">Cliente</span>
-                        <div class="mockup-select">
-                            <span>Fall Creek</span>
-                            <div class="mockup-chevron"></div>
-                        </div>
-                    </div>
-                    <div class="mockup-field">
-                        <span class="mockup-label" style="color: #10b981;">SubCliente (Destinatario)</span>
-                        <div class="mockup-select highlight">
-                            <span>Seleccione un subcliente...</span>
-                            <div class="mockup-chevron"></div>
-                        </div>
-                    </div>
-                    <div class="mockup-field">
-                        <span class="mockup-label">Filtrar por Lote</span>
-                        <div class="mockup-input">
-                            <span style="color: #64748b;">Escriba para filtrar...</span>
-                        </div>
-                    </div>
-                    <div class="mockup-field">
-                        <span class="mockup-label">Documento de Despacho</span>
-                        <div class="mockup-input">
-                            <span style="color: #64748b;">Ej: 12345</span>
-                        </div>
+                <div style="max-width: 300px;">
+                    <span class="ui-mockup-label" style="color: #10b981;">SubCliente</span>
+                    <div class="ui-mockup-select ui-mockup-success">
+                        <span>Agrícola El Vergel</span>
+                        <span style="color: #64748b;">▼</span>
                     </div>
                 </div>
             </div>
 
-            <h3>Descripción de los Campos:</h3>
+            <p><strong>Instrucciones:</strong></p>
             <ul>
-                <li><strong>Cliente (Obligatorio):</strong> Permite seleccionar la entidad dueña del stock. Para evitar pantallas vacías, el sistema solo lista aquellos clientes de tipo "FRUTA" que tengan al menos 1 bin o pallet en estado <em>"Almacenado"</em> y con cantidades mayores a cero.</li>
-                <li><strong>Filtrar por Lote:</strong> Permite ingresar parte del lote del sistema (ej. <code>LOT-FC-123</code>) o lote del cliente para aislar rápidamente la variedad o el cargamento específico que se desea retirar.</li>
-                <li><strong>Documento de Despacho (Obligatorio):</strong> Campo numérico o de texto donde se digita la guía de despacho física que acompaña al camión. El sistema mantendrá deshabilitado el botón de confirmar hasta que se ingrese este número.</li>
+                <li>Al marcar <em>Fall Creek</em>, aparecerá de inmediato el selector **SubCliente** a su lado derecho.</li>
+                <li>Haz clic en este selector y elige el destinatario correspondiente.</li>
             </ul>
-        </section>
-
-        <section id="subcliente-fallcreek">
-            <h2>3. Selector de SubCliente (Caso Especial: Fall Creek)</h2>
-            <p>La última actualización incorpora un campo condicional y obligatorio denominado <strong>"SubCliente"</strong>, aplicable exclusivamente cuando el cliente seleccionado es <strong>Fall Creek (código <code>EXP004</code>)</strong>.</p>
-
-            <div class="callout callout-warning">
-                <div class="callout-title">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
-                    Regla de validación de Fall Creek
-                </div>
-                Si se selecciona a Fall Creek como el exportador y se intenta confirmar un despacho sin elegir un SubCliente, el sistema bloqueará la operación inmediatamente y mostrará un mensaje emergente de alerta:
-                <br><strong>"Debe seleccionar un SubCliente para despachar a Fall Creek."</strong>
-            </div>
-
-            <h3>Funcionamiento del Selector:</h3>
-            <ol>
-                <li><strong>Filtro Automático:</strong> El listado de subclientes se genera automáticamente en tiempo real. Filtra a los productores del sistema que cumplen con dos condiciones simultáneas:
-                    <ul>
-                        <li>Su estado es <code>activo</code> en la base de datos.</li>
-                        <li>Tienen asignado o vinculado el exportador <code>EXP004</code> (Fall Creek) en su ficha maestro de socios comerciales.</li>
-                    </ul>
-                </li>
-                <li><strong>Identificación Visual:</strong> El selector muestra el nombre abreviado (<em>shortName</em>) si existe, o el nombre completo del productor para facilitar la búsqueda al operador.</li>
-                <li><strong>Destino de Datos:</strong> Al seleccionar un subcliente, el sistema asocia de forma permanente el despacho a este productor. Esto se registra en la base de datos en los campos <code>destinationClientName</code> y <code>destinationClientRUT</code> para auditorías de destino.</li>
-            </ol>
-        </section>
-
-        <section id="tabla-ubicaciones">
-            <h2>4. Acordeón de Lotes y Desglose de Ubicaciones</h2>
-            <p>Al ingresar el cliente, se despliega una lista en formato de acordeón agrupando el stock por su identificador de lote de sistema y lote cliente. Al hacer clic en un acordeón se abre la tabla detallada del lote:</p>
-
-            <table>
-                <thead>
-                    <tr>
-                        <th style="width: 5%">SELECCIÓN</th>
-                        <th style="width: 15%">COORDENADA</th>
-                        <th style="width: 20%">PRODUCTO (VARIEDAD)</th>
-                        <th style="width: 25%">LOTE CLIENTE</th>
-                        <th style="width: 10%">DISP.</th>
-                        <th style="width: 25%">A DESPACHAR</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td style="text-align: center;"><input type="checkbox" checked disabled></td>
-                        <td><strong>C3 - Nivel 2</strong></td>
-                        <td>Sekoya Crunch</td>
-                        <td>LOTE-FC-MAYO-26</td>
-                        <td><strong>12</strong></td>
-                        <td><input type="number" value="12" style="width: 80px; padding: 0.35rem; border: 1px solid var(--border); border-radius: var(--radius-sm); font-weight: bold; text-align: center;" disabled> Bins</td>
-                    </tr>
-                    <tr>
-                        <td style="text-align: center;"><input type="checkbox" checked disabled></td>
-                        <td><strong>C5 - Nivel 1</strong></td>
-                        <td>Sekoya Grande</td>
-                        <td>LOTE-FC-MIXTO-A</td>
-                        <td><strong>8</strong></td>
-                        <td><input type="number" value="5" style="width: 80px; padding: 0.35rem; border: 2px solid var(--brand); border-radius: var(--radius-sm); font-weight: bold; text-align: center; color: var(--brand);" disabled> Bins</td>
-                    </tr>
-                </tbody>
-            </table>
-
-            <h3>Columnas Clave:</h3>
-            <ul>
-                <li><strong>Ubicación Física (Coordenada):</strong> Muestra la celda exacta de la cámara donde se localiza el producto (ej. <code>C3</code>, <code>C5</code>).</li>
-                <li><strong>Disp. (Disponible):</strong> Representa el saldo total actual registrado de ese lote en esa coordenada física exacta.</li>
-                <li><strong>A Despachar:</strong> Campo numérico editable donde se define la cantidad a retirar del inventario. Por defecto, al marcar la casilla de selección, el sistema llena este campo con el total disponible (despacho total).</li>
-            </ul>
-        </section>
-
-        <section id="despacho-parcial">
-            <h2>5. Cómo Realizar un Despacho Parcial</h2>
-            <p>El sistema soporta el retiro fraccionado de stock en una misma coordenada para adaptarse a la capacidad del camión o solicitudes especiales del cliente. Para realizar un despacho parcial, siga estas instrucciones:</p>
-
-            <ol>
-                <li>Haga clic en la casilla de selección de la fila correspondiente a la coordenada. El campo <strong>A Despachar</strong> se completará automáticamente con el stock máximo disponible.</li>
-                <li>Haga clic sobre el campo numérico de la columna <strong>"A Despachar"</strong>.</li>
-                <li>Reemplace el valor sugerido por la cantidad real que se subirá al transporte (ej: si hay 12 disponibles, ingrese <code>5</code>).</li>
-                <li>El sistema calculará automáticamente la suma final en la barra inferior (ej. <em>"Total a despachar: 5 Bins"</em>).</li>
-                <li>Al presionar "Confirmar Despacho", el sistema descontará únicamente 5 unidades de la coordenada seleccionada. La base de datos mantendrá los 7 bins restantes en la cámara en perfecto estado <code>Almacenado</code> para futuras operaciones.</li>
-            </ol>
-        </section>
-
-        <section id="registro-base-datos">
-            <h2>6. Registro Técnico e Impacto en Firestore</h2>
-            <p>Al presionar el botón <strong>"Confirmar Despacho"</strong> en la barra inferior, el sistema procesa una transacción por lotes (<em>Write Batch</em>) en la base de datos de FriO que ejecuta los siguientes cambios de forma segura:</p>
-
-            <h3>1. Colección <code>otherFruitReceptions</code> (Recepción Origen)</h3>
-            <p>Se localiza el documento de ingreso del lote y se actualiza la cantidad disponible del ítem en la coordenada restando el valor ingresado. Si la cantidad llega a <code>0</code>, el ítem permanece en el historial pero con stock nulo.</p>
-
-            <h3>2. Colección <code>otherFruitMovements</code> (Historial de Transacciones)</h3>
-            <p>Se crea un nuevo documento de movimiento con la siguiente estructura de campos (con soporte para subcliente):</p>
-
-            <table>
-                <thead>
-                    <tr>
-                        <th>Campo Firestore</th>
-                        <th>Tipo</th>
-                        <th>Descripción</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td><code>type</code></td>
-                        <td>string</td>
-                        <td>Tipo de movimiento. Siempre se registra como <code>'salida'</code>.</td>
-                    </tr>
-                    <tr>
-                        <td><code>clientId</code></td>
-                        <td>string</td>
-                        <td>Identificador del socio comercial principal (ej. <code>EXP004</code>).</td>
-                    </tr>
-                    <tr>
-                        <td><code>clientName</code></td>
-                        <td>string</td>
-                        <td>Nombre del socio comercial principal (ej. <code>Fall Creek</code>).</td>
-                    </tr>
-                    <tr>
-                        <td><code>document</code></td>
-                        <td>string</td>
-                        <td>Número de guía de despacho física ingresado por el operador.</td>
-                    </tr>
-                    <tr style="background-color: var(--brand-light);">
-                        <td><code>destinationClientName</code></td>
-                        <td>string</td>
-                        <td><strong>Nombre del SubCliente receptor (solo Fall Creek).</strong> Ej: <code>Agrícola El Vergel</code>.</td>
-                    </tr>
-                    <tr style="background-color: var(--brand-light);">
-                        <td><code>destinationClientRUT</code></td>
-                        <td>string</td>
-                        <td><strong>RUT del SubCliente receptor (solo Fall Creek).</strong> Ej: <code>77.654.321-K</code>.</td>
-                    </tr>
-                    <tr>
-                        <td><code>createdAt</code></td>
-                        <td>timestamp</td>
-                        <td>Fecha y hora del servidor al momento del despacho.</td>
-                    </tr>
-                    <tr>
-                        <td><code>items</code></td>
-                        <td>array</td>
-                        <td>Lista de los ítems despachados, incluyendo código, nombre del producto, lote cliente y cantidad.</td>
-                    </tr>
-                </tbody>
-            </table>
 
             <div class="callout callout-danger">
                 <div class="callout-title">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="7.86 2 16.14 2 22 7.86 22 16.14 16.14 22 7.86 22 2 16.14 2 7.86 7.86 2"></polygon><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
-                    Importante
+                    Campo Obligatorio
                 </div>
-                Estos movimientos son irreversibles de forma automática desde la interfaz del operador. Cualquier anulación de despacho o error en la digitación del número de guía o subcliente debe ser corregida o auditada por un administrador del sistema directamente en el panel de control o colecciones del Kardex.
+                No podrás confirmar el despacho de Fall Creek si dejas este campo vacío. Si lo intentas, el sistema te mostrará una alerta roja en pantalla: <strong>"Debe seleccionar un SubCliente para despachar a Fall Creek."</strong>
             </div>
-        </section>
+        </div>
+
+        <!-- PASO 3 -->
+        <div class="step-card" id="paso3">
+            <div class="step-badge">Paso 3</div>
+            <h2>Ingresar la Guía de Despacho</h2>
+            <p>Es indispensable registrar el documento físico legal que autoriza el movimiento y la salida del camión de la planta.</p>
+
+            <div class="ui-mockup">
+                <div class="ui-mockup-header">
+                    <div class="ui-mockup-dots"><div class="ui-mockup-dot red"></div><div class="ui-mockup-dot yellow"></div><div class="ui-mockup-dot green"></div></div>
+                </div>
+                <div style="max-width: 300px;">
+                    <span class="ui-mockup-label">Documento de Despacho</span>
+                    <div class="ui-mockup-input">
+                        <span>894551</span>
+                    </div>
+                </div>
+            </div>
+
+            <p><strong>Instrucciones:</strong></p>
+            <ul>
+                <li>Digita el número de la guía de despacho física en el campo **"Documento de Despacho"**.</li>
+                <li>Verifica que el número coincida exactamente con la guía que porta el conductor del camión.</li>
+            </ul>
+        </div>
+
+        <!-- PASO 4 -->
+        <div class="step-card" id="paso4">
+            <div class="step-badge">Paso 4</div>
+            <h2>Buscar o Filtrar por Lote (Opcional)</h2>
+            <p>Si el cliente posee un inventario muy extenso con docenas de lotes almacenados, puedes usar el buscador rápido para aislar el stock requerido de forma inmediata.</p>
+
+            <div class="ui-mockup">
+                <div style="max-width: 300px;">
+                    <span class="ui-mockup-label">Filtrar por Lote</span>
+                    <div class="ui-mockup-input" style="border-color: var(--brand);">
+                        <span>Sekoya</span>
+                    </div>
+                </div>
+            </div>
+
+            <p><strong>Instrucciones:</strong></p>
+            <ul>
+                <li>Escribe el código del lote o parte de la variedad en el campo **"Filtrar por Lote"**.</li>
+                <li>La pantalla ocultará de inmediato todos los lotes que no coincidan con lo escrito, facilitando la ubicación del producto.</li>
+            </ul>
+        </div>
+
+        <!-- PASO 5 -->
+        <div class="step-card" id="paso5">
+            <div class="step-badge">Paso 5</div>
+            <h2>Desplegar el Lote y Seleccionar Ubicaciones</h2>
+            <p>El stock se presenta consolidado en acordeones interactivos que agrupan los bins. Al hacer clic en un lote, se abre el detalle de las cámaras y niveles.</p>
+
+            <div class="ui-mockup">
+                <div style="border: 1px solid #334155; border-radius: var(--radius-sm); padding: 1rem; background-color: #1e293b;">
+                    <div style="display: flex; justify-content: space-between; font-weight: bold; border-bottom: 1px solid #475569; padding-bottom: 0.5rem; margin-bottom: 0.5rem;">
+                        <span>▼ Lote: LOT-FC-MAYO (Lote Cliente: SEC-CRUNCH)</span>
+                        <span style="color: #38bdf8;">20 Bins Disponibles</span>
+                    </div>
+                    
+                    <table style="border: none; margin: 0; background: transparent;">
+                        <thead>
+                            <tr style="border-bottom: 1px solid #475569;">
+                                <th style="color: #94a3b8; background: transparent; padding: 0.5rem;">[✔]</th>
+                                <th style="color: #94a3b8; background: transparent; padding: 0.5rem;">COORDENADA</th>
+                                <th style="color: #94a3b8; background: transparent; padding: 0.5rem;">DISP.</th>
+                                <th style="color: #94a3b8; background: transparent; padding: 0.5rem;">A DESPACHAR</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td style="padding: 0.5rem;"><input type="checkbox" checked></td>
+                                <td style="padding: 0.5rem; color: white;"><strong>Cámara 3 - Fila A</strong></td>
+                                <td style="padding: 0.5rem; color: #10b981;">12 Bins</td>
+                                <td style="padding: 0.5rem;"><input type="number" value="12" style="width: 60px; background: #0f172a; border: 1px solid #475569; color: white; text-align: center;" disabled></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <p><strong>Instrucciones:</strong></p>
+            <ul>
+                <li>Haz clic sobre el encabezado del lote que deseas despachar para expandir su tabla de ubicaciones.</li>
+                <li>Marca la **Casilla de Selección (Checkbox)** al lado izquierdo de la coordenada de donde el gruero retirará los bins físicamente.</li>
+                <li>Si deseas despachar el lote completo en su totalidad, haz clic en la casilla de la cabecera de la tabla para seleccionar todas las filas a la vez.</li>
+            </ul>
+        </div>
+
+        <!-- PASO 6 -->
+        <div class="step-card" id="paso6">
+            <div class="step-badge" style="background: linear-gradient(135deg, var(--warning) 0%, #d97706 100%); box-shadow: 0 4px 10px rgba(245, 158, 11, 0.25);">Paso 6 (Caso Despacho Parcial)</div>
+            <h2>Definir Cantidades y Retiros Parciales</h2>
+            <p>Si el camión no cargará la totalidad de los bins de una coordenada, puedes realizar un despacho fraccionado.</p>
+
+            <div class="ui-mockup">
+                <div style="background-color: #1e293b; padding: 1rem; border-radius: var(--radius-sm); max-width: 400px;">
+                    <div style="font-size: 0.8rem; color: #94a3b8; margin-bottom: 0.5rem;">Edición de Bins en Coordenada Cámara 3 - Fila A</div>
+                    <div style="display: flex; align-items: center; gap: 1rem;">
+                        <div>
+                            <span class="ui-mockup-label">Disponible</span>
+                            <span style="font-size: 1.1rem; font-weight: bold; color: white;">12 Bins</span>
+                        </div>
+                        <span style="font-size: 1.5rem; color: #64748b;">➔</span>
+                        <div>
+                            <span class="ui-mockup-label" style="color: #f59e0b;">A Despachar</span>
+                            <input type="number" value="5" style="width: 80px; padding: 0.4rem; font-size: 1.1rem; font-weight: bold; background: #0f172a; border: 2px solid #f59e0b; color: #f59e0b; text-align: center; border-radius: var(--radius-sm);">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <p><strong>Instrucciones para retirar solo una parte:</strong></p>
+            <ol>
+                <li>Asegúrate de marcar el checkbox de la fila correspondiente a la coordenada.</li>
+                <li>Haz clic en el cuadro de texto de la columna <strong>"A Despachar"</strong>.</li>
+                <li>Borra el número sugerido (que siempre es el máximo) y escribe la cantidad real a retirar (ejemplo: escribe <code>5</code>).</li>
+            </ol>
+
+            <div class="callout callout-warning">
+                <div class="callout-title">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+                    Control de Sobrestock
+                </div>
+                El sistema nunca te permitirá ingresar una cantidad mayor a la disponible en esa coordenada. Si intentas despachar más de lo que existe, la celda bloqueará el ingreso o corregirá el número al máximo permitido.
+            </div>
+        </div>
+
+        <!-- PASO 7 -->
+        <div class="step-card" id="paso7">
+            <div class="step-badge">Paso 7</div>
+            <h2>Confirmar y Registrar la Salida</h2>
+            <p>Una vez definidas las coordenadas y las cantidades, el sistema te mostrará un resumen consolidado en la zona inferior de la pantalla.</p>
+
+            <div class="ui-mockup">
+                <div style="background-color: #1e293b; padding: 1rem; border-radius: var(--radius-sm); display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <span style="font-size: 0.8rem; color: #94a3b8; display: block;">Resumen de Operación</span>
+                        <span style="font-size: 1.1rem; font-weight: bold; color: white;">Total a despachar: 5 Bins</span>
+                    </div>
+                    <button class="mockup-button" style="background-color: var(--success); cursor: default;">
+                        <span>Confirmar Despacho</span>
+                    </button>
+                </div>
+            </div>
+
+            <p><strong>Instrucciones:</strong></p>
+            <ul>
+                <li>Verifica en el resumen inferior que la cantidad total de bins o pallets seleccionados coincida con la carga física real del camión.</li>
+                <li>Haz clic en el botón <strong>"Confirmar Despacho"</strong>.</li>
+                <li>El sistema procesará la salida y mostrará un mensaje de éxito: <strong>"Éxito: Despacho registrado y stock actualizado"</strong>.</li>
+            </ul>
+
+            <div class="callout callout-note">
+                <div class="callout-title">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                    Resultado de la Operación
+                </div>
+                Al presionar "Confirmar Despacho", el stock de bins de las coordenadas marcadas se descuenta en ese mismo instante. Al mismo tiempo, se añade el registro del despacho al historial de movimientos, quedando visible en tu reporte de <strong>Kardex de Movimientos</strong> para auditorías inmediatas.
+            </div>
+        </div>
+
+        <!-- PREGUNTAS FRECUENTES -->
+        <div class="step-card" id="preguntas-frecuentes">
+            <h2>Preguntas Frecuentes y Ayuda</h2>
+            
+            <h3>¿Qué pasa si me equivoqué en el número de guía o en la cantidad despachada?</h3>
+            <p>Debido a que el despacho realiza un descuento directo e inmediato del stock en el sistema, esta operación no se puede "deshacer" de forma automática desde la pantalla del operador. Si cometiste un error, debes comunicarte de inmediato con el Administrador del Sistema para que realice la corrección o anulación manual en el registro de movimientos e inventario.</p>
+
+            <h3>¿Por qué no puedo hacer clic en el botón "Confirmar Despacho"?</h3>
+            <p>El botón se mantiene deshabilitado (no responde) si ocurre alguna de las siguientes situaciones:</p>
+            <ol>
+                <li>No has ingresado el número en el campo **Documento de Despacho** (es obligatorio).</li>
+                <li>No has seleccionado ninguna ubicación física (checkbox) para despachar.</li>
+                <li>El cliente es Fall Creek y no has seleccionado un **SubCliente** en la lista.</li>
+            </ol>
+
+            <h3>¿Cómo veo los despachos anteriores realizados?</h3>
+            <p>Todos los despachos confirmados en esta pestaña se listan de forma cronológica en el reporte de **Kardex de Movimientos de Bins y Materiales**. Ahí podrás buscar por fecha o número de documento para revisar las cantidades y el destinatario (subcliente) registrado.</p>
+        </div>
     </main>
 
 </body>

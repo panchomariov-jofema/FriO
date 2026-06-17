@@ -19,7 +19,8 @@ import {
     History,
     Truck,
     Thermometer,
-    Clock
+    Clock,
+    FileText
 } from 'lucide-react';
 import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import type { ReportSetting } from '@/lib/types';
@@ -120,6 +121,15 @@ const reportList = [
         icon: Box,
         color: 'text-amber-500',
         image: PlaceHolderImages.find(img => img.id === 'report-stock')
+    },
+    { 
+        id: 'stock-bins-camaras',
+        title: 'Stock Bins en Cámaras', 
+        description: 'Resumen ejecutivo de bins en cámaras agrupado por Cliente/Productor y Cámara.',
+        href: '/reportes/stock-bins-camaras',
+        icon: FileText,
+        color: 'text-indigo-600',
+        image: PlaceHolderImages.find(img => img.id === 'report-chamber')
     },
 ];
 
