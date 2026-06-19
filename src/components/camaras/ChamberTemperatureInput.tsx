@@ -29,9 +29,10 @@ type TempFormValues = z.infer<typeof tempSchema>;
 
 interface ChamberTemperatureInputProps {
   chamberId: string;
+  readOnly?: boolean;
 }
 
-export function ChamberTemperatureInput({ chamberId }: ChamberTemperatureInputProps) {
+export function ChamberTemperatureInput({ chamberId, readOnly = false }: ChamberTemperatureInputProps) {
   const [latestTemp, setLatestTemp] = React.useState<ChamberTemperature | null>(null);
   const [isPopoverOpen, setPopoverOpen] = React.useState(false);
   const firestore = useFirestore();
@@ -103,26 +104,34 @@ export function ChamberTemperatureInput({ chamberId }: ChamberTemperatureInputPr
     }
   }, [isPopoverOpen, form]);
 
+  const content = (
+    <div
+      role={readOnly ? undefined : "button"}
+      onClick={!readOnly ? (e) => { e.stopPropagation(); setPopoverOpen(true); } : undefined}
+      className={cn(
+        'flex items-center gap-4 text-muted-foreground transition-colors rounded-md px-2 py-1',
+        !readOnly && 'hover:bg-muted cursor-pointer'
+      )}
+    >
+      <div className="flex items-center gap-1">
+        <Thermometer className="h-4 w-4 text-blue-500" />
+        <span className="font-mono text-sm">{latestTemp ? `${latestTemp.temperature.toFixed(1)}°C` : '--.- °C'}</span>
+      </div>
+      <div className="flex items-center gap-1">
+        <Droplets className="h-4 w-4 text-sky-500" />
+        <span className="font-mono text-sm">{latestTemp && latestTemp.humidity !== undefined ? `${latestTemp.humidity}% HR` : '--% HR'}</span>
+      </div>
+    </div>
+  );
+
+  if (readOnly) {
+    return content;
+  }
+
   return (
     <Popover open={isPopoverOpen} onOpenChange={setPopoverOpen}>
       <PopoverTrigger asChild>
-        <div
-          role="button"
-          onClick={(e) => { e.stopPropagation(); setPopoverOpen(true); }}
-          className={cn(
-            buttonVariants({ variant: 'ghost', size: 'sm' }),
-            'flex items-center gap-4 text-muted-foreground'
-          )}
-        >
-          <div className="flex items-center gap-1">
-            <Thermometer className="h-4 w-4 text-blue-500" />
-            <span className="font-mono text-sm">{latestTemp ? `${latestTemp.temperature.toFixed(1)}°C` : '--.- °C'}</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <Droplets className="h-4 w-4 text-sky-500" />
-            <span className="font-mono text-sm">{latestTemp && latestTemp.humidity !== undefined ? `${latestTemp.humidity}% HR` : '--% HR'}</span>
-          </div>
-        </div>
+        {content}
       </PopoverTrigger>
       <PopoverContent className="w-56 p-3" onClick={(e) => e.stopPropagation()}>
         <Form {...form}>

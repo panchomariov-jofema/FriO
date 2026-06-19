@@ -11,7 +11,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { StoreInChamberDialog } from '@/components/hidrocooler/StoreInChamberDialog';
-import { collection, doc, setDoc, writeBatch, getDocs, updateDoc, getDoc, serverTimestamp, query, orderBy, limit, onSnapshot, where, getCountFromServer } from 'firebase/firestore';
+import { collection, doc, setDoc, writeBatch, getDocs, updateDoc, getDoc, serverTimestamp, query, orderBy, limit, onSnapshot, where, getCountFromServer, Timestamp } from 'firebase/firestore';
 import { useFirestore, useCollection, useMemoFirebase, useUser } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { errorEmitter } from '@/firebase/error-emitter';
@@ -23,7 +23,7 @@ import { cn, getSortedCoordinates } from '@/lib/utils';
 import { Progress } from '@/components/ui/progress';
 import { RelocateLotDialog } from '@/components/camaras/RelocateLotDialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Trash2, Upload } from 'lucide-react';
+import { Trash2, Upload, Loader2 } from 'lucide-react';
 import { ExternalReceptionUploader } from '@/components/hidrocooler/ExternalReceptionUploader';
 import { ChamberTemperatureInput } from '@/components/camaras/ChamberTemperatureInput';
 import { Label } from '@/components/ui/label';
@@ -31,6 +31,9 @@ import { Switch } from '@/components/ui/switch';
 import { mockStoredItems } from '@/lib/mock-chamber5';
 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
+import * as XLSX from 'xlsx';
+import { parseTemperatureExcel } from '@/lib/fall-creek-utils';
 
 
 
@@ -89,13 +92,12 @@ const getItemColorKey = (item: StoredItem) => {
 
 export default function CamarasPage() {
   const { user } = useUser();
-  const isAdmin = user?.email === 'francisco.villarreal@outlook.es';
-
   const firestore = useFirestore();
   const { data: exporters, loading: loadingExporters } = useFirestoreCollection<Exporter>('exporters');
   const { data: otherFruitReceptions, loading: loadingOtherFruit } = useFirestoreCollection<OtherFruitReception>('otherFruitReceptions');
   const { data: clientConfigs, loading: loadingConfigs } = useFirestoreCollection<ClientStorageConfig>('clientStorageConfigs');
   const { data: chamberSettings } = useFirestoreCollection<{ id: string; row13Enabled?: boolean }>('chamberSettings');
+  const { data: usersMaster } = useFirestoreCollection<any>('usersMaster');
 
   const pendingLotsQuery = useMemoFirebase(() => {
     if (!firestore) return null;
@@ -117,6 +119,16 @@ export default function CamarasPage() {
   const [latestTemperatures, setLatestTemperatures] = React.useState<Record<string, ChamberTemperature | null>>({});
   const { toast } = useToast();
   const [showChamberStatus, setShowChamberStatus] = React.useState(false);
+  const [importingTemps, setImportingTemps] = React.useState(false);
+  const tempFileInputRef = React.useRef<HTMLInputElement>(null);
+
+  const currentUserMaster = React.useMemo(() => {
+    if (!user?.email || !usersMaster) return null;
+    const emailUsername = user.email.split('@')[0].toLowerCase();
+    return usersMaster.find(u => typeof u.userName === 'string' && u.userName.toLowerCase() === emailUsername) || null;
+  }, [user, usersMaster]);
+
+  const isMaestro = currentUserMaster?.profileId === 'MAESTRO' || user?.email === 'francisco.villarreal@outlook.es' || user?.email?.split('@')[0].toLowerCase() === 'francisco';
   const loading = loadingPendingLots || loadingStoredLots || loadingOtherFruit || loadingExporters || loadingConfigs;
   
   React.useEffect(() => {
@@ -697,11 +709,92 @@ export default function CamarasPage() {
   };
 
 
+  const handleTempExcelUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !firestore) return;
+
+    setImportingTemps(true);
+    try {
+      const records = await parseTemperatureExcel(file);
+      if (records.length === 0) {
+        toast({ variant: 'destructive', title: 'Sin Datos', description: 'No se encontraron registros de temperatura válidos.' });
+        return;
+      }
+
+      // Write in batches of 400
+      const CHUNK_SIZE = 400;
+      let committedCount = 0;
+      
+      for (let i = 0; i < records.length; i += CHUNK_SIZE) {
+        const chunk = records.slice(i, i + CHUNK_SIZE);
+        const batch = writeBatch(firestore);
+        
+        chunk.forEach(record => {
+          const docId = `${record.chamberId}_${record.date.getTime()}`;
+          const docRef = doc(firestore, 'chamberTemperatures', docId);
+          batch.set(docRef, {
+            chamberId: record.chamberId,
+            temperature: record.temperature,
+            timestamp: Timestamp.fromDate(record.date),
+            userId: user?.uid || null,
+            userName: user?.email || (user?.isAnonymous ? 'Anónimo' : user?.displayName || 'N/A'),
+          });
+        });
+        
+        await batch.commit();
+        committedCount += chunk.length;
+      }
+
+      toast({ title: 'Éxito', description: `Se han importado ${committedCount} registros de climatización correctamente.` });
+    } catch (err: any) {
+      console.error('Error importing temperature Excel:', err);
+      toast({ variant: 'destructive', title: 'Error de Importación', description: err.message || 'No se pudo procesar el archivo Excel.' });
+    } finally {
+      setImportingTemps(false);
+      if (tempFileInputRef.current) tempFileInputRef.current.value = '';
+    }
+  };
+
   const lotsInCoordToRelocate = coordToRelocate ? storedItemsByChamber[coordToRelocate.chamberId]?.[coordToRelocate.coordinate] || [] : [];
 
 
   return (
     <div className="space-y-6">
+      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 bg-card p-6 rounded-lg border shadow-sm">
+        <div>
+          <h1 className="text-2xl font-bold text-[#004b8d]">Cámaras de Almacenamiento</h1>
+          <p className="text-sm text-muted-foreground">Monitoreo de clima, stock y movimientos en cámaras.</p>
+        </div>
+        {isMaestro && (
+          <div className="flex items-center gap-2">
+            <Input
+              type="file"
+              ref={tempFileInputRef}
+              className="hidden"
+              accept=".xlsx,.xls"
+              onChange={handleTempExcelUpload}
+            />
+            <Button
+              onClick={() => tempFileInputRef.current?.click()}
+              className="bg-[#7aba28] hover:bg-[#6aa423] text-white font-bold"
+              disabled={importingTemps}
+            >
+              {importingTemps ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Importando...
+                </>
+              ) : (
+                <>
+                  <Upload className="mr-2 h-4 w-4" />
+                  Importar Planilla de Clima
+                </>
+              )}
+            </Button>
+          </div>
+        )}
+      </div>
+
       <Card>
         <CardHeader>
             <div>
@@ -848,7 +941,7 @@ export default function CamarasPage() {
                             </div>
                             <AccordionContent>
                                 <div className="p-2 sm:p-4 bg-muted/50 rounded-b-lg border border-t-0">
-                                    {isAdmin && (
+                                    {isMaestro && (
                                         <div className="flex justify-end mb-4">
                                             <AlertDialog>
                                                 <AlertDialogTrigger asChild>

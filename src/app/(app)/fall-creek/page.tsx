@@ -4,7 +4,7 @@ import * as React from 'react';
 import Image from 'next/image';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
-import type { OtherClient, OtherFruitReception, OtherFruitReceptionItem, OtherFruitMovement, StoredItem, ChamberLot, OtherFruitMovementLocation } from '@/lib/types';
+import type { OtherClient, OtherFruitReception, OtherFruitReceptionItem, OtherFruitMovement, StoredItem, ChamberLot, OtherFruitMovementLocation, UserMaster, ChamberTemperature } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -19,6 +19,8 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { cn } from '@/lib/utils';
 import { chambersConfig } from '@/lib/chambers-config';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
 import { CheckCircle2, CircleDot, Eye, Pencil, Trash2, X, Move, ClipboardCheck, History, PackageCheck } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
@@ -66,11 +68,14 @@ export default function FallCreekPage() {
     const { data: allMovements, loading: loadingMovements } = useFirestoreCollection<OtherFruitMovement>('otherFruitMovements');
     const { data: allChamberLots, loading: loadingChamberLots } = useFirestoreCollection<ChamberLot>('chamberLots');
     const { data: chamberSettings } = useFirestoreCollection<{ id: string; row13Enabled?: boolean }>('chamberSettings');
+    const { data: usersMaster } = useFirestoreCollection<UserMaster>('usersMaster');
+    const { data: allTemperatures } = useFirestoreCollection<ChamberTemperature>('chamberTemperatures');
 
     const { toast } = useToast();
     const firestore = useFirestore();
     const { user } = useUser();
 
+    const [selectedChamber, setSelectedChamber] = React.useState('CAMARA-5');
     const [selectionMode, setSelectionMode] = React.useState(false);
     const [selectedCoords, setSelectedCoords] = React.useState<Record<string, StoredItem[]>>({});
     const [documentoDespacho, setDocumentoDespacho] = React.useState('');
@@ -114,6 +119,39 @@ export default function FallCreekPage() {
         if (!allClients) return null;
         return allClients.find(c => c.name.toUpperCase() === FALL_CREEK_CLIENT_NAME) || null;
     }, [allClients]);
+
+    const currentUserMaster = React.useMemo(() => {
+        if (!user?.email || !usersMaster) return null;
+        const emailUsername = user.email.split('@')[0].toLowerCase();
+        return usersMaster.find(u => typeof u.userName === 'string' && u.userName.toLowerCase() === emailUsername) || null;
+    }, [user, usersMaster]);
+
+    const showCargarManifiesto = currentUserMaster?.profileId === 'MAESTRO';
+
+    const formattedData = React.useMemo(() => {
+        if (!allTemperatures) return [];
+        return allTemperatures
+            .filter(t => t.chamberId === selectedChamber && t.timestamp && t.temperature !== undefined && t.humidity !== undefined)
+            .map(t => {
+                const ts = t.timestamp as any;
+                const date = ts && typeof ts.toDate === 'function' ? ts.toDate() : new Date(ts);
+                return {
+                    ...t,
+                    dateStr: date.toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit' }),
+                    timeStr: date.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' }),
+                    dateTimeStr: `${date.toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit' })} ${date.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}`,
+                    temperature: Number(t.temperature),
+                    humidity: Number(t.humidity),
+                };
+            })
+            .sort((a, b) => {
+                const tsA = a.timestamp as any;
+                const tsB = b.timestamp as any;
+                const timeA = tsA && typeof tsA.toMillis === 'function' ? tsA.toMillis() : new Date(tsA).getTime();
+                const timeB = tsB && typeof tsB.toMillis === 'function' ? tsB.toMillis() : new Date(tsB).getTime();
+                return timeA - timeB;
+            });
+    }, [allTemperatures, selectedChamber]);
 
     const { storedItemsByChamber, chamberOccupancy, chambersWithFallCreekStock, reservedCoords, pendingItems } = React.useMemo(() => {
         if (!fallCreekClient) return { storedItemsByChamber: {}, chamberOccupancy: {}, chambersWithFallCreekStock: [], reservedCoords: new Set<string>(), pendingItems: [] };
@@ -444,7 +482,7 @@ export default function FallCreekPage() {
                 items: movementItems,
                 locations: locationsToPick,
                 status: 'Pendiente de Picking' as const,
-                userId: user?.uid || null,
+                userId: user?.uid || undefined,
                 userName: user?.email || (user?.isAnonymous ? 'Anónimo' : user?.displayName || 'N/A'),
             };
 
@@ -723,22 +761,26 @@ export default function FallCreekPage() {
                             </div>
                         </div>
                         <div className="flex items-center gap-2">
-                            <Input
-                                type="file"
-                                ref={fileInputRef}
-                                className="hidden"
-                                accept=".xlsx,.xls,.csv,.pdf,image/*"
-                                onChange={handleFileUpload}
-                            />
-                            <Button 
-                                onClick={() => fileInputRef.current?.click()}
-                                variant="outline"
-                                className="border-[#004b8d] text-[#004b8d] hover:bg-[#004b8d]/10"
-                                disabled={importing}
-                            >
-                                {importing ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <FileUp className="mr-2 h-4 w-4"/>}
-                                Cargar Manifiesto
-                            </Button>
+                            {showCargarManifiesto && (
+                                <>
+                                    <Input
+                                        type="file"
+                                        ref={fileInputRef}
+                                        className="hidden"
+                                        accept=".xlsx,.xls,.csv,.pdf,image/*"
+                                        onChange={handleFileUpload}
+                                    />
+                                    <Button 
+                                        onClick={() => fileInputRef.current?.click()}
+                                        variant="outline"
+                                        className="border-[#004b8d] text-[#004b8d] hover:bg-[#004b8d]/10"
+                                        disabled={importing}
+                                    >
+                                        {importing ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <FileUp className="mr-2 h-4 w-4"/>}
+                                        Cargar Manifiesto
+                                    </Button>
+                                </>
+                            )}
                             <Button 
                                 onClick={handleToggleSelectionMode} 
                                 variant={selectionMode ? "destructive" : "default"}
@@ -765,18 +807,7 @@ export default function FallCreekPage() {
                                                     <span className="text-lg font-bold text-[#004b8d]">{config.name}</span>
                                                 </AccordionTrigger>
                                                 <div className="flex items-center gap-4 py-2 sm:py-0 z-10">
-                                                    <ChamberTemperatureInput chamberId={chamberId} />
-                                                    <div className="flex items-center gap-1.5 ml-2" onClick={(e) => e.stopPropagation()}>
-                                                        <Switch
-                                                            id={`row13-fc-${chamberId}`}
-                                                            checked={isRow13Enabled}
-                                                            onCheckedChange={async (checked) => {
-                                                                await setDoc(doc(firestore, 'chamberSettings', chamberId), { row13Enabled: checked }, { merge: true });
-                                                            }}
-                                                            className="scale-75 data-[state=checked]:bg-amber-500"
-                                                        />
-                                                        <label htmlFor={`row13-fc-${chamberId}`} className="text-[10px] font-black uppercase tracking-wider text-muted-foreground cursor-pointer select-none">Fila 13</label>
-                                                    </div>
+                                                    <ChamberTemperatureInput chamberId={chamberId} readOnly={true} />
                                                     <div className="text-right">
                                                         <Badge variant="secondary" className="font-mono text-sm px-3 py-1 bg-muted">
                                                             {occupancy?.occupied ?? 0} {fallCreekClient.unit} Almacenados
@@ -900,7 +931,104 @@ export default function FallCreekPage() {
                         </Accordion>
                     </CardContent>
                            {/* Redundant history card removed from Stock tab */}
-           </Card>
+            </Card>
+
+                    <Card className="border-t-4 border-t-[#7aba28] mt-6">
+                        <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                            <div>
+                                <CardTitle className="text-xl text-[#004b8d] flex items-center gap-2">
+                                    <History className="h-5 w-5 text-[#7aba28]" />
+                                    Historial de Climatización de Cámaras
+                                </CardTitle>
+                                <CardDescription>
+                                    Evolución de temperatura y humedad en las cámaras de almacenamiento.
+                                </CardDescription>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <Select value={selectedChamber} onValueChange={setSelectedChamber}>
+                                    <SelectTrigger className="w-[180px] border-[#004b8d]/20">
+                                        <SelectValue placeholder="Seleccione Cámara" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="CAMARA-2">Cámara 2</SelectItem>
+                                        <SelectItem value="CAMARA-3">Cámara 3</SelectItem>
+                                        <SelectItem value="CAMARA-4">Cámara 4</SelectItem>
+                                        <SelectItem value="CAMARA-5">Cámara 5</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        </CardHeader>
+                        <CardContent>
+                            {formattedData.length > 0 ? (
+                                <div className="h-[350px] w-full mt-4">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <AreaChart
+                                            data={formattedData}
+                                            margin={{ top: 10, right: 30, left: 10, bottom: 0 }}
+                                        >
+                                            <defs>
+                                                <linearGradient id="colorTemp" x1="0" y1="0" x2="0" y2="1">
+                                                    <stop offset="5%" stopColor="#004b8d" stopOpacity={0.2}/>
+                                                    <stop offset="95%" stopColor="#004b8d" stopOpacity={0}/>
+                                                </linearGradient>
+                                                <linearGradient id="colorHum" x1="0" y1="0" x2="0" y2="1">
+                                                    <stop offset="5%" stopColor="#00a9e0" stopOpacity={0.2}/>
+                                                    <stop offset="95%" stopColor="#00a9e0" stopOpacity={0}/>
+                                                </linearGradient>
+                                            </defs>
+                                            <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                                            <XAxis 
+                                                dataKey="dateTimeStr" 
+                                                className="text-[10px] fill-muted-foreground"
+                                                tickLine={false}
+                                            />
+                                            <YAxis 
+                                                yAxisId="left"
+                                                className="text-[10px] fill-muted-foreground"
+                                                tickLine={false}
+                                                label={{ value: 'Temp (°C)', angle: -90, position: 'insideLeft', offset: -5, style: { textAnchor: 'middle', fill: '#004b8d', fontWeight: 'bold' } }}
+                                            />
+                                            <YAxis 
+                                                yAxisId="right"
+                                                orientation="right"
+                                                className="text-[10px] fill-muted-foreground"
+                                                tickLine={false}
+                                                label={{ value: 'Humedad (% HR)', angle: 90, position: 'insideRight', offset: 5, style: { textAnchor: 'middle', fill: '#00a9e0', fontWeight: 'bold' } }}
+                                            />
+                                            <Tooltip 
+                                                contentStyle={{ backgroundColor: 'hsl(var(--background))', borderColor: 'hsl(var(--border))', borderRadius: '8px' }}
+                                                labelStyle={{ fontWeight: 'bold', color: 'hsl(var(--foreground))' }}
+                                            />
+                                            <Legend verticalAlign="top" height={36} />
+                                            <Area 
+                                                yAxisId="left"
+                                                type="monotone" 
+                                                dataKey="temperature" 
+                                                name="Temperatura (°C)" 
+                                                stroke="#004b8d" 
+                                                fillOpacity={1} 
+                                                fill="url(#colorTemp)" 
+                                            />
+                                            <Area 
+                                                yAxisId="right"
+                                                type="monotone" 
+                                                dataKey="humidity" 
+                                                name="Humedad (% HR)" 
+                                                stroke="#00a9e0" 
+                                                fillOpacity={1} 
+                                                fill="url(#colorHum)" 
+                                            />
+                                        </AreaChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            ) : (
+                                <div className="flex flex-col items-center justify-center h-[200px] border-2 border-dashed rounded-lg bg-muted/20">
+                                    <History className="h-8 w-8 text-muted-foreground/50 mb-2" />
+                                    <p className="text-sm text-muted-foreground">No hay registros de climatización para esta cámara en los últimos días.</p>
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
                 </TabsContent>
 
                 <TabsContent value="history" className="space-y-6">
@@ -952,14 +1080,16 @@ export default function FallCreekPage() {
                                                             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setReceptionToView(reception)}>
                                                                 <Eye className="h-4 w-4" />
                                                             </Button>
-                                                            <Button 
-                                                                variant="ghost" 
-                                                                size="icon" 
-                                                                className="h-8 w-8 text-destructive hover:bg-destructive/10 hover:text-destructive" 
-                                                                onClick={() => handleDeleteManifest(reception)}
-                                                            >
-                                                                <Trash2 className="h-4 w-4" />
-                                                            </Button>
+                                                            {showCargarManifiesto && (
+                                                                <Button 
+                                                                    variant="ghost" 
+                                                                    size="icon" 
+                                                                    className="h-8 w-8 text-destructive hover:bg-destructive/10 hover:text-destructive" 
+                                                                    onClick={() => handleDeleteManifest(reception)}
+                                                                >
+                                                                    <Trash2 className="h-4 w-4" />
+                                                                </Button>
+                                                            )}
                                                         </TableCell>
                                                     </TableRow>
                                                 ))}

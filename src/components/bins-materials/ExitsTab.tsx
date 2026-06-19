@@ -170,7 +170,7 @@ export function ExitsTab({ exporterId, exporterName, producerId }: ExitsTabProps
         if (isNaN(pivotQty)) return;
 
         Object.entries(rules.related).forEach(([relatedCode, multiplier]) => {
-          const relatedItemIndex = allItems.findIndex(item => item.binMaterialCode === relatedCode);
+          const relatedItemIndex = allItems.findIndex(item => item && item.binMaterialCode === relatedCode);
 
           if (relatedItemIndex !== -1) {
             const newVal = pivotQty * multiplier;

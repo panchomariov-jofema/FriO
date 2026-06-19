@@ -361,7 +361,8 @@ export default function HidrocoolerPage() {
           lot={lotToProcess}
           open={isProcessDialogOpen}
           onOpenChange={setProcessDialogOpen}
-          onProcess={handleStartProcessing}
+          onProcess={handleStartProcessing as any}
+          processingLots={processingLots}
         />
       )}
 

@@ -161,3 +161,96 @@ export async function fileToBase64(file: File): Promise<string> {
     });
 }
 
+export interface ExcelTemperatureRow {
+  date: Date;
+  chamberId: string;
+  temperature: number;
+}
+
+export function parseTemperatureExcel(file: File): Promise<ExcelTemperatureRow[]> {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            try {
+                const data = new Uint8Array(e.target?.result as ArrayBuffer);
+                const workbook = XLSX.read(data, { type: 'array' });
+                const sheetName = workbook.SheetNames[0];
+                const sheet = workbook.Sheets[sheetName];
+                
+                const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as any[][];
+                
+                let headerRowIdx = -1;
+                for (let i = 0; i < Math.min(20, rows.length); i++) {
+                    const row = rows[i];
+                    if (row && row.includes('FECHA') && row.includes('HORA')) {
+                        headerRowIdx = i;
+                        break;
+                    }
+                }
+                
+                if (headerRowIdx === -1) {
+                    throw new Error('No se encontró la cabecera con "FECHA" y "HORA" en el archivo Excel.');
+                }
+                
+                const headers = rows[headerRowIdx];
+                const result: ExcelTemperatureRow[] = [];
+                
+                const chamberMapping: Record<number, string> = {};
+                headers.forEach((header, idx) => {
+                    if (typeof header === 'string') {
+                        const match = header.toUpperCase().match(/C[ÁA]MARA\s*(?:N[°º]|\s)\s*(\d+)/);
+                        if (match) {
+                            chamberMapping[idx] = `CAMARA-${match[1]}`;
+                        }
+                    }
+                });
+                
+                for (let i = headerRowIdx + 1; i < rows.length; i++) {
+                    const row = rows[i];
+                    if (!row || row.length === 0) continue;
+                    
+                    const excelDate = row[0];
+                    const excelTime = row[1];
+                    
+                    if (typeof excelDate !== 'number') continue;
+                    
+                    const timeFraction = typeof excelTime === 'number' ? excelTime : 0;
+                    const dateMs = (excelDate - 25569) * 86400 * 1000;
+                    const timeMs = timeFraction * 86400 * 1000;
+                    
+                    const utcDate = new Date(dateMs + timeMs);
+                    const localDate = new Date(
+                        utcDate.getUTCFullYear(),
+                        utcDate.getUTCMonth(),
+                        utcDate.getUTCDate(),
+                        utcDate.getUTCHours(),
+                        utcDate.getUTCMinutes(),
+                        utcDate.getUTCSeconds()
+                    );
+                    
+                    Object.entries(chamberMapping).forEach(([colIdxStr, chamberId]) => {
+                        const colIdx = parseInt(colIdxStr, 10);
+                        const val = row[colIdx];
+                        if (val !== undefined && val !== null && val !== '') {
+                            const temp = parseFloat(String(val));
+                            if (!isNaN(temp)) {
+                                result.push({
+                                    date: localDate,
+                                    chamberId,
+                                    temperature: temp
+                                });
+                            }
+                        }
+                    });
+                }
+                
+                resolve(result);
+            } catch (error) {
+                reject(error);
+            }
+        };
+        reader.onerror = (error) => reject(error);
+        reader.readAsArrayBuffer(file);
+    });
+}
+

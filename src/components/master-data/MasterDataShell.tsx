@@ -107,7 +107,7 @@ export function MasterDataShell<T extends MasterData>({
   const form = useForm<z.infer<typeof schema>>({
     resolver: zodResolver(schema),
     defaultValues: Object.fromEntries(
-        Object.keys(schema.shape).map(key => [key, ''])
+        Object.keys((schema as any).shape).map(key => [key, ''])
     ),
   });
 
@@ -119,7 +119,7 @@ export function MasterDataShell<T extends MasterData>({
   const handleCancelEdit = () => {
     setCurrentItem(null);
     form.reset(Object.fromEntries(
-        Object.keys(schema.shape).map(key => [key, ''])
+        Object.keys((schema as any).shape).map(key => [key, ''])
       ));
   }
 

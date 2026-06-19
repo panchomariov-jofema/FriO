@@ -332,11 +332,11 @@ export function OtherFruitExitTab({ clientId: fixedClientId }: { clientId?: stri
             clientName: client.name,
             unit: client.unit,
             document: document,
-            destinationClientName: selectedSubClient ? selectedSubClient.name : null,
-            destinationClientRUT: selectedSubClient ? selectedSubClient.rut : null,
+            destinationClientName: (selectedSubClient ? selectedSubClient.name : null) as any,
+            destinationClientRUT: (selectedSubClient ? selectedSubClient.rut : null) as any,
             items: movementItems,
             createdAt: serverTimestamp() as any,
-            userId: user?.uid || null,
+            userId: (user?.uid || null) as any,
             userName: user?.email || (user?.isAnonymous ? 'Anónimo' : user?.displayName || 'N/A'),
         };
 

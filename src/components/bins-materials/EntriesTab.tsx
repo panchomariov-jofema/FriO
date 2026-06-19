@@ -134,7 +134,7 @@ export function EntriesTab({ exporterId, exporterName, producerId, isDirectDispa
         if (isNaN(pivotQty)) return;
 
         Object.entries(rules.related).forEach(([relatedCode, multiplier]) => {
-          const relatedItemIndex = allItems.findIndex(item => item.binMaterialCode === relatedCode);
+          const relatedItemIndex = allItems.findIndex(item => item && item.binMaterialCode === relatedCode);
 
           if (relatedItemIndex !== -1) {
             const newVal = pivotQty * multiplier;
@@ -175,9 +175,9 @@ export function EntriesTab({ exporterId, exporterName, producerId, isDirectDispa
           exporterId,
           producerId,
           items: itemsToProcess,
-          createdAt: serverTimestamp(),
+          createdAt: serverTimestamp() as any,
           userId: user?.uid,
-          userName: user?.email,
+          userName: user?.email || undefined,
         };
 
         if (isDirectDispatch) {
