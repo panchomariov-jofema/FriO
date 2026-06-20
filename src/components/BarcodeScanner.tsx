@@ -36,6 +36,8 @@ export function BarcodeScanner({
 }: BarcodeScannerProps) {
   const { toast } = useToast();
   const [localUsePhysicalScanner, setLocalUsePhysicalScanner] = React.useState<boolean>(false);
+  const [devices, setDevices] = React.useState<{ id: string; label: string }[]>([]);
+  const [selectedCameraId, setSelectedCameraId] = React.useState<string>('');
   
   React.useEffect(() => {
     if (propUsePhysicalScanner === undefined && typeof window !== 'undefined') {
@@ -66,78 +68,144 @@ export function BarcodeScanner({
     let isMounted = true;
     let timerId: any = null;
 
-    timerId = setTimeout(() => {
+    const checkAndStart = () => {
       if (!isMounted) return;
+      const el = document.getElementById(qrcodeRegionId);
+      if (!el) {
+        timerId = setTimeout(checkAndStart, 50);
+        return;
+      }
+      
+      const rect = el.getBoundingClientRect();
+      if (rect.width === 0 || rect.height === 0) {
+        // Wait and check again shortly, as the dialog is still animating
+        timerId = setTimeout(checkAndStart, 50);
+        return;
+      }
 
-      // Dynamically import the library only on the client-side
+      // Element is visible and has non-zero size, we can import and start
       import('html5-qrcode').then(({ Html5Qrcode }) => {
           if (!isMounted) return;
-          // Ensure the element exists in DOM before creating instance
-          const el = document.getElementById(qrcodeRegionId);
-          if (!el) return;
 
-          html5QrCode = new Html5Qrcode(qrcodeRegionId);
-          let isScanning = true;
-
-          const qrCodeSuccessCallback = (decodedText: string, decodedResult: any) => {
-            if (isScanning) {
-              isScanning = false; // Prevent multiple calls
-              onScan(decodedText);
-              if (closeOnScan) {
-                onOpenChange(false);
-              } else {
-                // If not closing, allow scanning again after a short delay
-                setTimeout(() => {
-                  isScanning = true;
-                }, 1000);
-              }
-            }
-          };
-
-          const config = { 
-              fps: 15, 
-              qrbox: (viewfinderWidth: number, viewfinderHeight: number) => {
-                  const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
-                  // Sensible minimum size of 250px if viewfinder size is 0 or too small
-                  const qrboxSize = minEdge > 120 ? Math.floor(minEdge * 0.7) : 250;
-                  return {
-                      width: qrboxSize,
-                      height: qrboxSize,
-                  };
-              }
-          };
-          
-          html5QrCode.start(
-              { facingMode: "environment" }, 
-              config, 
-              qrCodeSuccessCallback, 
-              undefined
-          ).then(() => {
-              // Apply continuous autofocus if supported after camera initialization
-              setTimeout(() => {
-                  if (html5QrCode && html5QrCode.isScanning) {
-                      html5QrCode.applyVideoConstraints({
-                          focusMode: "continuous"
-                      } as any).catch((err: any) => {
-                          console.warn("Could not apply continuous autofocus constraint:", err);
-                      });
+          // Request camera permission and list available devices
+          Html5Qrcode.getCameras().then((cameras) => {
+              if (!isMounted) return;
+              if (cameras && cameras.length > 0) {
+                  setDevices(cameras);
+                  
+                  // Read saved camera or default to the last one (which is usually the main rear camera on Android)
+                  const saved = localStorage.getItem('frio_selected_camera_id');
+                  const isSavedValid = cameras.some(c => c.id === saved);
+                  
+                  let activeId = '';
+                  if (selectedCameraId && cameras.some(c => c.id === selectedCameraId)) {
+                      activeId = selectedCameraId;
+                  } else if (isSavedValid) {
+                      activeId = saved!;
+                  } else {
+                      activeId = cameras[cameras.length - 1].id;
                   }
-              }, 1000);
-          }).catch((err: any) => {
-              console.error("Failed to start html5-qrcode scanner", err);
-              
-              // Contexto seguro check (Camera requires HTTPS or Localhost)
-              const isNotSecure = typeof window !== 'undefined' && !window.isSecureContext;
-              
-              toast({
-                  variant: "destructive",
-                  title: "Error de Cámara",
-                  description: isNotSecure 
-                      ? "La cámara requiere una conexión segura (HTTPS). Chrome bloquea la cámara en IPs locales (192.168.x.x) sin SSL."
-                      : "No se pudo iniciar el escáner. Verifique los permisos o si otra app usa la cámara.",
-              });
-              onOpenChange(false);
+                  
+                  if (selectedCameraId !== activeId) {
+                      setSelectedCameraId(activeId);
+                  }
+                  
+                  startScanning(activeId);
+              } else {
+                  // Fallback if no cameras found
+                  startScanning({ facingMode: "environment" });
+              }
+          }).catch((err) => {
+              console.warn("Could not list cameras, using default facingMode:", err);
+              startScanning({ facingMode: "environment" });
           });
+
+          function startScanning(cameraSource: any) {
+              if (!isMounted) return;
+              
+              html5QrCode = new Html5Qrcode(qrcodeRegionId);
+              let isScanning = true;
+
+              const qrCodeSuccessCallback = (decodedText: string, decodedResult: any) => {
+                if (isScanning) {
+                  isScanning = false; // Prevent multiple calls
+                  
+                  // Trim the scanned text to avoid matching issues with spaces or trailing newlines
+                  const cleanText = decodedText.trim();
+                  onScan(cleanText);
+                  
+                  if (closeOnScan) {
+                    onOpenChange(false);
+                  } else {
+                    // If not closing, allow scanning again after a short delay
+                    setTimeout(() => {
+                      isScanning = true;
+                    }, 1000);
+                  }
+                }
+              };
+
+              const config = { 
+                  fps: 15, 
+                  qrbox: (viewfinderWidth: number, viewfinderHeight: number) => {
+                      const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
+                      // Use a safe percentage so it is always smaller than the viewfinder
+                      const qrboxSize = minEdge > 0 ? Math.floor(minEdge * 0.7) : 150;
+                      
+                      // Ensure it never exceeds the actual boundaries (which triggers canvas crop errors)
+                      const safeWidth = minEdge > 0 ? Math.min(qrboxSize, viewfinderWidth - 25) : 150;
+                      const safeHeight = minEdge > 0 ? Math.min(qrboxSize, viewfinderHeight - 25) : 150;
+                      
+                      return {
+                          width: Math.max(safeWidth, 50),
+                          height: Math.max(safeHeight, 50),
+                      };
+                  },
+                  videoConstraints: {
+                      ...(typeof cameraSource === 'string'
+                          ? { deviceId: { exact: cameraSource } }
+                          : { facingMode: "environment" }),
+                      width: { ideal: 1280 },
+                      height: { ideal: 720 }
+                  }
+              };
+              
+              const startSource = typeof cameraSource === 'string' 
+                  ? { deviceId: { exact: cameraSource } }
+                  : cameraSource;
+                  
+              html5QrCode.start(
+                  startSource, 
+                  config, 
+                  qrCodeSuccessCallback, 
+                  undefined
+              ).then(() => {
+                  // Apply continuous autofocus constraint
+                  setTimeout(() => {
+                      if (html5QrCode && html5QrCode.isScanning) {
+                          html5QrCode.applyVideoConstraints({
+                              focusMode: "continuous"
+                          } as any).catch((err: any) => {
+                              console.warn("Could not apply autofocus constraint:", err);
+                          });
+                      }
+                  }, 1000);
+              }).catch((err: any) => {
+                  console.error("Failed to start html5-qrcode scanner", err);
+                  
+                  // Contexto seguro check (Camera requires HTTPS or Localhost)
+                  const isNotSecure = typeof window !== 'undefined' && !window.isSecureContext;
+                  
+                  toast({
+                      variant: "destructive",
+                      title: "Error de Cámara",
+                      description: isNotSecure 
+                          ? "La cámara requiere una conexión segura (HTTPS). Chrome bloquea la cámara en IPs locales (192.168.x.x) sin SSL."
+                          : "No se pudo iniciar el escáner. Verifique los permisos o si otra app usa la cámara.",
+                  });
+                  onOpenChange(false);
+              });
+          }
 
       }).catch((error) => {
           console.error("Failed to load html5-qrcode library", error);
@@ -148,7 +216,10 @@ export function BarcodeScanner({
           });
           onOpenChange(false);
       });
-    }, 350); // 350ms delay to allow Dialog animation to finish
+    };
+
+    // Trigger size check loop
+    timerId = setTimeout(checkAndStart, 50);
 
     // Cleanup function to stop the scanner when the component unmounts or dialog closes.
     return () => {
@@ -162,7 +233,7 @@ export function BarcodeScanner({
       }
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, activeUsePhysicalScanner]);
+  }, [open, activeUsePhysicalScanner, selectedCameraId]);
   
   const inputRef = React.useRef<HTMLInputElement>(null);
 
@@ -221,6 +292,28 @@ export function BarcodeScanner({
         >
            <div className="absolute inset-0 border-2 border-primary/20 pointer-events-none z-10" />
         </div>
+
+        {/* Camera Selector Dropdown */}
+        {!activeUsePhysicalScanner && devices.length > 1 && (
+          <div className="flex flex-col gap-1 my-1">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Seleccionar Cámara / Lente</span>
+            <select
+              value={selectedCameraId}
+              onChange={(e) => {
+                const newId = e.target.value;
+                setSelectedCameraId(newId);
+                localStorage.setItem('frio_selected_camera_id', newId);
+              }}
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            >
+              {devices.map((device, idx) => (
+                <option key={device.id} value={device.id}>
+                  {device.label || `Cámara ${idx + 1} (${device.id.substring(0, 8)})`}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
 
         {/* Prominent count/progress card for physical reader mode */}
         {activeUsePhysicalScanner && (
