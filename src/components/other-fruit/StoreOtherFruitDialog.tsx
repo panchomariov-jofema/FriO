@@ -77,12 +77,11 @@ export function StoreOtherFruitDialog({
   
   const capacityPerCoord = useMemo(() => {
     if (!item) return DEFAULT_PALLETS_PER_COORDINATE;
-    // Fall Creek rule: 9 bins total per coordinate
-    if (item.clientName === 'FALL CREEK' || item.clientName?.toUpperCase() === 'FALL CREEK') return 9; 
+    const isFC = item.clientName === 'FALL CREEK' || item.clientName?.toUpperCase() === 'FALL CREEK';
     if (item.unit === 'Bins') {
-      return clientConfig?.binsPerCoordinate ?? DEFAULT_BINS_PER_COORDINATE;
+      return clientConfig?.binsPerCoordinate ?? (isFC ? 9 : DEFAULT_BINS_PER_COORDINATE);
     }
-    return clientConfig?.palletsPerCoordinate ?? DEFAULT_PALLETS_PER_COORDINATE;
+    return clientConfig?.palletsPerCoordinate ?? (isFC ? 3 : DEFAULT_PALLETS_PER_COORDINATE);
   }, [item, clientConfig]);
 
   const { availableCoordinates, suggestion } = useMemo(() => {
@@ -258,13 +257,11 @@ export function StoreOtherFruitDialog({
   useEffect(() => {
     if (open && item) {
        const isFallCreek = item.clientName === 'FALL CREEK' || item.clientName?.toUpperCase() === 'FALL CREEK';
-       let strategy = isFallCreek ? 'aisle-access' : (clientConfig?.strategy ?? 'secuencial');
+       let strategy = clientConfig?.strategy ?? (isFallCreek ? 'aisle-access' : 'secuencial');
        let totalQuantity = item.quantity;
-       let qtyPerLocation = isFallCreek 
-         ? 9 
-         : (item.unit === 'Bins' 
-           ? (clientConfig?.binsPerCoordinate ?? DEFAULT_BINS_PER_COORDINATE)
-           : (clientConfig?.palletsPerCoordinate ?? DEFAULT_PALLETS_PER_COORDINATE));
+       let qtyPerLocation = item.unit === 'Bins'
+         ? (clientConfig?.binsPerCoordinate ?? (isFallCreek ? 9 : DEFAULT_BINS_PER_COORDINATE))
+         : (clientConfig?.palletsPerCoordinate ?? (isFallCreek ? 3 : DEFAULT_PALLETS_PER_COORDINATE));
 
         // Prioritize session continuity (lastUsedChamberId from props or localStorage) over client preferred chamber
         const savedChamber = lastUsedChamberId || (typeof window !== 'undefined' ? localStorage.getItem('frio_last_chamber_id') : null);

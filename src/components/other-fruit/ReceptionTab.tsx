@@ -195,9 +195,9 @@ export function OtherFruitReceptionTab({ clientId: fixedClientId }: { clientId?:
 
     // Hardcoded defaults for Fall Creek
     if (masterData?.name?.toUpperCase() === 'FALL CREEK' || masterData?.id?.toLowerCase() === 'fallcreek' || itemToStore.clientName?.toUpperCase() === 'FALL CREEK') {
-        strategy = 'aisle-access';
-        binsPerCoordinate = 9;
-        palletsPerCoordinate = 3;
+        if (!explicitOverride?.strategy && !masterData?.storageStrategy) strategy = 'aisle-access';
+        if (explicitOverride?.binsPerCoordinate === undefined && masterData?.binsPerCoordinate === undefined) binsPerCoordinate = 9;
+        if (explicitOverride?.palletsPerCoordinate === undefined && masterData?.palletsPerCoordinate === undefined) palletsPerCoordinate = 3;
     }
 
     return {

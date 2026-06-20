@@ -128,19 +128,32 @@ export function BarcodeScanner({
           Html5Qrcode.getCameras().then((cameras) => {
               if (!isMounted) return;
               if (cameras && cameras.length > 0) {
-                  setDevices(cameras);
+                  // Filter out front-facing cameras by checking standard labels
+                  const rearCameras = cameras.filter(c => {
+                      const label = (c.label || '').toLowerCase();
+                      return !(
+                          label.includes('front') || 
+                          label.includes('delantera') || 
+                          label.includes('user') || 
+                          label.includes('selfie') || 
+                          label.includes('anterior')
+                      );
+                  });
+                  
+                  const filteredCameras = rearCameras.length > 0 ? rearCameras : cameras;
+                  setDevices(filteredCameras);
                   
                   // Read saved camera or default to the last one (which is usually the main rear camera on Android)
                   const saved = localStorage.getItem('frio_selected_camera_id');
-                  const isSavedValid = cameras.some(c => c.id === saved);
+                  const isSavedValid = filteredCameras.some(c => c.id === saved);
                   
                   let activeId = '';
-                  if (selectedCameraId && cameras.some(c => c.id === selectedCameraId)) {
+                  if (selectedCameraId && filteredCameras.some(c => c.id === selectedCameraId)) {
                       activeId = selectedCameraId;
                   } else if (isSavedValid) {
                       activeId = saved!;
                   } else {
-                      activeId = cameras[cameras.length - 1].id;
+                      activeId = filteredCameras[filteredCameras.length - 1].id;
                   }
                   
                   if (selectedCameraId !== activeId) {
@@ -253,18 +266,23 @@ export function BarcodeScanner({
       });
     };
 
-    // Trigger size check loop
-    timerId = setTimeout(checkAndStart, 50);
+    // Trigger size check loop with a delay to let any transitions complete smoothly
+    timerId = setTimeout(checkAndStart, 300);
 
     // Cleanup function to stop the scanner when the component unmounts or dialog closes.
     return () => {
       isMounted = false;
       if (timerId) clearTimeout(timerId);
-      const el = document.getElementById(qrcodeRegionId);
-      if (el && html5QrCode && html5QrCode.isScanning) {
-        html5QrCode.stop().catch((err: any) => {
-          console.warn("Could not stop html5-qrcode scanner on cleanup:", err);
-        });
+      const localScanner = html5QrCode;
+      if (localScanner && localScanner.isScanning) {
+        // Defer stopping the camera stream to let the UI toggle and render instantly
+        setTimeout(() => {
+          if (localScanner && localScanner.isScanning) {
+            localScanner.stop().catch((err: any) => {
+              console.warn("Could not stop html5-qrcode scanner on cleanup:", err);
+            });
+          }
+        }, 150);
       }
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps

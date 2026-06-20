@@ -456,6 +456,7 @@ export type StoredItem = {
   observation?: string;
   exporterId?: string;
   document?: string;
+  palletId?: string;
 }
 
 export interface BusinessEntity {

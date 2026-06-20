@@ -214,6 +214,7 @@ export default function CamarasPage() {
                 observation: item.observation,
                 exporterId: reception.clientId,
                 document: reception.document,
+                palletId: item.palletId,
             }))
         )
     ];
@@ -1011,15 +1012,19 @@ export default function CamarasPage() {
                                           const totalPallets = itemsInCoord.filter(i => i.unit === 'Pallets').reduce((s, i) => s + i.quantity, 0);
                                           const totalNetWeight = itemsInCoord.reduce((sum, i) => sum + (i.quantity * (i.netWeightPerBin || 0)), 0);
                                           const clientLotIds = Array.from(new Set(itemsInCoord.map(i => i.clientLotId).filter(Boolean)));
+                                          const uniquePalletIds = Array.from(new Set(itemsInCoord.map(i => i.palletId).filter(Boolean)));
                                         
                                           const firstItem = isOccupied ? itemsInCoord[0] : null;
                                           
                                           // Dynamic capacity lookup
                                           const clientName = firstItem?.ownerName || '';
                                           const clientConfig = (clientConfigs || []).find(c => c.clientName.toUpperCase() === clientName.toUpperCase());
+                                          const isFC = clientName.toUpperCase() === 'FALL CREEK';
+                                          const defaultBins = isFC ? 9 : 6;
+                                          const defaultPallets = 3;
                                           const coordCapacity = clientConfig 
-                                            ? (firstItem?.unit === 'Pallets' ? clientConfig.palletsPerCoordinate : clientConfig.binsPerCoordinate)
-                                            : (firstItem?.unit === 'Pallets' ? 3 : 6);
+                                            ? (firstItem?.unit === 'Pallets' ? (clientConfig.palletsPerCoordinate ?? defaultPallets) : (clientConfig.binsPerCoordinate ?? defaultBins))
+                                            : (firstItem?.unit === 'Pallets' ? defaultPallets : defaultBins);
      
                                           const occupancyPercentage = isOccupied ? (totalBins + totalPallets) / coordCapacity * 100 : 0;
 
@@ -1143,16 +1148,28 @@ export default function CamarasPage() {
                                                           <>
                                                               {firstItem && (
                                                                   <div className="text-xs space-y-1">
-                                                                      <p>
-                                                                      {firstItem.type === 'producerLot' ? `Productor: ${firstItem.ownerName}` : `Cliente: ${firstItem.ownerName}`}
-                                                                      </p>
-                                                                      {firstItem.type === 'otherFruit' && (
-                                                                          <p>Documento: {firstItem.document || '-'}</p>
+                                                                      {isFC ? (
+                                                                          <>
+                                                                              <p>Cliente: {firstItem.ownerName}</p>
+                                                                              <p>Pallet Log: {firstItem.document || '-'}</p>
+                                                                              <p>Pallet ID: <span className="font-mono">{uniquePalletIds.join(', ') || '-'}</span></p>
+                                                                              <p>Variedad: {firstItem.varietyOrProduct}</p>
+                                                                              <p>Documento: {firstItem.document || '-'}</p>
+                                                                          </>
+                                                                      ) : (
+                                                                          <>
+                                                                              <p>
+                                                                              {firstItem.type === 'producerLot' ? `Productor: ${firstItem.ownerName}` : `Cliente: ${firstItem.ownerName}`}
+                                                                              </p>
+                                                                              {firstItem.type === 'otherFruit' && (
+                                                                                  <p>Documento: {firstItem.document || '-'}</p>
+                                                                              )}
+                                                                              {clientLotIds.length > 0 && (
+                                                                              <p>Lote Cliente: <span className="font-mono">{clientLotIds.join(', ')}</span></p>
+                                                                              )}
+                                                                              <p>Producto: {firstItem.varietyOrProduct}</p>
+                                                                          </>
                                                                       )}
-                                                                      {clientLotIds.length > 0 && (
-                                                                      <p>Lote Cliente: <span className="font-mono">{clientLotIds.join(', ')}</span></p>
-                                                                      )}
-                                                                      <p>Producto: {firstItem.varietyOrProduct}</p>
                                                                       {firstItem.observation && (
                                                                         <p className="text-muted-foreground italic text-xs mt-0.5">Obs: {firstItem.observation}</p>
                                                                       )}
