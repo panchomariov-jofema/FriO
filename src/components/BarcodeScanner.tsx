@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { ScanLine } from 'lucide-react';
+import { ScanLine, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface BarcodeScannerProps {
@@ -38,6 +38,43 @@ export function BarcodeScanner({
   const [localUsePhysicalScanner, setLocalUsePhysicalScanner] = React.useState<boolean>(false);
   const [devices, setDevices] = React.useState<{ id: string; label: string }[]>([]);
   const [selectedCameraId, setSelectedCameraId] = React.useState<string>('');
+  const [scanSuccessFlash, setScanSuccessFlash] = React.useState<boolean>(false);
+
+  const playBeepSound = () => {
+    if (typeof window !== 'undefined') {
+      try {
+        const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+        if (AudioContextClass) {
+          const ctx = new AudioContextClass();
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(850, ctx.currentTime); // Clean scan beep
+          
+          gain.gain.setValueAtTime(0.3, ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.12); // fade out over 120ms
+          
+          osc.start(ctx.currentTime);
+          osc.stop(ctx.currentTime + 0.12);
+        }
+      } catch (err) {
+        console.warn("Could not play scan sound:", err);
+      }
+    }
+  };
+
+  const handleScanSuccess = (value: string) => {
+    playBeepSound();
+    setScanSuccessFlash(true);
+    setTimeout(() => {
+      setScanSuccessFlash(false);
+    }, 450);
+    onScan(value.trim());
+  };
   
   React.useEffect(() => {
     if (propUsePhysicalScanner === undefined && typeof window !== 'undefined') {
@@ -130,17 +167,15 @@ export function BarcodeScanner({
                 if (isScanning) {
                   isScanning = false; // Prevent multiple calls
                   
-                  // Trim the scanned text to avoid matching issues with spaces or trailing newlines
-                  const cleanText = decodedText.trim();
-                  onScan(cleanText);
+                  handleScanSuccess(decodedText);
                   
                   if (closeOnScan) {
                     onOpenChange(false);
                   } else {
-                    // If not closing, allow scanning again after a short delay
+                    // If not closing, allow scanning again after a delay to show flash and move to next item
                     setTimeout(() => {
                       isScanning = true;
-                    }, 1000);
+                    }, 1500);
                   }
                 }
               };
@@ -291,6 +326,15 @@ export function BarcodeScanner({
           )}
         >
            <div className="absolute inset-0 border-2 border-primary/20 pointer-events-none z-10" />
+           
+           {/* Success visual flash overlay for camera feed */}
+           {scanSuccessFlash && (
+             <div className="absolute inset-0 bg-green-500/40 flex items-center justify-center z-20 animate-in fade-in zoom-in duration-150">
+               <div className="bg-white rounded-full p-4 shadow-lg scale-110 transition-transform">
+                 <Check className="h-10 w-10 text-green-600 animate-bounce" />
+               </div>
+             </div>
+           )}
         </div>
 
         {/* Camera Selector Dropdown */}
@@ -317,8 +361,18 @@ export function BarcodeScanner({
 
         {/* Prominent count/progress card for physical reader mode */}
         {activeUsePhysicalScanner && (
-          <div className="w-full py-6 px-4 rounded-xl bg-muted/40 flex flex-col items-center justify-center border-2 border-dashed border-[#7aba28]/40 shadow-inner">
-            {currentCount !== undefined && totalCount !== undefined ? (
+          <div className={cn(
+            "w-full py-6 px-4 rounded-xl flex flex-col items-center justify-center border-2 border-dashed shadow-inner transition-all duration-300",
+            scanSuccessFlash 
+              ? "bg-green-50 border-green-500 scale-105" 
+              : "bg-muted/40 border-[#7aba28]/40"
+          )}>
+            {scanSuccessFlash ? (
+              <div className="flex flex-col items-center gap-2 py-2">
+                <Check className="h-10 w-10 text-green-600 animate-bounce" />
+                <span className="text-sm font-black text-green-700 uppercase tracking-tight">¡Leído con Éxito!</span>
+              </div>
+            ) : currentCount !== undefined && totalCount !== undefined ? (
               <div className="flex flex-col items-center gap-2">
                 <div className="flex items-baseline gap-1 bg-[#004b8d]/10 px-8 py-4 rounded-2xl border border-[#004b8d]/20 shadow-md">
                   <span className="text-6xl font-black text-[#004b8d] tracking-tight">{currentCount}</span>
@@ -367,7 +421,7 @@ export function BarcodeScanner({
                 if (e.key === 'Enter') {
                   const val = (e.target as HTMLInputElement).value;
                   if (val) {
-                    onScan(val);
+                    handleScanSuccess(val);
                     if (closeOnScan) {
                       onOpenChange(false);
                     } else {
