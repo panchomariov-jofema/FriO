@@ -95,7 +95,7 @@ export function BarcodeScanner({
           };
 
           const config = { 
-              fps: 10, 
+              fps: 15, 
               qrbox: (viewfinderWidth: number, viewfinderHeight: number) => {
                   const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
                   // Sensible minimum size of 250px if viewfinder size is 0 or too small
@@ -104,8 +104,7 @@ export function BarcodeScanner({
                       width: qrboxSize,
                       height: qrboxSize,
                   };
-              },
-              aspectRatio: 1.0
+              }
           };
           
           html5QrCode.start(
@@ -113,7 +112,18 @@ export function BarcodeScanner({
               config, 
               qrCodeSuccessCallback, 
               undefined
-          ).catch((err: any) => {
+          ).then(() => {
+              // Apply continuous autofocus if supported after camera initialization
+              setTimeout(() => {
+                  if (html5QrCode && html5QrCode.isScanning) {
+                      html5QrCode.applyVideoConstraints({
+                          focusMode: "continuous"
+                      } as any).catch((err: any) => {
+                          console.warn("Could not apply continuous autofocus constraint:", err);
+                      });
+                  }
+              }, 1000);
+          }).catch((err: any) => {
               console.error("Failed to start html5-qrcode scanner", err);
               
               // Contexto seguro check (Camera requires HTTPS or Localhost)
