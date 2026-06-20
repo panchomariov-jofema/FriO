@@ -213,6 +213,7 @@ export default function CamarasPage() {
                 clientLotId: item.clientLotId,
                 observation: item.observation,
                 exporterId: reception.clientId,
+                document: reception.document,
             }))
         )
     ];
@@ -721,12 +722,40 @@ export default function CamarasPage() {
         return;
       }
 
+      // Fetch recent records to find the latest timestamp for each chamber without index requirement
+      const q = query(
+        collection(firestore, 'chamberTemperatures'),
+        orderBy('timestamp', 'desc'),
+        limit(500)
+      );
+      const snap = await getDocs(q);
+      const latestTimestamps: Record<string, number> = {};
+      snap.forEach(docSnap => {
+        const data = docSnap.data();
+        const chId = data.chamberId;
+        const time = (data.timestamp as Timestamp).toMillis();
+        if (chId && (!latestTimestamps[chId] || time > latestTimestamps[chId])) {
+          latestTimestamps[chId] = time;
+        }
+      });
+
+      // Filter only records that are strictly newer than the latest in DB for that chamber
+      const newRecords = records.filter(record => {
+        const latestTime = latestTimestamps[record.chamberId] || 0;
+        return record.date.getTime() > latestTime;
+      });
+
+      if (newRecords.length === 0) {
+        toast({ title: 'Planilla al Día', description: 'No hay nuevos registros para importar. Todos los datos ya están registrados.' });
+        return;
+      }
+
       // Write in batches of 400
       const CHUNK_SIZE = 400;
       let committedCount = 0;
       
-      for (let i = 0; i < records.length; i += CHUNK_SIZE) {
-        const chunk = records.slice(i, i + CHUNK_SIZE);
+      for (let i = 0; i < newRecords.length; i += CHUNK_SIZE) {
+        const chunk = newRecords.slice(i, i + CHUNK_SIZE);
         const batch = writeBatch(firestore);
         
         chunk.forEach(record => {
@@ -745,7 +774,7 @@ export default function CamarasPage() {
         committedCount += chunk.length;
       }
 
-      toast({ title: 'Éxito', description: `Se han importado ${committedCount} registros de climatización correctamente.` });
+      toast({ title: 'Éxito', description: `Se han importado ${committedCount} nuevos registros de climatización.` });
     } catch (err: any) {
       console.error('Error importing temperature Excel:', err);
       toast({ variant: 'destructive', title: 'Error de Importación', description: err.message || 'No se pudo procesar el archivo Excel.' });
@@ -1086,7 +1115,7 @@ export default function CamarasPage() {
                                                   <div className="space-y-2">
                                                       <div className="border-b pb-1">
                                                           <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Ubicación {coord}</p>
-                                                          <p className="text-sm font-semibold">{uniqueLotIds.length > 1 ? 'Lotes Mezclados' : firstItem?.type === 'producerLot' ? `Lote: ${firstItem?.displayId}` : `Producto: ${firstItem?.displayId}`}</p>
+                                                          <p className="text-sm font-semibold">{uniqueLotIds.length > 1 ? 'Lotes Mezclados' : firstItem?.type === 'producerLot' ? `Lote: ${firstItem?.displayId}` : `Documento: ${firstItem?.document || '-'}`}</p>
                                                       </div>
 
                                                       {uniqueLotIds.length > 1 ? (
@@ -1098,7 +1127,7 @@ export default function CamarasPage() {
                                                                   {itemsInCoord.map((item, idx) => (
                                                                       <div key={idx} className="text-xs border-b border-dashed pb-1.5 last:border-0 last:pb-0">
                                                                           <div className="flex justify-between items-center">
-                                                                              <span className="font-bold">{item.type === 'producerLot' ? `Lote: ${item.displayId}` : `Prod: ${item.displayId}`}</span>
+                                                                              <span className="font-bold">{item.type === 'producerLot' ? `Lote: ${item.displayId}` : `Doc: ${item.document || '-'}`}</span>
                                                                               <Badge variant="outline" className="h-4 text-[9px] px-1 bg-primary/5 text-primary border-primary/20">
                                                                                   {item.quantity} {item.unit}
                                                                               </Badge>
@@ -1113,18 +1142,21 @@ export default function CamarasPage() {
                                                       ) : (
                                                           <>
                                                               {firstItem && (
-                                                                  <>
-                                                                      {clientLotIds.length > 0 && (
-                                                                      <p>Lote Cliente: <span className="font-mono">{clientLotIds.join(', ')}</span></p>
-                                                                      )}
+                                                                  <div className="text-xs space-y-1">
                                                                       <p>
                                                                       {firstItem.type === 'producerLot' ? `Productor: ${firstItem.ownerName}` : `Cliente: ${firstItem.ownerName}`}
                                                                       </p>
-                                                                      <p>Variedad/Producto: {firstItem.varietyOrProduct}</p>
+                                                                      {firstItem.type === 'otherFruit' && (
+                                                                          <p>Documento: {firstItem.document || '-'}</p>
+                                                                      )}
+                                                                      {clientLotIds.length > 0 && (
+                                                                      <p>Lote Cliente: <span className="font-mono">{clientLotIds.join(', ')}</span></p>
+                                                                      )}
+                                                                      <p>Producto: {firstItem.varietyOrProduct}</p>
                                                                       {firstItem.observation && (
                                                                         <p className="text-muted-foreground italic text-xs mt-0.5">Obs: {firstItem.observation}</p>
                                                                       )}
-                                                                  </>
+                                                                  </div>
                                                               )}
                                                           </>
                                                       )}

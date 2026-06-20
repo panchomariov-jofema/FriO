@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
-import type { OtherClient, OtherFruitReception, OtherFruitReceptionItem, OtherFruitMovement, Producer } from '@/lib/types';
+import type { OtherClient, OtherFruitReception, OtherFruitReceptionItem, OtherFruitMovement, Producer, OtherFruitMovementLocation } from '@/lib/types';
 import { useFirestore, useUser } from '@/firebase';
 import { mockOtherClients, mockOtherFruitReceptions, mockProducers } from '@/lib/mock-chamber5';
 
@@ -276,6 +276,7 @@ export function OtherFruitExitTab({ clientId: fixedClientId }: { clientId?: stri
         const batch = writeBatch(firestore);
         const receptionUpdates = new Map<string, OtherFruitReceptionItem[]>();
         const movementItems: OtherFruitMovement['items'] = [];
+        const movementLocations: OtherFruitMovement['locations'] = [];
         
         for (const [key, quantityToDispatch] of itemsToDispatch) {
             const [receptionId, itemIndexStr] = key.split('_');
@@ -314,6 +315,20 @@ export function OtherFruitExitTab({ clientId: fixedClientId }: { clientId?: stri
                 }
                 
                 movementItems.push(newItemForMovement);
+
+                movementLocations.push({
+                    receptionId,
+                    itemIndex,
+                    quantity: quantityToDispatch,
+                    unit: originalReception.unit,
+                    productCode: itemToUpdate.productCode,
+                    productName: itemToUpdate.productName,
+                    clientLotId: itemToUpdate.clientLotId,
+                    location: {
+                        chamberId: itemToUpdate.storageLocation?.chamberId || '',
+                        coordinate: itemToUpdate.storageLocation?.coordinate || ''
+                    }
+                });
             }
         }
 
@@ -335,6 +350,7 @@ export function OtherFruitExitTab({ clientId: fixedClientId }: { clientId?: stri
             destinationClientName: (selectedSubClient ? selectedSubClient.name : null) as any,
             destinationClientRUT: (selectedSubClient ? selectedSubClient.rut : null) as any,
             items: movementItems,
+            locations: movementLocations,
             createdAt: serverTimestamp() as any,
             userId: (user?.uid || null) as any,
             userName: user?.email || (user?.isAnonymous ? 'Anónimo' : user?.displayName || 'N/A'),

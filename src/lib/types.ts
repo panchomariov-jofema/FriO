@@ -455,6 +455,7 @@ export type StoredItem = {
   isMixedVariety?: boolean;
   observation?: string;
   exporterId?: string;
+  document?: string;
 }
 
 export interface BusinessEntity {

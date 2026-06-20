@@ -162,12 +162,14 @@ export function BarcodeScanner({
       const timer = setTimeout(() => {
         if (inputRef.current) {
           inputRef.current.value = '';
-          inputRef.current.focus();
+          if (activeUsePhysicalScanner) {
+            inputRef.current.focus();
+          }
         }
       }, 100);
       return () => clearTimeout(timer);
     }
-  }, [open]);
+  }, [open, activeUsePhysicalScanner]);
   
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -175,7 +177,9 @@ export function BarcodeScanner({
         className="sm:max-w-md"
         onOpenAutoFocus={(e) => {
           e.preventDefault();
-          inputRef.current?.focus();
+          if (activeUsePhysicalScanner) {
+            inputRef.current?.focus();
+          }
         }}
       >
         <DialogHeader>
@@ -256,7 +260,6 @@ export function BarcodeScanner({
               type="text" 
               placeholder="Escriba o escanee..."
               className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-              autoFocus
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
                   const val = (e.target as HTMLInputElement).value;
