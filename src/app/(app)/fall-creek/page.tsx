@@ -87,6 +87,23 @@ export default function FallCreekPage() {
     const [selectionAction, setSelectionAction] = React.useState<'select' | 'deselect' | null>(null);
     const [openAccordions, setOpenAccordions] = React.useState<string[]>([]);
 
+    const [activeTab, setActiveTab] = React.useState('storage');
+    const [searchQuery, setSearchQuery] = React.useState('');
+    const [highlightedCoordinate, setHighlightedCoordinate] = React.useState<{ chamberId: string; coordinate: string } | null>(null);
+
+    React.useEffect(() => {
+        if (highlightedCoordinate) {
+            const timer = setTimeout(() => setHighlightedCoordinate(null), 5000);
+            return () => clearTimeout(timer);
+        }
+    }, [highlightedCoordinate]);
+
+    const handleNavigateToCell = (chamberId: string, coordinate: string) => {
+        setActiveTab('storage');
+        setOpenAccordions(prev => Array.from(new Set([...prev, chamberId])));
+        setHighlightedCoordinate({ chamberId, coordinate });
+    };
+
     const [movementToView, setMovementToView] = React.useState<OtherFruitMovement | null>(null);
     const [editingMovement, setEditingMovement] = React.useState<OtherFruitMovement | null>(null);
     const isEditing = editingMovement !== null;
@@ -153,8 +170,8 @@ export default function FallCreekPage() {
             });
     }, [allTemperatures, selectedChamber]);
 
-    const { storedItemsByChamber, chamberOccupancy, chambersWithFallCreekStock, reservedCoords, pendingItems } = React.useMemo(() => {
-        if (!fallCreekClient) return { storedItemsByChamber: {}, chamberOccupancy: {}, chambersWithFallCreekStock: [], reservedCoords: new Set<string>(), pendingItems: [] };
+    const { storedItemsByChamber, chamberOccupancy, chambersWithFallCreekStock, reservedCoords, pendingItems, fallCreekStoredItems } = React.useMemo(() => {
+        if (!fallCreekClient) return { storedItemsByChamber: {}, chamberOccupancy: {}, chambersWithFallCreekStock: [], reservedCoords: new Set<string>(), pendingItems: [], fallCreekStoredItems: [] };
 
         const fallCreekStoredItems: StoredItem[] = (allReceptions || [])
             .filter(r => r.clientId === fallCreekClient.clientId)
@@ -180,6 +197,9 @@ export default function FallCreekPage() {
                     netWeightPerBin: 0,
                     isMixedVariety: item.isMixedVariety,
                     observation: item.observation,
+                    document: reception.document,
+                    palletId: item.palletId,
+                    storedAt: item.storedAt || reception.createdAt,
                 }))
             );
 
@@ -244,7 +264,8 @@ export default function FallCreekPage() {
             chamberOccupancy: calculatedChamberOccupancy,
             chambersWithFallCreekStock: calculatedChambersWithStock,
             reservedCoords: calculatedReservedCoords,
-            pendingItems
+            pendingItems,
+            fallCreekStoredItems
         };
 
     }, [fallCreekClient, allReceptions, allMovements, editingMovement]);
@@ -726,12 +747,16 @@ export default function FallCreekPage() {
     
     return (
         <div className="min-h-[calc(100vh-10rem)] pb-52">
-            <Tabs defaultValue="storage" className="space-y-6">
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
                 <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                     <TabsList className="bg-[#004b8d]/10 p-1">
                         <TabsTrigger value="storage" className="data-[state=active]:bg-[#004b8d] data-[state=active]:text-white">
                             <PackageCheck className="mr-2 h-4 w-4" />
                             Stock en Cámaras
+                        </TabsTrigger>
+                        <TabsTrigger value="stock-query" className="data-[state=active]:bg-[#004b8d] data-[state=active]:text-white">
+                            <Search className="mr-2 h-4 w-4" />
+                            Consulta Stock
                         </TabsTrigger>
                         <TabsTrigger value="history" className="data-[state=active]:bg-[#004b8d] data-[state=active]:text-white">
                             <History className="mr-2 h-4 w-4" />
@@ -888,7 +913,8 @@ export default function FallCreekPage() {
                                                                         row === 13 && "border-amber-500/40",
                                                                         selectionMode && isOccupied && !isReserved && "cursor-pointer hover:ring-2 hover:ring-primary",
                                                                         isReserved && "cursor-not-allowed",
-                                                                        isSelected && "ring-4 ring-[#7aba28] ring-offset-2 z-10"
+                                                                        isSelected && "ring-4 ring-[#7aba28] ring-offset-2 z-10",
+                                                                        highlightedCoordinate?.chamberId === chamberId && highlightedCoordinate?.coordinate === coord && "ring-4 ring-amber-500 border-amber-600 animate-pulse scale-105 z-20"
                                                                     )}
                                                                     style={cellStyle}
                                                                 >
@@ -1027,6 +1053,110 @@ export default function FallCreekPage() {
                                     <p className="text-sm text-muted-foreground">No hay registros de climatización para esta cámara en los últimos días.</p>
                                 </div>
                             )}
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+
+                <TabsContent value="stock-query" className="space-y-6">
+                    <Card className="border-t-4 border-t-[#004b8d]">
+                        <CardHeader className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                            <div>
+                                <CardTitle className="text-xl text-[#004b8d] flex items-center gap-2">
+                                    <Search className="h-5 w-5 text-[#7aba28]" />
+                                    Consulta de Stock de Fall Creek
+                                </CardTitle>
+                                <CardDescription>
+                                    Consulte la ubicación, Pallet ID y estado de los pallets almacenados en las cámaras.
+                                </CardDescription>
+                            </div>
+                            <div className="relative w-full md:w-80">
+                                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                                <Input
+                                    placeholder="Buscar Pallet ID, Documento, Lote..."
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    className="pl-9 border-[#004b8d]/20"
+                                />
+                            </div>
+                        </CardHeader>
+                        <CardContent>
+                            {(() => {
+                                const q = searchQuery.toLowerCase().trim();
+                                const filtered = (fallCreekStoredItems || []).filter(item => {
+                                    if (!q) return true;
+                                    const palletIdStr = String(item.palletId || '').toLowerCase();
+                                    const docStr = String(item.document || '').toLowerCase();
+                                    const lotStr = String(item.clientLotId || '').toLowerCase();
+                                    const prodStr = String(item.varietyOrProduct || '').toLowerCase();
+                                    const chamberStr = String(chambersConfig[item.chamberId]?.name || item.chamberId).toLowerCase();
+                                    const coordStr = String(item.coordinate || '').toLowerCase();
+
+                                    return palletIdStr.includes(q) ||
+                                           docStr.includes(q) ||
+                                           lotStr.includes(q) ||
+                                           prodStr.includes(q) ||
+                                           chamberStr.includes(q) ||
+                                           coordStr.includes(q);
+                                });
+
+                                return (
+                                    <div className="rounded-md border">
+                                        <Table>
+                                            <TableHeader>
+                                                <TableRow>
+                                                    <TableHead>Fecha Almacenamiento</TableHead>
+                                                    <TableHead>Pallet Log (Documento)</TableHead>
+                                                    <TableHead>Pallet ID</TableHead>
+                                                    <TableHead>Lote Cliente</TableHead>
+                                                    <TableHead>Variedad</TableHead>
+                                                    <TableHead>Cámara</TableHead>
+                                                    <TableHead>Ubicación</TableHead>
+                                                    <TableHead>Cantidad (Bins)</TableHead>
+                                                    <TableHead className="text-right">Acciones</TableHead>
+                                                </TableRow>
+                                            </TableHeader>
+                                            <TableBody>
+                                                {filtered.length > 0 ? (
+                                                    filtered.map((item) => {
+                                                        const storedDate = item.storedAt?.toDate 
+                                                            ? item.storedAt.toDate().toLocaleDateString() 
+                                                            : (item.storedAt ? new Date(item.storedAt).toLocaleDateString() : 'Sin fecha');
+                                                        return (
+                                                            <TableRow key={item.id}>
+                                                                <TableCell>{storedDate}</TableCell>
+                                                                <TableCell className="font-mono text-xs">{item.document || '-'}</TableCell>
+                                                                <TableCell className="font-mono text-xs font-bold">{item.palletId || '-'}</TableCell>
+                                                                <TableCell className="font-mono text-xs">{item.clientLotId || '-'}</TableCell>
+                                                                <TableCell>{item.varietyOrProduct}</TableCell>
+                                                                <TableCell>{chambersConfig[item.chamberId]?.name || item.chamberId}</TableCell>
+                                                                <TableCell className="font-mono font-bold text-[#004b8d]">{item.coordinate}</TableCell>
+                                                                <TableCell className="font-semibold">{item.quantity}</TableCell>
+                                                                <TableCell className="text-right">
+                                                                    <Button 
+                                                                        variant="outline" 
+                                                                        size="sm" 
+                                                                        className="h-7 text-xs border-[#004b8d]/20 hover:bg-[#004b8d]/10"
+                                                                        onClick={() => handleNavigateToCell(item.chamberId, item.coordinate)}
+                                                                    >
+                                                                        <Eye className="mr-1 h-3.5 w-3.5 text-[#004b8d]" />
+                                                                        Ver en Cámara
+                                                                    </Button>
+                                                                </TableCell>
+                                                            </TableRow>
+                                                        );
+                                                    })
+                                                ) : (
+                                                    <TableRow>
+                                                        <TableCell colSpan={9} className="h-24 text-center text-muted-foreground">
+                                                            No se encontraron pallets o bins con los criterios ingresados.
+                                                        </TableCell>
+                                                    </TableRow>
+                                                )}
+                                            </TableBody>
+                                        </Table>
+                                    </div>
+                                );
+                            })()}
                         </CardContent>
                     </Card>
                 </TabsContent>
