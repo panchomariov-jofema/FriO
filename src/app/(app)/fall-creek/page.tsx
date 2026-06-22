@@ -203,9 +203,10 @@ export default function FallCreekPage() {
                 }))
             );
 
-        if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
-            fallCreekStoredItems.push(...mockStoredItems);
-        }
+        // Comentado para salir en vivo sin mock data local
+        // if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
+        //     fallCreekStoredItems.push(...mockStoredItems);
+        // }
         
         const pendingItems: PendingItem[] = (allReceptions || [])
             .filter(r => r.clientId === fallCreekClient.clientId && (r.status === 'Recibido' || r.status === 'Parcialmente Almacenado'))
