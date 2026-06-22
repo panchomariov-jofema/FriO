@@ -32,12 +32,12 @@ export default function OtrosHortofruticolasPage() {
     
     const pendingStorageCount = React.useMemo(() => {
         const fruitCount = (otherFruitReceptions || [])
-            .flatMap(reception => reception.items)
-            .filter(item => item.status === 'Pendiente de almacenar')
+            .flatMap(reception => reception.items || [])
+            .filter(item => item && item.status === 'Pendiente de almacenar')
             .length;
         const packagingCount = (packagingReceptions || [])
-            .flatMap(reception => reception.items)
-            .filter(item => item.status === 'Pendiente de almacenar')
+            .flatMap(reception => reception.items || [])
+            .filter(item => item && item.status === 'Pendiente de almacenar')
             .length;
         return fruitCount + packagingCount;
     }, [otherFruitReceptions, packagingReceptions]);

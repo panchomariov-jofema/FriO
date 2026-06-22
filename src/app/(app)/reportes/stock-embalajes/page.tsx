@@ -45,8 +45,8 @@ export default function PackagingStockReportPage() {
     const flattenedData = React.useMemo(() => {
         if (!data) return [];
         return data.flatMap(reception => 
-            reception.items
-                .filter(item => item.status === 'Almacenado')
+            (reception.items || [])
+                .filter(item => item && item.status === 'Almacenado')
                 .map(item => ({
                     id: `${reception.id}-${item.packagingMasterCode}`,
                     clientName: reception.clientName,

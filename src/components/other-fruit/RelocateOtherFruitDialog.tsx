@@ -81,8 +81,11 @@ export function RelocateOtherFruitDialog({
 
     const isChamberRow13Enabled = !!chamberSettings?.find(s => s.id === targetChamberId)?.row13Enabled;
     if (isChamberRow13Enabled) {
-      const row13Coords = chamberConfig.columns.map(col => `${col.name}13`);
-      allPossibleCoords = [...allPossibleCoords, ...row13Coords].sort(naturalSort);
+      const allowedComodinColumns = ['A', 'B', 'C', 'H', 'I', 'J'];
+      const extraCoords = chamberConfig.columns
+        .filter(col => allowedComodinColumns.includes(col.name))
+        .flatMap(col => [`${col.name}13`, `${col.name}14`]);
+      allPossibleCoords = [...allPossibleCoords, ...extraCoords].sort(naturalSort);
     }
 
     // 1. Calculate current occupancy for all coordinates in target chamber

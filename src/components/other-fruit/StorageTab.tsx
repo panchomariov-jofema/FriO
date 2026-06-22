@@ -601,8 +601,9 @@ export function OtherFruitStorageTab({ clientId: fixedClientId }: { clientId?: s
         setScanValue('');
     } else {
         // Check if it was already stored
-        const storedItem = otherFruitReceptions?.flatMap(r => r.items)
+        const storedItem = otherFruitReceptions?.flatMap(r => r.items || [])
             .find(item => 
+                item && 
                 item.status === 'Almacenado' && 
                 (item.palletId?.toUpperCase() === cleanVal || item.containerId?.toUpperCase() === cleanVal || item.productCode?.toUpperCase() === cleanVal)
             );

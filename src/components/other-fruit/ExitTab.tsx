@@ -323,7 +323,7 @@ export function OtherFruitExitTab({ clientId: fixedClientId }: { clientId?: stri
                     unit: originalReception.unit,
                     productCode: itemToUpdate.productCode,
                     productName: itemToUpdate.productName,
-                    clientLotId: itemToUpdate.clientLotId,
+                    clientLotId: itemToUpdate.clientLotId || null,
                     location: {
                         chamberId: itemToUpdate.storageLocation?.chamberId || '',
                         coordinate: itemToUpdate.storageLocation?.coordinate || ''

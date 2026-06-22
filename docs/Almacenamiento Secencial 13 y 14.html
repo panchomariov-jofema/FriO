@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FriO — FallCreek · 12 Camiones</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:#0f1117;color:#e0e0e0;font-family:'Segoe UI',sans-serif;display:flex;flex-direction:column;align-items:center;min-height:100vh;padding:20px;}
+h1{font-size:1.05rem;color:#4fc3f7;margin-bottom:4px;letter-spacing:.05em;text-transform:uppercase;}
+.sub{font-size:.7rem;color:#778;margin-bottom:12px;text-align:center;line-height:1.9;}
+.top-bar{width:100%;max-width:720px;display:flex;justify-content:space-between;align-items:center;background:#1a1d26;border:1px solid #2a2d3a;border-radius:8px;padding:8px 16px;margin-bottom:10px;font-size:.72rem;}
+.cam{color:#4fc3f7;font-weight:700;font-size:.85rem;} .stock{color:#66bb6a;font-weight:700;}
+.legend-wrap{width:100%;max-width:720px;background:#1a1d26;border:1px solid #2a2d3a;border-radius:8px;padding:10px 14px;margin-bottom:10px;}
+.legend-title{font-size:.62rem;color:#556;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px;}
+.legend-grid{display:flex;flex-wrap:wrap;gap:7px;}
+.legend-item{display:flex;align-items:center;gap:5px;font-size:.68rem;}
+.legend-box{width:16px;height:16px;border-radius:3px;flex-shrink:0;}
+
+.camera-wrap{background:#1a1d26;border:1px solid #2a2d3a;border-radius:10px;padding:14px 14px 10px;width:100%;max-width:720px;}
+.col-headers{display:grid;grid-template-columns:28px repeat(10,1fr) 28px;gap:2px;margin-bottom:4px;}
+.col-headers span{text-align:center;font-size:.62rem;color:#667;font-weight:800;}
+.grid-area{display:flex;flex-direction:column;gap:2px;}
+.grid-row{display:grid;grid-template-columns:28px repeat(10,1fr) 28px;gap:2px;}
+.row-label{display:flex;align-items:center;justify-content:center;font-size:.52rem;color:#556;font-weight:700;}
+
+/* Comodin section */
+.comodin-section{margin-top:8px;}
+.comodin-divider{height:2px;background:linear-gradient(90deg,transparent,#ffb74d88,#ffb74d,#ffb74d88,transparent);margin:5px 0 4px;border-radius:2px;}
+.comodin-label{font-size:.58rem;color:#ffb74d;text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px;padding-left:30px;}
+/* Two comodin blocks side by side */
+.comodin-row{display:grid;grid-template-columns:28px repeat(10,1fr) 28px;gap:2px;}
+.row-label.cm{color:#ffb74d88;}
+
+.cell{height:30px;border-radius:4px;border:1px dashed #2a2d3a;background:#1e2130;transition:transform .12s,box-shadow .12s;position:relative;overflow:hidden;}
+.cell.inactive{background:#111318;border:1px dashed #1a1c22;pointer-events:none;}
+.cell.cm{border-color:#ffb74d33;background:#1c1a10;}
+.cell .cl{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:.4rem;color:#3a3d4a;font-weight:700;pointer-events:none;z-index:2;transition:opacity .2s;}
+.cell.cm .cl{color:#ffb74d44;}
+.cell .fill{position:absolute;inset:0;opacity:0;transition:opacity .25s;}
+.cell .ll{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:.42rem;color:rgba(255,255,255,.92);font-weight:900;text-shadow:0 0 5px rgba(0,0,0,.9);pointer-events:none;z-index:3;}
+.cell.active{transform:scale(1.16);box-shadow:0 0 18px rgba(255,255,255,.7);z-index:10;border-color:#fff!important;}
+.cell.filled .cl{opacity:.15;}
+.cell.lote-end{outline:2.5px solid rgba(255,255,255,.85)!important;outline-offset:-2px;}
+
+.door-label{text-align:center;margin-top:8px;font-size:.68rem;color:#4fc3f7;font-weight:700;}
+
+.progress-wrap{width:100%;max-width:720px;margin-top:10px;background:#1a1d26;border:1px solid #2a2d3a;border-radius:8px;padding:10px 16px;}
+.progress-label{font-size:.65rem;color:#667;margin-bottom:5px;display:flex;justify-content:space-between;}
+.progress-bar-bg{background:#252836;border-radius:4px;height:9px;overflow:hidden;}
+.progress-bar-fill{height:100%;border-radius:4px;background:linear-gradient(90deg,#1565c0,#4fc3f7,#66bb6a);transition:width .15s;width:0%;}
+.phase-banner{margin-top:10px;width:100%;max-width:720px;border-radius:8px;padding:10px 16px;text-align:center;font-size:.82rem;font-weight:700;background:#1a1d26;border:1px solid #2a2d3a;color:#556;transition:all .3s;}
+.phase-banner.lote-end{background:#0a2e0a;border-color:#66bb6a;color:#a5d6a7;}
+.phase-banner.col-change{background:#0d2040;border-color:#1976d2;color:#90caf9;}
+.phase-banner.zone-change{background:#2a1e00;border-color:#ffb74d;color:#ffcc80;}
+.phase-banner.done{background:#0a1a2a;border-color:#4fc3f7;color:#4fc3f7;}
+.info-bar{margin-top:10px;background:#1a1d26;border:1px solid #2a2d3a;border-radius:8px;padding:10px 16px;width:100%;max-width:720px;display:grid;grid-template-columns:repeat(5,1fr);gap:8px;text-align:center;}
+.info-item label{display:block;font-size:.58rem;color:#556;text-transform:uppercase;}
+.info-item span{font-size:.9rem;font-weight:700;}
+.controls{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap;justify-content:center;}
+button{padding:9px 20px;border-radius:6px;border:none;cursor:pointer;font-size:.78rem;font-weight:600;}
+.btn-play{background:#1976d2;color:#fff;} .btn-reset{background:#37474f;color:#cfd8dc;}
+.btn-speed{background:#1e2130;color:#90a4ae;border:1px solid #2a2d3a;font-size:.7rem;}
+.btn-speed.active{background:#37474f;color:#fff;border-color:#546e7a;}
+</style>
+</head>
+<body>
+<h1>FriO — FallCreek · 12 Camiones · Cámara Chica</h1>
+<p class="sub">
+  10 camiones en filas 1–11 · Camión 11 en fila 12+A13 · Camión 12 en bloques comodín A–C / H–J<br>
+  <strong>132 coords × 6 bins = 792 bins · 12 camiones exactos · 0 mezclas</strong>
+</p>
+<div class="top-bar">
+  <span class="cam">FALLCREAK · CÁMARA CHICA</span>
+  <span class="stock" id="stock-label">0 / 132 coords (0.0%)</span>
+</div>
+<div class="legend-wrap">
+  <div class="legend-title">12 Camiones · 66 bins c/u · 1 color por camión</div>
+  <div class="legend-grid" id="legend-grid"></div>
+</div>
+
+<div class="camera-wrap">
+  <div class="col-headers"><span></span><span>A</span><span>B</span><span>C</span><span>D</span><span>E</span><span>F</span><span>G</span><span>H</span><span>I</span><span>J</span><span></span></div>
+  <div class="grid-area" id="grid-main"></div>
+
+  <div class="comodin-section">
+    <div class="comodin-divider"></div>
+    <div class="comodin-label">⭐ Comodín — Bloque A–C y H–J (filas 13–14)</div>
+    <div class="grid-area" id="grid-comodin"></div>
+  </div>
+
+  <div class="door-label">▼ ACCESO — Fila 1</div>
+</div>
+
+<div class="progress-wrap">
+  <div class="progress-label"><span>Progreso llenado</span><span id="pct-label">0%</span></div>
+  <div class="progress-bar-bg"><div class="progress-bar-fill" id="prog-fill"></div></div>
+</div>
+<div class="phase-banner" id="phase-banner">Presiona ▶ Play para iniciar</div>
+<div class="info-bar">
+  <div class="info-item"><label>Coordenada</label><span id="info-coord">—</span></div>
+  <div class="info-item"><label>Camión</label><span id="info-lote">—</span></div>
+  <div class="info-item"><label>Zona</label><span id="info-zona">—</span></div>
+  <div class="info-item"><label>Paso</label><span id="info-step">0/132</span></div>
+  <div class="info-item"><label>Bins acum.</label><span id="info-bins">0</span></div>
+</div>
+<div class="controls">
+  <button class="btn-play" id="btn-play" onclick="togglePlay()">▶ Play</button>
+  <button class="btn-reset" onclick="resetAnim()">↺ Reset</button>
+  <button class="btn-speed active" id="spd-1" onclick="setSpeed(1)">1×</button>
+  <button class="btn-speed" id="spd-2" onclick="setSpeed(2)">2×</button>
+  <button class="btn-speed" id="spd-5" onclick="setSpeed(5)">5×</button>
+  <button class="btn-speed" id="spd-10" onclick="setSpeed(10)">10×</button>
+</div>
+
+<script>
+const COLS=['A','B','C','D','E','F','G','H','I','J'];
+const SEQUENCE=[["A", 1], ["A", 2], ["A", 3], ["A", 4], ["A", 5], ["A", 6], ["A", 7], ["A", 8], ["A", 9], ["A", 10], ["A", 11], ["B", 1], ["B", 2], ["B", 3], ["B", 4], ["B", 5], ["B", 6], ["B", 7], ["B", 8], ["B", 9], ["B", 10], ["B", 11], ["C", 1], ["C", 2], ["C", 3], ["C", 4], ["C", 5], ["C", 6], ["C", 7], ["C", 8], ["C", 9], ["C", 10], ["C", 11], ["D", 1], ["D", 2], ["D", 3], ["D", 4], ["D", 5], ["D", 6], ["D", 7], ["D", 8], ["D", 9], ["D", 10], ["D", 11], ["E", 1], ["E", 2], ["E", 3], ["E", 4], ["E", 5], ["E", 6], ["E", 7], ["E", 8], ["E", 9], ["E", 10], ["E", 11], ["F", 1], ["F", 2], ["F", 3], ["F", 4], ["F", 5], ["F", 6], ["F", 7], ["F", 8], ["F", 9], ["F", 10], ["F", 11], ["G", 1], ["G", 2], ["G", 3], ["G", 4], ["G", 5], ["G", 6], ["G", 7], ["G", 8], ["G", 9], ["G", 10], ["G", 11], ["H", 1], ["H", 2], ["H", 3], ["H", 4], ["H", 5], ["H", 6], ["H", 7], ["H", 8], ["H", 9], ["H", 10], ["H", 11], ["I", 1], ["I", 2], ["I", 3], ["I", 4], ["I", 5], ["I", 6], ["I", 7], ["I", 8], ["I", 9], ["I", 10], ["I", 11], ["J", 1], ["J", 2], ["J", 3], ["J", 4], ["J", 5], ["J", 6], ["J", 7], ["J", 8], ["J", 9], ["J", 10], ["J", 11], ["A", 12], ["B", 12], ["C", 12], ["D", 12], ["E", 12], ["F", 12], ["G", 12], ["H", 12], ["I", 12], ["J", 12], ["A", 13], ["B", 13], ["C", 13], ["H", 13], ["I", 13], ["J", 13], ["H", 14], ["I", 14], ["J", 14], ["A", 14], ["B", 14], ["C", 14]];
+const COORD_DATA={"A1": {"type": "pure", "lote": 1, "color": "#1565C0"}, "A2": {"type": "pure", "lote": 1, "color": "#1565C0"}, "A3": {"type": "pure", "lote": 1, "color": "#1565C0"}, "A4": {"type": "pure", "lote": 1, "color": "#1565C0"}, "A5": {"type": "pure", "lote": 1, "color": "#1565C0"}, "A6": {"type": "pure", "lote": 1, "color": "#1565C0"}, "A7": {"type": "pure", "lote": 1, "color": "#1565C0"}, "A8": {"type": "pure", "lote": 1, "color": "#1565C0"}, "A9": {"type": "pure", "lote": 1, "color": "#1565C0"}, "A10": {"type": "pure", "lote": 1, "color": "#1565C0"}, "A11": {"type": "pure", "lote": 1, "color": "#1565C0"}, "B1": {"type": "pure", "lote": 2, "color": "#0097A7"}, "B2": {"type": "pure", "lote": 2, "color": "#0097A7"}, "B3": {"type": "pure", "lote": 2, "color": "#0097A7"}, "B4": {"type": "pure", "lote": 2, "color": "#0097A7"}, "B5": {"type": "pure", "lote": 2, "color": "#0097A7"}, "B6": {"type": "pure", "lote": 2, "color": "#0097A7"}, "B7": {"type": "pure", "lote": 2, "color": "#0097A7"}, "B8": {"type": "pure", "lote": 2, "color": "#0097A7"}, "B9": {"type": "pure", "lote": 2, "color": "#0097A7"}, "B10": {"type": "pure", "lote": 2, "color": "#0097A7"}, "B11": {"type": "pure", "lote": 2, "color": "#0097A7"}, "C1": {"type": "pure", "lote": 3, "color": "#2E7D32"}, "C2": {"type": "pure", "lote": 3, "color": "#2E7D32"}, "C3": {"type": "pure", "lote": 3, "color": "#2E7D32"}, "C4": {"type": "pure", "lote": 3, "color": "#2E7D32"}, "C5": {"type": "pure", "lote": 3, "color": "#2E7D32"}, "C6": {"type": "pure", "lote": 3, "color": "#2E7D32"}, "C7": {"type": "pure", "lote": 3, "color": "#2E7D32"}, "C8": {"type": "pure", "lote": 3, "color": "#2E7D32"}, "C9": {"type": "pure", "lote": 3, "color": "#2E7D32"}, "C10": {"type": "pure", "lote": 3, "color": "#2E7D32"}, "C11": {"type": "pure", "lote": 3, "color": "#2E7D32"}, "D1": {"type": "pure", "lote": 4, "color": "#F57F17"}, "D2": {"type": "pure", "lote": 4, "color": "#F57F17"}, "D3": {"type": "pure", "lote": 4, "color": "#F57F17"}, "D4": {"type": "pure", "lote": 4, "color": "#F57F17"}, "D5": {"type": "pure", "lote": 4, "color": "#F57F17"}, "D6": {"type": "pure", "lote": 4, "color": "#F57F17"}, "D7": {"type": "pure", "lote": 4, "color": "#F57F17"}, "D8": {"type": "pure", "lote": 4, "color": "#F57F17"}, "D9": {"type": "pure", "lote": 4, "color": "#F57F17"}, "D10": {"type": "pure", "lote": 4, "color": "#F57F17"}, "D11": {"type": "pure", "lote": 4, "color": "#F57F17"}, "E1": {"type": "pure", "lote": 5, "color": "#6A1B9A"}, "E2": {"type": "pure", "lote": 5, "color": "#6A1B9A"}, "E3": {"type": "pure", "lote": 5, "color": "#6A1B9A"}, "E4": {"type": "pure", "lote": 5, "color": "#6A1B9A"}, "E5": {"type": "pure", "lote": 5, "color": "#6A1B9A"}, "E6": {"type": "pure", "lote": 5, "color": "#6A1B9A"}, "E7": {"type": "pure", "lote": 5, "color": "#6A1B9A"}, "E8": {"type": "pure", "lote": 5, "color": "#6A1B9A"}, "E9": {"type": "pure", "lote": 5, "color": "#6A1B9A"}, "E10": {"type": "pure", "lote": 5, "color": "#6A1B9A"}, "E11": {"type": "pure", "lote": 5, "color": "#6A1B9A"}, "F1": {"type": "pure", "lote": 6, "color": "#C62828"}, "F2": {"type": "pure", "lote": 6, "color": "#C62828"}, "F3": {"type": "pure", "lote": 6, "color": "#C62828"}, "F4": {"type": "pure", "lote": 6, "color": "#C62828"}, "F5": {"type": "pure", "lote": 6, "color": "#C62828"}, "F6": {"type": "pure", "lote": 6, "color": "#C62828"}, "F7": {"type": "pure", "lote": 6, "color": "#C62828"}, "F8": {"type": "pure", "lote": 6, "color": "#C62828"}, "F9": {"type": "pure", "lote": 6, "color": "#C62828"}, "F10": {"type": "pure", "lote": 6, "color": "#C62828"}, "F11": {"type": "pure", "lote": 6, "color": "#C62828"}, "G1": {"type": "pure", "lote": 7, "color": "#00695C"}, "G2": {"type": "pure", "lote": 7, "color": "#00695C"}, "G3": {"type": "pure", "lote": 7, "color": "#00695C"}, "G4": {"type": "pure", "lote": 7, "color": "#00695C"}, "G5": {"type": "pure", "lote": 7, "color": "#00695C"}, "G6": {"type": "pure", "lote": 7, "color": "#00695C"}, "G7": {"type": "pure", "lote": 7, "color": "#00695C"}, "G8": {"type": "pure", "lote": 7, "color": "#00695C"}, "G9": {"type": "pure", "lote": 7, "color": "#00695C"}, "G10": {"type": "pure", "lote": 7, "color": "#00695C"}, "G11": {"type": "pure", "lote": 7, "color": "#00695C"}, "H1": {"type": "pure", "lote": 8, "color": "#4527A0"}, "H2": {"type": "pure", "lote": 8, "color": "#4527A0"}, "H3": {"type": "pure", "lote": 8, "color": "#4527A0"}, "H4": {"type": "pure", "lote": 8, "color": "#4527A0"}, "H5": {"type": "pure", "lote": 8, "color": "#4527A0"}, "H6": {"type": "pure", "lote": 8, "color": "#4527A0"}, "H7": {"type": "pure", "lote": 8, "color": "#4527A0"}, "H8": {"type": "pure", "lote": 8, "color": "#4527A0"}, "H9": {"type": "pure", "lote": 8, "color": "#4527A0"}, "H10": {"type": "pure", "lote": 8, "color": "#4527A0"}, "H11": {"type": "pure", "lote": 8, "color": "#4527A0"}, "I1": {"type": "pure", "lote": 9, "color": "#558B2F"}, "I2": {"type": "pure", "lote": 9, "color": "#558B2F"}, "I3": {"type": "pure", "lote": 9, "color": "#558B2F"}, "I4": {"type": "pure", "lote": 9, "color": "#558B2F"}, "I5": {"type": "pure", "lote": 9, "color": "#558B2F"}, "I6": {"type": "pure", "lote": 9, "color": "#558B2F"}, "I7": {"type": "pure", "lote": 9, "color": "#558B2F"}, "I8": {"type": "pure", "lote": 9, "color": "#558B2F"}, "I9": {"type": "pure", "lote": 9, "color": "#558B2F"}, "I10": {"type": "pure", "lote": 9, "color": "#558B2F"}, "I11": {"type": "pure", "lote": 9, "color": "#558B2F"}, "J1": {"type": "pure", "lote": 10, "color": "#E65100"}, "J2": {"type": "pure", "lote": 10, "color": "#E65100"}, "J3": {"type": "pure", "lote": 10, "color": "#E65100"}, "J4": {"type": "pure", "lote": 10, "color": "#E65100"}, "J5": {"type": "pure", "lote": 10, "color": "#E65100"}, "J6": {"type": "pure", "lote": 10, "color": "#E65100"}, "J7": {"type": "pure", "lote": 10, "color": "#E65100"}, "J8": {"type": "pure", "lote": 10, "color": "#E65100"}, "J9": {"type": "pure", "lote": 10, "color": "#E65100"}, "J10": {"type": "pure", "lote": 10, "color": "#E65100"}, "J11": {"type": "pure", "lote": 10, "color": "#E65100"}, "A12": {"type": "pure", "lote": 11, "color": "#1976D2"}, "B12": {"type": "pure", "lote": 11, "color": "#1976D2"}, "C12": {"type": "pure", "lote": 11, "color": "#1976D2"}, "D12": {"type": "pure", "lote": 11, "color": "#1976D2"}, "E12": {"type": "pure", "lote": 11, "color": "#1976D2"}, "F12": {"type": "pure", "lote": 11, "color": "#1976D2"}, "G12": {"type": "pure", "lote": 11, "color": "#1976D2"}, "H12": {"type": "pure", "lote": 11, "color": "#1976D2"}, "I12": {"type": "pure", "lote": 11, "color": "#1976D2"}, "J12": {"type": "pure", "lote": 11, "color": "#1976D2"}, "A13": {"type": "pure", "lote": 11, "color": "#1976D2"}, "B13": {"type": "pure", "lote": 12, "color": "#00838F"}, "C13": {"type": "pure", "lote": 12, "color": "#00838F"}, "H13": {"type": "pure", "lote": 12, "color": "#00838F"}, "I13": {"type": "pure", "lote": 12, "color": "#00838F"}, "J13": {"type": "pure", "lote": 12, "color": "#00838F"}, "H14": {"type": "pure", "lote": 12, "color": "#00838F"}, "I14": {"type": "pure", "lote": 12, "color": "#00838F"}, "J14": {"type": "pure", "lote": 12, "color": "#00838F"}, "A14": {"type": "pure", "lote": 12, "color": "#00838F"}, "B14": {"type": "pure", "lote": 12, "color": "#00838F"}, "C14": {"type": "pure", "lote": 12, "color": "#00838F"}};
+const LOTE_COLORS=["#1565C0", "#0097A7", "#2E7D32", "#F57F17", "#6A1B9A", "#C62828", "#00695C", "#4527A0", "#558B2F", "#E65100", "#1976D2", "#00838F"];
+const LOTE_END_KEYS=new Set(["A13", "I11", "G11", "H11", "E11", "A11", "B11", "F11", "D11", "J11", "C14", "C11"]);
+const COMODIN_IZQ=new Set(["A13", "C13", "C14", "B13", "A14", "B14"]);
+const COMODIN_DER=new Set(["I14", "J14", "J13", "H14", "H13", "I13"]);
+const COMODIN_ALL=new Set([...COMODIN_IZQ,...COMODIN_DER]);
+const TOTAL=132,TOTAL_BINS=792,CAP=6,LOTE_SIZE=66;
+const coordBinEnd=[];
+let ac=0;SEQUENCE.forEach(()=>{ac+=CAP;coordBinEnd.push(ac);});
+
+// Legend
+const lg=document.getElementById('legend-grid');
+for(let i=1;i<=12;i++){
+  const it=document.createElement('div');it.className='legend-item';
+  const bx=document.createElement('div');bx.className='legend-box';
+  const cl=LOTE_COLORS[i-1];bx.style.background=cl;bx.style.border='1px solid '+cl+'88';
+  const lb=document.createElement('span');lb.textContent='🚛 Camión '+i+' (66 bins)';
+  it.appendChild(bx);it.appendChild(lb);lg.appendChild(it);
+}
+
+const cells={};
+function makeCell(col,row){
+  const isCm=COMODIN_ALL.has(col+row);
+  const cell=document.createElement('div');cell.className='cell'+(isCm?' cm':'');
+  const cl=document.createElement('div');cl.className='cl';cl.textContent=col+row;
+  const fill=document.createElement('div');fill.className='fill';
+  const ll=document.createElement('div');ll.className='ll';
+  cell.appendChild(cl);cell.appendChild(fill);cell.appendChild(ll);
+  cells[col+row]=cell;return cell;
+}
+function makeInactive(){const d=document.createElement('div');d.className='cell inactive';return d;}
+function makeLabel(t,cm){const d=document.createElement('div');d.className='row-label'+(cm?' cm':'');d.textContent=t;return d;}
+
+// Main grid filas 1-12
+const gm=document.getElementById('grid-main');
+for(let row=1;row<=12;row++){
+  const re=document.createElement('div');re.className='grid-row';
+  re.appendChild(makeLabel(row,false));
+  for(const col of COLS) re.appendChild(makeCell(col,row));
+  re.appendChild(makeLabel(row,false));
+  gm.appendChild(re);
+}
+
+// Comodin filas 13-14 con bloques A-C y H-J activos, D-G inactivos
+const gc=document.getElementById('grid-comodin');
+const IZQ=['A','B','C'];const DER=['H','I','J'];const MID=['D','E','F','G'];
+for(let row=13;row<=14;row++){
+  const re=document.createElement('div');re.className='grid-row';
+  re.appendChild(makeLabel(row,true));
+  for(const col of COLS){
+    if(IZQ.includes(col)||DER.includes(col)) re.appendChild(makeCell(col,row));
+    else re.appendChild(makeInactive());
+  }
+  re.appendChild(makeLabel(row,true));
+  gc.appendChild(re);
+}
+
+let curStep=0,playing=false,timer=null,speed=1,prevActive=null,lastCol=null,prevRow=null;
+function getDelay(){return Math.max(18,230/speed);}
+function getZona(row){return row<=12?'📦 Principal':'⭐ Comodín';}
+
+function tick(){
+  if(prevActive){prevActive.classList.remove('active');prevActive=null;}
+  if(curStep>=TOTAL){
+    playing=false;clearInterval(timer);
+    document.getElementById('btn-play').textContent='▶ Play';
+    const b=document.getElementById('phase-banner');
+    b.className='phase-banner done';
+    b.textContent='✅ Cámara llena — 12 camiones FallCreek · 792 bins · 0 mezclas';
+    return;
+  }
+  const[col,row]=SEQUENCE[curStep];
+  const key=col+row;
+  const data=COORD_DATA[key];
+  const cell=cells[key];
+  const binEnd=coordBinEnd[curStep];
+
+  cell.querySelector('.fill').style.background=data.color;
+  cell.querySelector('.fill').style.opacity='1';
+  cell.querySelector('.ll').textContent='🚛'+data.lote;
+  cell.classList.add('active','filled');
+  if(LOTE_END_KEYS.has(key))cell.classList.add('lote-end');
+  prevActive=cell;
+
+  const pct=(binEnd/TOTAL_BINS*100).toFixed(1);
+  document.getElementById('info-coord').textContent=key;
+  document.getElementById('info-lote').textContent='Camión '+data.lote;
+  document.getElementById('info-zona').textContent=getZona(row);
+  document.getElementById('info-step').textContent=(curStep+1)+'/132';
+  document.getElementById('info-bins').textContent=binEnd;
+  document.getElementById('stock-label').textContent=(curStep+1)+' / 132 coords ('+pct+'%)';
+  document.getElementById('pct-label').textContent=pct+'%';
+  document.getElementById('prog-fill').style.width=pct+'%';
+
+  const b=document.getElementById('phase-banner');
+  if(LOTE_END_KEYS.has(key)){
+    b.className='phase-banner lote-end';
+    b.textContent=`✅ CAMIÓN ${data.lote} COMPLETO — 66 bins · Cierra en ${key}`;
+  }else if(row>=13&&(prevRow===null||prevRow<13)){
+    b.className='phase-banner zone-change';
+    b.textContent=`⭐ Zona Comodín — Camión ${data.lote} · Bloques A–C y H–J`;
+  }else if(col!==lastCol){
+    b.className='phase-banner col-change';
+    b.textContent=`▶ Columna ${col} — Camión ${data.lote} · ${getZona(row)}`;
+    lastCol=col;
+  }else{
+    b.className='phase-banner';
+    b.style.borderColor=data.color+'88';b.style.color=data.color;b.style.background='#1a1d26';
+    b.textContent=`${key} · Camión ${data.lote} · ${getZona(row)} · ${binEnd} bins acum.`;
+  }
+  prevRow=row;curStep++;
+}
+
+function togglePlay(){
+  if(playing){playing=false;clearInterval(timer);document.getElementById('btn-play').textContent='▶ Play';}
+  else{playing=true;document.getElementById('btn-play').textContent='⏸ Pausa';timer=setInterval(tick,getDelay());}
+}
+function resetAnim(){
+  playing=false;clearInterval(timer);curStep=0;prevActive=null;lastCol=null;prevRow=null;
+  document.getElementById('btn-play').textContent='▶ Play';
+  for(const k in cells){
+    const c=cells[k];c.classList.remove('active','filled','lote-end');
+    c.querySelector('.fill').style.opacity='0';c.querySelector('.ll').textContent='';
+  }
+  ['info-coord','info-lote','info-zona','info-bins'].forEach(id=>document.getElementById(id).textContent='—');
+  document.getElementById('info-step').textContent='0/132';
+  document.getElementById('stock-label').textContent='0 / 132 coords (0.0%)';
+  document.getElementById('pct-label').textContent='0%';
+  document.getElementById('prog-fill').style.width='0%';
+  const b=document.getElementById('phase-banner');b.className='phase-banner';b.style.cssText='';
+  b.textContent='Presiona ▶ Play para iniciar';
+}
+function setSpeed(s){
+  speed=s;
+  ['spd-1','spd-2','spd-5','spd-10'].forEach(id=>{const el=document.getElementById(id);if(el)el.classList.remove('active');});
+  document.getElementById('spd-'+s).classList.add('active');
+  if(playing){clearInterval(timer);timer=setInterval(tick,getDelay());}
+}
+</script>
+</body>
+</html>

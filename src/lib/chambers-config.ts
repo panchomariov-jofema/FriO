@@ -16,14 +16,17 @@ const columns4to6 = [
     { name: 'M', id: 'M' }, { name: 'N', id: 'N' }, { name: 'O', id: 'O' }
 ];
 
-const rows = Array.from({ length: 13 }, (_, i) => i + 1);
+const rows = Array.from({ length: 14 }, (_, i) => i + 1);
 
-const generateRow13Blocked = (columns: { name: string }[]) => {
-    return columns.map(c => `${c.name}13`);
+const generateComodinBlocked = (columns: { name: string }[]) => {
+    return [
+        ...columns.map(c => `${c.name}13`),
+        ...columns.map(c => `${c.name}14`)
+    ];
 };
 
-const blocked1to3 = generateRow13Blocked(columns1to3);
-const blocked4to6 = generateRow13Blocked(columns4to6);
+const blocked1to3 = generateComodinBlocked(columns1to3);
+const blocked4to6 = generateComodinBlocked(columns4to6);
 
 export const chambersConfig: ChambersConfig = {
     'CAMARA-1': {

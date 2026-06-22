@@ -175,9 +175,9 @@ export default function FallCreekPage() {
 
         const fallCreekStoredItems: StoredItem[] = (allReceptions || [])
             .filter(r => r.clientId === fallCreekClient.clientId)
-            .flatMap(reception => reception.items
+            .flatMap(reception => (reception.items || [])
                 .map((item, index) => ({ item, index }))
-                .filter(({ item }) => item.status === 'Almacenado' && item.storageLocation?.chamberId && item.storageLocation?.coordinate && item.quantity > 0)
+                .filter(({ item }) => item && item.status === 'Almacenado' && item.storageLocation?.chamberId && item.storageLocation?.coordinate && item.quantity > 0)
                 .map(({ item, index }) => ({
                     id: `${reception.id}-${index}`,
                     type: 'otherFruit' as const,
@@ -210,7 +210,7 @@ export default function FallCreekPage() {
         
         const pendingItems: PendingItem[] = (allReceptions || [])
             .filter(r => r.clientId === fallCreekClient.clientId && (r.status === 'Recibido' || r.status === 'Parcialmente Almacenado'))
-            .flatMap(reception => reception.items
+            .flatMap(reception => (reception.items || [])
                 .map((item, index) => ({ 
                     ...item, 
                     receptionId: reception.id, 
@@ -219,7 +219,7 @@ export default function FallCreekPage() {
                     document: reception.document || '',
                     unit: reception.unit as 'Bins' | 'Pallets'
                 }))
-                .filter(item => !item.storageLocation)
+                .filter(item => item && !item.storageLocation)
             );
 
         const calculatedStoredItemsByChamber = fallCreekStoredItems.reduce((acc, item) => {
@@ -825,7 +825,7 @@ export default function FallCreekPage() {
                                     const config = chambersConfig[chamberId];
                                     const occupancy = chamberOccupancy[chamberId];
                                     const isRow13Enabled = !!chamberSettings?.find(s => s.id === chamberId)?.row13Enabled;
-                                    const activeRows = isRow13Enabled ? config.rows : config.rows.filter(r => r !== 13);
+                                    const activeRows = isRow13Enabled ? config.rows : config.rows.filter(r => r !== 13 && r !== 14);
                                     return (
                                         <AccordionItem value={chamberId} key={chamberId} className="border rounded-lg mb-2 px-4">
                                             <div className="flex w-full items-center justify-between pr-4">
@@ -895,45 +895,49 @@ export default function FallCreekPage() {
                                                                     } as React.CSSProperties;
                                                                 }
                                                             }
+                                                            const isPermanentlyBlocked = (row === 13 || row === 14) && !['A', 'B', 'C', 'H', 'I', 'J'].includes(col.name);
+                                                            const isComodinRow = row === 13 || row === 14;
 
                                                             return (
                                                                 <div key={coord}
                                                                     onMouseDown={() => {
-                                                                        if (isReserved || !isOccupied) return;
+                                                                        if (isPermanentlyBlocked || isReserved || !isOccupied) return;
                                                                         handleMouseDown(chamberId, coord);
                                                                     }}
                                                                     onMouseEnter={() => {
-                                                                        if (isReserved || !isOccupied) return;
+                                                                        if (isPermanentlyBlocked || isReserved || !isOccupied) return;
                                                                         handleMouseEnter(chamberId, coord);
                                                                     }}
                                                                     className={cn(
                                                                         "h-12 w-full min-w-[60px] rounded border-2 flex items-center justify-center text-xs font-mono relative overflow-hidden transition-all",
-                                                                        isOccupied && !isMixed && "bg-[var(--lot-color-bg)] border-[var(--lot-color)]",
-                                                                        isOccupied && isMixed && "border-[var(--lot-color)]",
-                                                                        !isOccupied && "bg-background border-dashed",
-                                                                        row === 13 && "border-amber-500/40",
-                                                                        selectionMode && isOccupied && !isReserved && "cursor-pointer hover:ring-2 hover:ring-primary",
+                                                                        isPermanentlyBlocked 
+                                                                          ? 'bg-muted/10 border-muted-foreground/10 text-muted-foreground/30 pointer-events-none select-none'
+                                                                          : (isOccupied && !isMixed && "bg-[var(--lot-color-bg)] border-[var(--lot-color)] cursor-pointer"),
+                                                                        isOccupied && isMixed && !isPermanentlyBlocked && "border-[var(--lot-color)] cursor-pointer",
+                                                                        !isOccupied && !isPermanentlyBlocked && "bg-background border-dashed cursor-pointer",
+                                                                        !isPermanentlyBlocked && isComodinRow && "border-amber-500/40",
+                                                                        selectionMode && isOccupied && !isReserved && !isPermanentlyBlocked && "hover:ring-2 hover:ring-primary",
                                                                         isReserved && "cursor-not-allowed",
                                                                         isSelected && "ring-4 ring-[#7aba28] ring-offset-2 z-10",
                                                                         highlightedCoordinate?.chamberId === chamberId && highlightedCoordinate?.coordinate === coord && "ring-4 ring-amber-500 border-amber-600 animate-pulse scale-105 z-20"
                                                                     )}
-                                                                    style={cellStyle}
+                                                                    style={isPermanentlyBlocked ? {} : cellStyle}
                                                                 >
-                                                                    <span className={cn("relative z-10 font-bold", isReserved && "opacity-40")}>{coord}</span>
-                                                                    {row === 13 && (
+                                                                    <span className={cn("relative z-10 font-bold", (isReserved || isPermanentlyBlocked) && "opacity-40")}>{coord}</span>
+                                                                    {!isPermanentlyBlocked && isComodinRow && (
                                                                         <div className="absolute inset-0 bg-repeat bg-[length:12px_12px] opacity-25 z-0 pointer-events-none" style={{backgroundImage: "repeating-linear-gradient(-45deg, #f59e0b, #f59e0b 1px, transparent 1px, transparent 6px)"}} />
                                                                     )}
-                                                                    {isOccupied && itemsInCoord.some(i => i.isMixedVariety) && (
+                                                                    {isOccupied && !isPermanentlyBlocked && itemsInCoord.some(i => i.isMixedVariety) && (
                                                                         <div className="absolute top-0 right-0 p-0.5">
                                                                             <div className="h-2 w-2 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.8)]" />
                                                                         </div>
                                                                     )}
-                                                                    {isMixed && (
+                                                                    {isMixed && !isPermanentlyBlocked && (
                                                                         <div className="absolute top-0.5 left-1 z-20 bg-black/60 rounded px-0.5 text-[8px] font-black text-amber-500 leading-none shadow-[0_0_2px_rgba(0,0,0,0.5)]">
                                                                             ⚠
                                                                         </div>
                                                                     )}
-                                                                    {row === 13 && (
+                                                                    {!isPermanentlyBlocked && isComodinRow && (
                                                                         <div className="absolute bottom-0.5 right-1 z-20 bg-amber-500 text-white rounded px-0.5 text-[8px] font-black leading-none shadow-[0_0_2px_rgba(0,0,0,0.5)]">
                                                                             SOS
                                                                         </div>

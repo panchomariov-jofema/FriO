@@ -51,8 +51,8 @@ export default function OtherFruitStockReportPage() {
     const stockData = React.useMemo(() => {
         if (!receptions) return [];
         return receptions.flatMap(reception => 
-            reception.items
-                .filter(item => item.status === 'Almacenado' && item.quantity > 0 && item.storageLocation)
+            (reception.items || [])
+                .filter(item => item && item.status === 'Almacenado' && item.quantity > 0 && item.storageLocation)
                 .map((item, index) => ({
                     id: `${reception.id}-${index}`,
                     clientName: reception.clientName,

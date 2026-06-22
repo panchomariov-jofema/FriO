@@ -131,8 +131,9 @@ function DespachosPageContent() {
         .filter(lot => lot.status === 'Almacenado' && activeExporterIds.has(lot.exporterId));
 
     const storedOtherFruit = showCherryOnly ? [] : (otherFruitReceptions || [])
-        .flatMap(r => r.items.map(item => ({ ...item, reception: r })))
+        .flatMap(r => (r.items || []).map(item => ({ ...item, reception: r })))
         .filter((item) => 
+            item &&
             item.status === 'Almacenado' && 
             item.quantity > 0 && 
             item.storageLocation?.chamberId &&

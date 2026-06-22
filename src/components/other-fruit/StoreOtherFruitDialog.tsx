@@ -236,8 +236,11 @@ export function StoreOtherFruitDialog({
 
     const isChamberRow13Enabled = !!chamberSettings?.find(s => s.id === selectedChamberId)?.row13Enabled;
     if (isChamberRow13Enabled) {
-        const row13Coords = chamberConfig.columns.map(col => `${col.name}13`);
-        const availableRow13 = row13Coords.filter(coord => {
+        const allowedComodinColumns = ['A', 'B', 'C', 'H', 'I', 'J'];
+        const comodinCoords = chamberConfig.columns
+            .filter(col => allowedComodinColumns.includes(col.name))
+            .flatMap(col => [`${col.name}13`, `${col.name}14`]);
+        const availableComodines = comodinCoords.filter(coord => {
             const entry = occupancyMap.get(coord);
             if (!entry || entry.lots.length === 0) return true; // Empty
 
@@ -247,7 +250,7 @@ export function StoreOtherFruitDialog({
             const currentOccupancy = entry.lots.reduce((sum, l) => sum + l.binCount, 0);
             return currentOccupancy + unitsPerItem <= occupancyThreshold;
         });
-        available = [...available, ...availableRow13];
+        available = [...available, ...availableComodines];
     }
     
     return { availableCoordinates: available, suggestion: currentSuggestion };

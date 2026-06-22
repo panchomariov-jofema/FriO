@@ -433,8 +433,8 @@ export default function DashboardPage() {
             .reduce((sum, lot) => sum + lot.binCount, 0);
 
         const otherFruitInStock = finalOtherFruitReceptions
-            .flatMap(r => r.items.map(item => ({ ...item, unit: r.unit })))
-            .filter(item => item.status === 'Almacenado' && item.quantity > 0);
+            .flatMap(r => (r.items || []).map(item => ({ ...item, unit: r.unit })))
+            .filter(item => item && item.status === 'Almacenado' && item.quantity > 0);
 
         const otherFruitBins = otherFruitInStock
             .filter(item => item.unit === 'Bins')
@@ -452,8 +452,8 @@ export default function DashboardPage() {
         
         const otherFruitPendingStorage = finalOtherFruitReceptions
             .filter(r => r.status === 'Pendiente de almacenar' || r.status === 'Parcialmente Almacenado')
-            .flatMap(r => r.items.map(item => ({...item, unit: r.unit})))
-            .filter(item => item.status === 'Pendiente de almacenar')
+            .flatMap(r => (r.items || []).map(item => ({...item, unit: r.unit})))
+            .filter(item => item && item.status === 'Pendiente de almacenar')
             .reduce((sum, item) => {
                 if (item.unit === 'Bins') {
                     return sum + item.quantity;
@@ -501,8 +501,8 @@ export default function DashboardPage() {
                 ? []
                 : (otherFruitReceptions || [])
                     .filter(r => !selectedClient || (selectedClient.type === 'otherclient' && r.clientId === selectedClient.id))
-                    .flatMap(r => r.items.map(item => ({ ...item, unit: r.unit })))
-                    .filter(item => item.status === 'Almacenado' && item.storageLocation?.chamberId === chamberId);
+                    .flatMap(r => (r.items || []).map(item => ({ ...item, unit: r.unit })))
+                    .filter(item => item && item.status === 'Almacenado' && item.storageLocation?.chamberId === chamberId);
             
             const otherBins = otherFruitInChamberItems
                 .filter(item => item.unit === 'Bins')
@@ -596,8 +596,8 @@ export default function DashboardPage() {
         const clientReceptions = (otherFruitReceptions || []).filter(r => r.clientId === selectedClient.id);
 
         const summaryItems = clientReceptions.flatMap(reception => 
-            reception.items
-                .filter(item => item.status === 'Almacenado' && item.storageLocation?.chamberId && item.quantity > 0)
+            (reception.items || [])
+                .filter(item => item && item.status === 'Almacenado' && item.storageLocation?.chamberId && item.quantity > 0)
                 .map((item, index) => ({
                     receptionDate: reception.createdAt,
                     lot: item.clientLotId || reception.displayLotId || 'N/A',

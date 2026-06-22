@@ -191,9 +191,9 @@ export default function CamarasPage() {
             exporterId: lot.exporterId,
         })),
       ...allOtherFruitReceptions
-        .flatMap(reception => reception.items
+        .flatMap(reception => (reception.items || [])
             .map((item, index) => ({ item, index })) // Map to include original index
-            .filter(({ item }) => item.status === 'Almacenado' && item.storageLocation?.chamberId && item.storageLocation?.coordinate && item.quantity > 0)
+            .filter(({ item }) => item && item.status === 'Almacenado' && item.storageLocation?.chamberId && item.storageLocation?.coordinate && item.quantity > 0)
             .map(({ item, index }) => ({ // Use original index
                 id: `${reception.id}-${index}`,
                 type: 'otherFruit' as const,
@@ -938,7 +938,7 @@ export default function CamarasPage() {
             <Accordion type="single" collapsible className="w-full">
                 {Object.entries(chambersConfig).map(([chamberId, config]) => {
                     const isRow13Enabled = !!chamberSettings?.find(s => s.id === chamberId)?.row13Enabled;
-                    const activeRows = isRow13Enabled ? config.rows : config.rows.filter(r => r !== 13);
+                    const activeRows = isRow13Enabled ? config.rows : config.rows.filter(r => r !== 13 && r !== 14);
                     return (
                         <AccordionItem value={chamberId} key={chamberId}>
                             <div className="flex flex-col sm:flex-row w-full items-start sm:items-center justify-between pr-4">
@@ -957,7 +957,7 @@ export default function CamarasPage() {
                                                 }}
                                                 className="scale-75 data-[state=checked]:bg-amber-500"
                                             />
-                                            <label htmlFor={`row13-${chamberId}`} className="text-[10px] font-black uppercase tracking-wider text-muted-foreground cursor-pointer select-none">Fila 13</label>
+                                            <label htmlFor={`row13-${chamberId}`} className="text-[10px] font-black uppercase tracking-wider text-muted-foreground cursor-pointer select-none">Fila 13 y 14</label>
                                         </div>
                                     </div>
                                     <div className="text-left sm:text-right w-full sm:w-auto">
@@ -1087,18 +1087,25 @@ export default function CamarasPage() {
                                               }
                                           }
     
+                                          const isPermanentlyBlocked = (row === 13 || row === 14) && !['A', 'B', 'C', 'H', 'I', 'J'].includes(col.name);
+                                          const isComodinRow = row === 13 || row === 14;
+
                                           return (
                                               <Popover key={coord}>
-                                              <PopoverTrigger asChild>
+                                              <PopoverTrigger asChild disabled={isPermanentlyBlocked}>
                                                   <div 
-                                                  className={cn("h-12 w-full min-w-[60px] rounded border-2 flex items-center justify-center text-xs font-mono relative overflow-hidden cursor-pointer",
-                                                      isOccupied ? 'border-[var(--lot-color-border)] bg-[var(--lot-color-bg)]' : 'bg-background border-dashed',
-                                                      row === 13 && "border-amber-500/40"
+                                                  className={cn("h-12 w-full min-w-[60px] rounded border-2 flex items-center justify-center text-xs font-mono relative overflow-hidden",
+                                                      isPermanentlyBlocked 
+                                                        ? 'bg-muted/10 border-muted-foreground/10 text-muted-foreground/30 pointer-events-none select-none' 
+                                                        : (isOccupied ? 'border-[var(--lot-color-border)] bg-[var(--lot-color-bg)] cursor-pointer' : 'bg-background border-dashed cursor-pointer'),
+                                                      !isPermanentlyBlocked && isComodinRow && "border-amber-500/40"
                                                   )}
-                                                  style={cellStyle}
+                                                  style={isPermanentlyBlocked ? {} : cellStyle}
                                                   >
-                                                  <div className="absolute bottom-0 left-0 top-0 transition-all duration-300" style={progressStyle} />
-                                                  {row === 13 && (
+                                                  {!isPermanentlyBlocked && (
+                                                      <div className="absolute bottom-0 left-0 top-0 transition-all duration-300" style={progressStyle} />
+                                                  )}
+                                                  {!isPermanentlyBlocked && isComodinRow && (
                                                       <div className="absolute inset-0 bg-repeat bg-[length:12px_12px] opacity-25 z-0 pointer-events-none" style={{backgroundImage: "repeating-linear-gradient(-45deg, #f59e0b, #f59e0b 1px, transparent 1px, transparent 6px)"}} />
                                                   )}
                                                   {renderVarietyBorders(chamberId, colIdx, rowIdx, config)}
@@ -1108,7 +1115,7 @@ export default function CamarasPage() {
                                                           ⚠
                                                       </div>
                                                   )}
-                                                  {row === 13 && (
+                                                  {!isPermanentlyBlocked && isComodinRow && (
                                                       <div className="absolute top-0.5 left-1 z-20 bg-amber-500 text-white rounded px-0.5 text-[8px] font-black leading-none shadow-[0_0_2px_rgba(0,0,0,0.5)]">
                                                           SOS
                                                       </div>
