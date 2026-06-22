@@ -98,7 +98,7 @@ export function OtherFruitExitTab({ clientId: fixedClientId }: { clientId?: stri
   }, [producers]);
 
   const fruitClients = React.useMemo(() => {
-    const rawClients = (clients || []).filter(c => c.type.toUpperCase() === 'FRUTA');
+    const rawClients = (clients || []).filter(c => c.type && c.type.toUpperCase() === 'FRUTA');
     if (!receptions) return [];
 
     const clientsWithStock = new Set<string>();
@@ -137,7 +137,7 @@ export function OtherFruitExitTab({ clientId: fixedClientId }: { clientId?: stri
       const lotId = reception.displayLotId || reception.document || reception.id;
       if (!lotId) return;
 
-      reception.items.forEach((item, index) => {
+      (reception.items || []).forEach((item, index) => {
         if (item.status === 'Almacenado' && item.quantity > 0 && item.storageLocation?.coordinate) {
           const displayKey = item.clientLotId 
             ? `${lotId}-${item.clientLotId}` 

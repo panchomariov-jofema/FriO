@@ -416,12 +416,12 @@ export function OtherFruitReceptionTab({ clientId: fixedClientId }: { clientId?:
   const selectedClientId = form.watch('clientId');
 
   const fruitClients = React.useMemo(() => {
-    return (allClients || []).filter(c => c.type.toUpperCase() === 'FRUTA' && c.status !== 'inactivo');
+    return (allClients || []).filter(c => c.type && c.type.toUpperCase() === 'FRUTA' && c.status !== 'inactivo');
   }, [allClients]);
 
   const isFruitAndNotFC = React.useMemo(() => {
     const client = fruitClients.find(c => c.clientId === selectedClientId);
-    return client ? (client.type.toUpperCase() === 'FRUTA' && client.name.toUpperCase() !== 'FALL CREEK') : false;
+    return client ? (client.type && client.type.toUpperCase() === 'FRUTA' && client.name.toUpperCase() !== 'FALL CREEK') : false;
   }, [fruitClients, selectedClientId]);
 
   const { data: clientProducts, loading: loadingProducts } = usePackagingMastersByClient(selectedClientId, isFruitAndNotFC);

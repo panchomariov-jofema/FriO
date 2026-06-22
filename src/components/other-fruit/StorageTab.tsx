@@ -289,7 +289,7 @@ export function OtherFruitStorageTab({ clientId: fixedClientId }: { clientId?: s
     });
 
     (otherFruitReceptions || []).forEach(r => {
-        r.items.forEach((it) => {
+        (r.items || []).forEach((it) => {
             if (it.status === 'Almacenado' && it.storageLocation && it.storageLocation.chamberId === chamberId && it.storageLocation.coordinate) {
                 const multiplier = (r.clientName?.toUpperCase() === 'FALL CREEK' && r.unit === 'Pallets') ? 3 : (r.unit === 'Bins' ? 1 : 2);
                 const equivalentUnits = it.quantity * multiplier;
@@ -394,7 +394,7 @@ export function OtherFruitStorageTab({ clientId: fixedClientId }: { clientId?: s
         }
     });
     (otherFruitReceptions || []).forEach(r => {
-        r.items.forEach((item) => {
+        (r.items || []).forEach((item) => {
             if (item.status === 'Almacenado' && item.storageLocation?.chamberId === chamberId && item.storageLocation.coordinate) {
                 const multiplier = (r.clientName?.toUpperCase() === 'FALL CREEK' && r.unit === 'Pallets') ? 3 : (r.unit === 'Bins' ? 1 : 2);
                 const equivalentUnits = item.quantity * multiplier;

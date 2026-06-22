@@ -105,7 +105,7 @@ export function RelocateLotDialog({
     });
 
     allOtherFruitReceptions.forEach(reception => {
-        reception.items.forEach(item => {
+        (reception.items || []).forEach(item => {
             if(item.status === 'Almacenado' && item.storageLocation?.chamberId === targetChamberId && item.storageLocation.coordinate) {
                 const current = occupancyMap.get(item.storageLocation.coordinate) || { quantity: 0, ownerName: reception.clientName, unit: reception.unit, documents: new Set<string>() };
                 current.documents.add(reception.document);

@@ -99,7 +99,7 @@ export function RelocateOtherFruitDialog({
     });
 
     allOtherFruitReceptions.forEach(reception => {
-        reception.items.forEach(it => {
+        (reception.items || []).forEach(it => {
             if(it.status === 'Almacenado' && it.storageLocation?.chamberId === targetChamberId && it.storageLocation.coordinate) {
                 const current = occupancyMap.get(it.storageLocation.coordinate) || { quantity: 0, ownerName: reception.clientName };
                 // Determine units: if it's Fall Creek, 1 pallet = 3 bins.

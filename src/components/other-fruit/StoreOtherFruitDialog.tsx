@@ -122,7 +122,7 @@ export function StoreOtherFruitDialog({
         const isFC = reception.clientName === 'FALL CREEK' || reception.clientName?.toUpperCase() === 'FALL CREEK';
         const multiplier = (isFC && reception.unit === 'Pallets') ? 3 : (reception.unit === 'Bins' ? 1 : 2);
 
-        reception.items.forEach((storedItem, idx) => {
+        (reception.items || []).forEach((storedItem, idx) => {
             if (storedItem.status === 'Almacenado' && storedItem.storageLocation?.chamberId === selectedChamberId && storedItem.storageLocation.coordinate && storedItem.quantity > 0) {
                 const equivalentUnits = storedItem.quantity * multiplier;
                 const lotId = `other_${reception.id}_${storedItem.containerId || storedItem.palletId || idx}`;

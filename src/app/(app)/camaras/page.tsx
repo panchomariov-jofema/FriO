@@ -368,7 +368,7 @@ export default function CamarasPage() {
           occupiedCoordinates.get(l.coordinate!)!.push({ displayLotId: l.displayLotId, binCount: l.binCount });
       });
     (otherFruitReceptions || []).forEach(reception => {
-        reception.items.forEach(item => {
+        (reception.items || []).forEach(item => {
             if (item.status === 'Almacenado' && item.storageLocation?.chamberId === chamberId && item.storageLocation.coordinate) {
                  if (!occupiedCoordinates.has(item.storageLocation.coordinate)) {
                     occupiedCoordinates.set(item.storageLocation.coordinate, []);

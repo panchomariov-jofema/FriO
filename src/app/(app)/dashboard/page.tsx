@@ -636,7 +636,7 @@ export default function DashboardPage() {
 
 
         clientReceptions.forEach(reception => {
-            reception.items.forEach(item => {
+            (reception.items || []).forEach(item => {
                 const equivalentBins = item.quantity;
                 if (item.status === 'Almacenado' && item.quantity > 0) {
                     if (!quantityByProduct[item.productName]) {

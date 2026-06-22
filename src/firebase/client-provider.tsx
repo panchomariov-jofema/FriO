@@ -14,7 +14,25 @@ interface FirebaseClientProviderProps {
 export function FirebaseClientProvider({ children }: FirebaseClientProviderProps) {
   const firebaseServices = useMemo(() => {
     // Initialize Firebase on the client side, once per component mount.
-    return initializeFirebase();
+    const sdks = initializeFirebase();
+
+    if (typeof window !== 'undefined') {
+      import('firebase/firestore').then(({ enableMultiTabIndexedDbPersistence }) => {
+        enableMultiTabIndexedDbPersistence(sdks.firestore).catch((err) => {
+          if (err.code === 'failed-precondition') {
+            console.warn("Firestore offline persistence failed: multiple tabs open.");
+          } else if (err.code === 'unimplemented') {
+            console.warn("Firestore offline persistence not supported by browser.");
+          } else {
+            console.error("Error enabling Firestore offline persistence:", err);
+          }
+        });
+      }).catch((err) => {
+        console.error("Failed to load firestore SDK for offline persistence:", err);
+      });
+    }
+
+    return sdks;
   }, []); // Empty dependency array ensures this runs only once on mount
 
   return (
