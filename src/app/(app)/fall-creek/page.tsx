@@ -143,7 +143,8 @@ export default function FallCreekPage() {
         return usersMaster.find(u => typeof u.userName === 'string' && u.userName.toLowerCase() === emailUsername) || null;
     }, [user, usersMaster]);
 
-    const showCargarManifiesto = currentUserMaster?.profileId === 'MAESTRO';
+    const isMaestro = currentUserMaster?.profileId === 'MAESTRO' || user?.email === 'francisco.villarreal@outlook.es' || user?.email?.split('@')[0].toLowerCase() === 'francisco';
+    const showCargarManifiesto = isMaestro;
 
     const formattedData = React.useMemo(() => {
         if (!allTemperatures) return [];
