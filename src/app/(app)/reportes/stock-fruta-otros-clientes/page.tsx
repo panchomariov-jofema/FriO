@@ -57,6 +57,7 @@ export default function OtherFruitStockReportPage() {
                     id: `${reception.id}-${index}`,
                     clientName: reception.clientName,
                     document: reception.document,
+                    documentNumber: reception.documentNumber,
                     clientLotId: item.clientLotId || '-',
                     productCode: item.productCode,
                     productName: item.productName,
@@ -139,11 +140,12 @@ export default function OtherFruitStockReportPage() {
     }, [filteredData]);
 
     const handleExport = () => {
-        const headers = ["Fecha Recepción", "Cliente", "Documento Entrada", "Lote", "Codigo Producto", "Nombre Producto", "Cámara", "Ubicación", "Cantidad", "Unidad"];
+        const headers = ["Fecha Recepción", "Cliente", "Documento Entrada", "N° Documento", "Lote", "Codigo Producto", "Nombre Producto", "Cámara", "Ubicación", "Cantidad", "Unidad"];
         const dataToExport = filteredData.map(item => ({
             "Fecha Recepción": item.receptionDate?.toDate(),
             "Cliente": item.clientName,
             "Documento Entrada": item.document,
+            "N° Documento": (item as any).documentNumber || '',
             "Lote": item.clientLotId,
             "Codigo Producto": item.productCode,
             "Nombre Producto": item.productName,
@@ -225,7 +227,12 @@ export default function OtherFruitStockReportPage() {
                                             <TableRow key={item.id}>
                                                 <TableCell>{item.receptionDate?.toDate()?.toLocaleDateString() ?? 'Sin fecha'}</TableCell>
                                                 <TableCell>{item.clientName}</TableCell>
-                                                <TableCell className="font-mono text-xs">{item.document}</TableCell>
+                                                <TableCell className="font-mono text-xs">
+                                                    <div>{item.document}</div>
+                                                    {(item as any).documentNumber && (
+                                                        <span className="text-[10px] text-muted-foreground block mt-0.5">Doc: {(item as any).documentNumber}</span>
+                                                    )}
+                                                </TableCell>
                                                 <TableCell className="font-mono text-xs">{item.clientLotId}</TableCell>
                                                 <TableCell>{item.productCode}</TableCell>
                                                 <TableCell>{item.productName}</TableCell>

@@ -612,6 +612,8 @@ export default function FallCreekPage() {
                 items: decomposedItems,
                 status: 'Pendiente de recibir',
                 createdAt: serverTimestamp() as any,
+                userId: user?.uid || null,
+                userName: user?.email || (user?.isAnonymous ? 'Anónimo' : user?.displayName || 'N/A'),
             };
 
             await addDoc(collection(firestore, 'otherFruitReceptions'), receptionData);
@@ -896,7 +898,9 @@ export default function FallCreekPage() {
                                                                     } as React.CSSProperties;
                                                                 }
                                                             }
-                                                            const isPermanentlyBlocked = (row === 13 || row === 14) && !['A', 'B', 'C', 'H', 'I', 'J'].includes(col.name);
+                                                             const isLargeChamber = ['CAMARA-4', 'CAMARA-5', 'CAMARA-6'].includes(chamberId);
+                                                             const allowedComodinCols = isLargeChamber ? ['A', 'B', 'C', 'M', 'N', 'O'] : ['A', 'B', 'C', 'H', 'I', 'J'];
+                                                             const isPermanentlyBlocked = (row === 13 || row === 14) && !allowedComodinCols.includes(col.name);
                                                             const isComodinRow = row === 13 || row === 14;
 
                                                             return (
@@ -1198,7 +1202,12 @@ export default function FallCreekPage() {
                                                 .map(reception => (
                                                     <TableRow key={reception.id}>
                                                         <TableCell>{reception.createdAt?.toDate()?.toLocaleDateString() ?? 'Sin fecha'}</TableCell>
-                                                        <TableCell className="font-mono font-bold">{reception.document}</TableCell>
+                                                        <TableCell className="font-mono font-bold">
+                                                            <div>{reception.document}</div>
+                                                            {reception.documentNumber && (
+                                                                <span className="text-[11px] text-muted-foreground font-normal block mt-0.5">Doc: {reception.documentNumber}</span>
+                                                            )}
+                                                        </TableCell>
                                                         <TableCell>{reception.items.length}</TableCell>
                                                         <TableCell>
                                                             <Badge 
@@ -1414,7 +1423,7 @@ export default function FallCreekPage() {
                          <DialogHeader>
                              <DialogTitle className="text-[#004b8d]">Detalle de Manifiesto (Pallet Log)</DialogTitle>
                              <DialogDescription>
-                                 Documento: {receptionToView.document} - Fecha: {receptionToView.createdAt?.toDate()?.toLocaleDateString() ?? 'Sin fecha'}
+                                 Pallet Log: {receptionToView.document} {receptionToView.documentNumber ? ` - N° Documento: ${receptionToView.documentNumber}` : ''} - Fecha: {receptionToView.createdAt?.toDate()?.toLocaleDateString() ?? 'Sin fecha'}
                              </DialogDescription>
                          </DialogHeader>
                          <div className="max-h-96 overflow-y-auto">

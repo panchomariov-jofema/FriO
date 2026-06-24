@@ -236,7 +236,8 @@ export function StoreOtherFruitDialog({
 
     const isChamberRow13Enabled = !!chamberSettings?.find(s => s.id === selectedChamberId)?.row13Enabled;
     if (isChamberRow13Enabled) {
-        const allowedComodinColumns = ['A', 'B', 'C', 'H', 'I', 'J'];
+        const isLargeChamber = ['CAMARA-4', 'CAMARA-5', 'CAMARA-6'].includes(selectedChamberId);
+        const allowedComodinColumns = isLargeChamber ? ['A', 'B', 'C', 'M', 'N', 'O'] : ['A', 'B', 'C', 'H', 'I', 'J'];
         const comodinCoords = chamberConfig.columns
             .filter(col => allowedComodinColumns.includes(col.name))
             .flatMap(col => [`${col.name}13`, `${col.name}14`]);

@@ -328,12 +328,15 @@ export default function OtherFruitKardexReportPage() {
 
         if (receptions) {
             receptions.forEach(reception => {
-                const totalQuantity = reception.items.reduce((sum, item) => sum + item.quantity, 0);
-                const observations = [...new Set(reception.items.map(i => i.observation).filter(Boolean))].join(', ');
+                const receivedItems = (reception.items || []).filter(item => item && item.status !== 'Pendiente de recibir');
+                if (receivedItems.length === 0) return;
 
-                const productNames = [...new Set(reception.items.map(i => i.productName))].join(', ');
-                const productCodes = [...new Set(reception.items.map(i => i.productCode))].join(', ');
-                const clientLotIds = [...new Set(reception.items.map(i => i.clientLotId).filter(Boolean))].join(', ');
+                const totalQuantity = receivedItems.reduce((sum, item) => sum + item.quantity, 0);
+                const observations = [...new Set(receivedItems.map(i => i.observation).filter(Boolean))].join(', ');
+
+                const productNames = [...new Set(receivedItems.map(i => i.productName))].join(', ');
+                const productCodes = [...new Set(receivedItems.map(i => i.productCode))].join(', ');
+                const clientLotIds = [...new Set(receivedItems.map(i => i.clientLotId).filter(Boolean))].join(', ');
 
                 allMovements.push({
                     key: `${reception.id}-E`,
@@ -342,6 +345,7 @@ export default function OtherFruitKardexReportPage() {
                     type: 'entrada',
                     clientName: reception.clientName,
                     document: reception.document,
+                    documentNumber: reception.documentNumber,
                     temperature: reception.temperature,
                     clientLotId: clientLotIds || '-',
                     productCode: productCodes,
@@ -372,6 +376,7 @@ export default function OtherFruitKardexReportPage() {
                     type: 'salida',
                     clientName: movement.clientName,
                     document: movement.document,
+                    documentNumber: '',
                     clientLotId: clientLotIds || '-',
                     productCode: productCodes,
                     productName: productNames,
@@ -407,6 +412,7 @@ export default function OtherFruitKardexReportPage() {
             "Tipo": item.type,
             "Cliente": item.clientName,
             "Documento": item.document,
+            "N° Documento": (item as any).documentNumber || '',
             "Temperatura": item.temperature ? `${item.temperature.toFixed(1)}°C` : '',
             "Lote Cliente": item.clientLotId || '',
             "Codigo Producto": item.productCode,
@@ -415,7 +421,7 @@ export default function OtherFruitKardexReportPage() {
             "Observación": item.observation || '',
             "Usuario": item.userName || '',
         }));
-        const headers = ["Fecha", "Tipo", "Cliente", "Documento", "Temperatura", "Lote Cliente", "Codigo Producto", "Nombre Producto", "Cantidad", "Observación", "Usuario"];
+        const headers = ["Fecha", "Tipo", "Cliente", "Documento", "N° Documento", "Temperatura", "Lote Cliente", "Codigo Producto", "Nombre Producto", "Cantidad", "Observación", "Usuario"];
         const csv = convertToCSV(dataToExport, headers);
         downloadCSV(csv, 'kardex_fruta_otros_clientes.csv');
     };
@@ -563,7 +569,12 @@ export default function OtherFruitKardexReportPage() {
                                             </Badge>
                                         </TableCell>
                                         <TableCell>{item.clientName}</TableCell>
-                                        <TableCell>{item.document}</TableCell>
+                                        <TableCell>
+                                            <div>{item.document}</div>
+                                            {(item as any).documentNumber && (
+                                                <span className="text-[10px] text-muted-foreground block mt-0.5">Doc: {(item as any).documentNumber}</span>
+                                            )}
+                                        </TableCell>
                                         <TableCell>{item.temperature ? item.temperature.toFixed(1) : '-'}</TableCell>
                                         <TableCell className="font-mono">{item.clientLotId || '-'}</TableCell>
                                         <TableCell>{item.productCode}</TableCell>

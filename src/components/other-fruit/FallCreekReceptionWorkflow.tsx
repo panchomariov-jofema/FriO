@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { QrCode, PackageCheck, ScanLine, Trash2, CheckCircle2, Loader2, AlertCircle, AlertTriangle } from 'lucide-react';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
-import { useFirestore } from '@/firebase';
+import { useFirestore, useUser } from '@/firebase';
 import { doc, updateDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import type { OtherFruitReception, OtherFruitReceptionItem } from '@/lib/types';
@@ -33,13 +33,20 @@ import { Label } from '@/components/ui/label';
 export function FallCreekReceptionWorkflow({ 
     directStorageMode, 
     usePhysicalScanner,
-    onTriggerStorage 
+    onTriggerStorage,
+    selectedManifestId: externalSelectedManifestId,
+    onSelectedManifestIdChange,
+    documentNumber
 }: { 
     directStorageMode?: boolean, 
     usePhysicalScanner?: boolean,
-    onTriggerStorage?: (item: any) => void 
+    onTriggerStorage?: (item: any) => void,
+    selectedManifestId?: string | null,
+    onSelectedManifestIdChange?: (id: string | null) => void,
+    documentNumber?: string
 }) {
     const firestore = useFirestore();
+    const { user } = useUser();
     const { toast } = useToast();
     const { data: allReceptions, loading } = useFirestoreCollection<OtherFruitReception>('otherFruitReceptions');
     
@@ -49,7 +56,15 @@ export function FallCreekReceptionWorkflow({
     const { data: clientConfigs } = useFirestoreCollection<any>('clientStorageConfigs');
     const { data: allChamberLots } = useFirestoreCollection<any>('chamberLots');
 
-    const [selectedManifestId, setSelectedManifestId] = React.useState<string | null>(null);
+    const [localSelectedManifestId, setLocalSelectedManifestId] = React.useState<string | null>(null);
+    const selectedManifestId = externalSelectedManifestId !== undefined ? externalSelectedManifestId : localSelectedManifestId;
+    const setSelectedManifestId = (id: string | null) => {
+        if (onSelectedManifestIdChange) {
+            onSelectedManifestIdChange(id);
+        } else {
+            setLocalSelectedManifestId(id);
+        }
+    };
     const [selectedPalletId, setSelectedPalletId] = React.useState<string | null>(null);
     const [scannedBins, setScannedBins] = React.useState<string[]>([]);
     const [isSubmitting, setIsSubmitting] = React.useState(false);
@@ -147,7 +162,10 @@ export function FallCreekReceptionWorkflow({
 
             await updateDoc(doc(firestore, 'otherFruitReceptions', activeManifest.id!), {
                 items: updatedItems,
-                status: manifestStatus
+                status: manifestStatus,
+                documentNumber: documentNumber || activeManifest.documentNumber || '',
+                userId: user?.uid || null,
+                userName: user?.email || (user?.isAnonymous ? 'Anónimo' : user?.displayName || 'N/A'),
             });
 
             toast({ title: 'Éxito', description: `Pallet ${selectedPalletId} actualizado.` });

@@ -173,6 +173,52 @@ export function OtherFruitReceptionTab({ clientId: fixedClientId }: { clientId?:
   const [newProductCode, setNewProductCode] = React.useState('');
   const [isCreatingProduct, setIsCreatingProduct] = React.useState(false);
 
+  const [selectedManifestId, setSelectedManifestId] = React.useState<string | null>(null);
+  const [manifestDocuments, setManifestDocuments] = React.useState<Record<string, string>>({});
+
+  const handleDocumentChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    if (selectedManifestId) {
+      setManifestDocuments(prev => ({
+        ...prev,
+        [selectedManifestId]: val
+      }));
+    }
+  };
+
+  const handleDocumentBlur = async () => {
+    if (selectedManifestId && firestore) {
+      const docVal = manifestDocuments[selectedManifestId];
+      if (docVal !== undefined) {
+        try {
+          await updateDoc(doc(firestore, 'otherFruitReceptions', selectedManifestId), {
+            documentNumber: docVal
+          });
+        } catch (e) {
+          console.error("Error saving document number:", e);
+        }
+      }
+    }
+  };
+
+  React.useEffect(() => {
+    if (allReceptions) {
+      const docsMap: Record<string, string> = {};
+      allReceptions.forEach(r => {
+        if (r.clientName?.toUpperCase() === 'FALL CREEK' && r.documentNumber) {
+          docsMap[r.id] = r.documentNumber;
+        }
+      });
+      setManifestDocuments(prev => {
+        const next = { ...docsMap };
+        Object.keys(prev).forEach(key => {
+          next[key] = prev[key];
+        });
+        return next;
+      });
+    }
+  }, [allReceptions]);
+
   const resolvedClientConfig = React.useMemo(() => {
     if (!itemToStore) return undefined;
     
@@ -702,18 +748,35 @@ export function OtherFruitReceptionTab({ clientId: fixedClientId }: { clientId?:
           </CardHeader>
           <CardContent className="px-2 sm:px-6 pb-6">
              {!fixedClientId && (
-                <div className="max-w-md mb-4 sm:mb-6 px-2 sm:px-0">
-                  <Label className="mb-2 block text-xs sm:text-sm uppercase font-bold text-muted-foreground">Socio Comercial</Label>
-                  <Select onValueChange={handleClientChange} value={selectedClientId} disabled={loadingClients}>
-                    <SelectTrigger className="h-12 border-2">
-                      <SelectValue placeholder="Seleccione un socio..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {fruitClients.map(c => (
-                        <SelectItem key={c.id} value={c.clientId}>{c.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                <div className="flex flex-col sm:flex-row gap-4 mb-4 sm:mb-6 px-2 sm:px-0">
+                  <div className="w-full max-w-md">
+                    <Label className="mb-2 block text-xs sm:text-sm uppercase font-bold text-muted-foreground">Socio Comercial</Label>
+                    <Select onValueChange={handleClientChange} value={selectedClientId} disabled={loadingClients}>
+                      <SelectTrigger className="h-12 border-2">
+                        <SelectValue placeholder="Seleccione un socio..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {fruitClients.map(c => (
+                          <SelectItem key={c.id} value={c.clientId}>{c.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  {selectedClient?.name?.toUpperCase() === 'FALL CREEK' && (
+                    <div className="w-full max-w-md">
+                      <Label className="mb-2 block text-xs sm:text-sm uppercase font-bold text-muted-foreground">Documento</Label>
+                      <Input
+                        type="text"
+                        placeholder={selectedManifestId ? "Ingrese documento..." : "Seleccione un Pallet Log primero..."}
+                        value={selectedManifestId ? (manifestDocuments[selectedManifestId] || '') : ''}
+                        onChange={handleDocumentChange}
+                        onBlur={handleDocumentBlur}
+                        disabled={!selectedManifestId}
+                        className="h-12 border-2"
+                      />
+                    </div>
+                  )}
                 </div>
               )}
               <FallCreekReceptionWorkflow 
@@ -723,6 +786,9 @@ export function OtherFruitReceptionTab({ clientId: fixedClientId }: { clientId?:
                   setItemToStore(item);
                   setIsStoreDialogOpen(true);
                 }}
+                selectedManifestId={selectedManifestId}
+                onSelectedManifestIdChange={setSelectedManifestId}
+                documentNumber={selectedManifestId ? (manifestDocuments[selectedManifestId] || '') : ''}
               />
           </CardContent>
         </Card>

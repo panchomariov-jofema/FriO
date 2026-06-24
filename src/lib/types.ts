@@ -342,6 +342,7 @@ export interface OtherFruitReception {
   updatedAt?: Timestamp;
   userId?: string;
   userName?: string;
+  documentNumber?: string;
 }
 
 export interface OtherFruitMovementLocation {

@@ -118,7 +118,7 @@ export default function CamarasPage() {
   const [isRelocateDialogOpen, setRelocateDialogOpen] = React.useState(false);
   const [latestTemperatures, setLatestTemperatures] = React.useState<Record<string, ChamberTemperature | null>>({});
   const { toast } = useToast();
-  const [showChamberStatus, setShowChamberStatus] = React.useState(false);
+  const [showChamberStatus, setShowChamberStatus] = React.useState(true);
   const [importingTemps, setImportingTemps] = React.useState(false);
   const tempFileInputRef = React.useRef<HTMLInputElement>(null);
 
@@ -129,6 +129,7 @@ export default function CamarasPage() {
   }, [user, usersMaster]);
 
   const isMaestro = currentUserMaster?.profileId === 'MAESTRO' || user?.email === 'francisco.villarreal@outlook.es' || user?.email?.split('@')[0].toLowerCase() === 'francisco';
+  const isJlog = currentUserMaster?.profileId === 'JEF_LOG' || user?.email === 'jlog@frio.cl';
   const loading = loadingPendingLots || loadingStoredLots || loadingOtherFruit || loadingExporters || loadingConfigs;
   
   React.useEffect(() => {
@@ -795,7 +796,7 @@ export default function CamarasPage() {
           <h1 className="text-2xl font-bold text-[#004b8d]">Cámaras de Almacenamiento</h1>
           <p className="text-sm text-muted-foreground">Monitoreo de clima, stock y movimientos en cámaras.</p>
         </div>
-        {isMaestro && (
+        {(isMaestro || isJlog) && (
           <div className="flex items-center gap-2">
             <Input
               type="file"
@@ -1087,7 +1088,9 @@ export default function CamarasPage() {
                                               }
                                           }
     
-                                          const isPermanentlyBlocked = (row === 13 || row === 14) && !['A', 'B', 'C', 'H', 'I', 'J'].includes(col.name);
+                                           const isLargeChamber = ['CAMARA-4', 'CAMARA-5', 'CAMARA-6'].includes(chamberId);
+                                           const allowedComodinCols = isLargeChamber ? ['A', 'B', 'C', 'M', 'N', 'O'] : ['A', 'B', 'C', 'H', 'I', 'J'];
+                                           const isPermanentlyBlocked = (row === 13 || row === 14) && !allowedComodinCols.includes(col.name);
                                           const isComodinRow = row === 13 || row === 14;
 
                                           return (

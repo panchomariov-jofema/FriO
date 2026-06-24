@@ -81,7 +81,8 @@ export function RelocateOtherFruitDialog({
 
     const isChamberRow13Enabled = !!chamberSettings?.find(s => s.id === targetChamberId)?.row13Enabled;
     if (isChamberRow13Enabled) {
-      const allowedComodinColumns = ['A', 'B', 'C', 'H', 'I', 'J'];
+      const isLargeChamber = ['CAMARA-4', 'CAMARA-5', 'CAMARA-6'].includes(targetChamberId);
+      const allowedComodinColumns = isLargeChamber ? ['A', 'B', 'C', 'M', 'N', 'O'] : ['A', 'B', 'C', 'H', 'I', 'J'];
       const extraCoords = chamberConfig.columns
         .filter(col => allowedComodinColumns.includes(col.name))
         .flatMap(col => [`${col.name}13`, `${col.name}14`]);
