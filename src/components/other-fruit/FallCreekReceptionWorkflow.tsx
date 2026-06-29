@@ -6,14 +6,18 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { QrCode, PackageCheck, ScanLine, Trash2, CheckCircle2, Loader2, AlertCircle, AlertTriangle } from 'lucide-react';
+import { QrCode, PackageCheck, ScanLine, Trash2, CheckCircle2, Loader2, AlertCircle, AlertTriangle, FileUp, ClipboardList } from 'lucide-react';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
 import { useFirestore, useUser } from '@/firebase';
-import { doc, updateDoc } from 'firebase/firestore';
+import { doc, updateDoc, collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import type { OtherFruitReception, OtherFruitReceptionItem } from '@/lib/types';
 import { BarcodeScanner } from '../BarcodeScanner';
 import { cn } from '@/lib/utils';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { parseFallCreekManifest, decomposePalletsIntoBins, type FallCreekManifestRow, fileToBase64 } from '@/lib/fall-creek-utils';
+import { parseManifestAIAction } from '@/app/(app)/fall-creek/actions';
 
 const cleanVarietyName = (name: string) => {
     if (!name) return 'N/A';
@@ -69,6 +73,115 @@ export function FallCreekReceptionWorkflow({
     const [scannedBins, setScannedBins] = React.useState<string[]>([]);
     const [isSubmitting, setIsSubmitting] = React.useState(false);
     const [scanning, setScanning] = React.useState(false);
+
+    const fileInputRef = React.useRef<HTMLInputElement>(null);
+    const [importing, setImporting] = React.useState(false);
+    const [showPreview, setShowPreview] = React.useState(false);
+    const [previewItems, setPreviewItems] = React.useState<FallCreekManifestRow[]>([]);
+    const [manifestDocument, setManifestDocument] = React.useState('');
+    const [isConfirmingImport, setIsConfirmingImport] = React.useState(false);
+
+    const fallCreekClient = React.useMemo(() => {
+        return otherClients?.find((c: any) => c.name.toUpperCase() === 'FALL CREEK') || null;
+    }, [otherClients]);
+
+    const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        setImporting(true);
+        try {
+            let items: FallCreekManifestRow[] = [];
+            
+            const fileName = file.name.toLowerCase();
+            const isPdf = file.type === 'application/pdf' || fileName.endsWith('.pdf');
+            const isImage = file.type.startsWith('image/') || /\.(jpe?g|png|webp|gif)$/i.test(fileName);
+
+            if (isPdf || isImage) {
+                toast({ title: 'Procesando con IA', description: 'Leyendo el documento visualmente...' });
+                const base64 = await fileToBase64(file);
+                const mimeType = isPdf ? 'application/pdf' : (file.type || 'image/jpeg');
+                const response = await parseManifestAIAction(base64, mimeType);
+                
+                if (response.success && response.data) {
+                    items = response.data;
+                } else {
+                    let friendlyError = response.error || 'No se pudo extraer la información del documento.';
+                    if (
+                        friendlyError.includes('API_KEY_SERVICE_BLOCKED') || 
+                        friendlyError.includes('API key') || 
+                        friendlyError.includes('leaked') || 
+                        friendlyError.includes('blocked') || 
+                        friendlyError.includes('NOT_FOUND') ||
+                        friendlyError.includes('403') ||
+                        friendlyError.includes('404')
+                    ) {
+                        friendlyError = 'Error de API Key de Gemini: La clave configurada en el servidor no es válida, está bloqueada o fue reportada como filtrada. Por favor, genere y configure una clave válida (GOOGLE_GENAI_API_KEY) en las variables de entorno de App Hosting o local.';
+                    }
+                    throw new Error(friendlyError);
+                }
+            } else {
+                items = await parseFallCreekManifest(file);
+            }
+
+            if (items.length === 0) {
+                toast({ variant: 'destructive', title: 'Sin Datos', description: 'No se encontraron registros en el archivo.' });
+                return;
+            }
+
+            setPreviewItems(items);
+            setManifestDocument(file.name.replace(/\.[^/.]+$/, ""));
+            setShowPreview(true);
+        } catch (error: any) {
+            console.error("Error parsing manifest:", error);
+            toast({ 
+                variant: 'destructive', 
+                title: 'Error de Importación', 
+                description: error.message || 'No se pudo procesar el archivo.' 
+            });
+        } finally {
+            setImporting(false);
+            if (fileInputRef.current) fileInputRef.current.value = '';
+        }
+    };
+
+    const handleConfirmImport = async () => {
+        if (!firestore || !fallCreekClient || previewItems.length === 0) return;
+
+        setIsConfirmingImport(true);
+        try {
+            const decomposedItems = decomposePalletsIntoBins(previewItems);
+
+            const receptionData: any = {
+                clientId: fallCreekClient.clientId,
+                clientName: fallCreekClient.name,
+                unit: fallCreekClient.unit,
+                document: manifestDocument,
+                items: decomposedItems,
+                status: 'Pendiente de recibir',
+                createdAt: serverTimestamp(),
+                userId: user?.uid || null,
+                userName: user?.email || (user?.isAnonymous ? 'Anónimo' : user?.displayName || 'N/A'),
+            };
+
+            const docRef = await addDoc(collection(firestore, 'otherFruitReceptions'), receptionData);
+            
+            toast({ title: 'Éxito', description: 'Manifiesto cargado correctamente. Se han generado los bins correspondientes para su recepción.' });
+            
+            // Auto-select newly loaded manifest
+            if (docRef.id) {
+                setSelectedManifestId(docRef.id);
+            }
+            
+            setShowPreview(false);
+            setPreviewItems([]);
+        } catch (error: any) {
+            console.error("Error saving manifest:", error);
+            toast({ variant: 'destructive', title: 'Error', description: 'No se pudo guardar el manifiesto en la base de datos.' });
+        } finally {
+            setIsConfirmingImport(false);
+        }
+    };
 
     // Filter manifests for Fall Creek that are pending reception
     const pendingManifests = React.useMemo(() => {
@@ -264,6 +377,24 @@ export function FallCreekReceptionWorkflow({
                             <CardDescription className="text-xs sm:text-sm">Escaneo masivo de bins por Pallet ID.</CardDescription>
                         </div>
                     </div>
+                    <div className="flex items-center gap-2">
+                        <Input
+                            type="file"
+                            ref={fileInputRef}
+                            className="hidden"
+                            accept=".xlsx,.xls,.csv,.pdf,image/*"
+                            onChange={handleFileUpload}
+                        />
+                        <Button 
+                            onClick={() => fileInputRef.current?.click()}
+                            variant="outline"
+                            className="border-[#004b8d] text-[#004b8d] hover:bg-[#004b8d]/10 h-10 text-xs sm:text-sm font-semibold"
+                            disabled={importing}
+                        >
+                            {importing ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <FileUp className="mr-2 h-4 w-4"/>}
+                            Cargar Manifiesto
+                        </Button>
+                    </div>
                 </div>
             </CardHeader>
             <CardContent className="p-4 sm:p-6 space-y-4 sm:space-y-6">
@@ -280,7 +411,9 @@ export function FallCreekReceptionWorkflow({
                                     <SelectItem key={m.id} value={m.id!}>
                                         <div className="flex flex-col items-start py-1">
                                             <span className="font-bold">{m.document}</span>
-                                            <span className="text-xs text-muted-foreground">{m.items.length} Bins totales</span>
+                                            <span className="text-xs text-muted-foreground">
+                                                {m.items.filter(item => item.status === 'Pendiente de recibir').length} Bins por ingresar
+                                            </span>
                                         </div>
                                     </SelectItem>
                                 ))}
@@ -479,6 +612,84 @@ export function FallCreekReceptionWorkflow({
                     currentCount={Math.min(scannedBins.length + 1, currentPalletItems.filter(item => item.status === 'Pendiente de recibir').length)}
                     totalCount={currentPalletItems.filter(item => item.status === 'Pendiente de recibir').length}
                 />
+
+                {showPreview && (
+                    <Dialog open={showPreview} onOpenChange={setShowPreview}>
+                        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                            <DialogHeader>
+                                <DialogTitle className="text-[#004b8d]">Previsualización de Manifiesto</DialogTitle>
+                                <DialogDescription>
+                                    Se han detectado {previewItems.length} registros en el archivo. Revise la información antes de confirmar.
+                                </DialogDescription>
+                            </DialogHeader>
+                            
+                            <div className="space-y-4 py-2">
+                                <div className="flex items-center gap-4 px-1">
+                                    <div className="flex-1 space-y-1">
+                                        <Label className="text-xs font-bold uppercase text-muted-foreground">Referencia del Manifiesto / Guía</Label>
+                                        <Input 
+                                            value={manifestDocument} 
+                                            onChange={e => setManifestDocument(e.target.value)}
+                                            placeholder="Ej: Guía Fall Creek 1234"
+                                            className="h-10 border-2"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="rounded-md border max-h-[40vh] overflow-y-auto">
+                                    <Table>
+                                        <TableHeader>
+                                            <TableRow className="bg-muted/50">
+                                                <TableHead>Pallet ID</TableHead>
+                                                <TableHead>Variedad / Producto</TableHead>
+                                                <TableHead>Lote (Batch)</TableHead>
+                                                <TableHead className="text-right">Bins</TableHead>
+                                                <TableHead className="text-right">Plantas Totales</TableHead>
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {previewItems.map((item, index) => (
+                                                <TableRow key={index}>
+                                                    <TableCell className="font-mono font-bold">{item['Pallet ID']}</TableCell>
+                                                    <TableCell>{item['Item Description']}</TableCell>
+                                                    <TableCell className="font-mono text-xs text-muted-foreground">{item['Lot Number (Batch)']}</TableCell>
+                                                    <TableCell className="text-right font-bold">{item['# of Packages']}</TableCell>
+                                                    <TableCell className="text-right font-semibold text-[#7aba28]">{item['Qty of Plants']}</TableCell>
+                                                </TableRow>
+                                            ))}
+                                        </TableBody>
+                                    </Table>
+                                </div>
+                            </div>
+
+                            <DialogFooter className="flex flex-col sm:flex-row items-center justify-between gap-4 border-t pt-4">
+                                <div className="flex gap-6 text-sm">
+                                    <div className="flex flex-col">
+                                        <span className="text-muted-foreground text-xs uppercase tracking-wider font-semibold">Total Pallets ID</span>
+                                        <span className="text-xl font-bold text-[#004b8d]">{previewItems.length}</span>
+                                    </div>
+                                    <div className="flex flex-col">
+                                        <span className="text-muted-foreground text-xs uppercase tracking-wider font-semibold">Total Plantas</span>
+                                        <span className="text-xl font-bold text-[#7aba28]">
+                                            {previewItems.reduce((sum, item) => sum + (Number(item['Qty of Plants']) || 0), 0).toLocaleString()}
+                                        </span>
+                                    </div>
+                                </div>
+                                <div className="flex gap-2 w-full sm:w-auto justify-end">
+                                    <Button variant="outline" onClick={() => setShowPreview(false)}>Cancelar</Button>
+                                    <Button 
+                                        onClick={handleConfirmImport} 
+                                        className="bg-[#7aba28] hover:bg-[#6aa423] text-white font-bold"
+                                        disabled={isConfirmingImport || !manifestDocument}
+                                    >
+                                        {isConfirmingImport ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <ClipboardList className="mr-2 h-4 w-4"/>}
+                                        Confirmar Importación
+                                    </Button>
+                                </div>
+                            </DialogFooter>
+                        </DialogContent>
+                    </Dialog>
+                )}
             </CardContent>
         </Card>
     );
