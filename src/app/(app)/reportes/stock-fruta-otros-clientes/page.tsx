@@ -59,6 +59,8 @@ export default function OtherFruitStockReportPage() {
                     document: reception.document,
                     documentNumber: reception.documentNumber,
                     clientLotId: item.clientLotId || '-',
+                    palletId: item.palletId || '-',
+                    containerId: item.containerId || '-',
                     productCode: item.productCode,
                     productName: item.productName,
                     unit: reception.unit,
@@ -66,7 +68,8 @@ export default function OtherFruitStockReportPage() {
                     chamberId: item.storageLocation!.chamberId,
                     coordinate: item.storageLocation!.coordinate,
                     chamberName: chambersConfig[item.storageLocation!.chamberId]?.name || item.storageLocation!.chamberId,
-                    receptionDate: reception.createdAt,
+                    receptionDate: item.storedAt || reception.createdAt,
+                    userName: item.storedByUserName || reception.userName || 'N/A',
                 }))
         );
     }, [receptions]);
@@ -140,20 +143,32 @@ export default function OtherFruitStockReportPage() {
     }, [filteredData]);
 
     const handleExport = () => {
-        const headers = ["Fecha Recepción", "Cliente", "Documento Entrada", "N° Documento", "Lote", "Codigo Producto", "Nombre Producto", "Cámara", "Ubicación", "Cantidad", "Unidad"];
-        const dataToExport = filteredData.map(item => ({
-            "Fecha Recepción": item.receptionDate?.toDate(),
-            "Cliente": item.clientName,
-            "Documento Entrada": item.document,
-            "N° Documento": (item as any).documentNumber || '',
-            "Lote": item.clientLotId,
-            "Codigo Producto": item.productCode,
-            "Nombre Producto": item.productName,
-            "Cámara": item.chamberName,
-            "Ubicación": item.coordinate,
-            "Cantidad": item.quantity,
-            "Unidad": item.unit,
-        }));
+        const headers = ["Fecha Recepción", "Cliente", "Documento Entrada", "N° Documento", "Lote", "Pallet ID", "QR Bin", "Codigo Producto", "Nombre Producto", "Cámara", "Ubicación", "Cantidad", "Unidad", "Usuario"];
+        const dataToExport = filteredData.map(item => {
+            let formattedDate = '';
+            if (item.receptionDate) {
+                const date = typeof (item.receptionDate as any).toDate === 'function'
+                    ? (item.receptionDate as any).toDate()
+                    : new Date(item.receptionDate as any);
+                formattedDate = `${date.toLocaleDateString('es-CL')} ${date.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}`;
+            }
+            return {
+                "Fecha Recepción": formattedDate,
+                "Cliente": item.clientName,
+                "Documento Entrada": item.document,
+                "N° Documento": (item as any).documentNumber || '',
+                "Lote": item.clientLotId,
+                "Pallet ID": item.palletId,
+                "QR Bin": item.containerId,
+                "Codigo Producto": item.productCode,
+                "Nombre Producto": item.productName,
+                "Cámara": item.chamberName,
+                "Ubicación": item.coordinate,
+                "Cantidad": item.quantity,
+                "Unidad": item.unit,
+                "Usuario": item.userName,
+            };
+        });
         const csv = convertToCSV(dataToExport, headers);
         downloadCSV(csv, 'reporte_stock_por_ubicacion_otros_clientes.csv');
     };
@@ -210,22 +225,33 @@ export default function OtherFruitStockReportPage() {
                                     <TableHead>Cliente</TableHead>
                                     <TableHead>Doc. Entrada</TableHead>
                                     <TableHead>Lote</TableHead>
+                                    <TableHead>Pallet ID</TableHead>
+                                    <TableHead>QR Bin</TableHead>
                                     <TableHead>Cód. Producto</TableHead>
                                     <TableHead>Producto</TableHead>
                                     <TableHead>Cámara</TableHead>
                                     <TableHead>Ubicación</TableHead>
+                                    <TableHead>Usuario</TableHead>
                                     <TableHead>Cantidad</TableHead>
                                     <TableHead>Unidad</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
                                 {loadingReceptions ? (
-                                    Array.from({ length: 5 }).map((_, i) => <TableRow key={i}><TableCell colSpan={10}><Skeleton className="h-4 w-full" /></TableCell></TableRow>)
+                                    Array.from({ length: 5 }).map((_, i) => <TableRow key={i}><TableCell colSpan={13}><Skeleton className="h-4 w-full" /></TableCell></TableRow>)
                                 ) : filteredData.length > 0 ? (
                                     <>
                                         {filteredData.map(item => (
                                             <TableRow key={item.id}>
-                                                <TableCell>{item.receptionDate?.toDate()?.toLocaleDateString() ?? 'Sin fecha'}</TableCell>
+                                                <TableCell>
+                                                    {(() => {
+                                                        if (!item.receptionDate) return 'Sin fecha';
+                                                        const date = typeof (item.receptionDate as any).toDate === 'function'
+                                                            ? (item.receptionDate as any).toDate()
+                                                            : new Date(item.receptionDate as any);
+                                                        return `${date.toLocaleDateString('es-CL')} ${date.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}`;
+                                                    })()}
+                                                </TableCell>
                                                 <TableCell>{item.clientName}</TableCell>
                                                 <TableCell className="font-mono text-xs">
                                                     <div>{item.document}</div>
@@ -234,16 +260,19 @@ export default function OtherFruitStockReportPage() {
                                                     )}
                                                 </TableCell>
                                                 <TableCell className="font-mono text-xs">{item.clientLotId}</TableCell>
+                                                <TableCell className="font-mono text-xs">{item.palletId}</TableCell>
+                                                <TableCell className="font-mono text-xs">{item.containerId}</TableCell>
                                                 <TableCell>{item.productCode}</TableCell>
                                                 <TableCell>{item.productName}</TableCell>
                                                 <TableCell className="font-medium">{item.chamberName}</TableCell>
                                                 <TableCell className="font-mono">{item.coordinate}</TableCell>
+                                                <TableCell className="font-medium truncate max-w-[120px]" title={item.userName}>{item.userName}</TableCell>
                                                 <TableCell className="font-semibold">{item.quantity}</TableCell>
                                                 <TableCell>{item.unit}</TableCell>
                                             </TableRow>
                                         ))}
                                         <TableRow className="bg-muted/50 font-semibold hover:bg-muted/50">
-                                            <TableCell colSpan={8} className="text-right font-bold text-muted-foreground uppercase tracking-wider text-xs">Total</TableCell>
+                                            <TableCell colSpan={11} className="text-right font-bold text-muted-foreground uppercase tracking-wider text-xs">Total</TableCell>
                                             {(() => {
                                                 const uniqueUnits = [...new Set(filteredData.map(item => item.unit))].filter(Boolean);
                                                 if (uniqueUnits.length === 1) {
@@ -270,7 +299,7 @@ export default function OtherFruitStockReportPage() {
                                         </TableRow>
                                     </>
                                 ) : (
-                                    <TableRow><TableCell colSpan={10} className="h-24 text-center">No hay datos de stock para los filtros seleccionados.</TableCell></TableRow>
+                                    <TableRow><TableCell colSpan={13} className="h-24 text-center">No hay datos de stock para los filtros seleccionados.</TableCell></TableRow>
                                 )}
                             </TableBody>
                         </Table>

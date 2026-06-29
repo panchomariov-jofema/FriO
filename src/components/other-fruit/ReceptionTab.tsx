@@ -372,7 +372,9 @@ export function OtherFruitReceptionTab({ clientId: fixedClientId }: { clientId?:
                     chamberId,
                     coordinate: currentCoord
                 },
-                storedAt: new Date()
+                storedAt: new Date(),
+                storedByUserName: user?.email || (user?.isAnonymous ? 'Anónimo' : user?.displayName || 'N/A'),
+                storedByUserId: user?.uid || undefined,
             });
 
             const unitsStored = amountToStore * unitsPerItem;

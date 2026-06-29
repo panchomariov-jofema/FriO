@@ -430,6 +430,19 @@ export function OtherFruitStorageTab({ clientId: fixedClientId }: { clientId?: s
     // --- 2. Prepare updates ---
     const itemsToProcess = itemToProcessScope.itemIndices.map(idx => originalReception.items[idx]);
     
+    const isFC = originalReception.clientName?.toUpperCase() === 'FALL CREEK';
+    if (isFC) {
+        const missingQrItems = itemsToProcess.filter(item => !item.containerId || item.containerId.trim() === '' || item.containerId === '-');
+        if (missingQrItems.length > 0) {
+            toast({
+                title: "Bloqueo de Seguridad",
+                description: `No se puede almacenar el Pallet ${itemToProcessScope.palletId || ''} porque tiene ${missingQrItems.length} bin(s) sin código QR registrado. Por favor, realice la recepción y escaneo de los QR primero.`,
+                variant: "destructive"
+            });
+            return;
+        }
+    }
+    
     const newStoredItems: OtherFruitReceptionItem[] = [];
     let remainingToStore = totalQuantity;
     const startIndex = allPossibleCoords.indexOf(startCoordinate);
@@ -442,7 +455,6 @@ export function OtherFruitStorageTab({ clientId: fixedClientId }: { clientId?: s
     let currentCoordIdx = 0;
     let currentCoord = coordsToFill[currentCoordIdx];
 
-    const isFC = originalReception.clientName?.toUpperCase() === 'FALL CREEK';
     const unitsPerItem = (isFC && originalReception.unit === 'Pallets') ? 3 : (originalReception.unit === 'Bins' ? 1 : 2);
 
     for (const itemToStore of itemsToProcess) {
@@ -477,6 +489,8 @@ export function OtherFruitStorageTab({ clientId: fixedClientId }: { clientId?: s
                     coordinate: currentCoord
                 },
                 storedAt: new Date(),
+                storedByUserName: user?.email || (user?.isAnonymous ? 'Anónimo' : user?.displayName || 'N/A'),
+                storedByUserId: user?.uid || undefined,
             });
 
             const binsStored = amountToStore * unitsPerItem;

@@ -578,7 +578,9 @@ export default function CamarasPage() {
                             chamberId: targetChamberId,
                             coordinate: targetCoordinate,
                         },
-                        storedAt: new Date()
+                        storedAt: new Date(),
+                        storedByUserName: user?.email || (user?.isAnonymous ? 'Anónimo' : user?.displayName || 'N/A'),
+                        storedByUserId: user?.uid || undefined,
                     });
                 }
             }
@@ -731,20 +733,21 @@ export default function CamarasPage() {
         limit(500)
       );
       const snap = await getDocs(q);
-      const latestTimestamps: Record<string, number> = {};
+      const existingKeys = new Set<string>();
       snap.forEach(docSnap => {
         const data = docSnap.data();
         const chId = data.chamberId;
-        const time = (data.timestamp as Timestamp).toMillis();
-        if (chId && (!latestTimestamps[chId] || time > latestTimestamps[chId])) {
-          latestTimestamps[chId] = time;
+        const ts = data.timestamp;
+        if (chId && ts) {
+          const time = typeof ts.toMillis === 'function' ? ts.toMillis() : new Date(ts).getTime();
+          existingKeys.add(`${chId}_${time}`);
         }
       });
 
-      // Filter only records that are strictly newer than the latest in DB for that chamber
+      // Filter only records that are not already present in the DB
       const newRecords = records.filter(record => {
-        const latestTime = latestTimestamps[record.chamberId] || 0;
-        return record.date.getTime() > latestTime;
+        const key = `${record.chamberId}_${record.date.getTime()}`;
+        return !existingKeys.has(key);
       });
 
       if (newRecords.length === 0) {

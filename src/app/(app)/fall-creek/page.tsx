@@ -19,6 +19,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { cn } from '@/lib/utils';
 import { chambersConfig } from '@/lib/chambers-config';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
 import { CheckCircle2, CircleDot, Eye, Pencil, Trash2, X, Move, ClipboardCheck, History, PackageCheck } from 'lucide-react';
@@ -612,7 +613,7 @@ export default function FallCreekPage() {
                 items: decomposedItems,
                 status: 'Pendiente de recibir',
                 createdAt: serverTimestamp() as any,
-                userId: user?.uid || null,
+                userId: user?.uid || undefined,
                 userName: user?.email || (user?.isAnonymous ? 'Anónimo' : user?.displayName || 'N/A'),
             };
 
@@ -903,7 +904,7 @@ export default function FallCreekPage() {
                                                              const isPermanentlyBlocked = (row === 13 || row === 14) && !allowedComodinCols.includes(col.name);
                                                             const isComodinRow = row === 13 || row === 14;
 
-                                                            return (
+                                                            const cellElement = (
                                                                 <div key={coord}
                                                                     onMouseDown={() => {
                                                                         if (isPermanentlyBlocked || isReserved || !isOccupied) return;
@@ -955,6 +956,75 @@ export default function FallCreekPage() {
                                                                         </div>
                                                                     )}
                                                                 </div>
+                                                            );
+
+                                                            if (selectionMode || isPermanentlyBlocked || !isOccupied) {
+                                                                return cellElement;
+                                                            }
+
+                                                            const firstItem = itemsInCoord[0];
+                                                            const uniquePalletIds = Array.from(new Set(itemsInCoord.map(i => i.palletId).filter(Boolean)));
+
+                                                            return (
+                                                                <Popover key={coord}>
+                                                                    <PopoverTrigger asChild>
+                                                                        {cellElement}
+                                                                    </PopoverTrigger>
+                                                                    <PopoverContent className="p-4 w-60 sm:w-64" side="bottom" align="center">
+                                                                        <div className="space-y-2">
+                                                                            <div className="border-b pb-1">
+                                                                                <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Ubicación {coord}</p>
+                                                                                <p className="text-sm font-semibold">
+                                                                                    {uniqueLotIds.length > 1 ? 'Lotes Mezclados' : `Documento: ${firstItem?.document || '-'}`}
+                                                                                </p>
+                                                                            </div>
+                                                                            
+                                                                            {uniqueLotIds.length > 1 ? (
+                                                                                <div className="space-y-3">
+                                                                                    <p className="text-xs font-bold text-amber-500 flex items-center gap-1">
+                                                                                        <span>⚠ Contiene {uniqueLotIds.length} lotes</span>
+                                                                                    </p>
+                                                                                    <div className="space-y-2 max-h-36 overflow-y-auto">
+                                                                                        {itemsInCoord.map((item, idx) => (
+                                                                                            <div key={idx} className="text-xs border-b border-dashed pb-1.5 last:border-0 last:pb-0">
+                                                                                                <div className="flex justify-between items-center">
+                                                                                                    <span className="font-bold">Doc: {item.document || '-'}</span>
+                                                                                                    <Badge variant="outline" className="h-4 text-[9px] px-1 bg-primary/5 text-primary border-primary/20">
+                                                                                                        {item.quantity} {item.unit}
+                                                                                                    </Badge>
+                                                                                                </div>
+                                                                                                <p className="text-muted-foreground mt-0.5">{item.varietyOrProduct}</p>
+                                                                                                {item.clientLotId && <p className="text-muted-foreground font-mono text-[9px]">Lote: {item.clientLotId}</p>}
+                                                                                                {item.palletId && <p className="text-muted-foreground font-mono text-[9px]">Pallet ID: {item.palletId}</p>}
+                                                                                                {item.observation && <p className="text-muted-foreground italic text-[10px] mt-0.5">Obs: {item.observation}</p>}
+                                                                                            </div>
+                                                                                        ))}
+                                                                                    </div>
+                                                                                </div>
+                                                                            ) : (
+                                                                                <div className="text-xs space-y-1">
+                                                                                    {firstItem && (
+                                                                                        <>
+                                                                                            <p><span className="font-semibold">Cliente:</span> {firstItem.ownerName}</p>
+                                                                                            <p><span className="font-semibold">Pallet Log:</span> {firstItem.document || '-'}</p>
+                                                                                            <p><span className="font-semibold">Pallet ID:</span> <span className="font-mono">{uniquePalletIds.join(', ') || '-'}</span></p>
+                                                                                            <p><span className="font-semibold">Variedad:</span> {firstItem.varietyOrProduct}</p>
+                                                                                            <p><span className="font-semibold">Documento:</span> {firstItem.document || '-'}</p>
+                                                                                            {firstItem.observation && (
+                                                                                                <p className="text-muted-foreground italic text-xs mt-0.5"><span className="font-semibold">Obs:</span> {firstItem.observation}</p>
+                                                                                            )}
+                                                                                        </>
+                                                                                    )}
+                                                                                </div>
+                                                                            )}
+                                                                            
+                                                                            <div className="grid grid-cols-2 gap-x-4 pt-1 text-xs font-semibold border-t">
+                                                                                <p>Bins: {itemsInCoord.filter(i => i.unit === 'Bins').reduce((s, i) => s + i.quantity, 0)}</p>
+                                                                                <p>Pallets: {itemsInCoord.filter(i => i.unit === 'Pallets').reduce((s, i) => s + i.quantity, 0)}</p>
+                                                                            </div>
+                                                                        </div>
+                                                                    </PopoverContent>
+                                                                </Popover>
                                                             );
                                                         })
                                                     )}

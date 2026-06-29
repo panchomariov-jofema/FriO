@@ -12,41 +12,31 @@ interface LineItems {
     textItems: MergedTextCell[];
 }
 
+// Columns boundaries based on X coordinates in the PDF layout
+function getColumnNameByX(x: number): keyof FallCreekManifestRow | null {
+    if (x < 45) return 'Pallet #';
+    if (x >= 45 && x < 90) return 'Pallet ID';
+    if (x >= 90 && x < 140) return 'Package IDs';
+    if (x >= 140 && x < 185) return 'Item';
+    if (x >= 185 && x < 350) return 'Item Description';
+    if (x >= 350 && x < 430) return 'Lot Number (Batch)';
+    if (x >= 430 && x < 495) return 'Qty of Plants';
+    if (x >= 495 && x < 540) return '# of Pots/Tray';
+    if (x >= 540) return '# of Packages';
+    return null;
+}
+
 export async function parseFallCreekPDF(pdfBuffer: Uint8Array): Promise<FallCreekManifestRow[]> {
     const pdf = await getDocumentProxy(pdfBuffer);
     const numPages = pdf.numPages;
     
     const resultRows: FallCreekManifestRow[] = [];
-    let activeHeaderColumns: { name: string; x: number }[] = [];
     
-    // Header keywords to map strings to standard columns
-    const headerKeywords = [
-        { key: 'pallet #', name: 'Pallet #' },
-        { key: 'pallet no', name: 'Pallet #' },
-        { key: 'pallet id', name: 'Pallet ID' },
-        { key: 'palletid', name: 'Pallet ID' },
-        { key: 'package id', name: 'Package IDs' },
-        { key: 'packageid', name: 'Package IDs' },
-        { key: 'item', name: 'Item' },
-        { key: 'description', name: 'Item Description' },
-        { key: 'lot number', name: 'Lot Number (Batch)' },
-        { key: 'lot number (batch)', name: 'Lot Number (Batch)' },
-        { key: 'lot', name: 'Lot Number (Batch)' },
-        { key: 'qty of plants', name: 'Qty of Plants' },
-        { key: 'qty', name: 'Qty of Plants' },
-        { key: 'plants', name: 'Qty of Plants' },
-        { key: '# of pots/tray', name: '# of Pots/Tray' },
-        { key: 'pots/tray', name: '# of Pots/Tray' },
-        { key: 'pots', name: '# of Pots/Tray' },
-        { key: '# of packages', name: '# of Packages' },
-        { key: 'packages', name: '# of Packages' }
-    ];
-
     for (let pageNum = 1; pageNum <= numPages; pageNum++) {
         const page = await pdf.getPage(pageNum);
         const textContent = await page.getTextContent();
         
-        // 1. Filter out empty text items and marked content (which lack transform)
+        // 1. Filter out empty text items and marked content
         const rawItems: any[] = textContent.items.filter((item: any) => 
             item && typeof item.str === 'string' && item.str.trim() !== '' && Array.isArray(item.transform)
         );
@@ -112,55 +102,55 @@ export async function parseFallCreekPDF(pdfBuffer: Uint8Array): Promise<FallCree
             lines.push({ y: r.y, textItems: mergedCells });
         }
 
-        // 4. Try to find the header row on this page
-        let pageHeaderColumns: { name: string; x: number }[] = [];
-        let headerLineIndex = -1;
-
-        for (let i = 0; i < lines.length; i++) {
-            const line = lines[i];
-            const matches: { name: string; x: number }[] = [];
-            
-            for (const cell of line.textItems) {
-                const textLower = cell.text.toLowerCase().trim();
-                
-                // Try to find the matching header
-                for (const kw of headerKeywords) {
-                    if (textLower === kw.key || textLower.includes(kw.key)) {
-                        // Prevent duplicate matches for the same column in one row
-                        if (!matches.some(m => m.name === kw.name)) {
-                            matches.push({ name: kw.name, x: cell.x });
-                            break;
-                        }
-                    }
-                }
-            }
-            
-            // If we match 4 or more headers, this is the header row
-            if (matches.length >= 4) {
-                matches.sort((a, b) => a.x - b.x);
-                pageHeaderColumns = matches;
-                headerLineIndex = i;
-                break;
-            }
-        }
-
-        // Update active header columns if we found a header row on this page
-        if (pageHeaderColumns.length >= 4) {
-            activeHeaderColumns = pageHeaderColumns;
-        }
-
-        // If we don't have any active headers (e.g. skipped or not found yet), we cannot parse
-        if (activeHeaderColumns.length === 0) continue;
-
-        // 5. Parse data rows starting after the header row (or from page start if header was on previous page)
-        const startIndex = headerLineIndex !== -1 ? headerLineIndex + 1 : 0;
+        // 4. Parse data rows
+        const pageRows: FallCreekManifestRow[] = [];
         
-        for (let i = startIndex; i < lines.length; i++) {
-            const line = lines[i];
-            
-            // Check if this line is likely a footer or summary line
+        for (const line of lines) {
+            // IGNORE page headers (above Y = 640) and page footers (below Y = 50)
+            if (line.y >= 640 || line.y <= 50) {
+                continue;
+            }
+
             const lineText = line.textItems.map(c => c.text.toLowerCase()).join(' ');
-            if (lineText.includes('total') || lineText.includes('page') || lineText.includes('document')) {
+            
+            // Skip headers/footers
+            if (
+                lineText.includes('pallet #') || 
+                lineText.includes('pallet id') || 
+                lineText.includes('palet #') || 
+                lineText.includes('palet id') || 
+                lineText.includes('qty of plants') ||
+                lineText.includes('total') ||
+                lineText.includes('page') ||
+                lineText.includes('página') ||
+                lineText.includes('pagina') ||
+                lineText.includes('document') ||
+                lineText.includes('transfer order') || 
+                lineText.includes('shipper/exporter') ||
+                lineText.includes('descripción') ||
+                lineText.includes('description') ||
+                lineText.includes('variedad') ||
+                lineText.includes('producto') ||
+                lineText.includes('lote') ||
+                lineText.includes('cantidad') ||
+                lineText.includes('macetas') ||
+                lineText.includes('bandejas') ||
+                lineText.includes('paquetes') ||
+                lineText.includes('peso bruto') ||
+                lineText.includes('peso neto') ||
+                lineText.includes('gross weight') ||
+                lineText.includes('net weight') ||
+                lineText.includes('estimado') ||
+                lineText.includes('estimated') ||
+                lineText.includes('fundo') ||
+                lineText.includes('coihueco') ||
+                lineText.includes('chile') ||
+                lineText.includes('cliente:') ||
+                lineText.includes('fecha de envío') ||
+                lineText.includes('orden de compra') ||
+                lineText.includes('pedido de ventas') ||
+                lineText.includes('notas de palet')
+            ) {
                 continue;
             }
 
@@ -179,7 +169,7 @@ export async function parseFallCreekPDF(pdfBuffer: Uint8Array): Promise<FallCree
             let hasData = false;
             
             for (const cell of line.textItems) {
-                const colName = getClosestColumn(cell.x, activeHeaderColumns);
+                const colName = getColumnNameByX(cell.x);
                 if (colName) {
                     if (['Pallet #', 'Qty of Plants', '# of Pots/Tray', '# of Packages'].includes(colName)) {
                         const cleaned = cell.text.replace(/,/g, '').replace(/[^\d]/g, '');
@@ -197,10 +187,10 @@ export async function parseFallCreekPDF(pdfBuffer: Uint8Array): Promise<FallCree
             }
             
             if (hasData) {
-                const isContinuation = !rowData['Pallet ID'] && !rowData['Pallet #'] && resultRows.length > 0;
+                const isContinuation = !rowData['Pallet ID'] && !rowData['Pallet #'] && pageRows.length > 0;
                 
                 if (isContinuation) {
-                    const lastRow = resultRows[resultRows.length - 1] as any;
+                    const lastRow = pageRows[pageRows.length - 1] as any;
                     for (const colName of ['Package IDs', 'Item Description', 'Item', 'Lot Number (Batch)']) {
                         if (rowData[colName]) {
                             lastRow[colName] = (lastRow[colName] ? lastRow[colName] + ' ' : '') + rowData[colName].trim();
@@ -217,30 +207,12 @@ export async function parseFallCreekPDF(pdfBuffer: Uint8Array): Promise<FallCree
                     rowData['Item'] = String(rowData['Item']).trim();
                     rowData['Item Description'] = String(rowData['Item Description']).trim();
                     rowData['Lot Number (Batch)'] = String(rowData['Lot Number (Batch)']).trim();
-                    resultRows.push(rowData);
+                    pageRows.push(rowData);
                 }
             }
         }
+        resultRows.push(...pageRows);
     }
     
     return resultRows;
-}
-
-function getClosestColumn(x: number, headerCols: { name: string; x: number }[]): string | null {
-    if (headerCols.length === 0) return null;
-    let closestCol = headerCols[0];
-    let minDist = Math.abs(x - closestCol.x);
-    
-    for (let i = 1; i < headerCols.length; i++) {
-        const col = headerCols[i];
-        const dist = Math.abs(x - col.x);
-        if (dist < minDist) {
-            minDist = dist;
-            closestCol = col;
-        }
-    }
-    
-    // If the element is too far from any column header, discard it
-    if (minDist > 120) return null;
-    return closestCol.name;
 }

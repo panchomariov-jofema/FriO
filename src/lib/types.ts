@@ -316,6 +316,8 @@ export interface OtherFruitReceptionItem {
       coordinate: string;
     };
     storedAt?: Timestamp | Date;
+    storedByUserName?: string;
+    storedByUserId?: string;
     isMixedVariety?: boolean;
     unit?: 'Bins' | 'Pallets';
 }
