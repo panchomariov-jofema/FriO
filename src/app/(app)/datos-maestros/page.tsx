@@ -4,6 +4,7 @@ import * as React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { MasterDataShell } from '@/components/master-data/MasterDataShell';
+import { TelegramSettings } from '@/components/master-data/TelegramSettings';
 import type {
   Exporter,
   Producer,
@@ -731,6 +732,7 @@ export default function DatosMaestrosPage() {
     { value: 'hidrocoolers', label: 'Hidro-coolers' },
     { value: 'businessEntities', label: 'Datos Matriz' },
     { value: 'labels', label: 'Generar Etiquetas' },
+    { value: 'telegram', label: 'Config. Telegram' },
   ];
 
   return (
@@ -1143,6 +1145,9 @@ export default function DatosMaestrosPage() {
                 ))}
               </div>
             </div>
+          </TabsContent>
+          <TabsContent value="telegram" className="mt-4">
+            <TelegramSettings />
           </TabsContent>
         </Tabs>
       </CardContent>

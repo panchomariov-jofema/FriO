@@ -31,7 +31,8 @@ export function OtherFruitPickingTab() {
   const { data: packagingMovements, loading: loadingPackagingMovements } = useFirestoreCollection<PackagingMovement>('packagingMovements');
   const { data: dispatches, loading: loadingDispatches } = useFirestoreCollection<Dispatch>('dispatches');
   const { data: allChamberLots, loading: loadingChamberLots } = useFirestoreCollection<ChamberLot>('chamberLots');
-  const { data: allReceptions, loading: loadingReceptions } = useFirestoreCollection<PackagingReception>('packagingReceptions');
+  const { data: packagingReceptions, loading: loadingPackagingReceptions } = useFirestoreCollection<PackagingReception>('packagingReceptions');
+  const { data: otherFruitReceptions, loading: loadingOtherFruitReceptions } = useFirestoreCollection<OtherFruitReception>('otherFruitReceptions');
   const { data: allClients, loading: loadingClients } = useFirestoreCollection<OtherClient>('otherClients');
   const firestore = useFirestore();
   const { toast } = useToast();
@@ -128,11 +129,11 @@ export function OtherFruitPickingTab() {
         const receptionUpdates = new Map<string, { ref: any, items: any[] }>();
         (confirmedMovement.locations || []).forEach(loc => {
             if (!receptionUpdates.has(loc.receptionId)) {
-                const receptionDoc = allReceptions.find(r => r.id === loc.receptionId);
+                const receptionDoc = otherFruitReceptions.find(r => r.id === loc.receptionId);
                 if (receptionDoc) {
                     receptionUpdates.set(loc.receptionId, {
                         ref: doc(firestore, 'otherFruitReceptions', loc.receptionId),
-                        items: JSON.parse(JSON.stringify(receptionDoc.items))
+                        items: JSON.parse(JSON.stringify(receptionDoc.items || []))
                     });
                 }
             }
@@ -176,10 +177,10 @@ export function OtherFruitPickingTab() {
             if (item.locations) {
               for(const loc of item.locations) {
                 if (loc.palletsToWithdraw > 0) {
-                    const receptionDoc = allReceptions.find(r => r.id === loc.receptionId);
+                    const receptionDoc = packagingReceptions.find(r => r.id === loc.receptionId);
                     if (receptionDoc) {
                         const receptionRef = doc(firestore, 'packagingReceptions', loc.receptionId);
-                        const newItems = JSON.parse(JSON.stringify(receptionDoc.items));
+                        const newItems = JSON.parse(JSON.stringify(receptionDoc.items || []));
                         const itemToUpdate = newItems[loc.itemIndex];
 
                         if (itemToUpdate && itemToUpdate.palletCount >= loc.palletsToWithdraw) {
@@ -264,7 +265,7 @@ export function OtherFruitPickingTab() {
   };
 
 
-  const loading = loadingFruitMovements || loadingPackagingMovements || loadingReceptions || loadingClients || loadingDispatches || loadingChamberLots;
+  const loading = loadingFruitMovements || loadingPackagingMovements || loadingPackagingReceptions || loadingOtherFruitReceptions || loadingClients || loadingDispatches || loadingChamberLots;
 
   return (
     <>

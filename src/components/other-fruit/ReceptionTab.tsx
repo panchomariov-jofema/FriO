@@ -23,6 +23,7 @@ import { FirestorePermissionError } from '@/firebase/errors';
 import { Label } from '@/components/ui/label';
 import { usePackagingMastersByClient } from '@/hooks/usePackagingMastersByClient';
 import { Checkbox } from '../ui/checkbox';
+import { notifyPalletLogStored } from '@/lib/telegram';
 import { BarcodeScanner } from '../BarcodeScanner';
 import { FallCreekReceptionWorkflow } from './FallCreekReceptionWorkflow';
 import { chambersConfig } from '@/lib/chambers-config';
@@ -408,6 +409,18 @@ export function OtherFruitReceptionTab({ clientId: fixedClientId }: { clientId?:
             items: finalItemsArray,
             status: newStatus
         });
+
+        if (newStatus === 'Almacenado') {
+            const updatedReception: OtherFruitReception = {
+                ...originalReception,
+                items: finalItemsArray,
+                status: newStatus,
+                updatedAt: new Date() as any,
+            };
+            notifyPalletLogStored(firestore, updatedReception).catch(err => {
+                console.error("Error al enviar la notificación de Telegram:", err);
+            });
+        }
 
         if (newLastCoord) {
             setLastUsedChamberId(chamberId);

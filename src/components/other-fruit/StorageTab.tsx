@@ -23,6 +23,7 @@ import { BarcodeScanner } from '../BarcodeScanner';
 import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { notifyPalletLogStored } from '@/lib/telegram';
 import { ChevronDown } from 'lucide-react';
 
 type PendingFruitItem = OtherFruitReceptionItem & {
@@ -532,6 +533,18 @@ export function OtherFruitStorageTab({ clientId: fixedClientId }: { clientId?: s
             updatedAt: serverTimestamp(),
         });
         toast({ title: 'Éxito', description: `Almacenado en ${chamberConfig.name}, Coord: ${startCoordinate}.` });
+
+        if (newStatus === 'Almacenado') {
+            const updatedReception: OtherFruitReception = {
+                ...originalReception,
+                items: finalItemsArray,
+                status: newStatus,
+                updatedAt: new Date() as any,
+            };
+            notifyPalletLogStored(firestore, updatedReception).catch(err => {
+                console.error("Error al enviar la notificación de Telegram:", err);
+            });
+        }
         const finalSessionCoord = lastCoord || startCoordinate;
         setLastUsedChamberId(chamberId);
         setLastUsedCoordinate(finalSessionCoord);

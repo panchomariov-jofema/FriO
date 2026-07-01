@@ -104,7 +104,7 @@ export function OtherFruitExitTab({ clientId: fixedClientId }: { clientId?: stri
     const clientsWithStock = new Set<string>();
     receptions.forEach(reception => {
       const hasStoredItem = reception.items?.some(
-        item => item.status === 'Almacenado' && item.quantity > 0
+        item => item && item.status === 'Almacenado' && item.quantity > 0
       );
       if (hasStoredItem) {
         clientsWithStock.add(reception.clientId);
@@ -138,7 +138,7 @@ export function OtherFruitExitTab({ clientId: fixedClientId }: { clientId?: stri
       if (!lotId) return;
 
       (reception.items || []).forEach((item, index) => {
-        if (item.status === 'Almacenado' && item.quantity > 0 && item.storageLocation?.coordinate) {
+        if (item && item.status === 'Almacenado' && item.quantity > 0 && item.storageLocation?.coordinate) {
           const displayKey = item.clientLotId 
             ? `${lotId}-${item.clientLotId}` 
             : lotId;
@@ -316,19 +316,22 @@ export function OtherFruitExitTab({ clientId: fixedClientId }: { clientId?: stri
                 
                 movementItems.push(newItemForMovement);
 
-                movementLocations.push({
+                const locationObj: any = {
                     receptionId,
                     itemIndex,
                     quantity: quantityToDispatch,
                     unit: originalReception.unit,
                     productCode: itemToUpdate.productCode,
                     productName: itemToUpdate.productName,
-                    clientLotId: itemToUpdate.clientLotId || undefined,
                     location: {
                         chamberId: itemToUpdate.storageLocation?.chamberId || '',
                         coordinate: itemToUpdate.storageLocation?.coordinate || ''
                     }
-                });
+                };
+                if (itemToUpdate.clientLotId) {
+                    locationObj.clientLotId = itemToUpdate.clientLotId;
+                }
+                movementLocations.push(locationObj);
             }
         }
 
