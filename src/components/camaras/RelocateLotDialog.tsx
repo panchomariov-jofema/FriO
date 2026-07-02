@@ -16,11 +16,13 @@ import { useToast } from '@/hooks/use-toast';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
 import { naturalSort } from '@/lib/utils';
 import type { ClientStorageConfig, Exporter } from '@/lib/types';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Badge } from '@/components/ui/badge';
 
 interface RelocateLotDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onRelocate: (data: { targetChamberId: string; targetCoordinate: string; quantityToRelocate: number; selectedPalletId?: string }) => void;
+  onRelocate: (data: { targetChamberId: string; targetCoordinate: string; quantityToRelocate: number; selectedItemIds?: string[] }) => void;
   sourceChamberId: string;
   sourceCoordinate: string;
   lotsInCoordinate: StoredItem[];
@@ -35,7 +37,7 @@ const relocateSchema = z.object({
   targetCoordinate: z.string({ required_error: 'Debe seleccionar una coordenada de destino.' }),
   quantityToRelocate: z.coerce.number({ required_error: 'Debe ingresar una cantidad.' })
     .positive('La cantidad debe ser mayor a 0.'),
-  selectedPalletId: z.string().optional(),
+  selectedItemIds: z.array(z.string()).optional(),
 });
 
 type RelocateFormValues = z.infer<typeof relocateSchema>;
@@ -56,10 +58,6 @@ export function RelocateLotDialog({
   
   const { data: chamberSettings } = useFirestoreCollection<{ id: string; row13Enabled?: boolean }>('chamberSettings');
   
-  const palletIds = React.useMemo(() => {
-    return Array.from(new Set(lotsInCoordinate.map(i => i.palletId).filter((pid): pid is string => !!pid)));
-  }, [lotsInCoordinate]);
-
   const totalQuantityInCoord = React.useMemo(() => {
     return lotsInCoordinate.reduce((sum, item) => sum + item.quantity, 0);
   }, [lotsInCoordinate]);
@@ -70,23 +68,13 @@ export function RelocateLotDialog({
       targetChamberId: undefined,
       targetCoordinate: undefined,
       quantityToRelocate: undefined,
-      selectedPalletId: 'all',
+      selectedItemIds: [],
     },
   });
   
   const targetChamberId = form.watch('targetChamberId');
   const watchQuantityToRelocate = form.watch('quantityToRelocate');
-  const watchSelectedPalletId = form.watch('selectedPalletId');
-
-  React.useEffect(() => {
-    if (watchSelectedPalletId && watchSelectedPalletId !== 'all') {
-      const palletItems = lotsInCoordinate.filter(item => item.palletId === watchSelectedPalletId);
-      const palletQty = palletItems.reduce((sum, item) => sum + item.quantity, 0);
-      form.setValue('quantityToRelocate', palletQty);
-    } else {
-      form.setValue('quantityToRelocate', totalQuantityInCoord);
-    }
-  }, [watchSelectedPalletId, lotsInCoordinate, totalQuantityInCoord, form]);
+  const watchSelectedItemIds = form.watch('selectedItemIds') || [];
 
   const { availableCoordinates, occupancyMap } = React.useMemo(() => {
     if (!targetChamberId) return { availableCoordinates: [], occupancyMap: new Map() };
@@ -210,14 +198,17 @@ export function RelocateLotDialog({
 
   React.useEffect(() => {
     if (open) {
+      const defaultItemIds = lotsInCoordinate[0]?.type === 'otherFruit' 
+        ? lotsInCoordinate.map(i => i.id)
+        : [];
       form.reset({
         targetChamberId: undefined,
         targetCoordinate: undefined,
         quantityToRelocate: totalQuantityInCoord,
-        selectedPalletId: 'all',
+        selectedItemIds: defaultItemIds,
       });
     }
-  }, [open, form, totalQuantityInCoord]);
+  }, [open, form, totalQuantityInCoord, lotsInCoordinate]);
 
   const onSubmit = (values: RelocateFormValues) => {
     if (values.targetChamberId === sourceChamberId && values.targetCoordinate === sourceCoordinate) {
@@ -260,7 +251,7 @@ export function RelocateLotDialog({
         targetChamberId: values.targetChamberId,
         targetCoordinate: values.targetCoordinate,
         quantityToRelocate: values.quantityToRelocate,
-        selectedPalletId: values.selectedPalletId === 'all' ? undefined : values.selectedPalletId,
+        selectedItemIds: lotsInCoordinate[0]?.type === 'otherFruit' ? values.selectedItemIds : undefined,
     });
   };
 
@@ -293,26 +284,53 @@ export function RelocateLotDialog({
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-4">
-            {palletIds.length > 0 && (
+            {item.type === 'otherFruit' && (
               <FormField
                 control={form.control}
-                name="selectedPalletId"
+                name="selectedItemIds"
                 render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Pallet ID a Reubicar</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Seleccione un Pallet ID" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="all">Todo (Reubicación general)</SelectItem>
-                        {palletIds.map(pid => (
-                          <SelectItem key={pid} value={pid}>{pid}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                  <FormItem className="space-y-2 border p-3 rounded-lg bg-muted/10">
+                    <FormLabel className="text-xs font-bold uppercase tracking-wider text-[#004b8d]">
+                      Seleccione Bins / Pallets a Reubicar
+                    </FormLabel>
+                    <div className="space-y-2 max-h-48 overflow-y-auto mt-1">
+                      {lotsInCoordinate.map((coordItem) => {
+                        const isChecked = (field.value || []).includes(coordItem.id);
+                        return (
+                          <div key={coordItem.id} className="flex items-center space-x-2 border-b pb-1.5 last:border-0 last:pb-0">
+                            <Checkbox 
+                              id={`item-${coordItem.id}`} 
+                              checked={isChecked}
+                              onCheckedChange={(checked) => {
+                                const newSelection = checked
+                                  ? [...(field.value || []), coordItem.id]
+                                  : (field.value || []).filter((id: string) => id !== coordItem.id);
+                                field.onChange(newSelection);
+                                
+                                // Sync quantityToRelocate automatically!
+                                const selectedItems = lotsInCoordinate.filter(i => newSelection.includes(i.id));
+                                const totalQty = selectedItems.reduce((sum, i) => sum + i.quantity, 0);
+                                form.setValue('quantityToRelocate', totalQty);
+                              }}
+                            />
+                            <label 
+                              htmlFor={`item-${coordItem.id}`}
+                              className="text-xs font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer flex-1"
+                            >
+                              <div className="flex justify-between items-center">
+                                <span className="font-bold">{coordItem.palletId ? `Pallet: ${coordItem.palletId}` : `Ref: ${coordItem.displayId}`}</span>
+                                <Badge variant="outline" className="h-4 text-[9px] px-1 bg-[#7aba28]/10 text-[#7aba28] border-[#7aba28]/20">
+                                  {coordItem.quantity} {coordItem.unit}
+                                </Badge>
+                              </div>
+                              <div className="text-[10px] text-muted-foreground mt-0.5">
+                                {coordItem.varietyOrProduct} {coordItem.clientLotId ? `| Lote: ${coordItem.clientLotId}` : ''}
+                              </div>
+                            </label>
+                          </div>
+                        );
+                      })}
+                    </div>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -331,7 +349,7 @@ export function RelocateLotDialog({
                       min={1} 
                       max={totalQuantityInCoord} 
                       placeholder="Ingrese cantidad..." 
-                      disabled={watchSelectedPalletId !== undefined && watchSelectedPalletId !== 'all'}
+                      disabled={item.type === 'otherFruit'}
                       {...field} 
                     />
                   </FormControl>

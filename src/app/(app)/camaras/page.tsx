@@ -477,13 +477,13 @@ export default function CamarasPage() {
     }
   };
 
-  const handleRelocate = async ({ targetChamberId, targetCoordinate, quantityToRelocate, selectedPalletId }: { targetChamberId: string; targetCoordinate: string; quantityToRelocate: number; selectedPalletId?: string }) => {
+  const handleRelocate = async ({ targetChamberId, targetCoordinate, quantityToRelocate, selectedItemIds }: { targetChamberId: string; targetCoordinate: string; quantityToRelocate: number; selectedItemIds?: string[] }) => {
     if (!coordToRelocate || !firestore) return;
 
     const { chamberId: sourceChamberId, coordinate: sourceCoordinate } = coordToRelocate;
 
-    // Find all lot documents that are in the source coordinate (none if relocating a specific pallet)
-    const lotsToMove = selectedPalletId ? [] : (storedLots || []).filter(
+    // Find all lot documents that are in the source coordinate (none if relocating specific individual bins)
+    const lotsToMove = selectedItemIds ? [] : (storedLots || []).filter(
       (lot) =>
         lot.chamberId === sourceChamberId &&
         lot.coordinate === sourceCoordinate
@@ -493,7 +493,7 @@ export default function CamarasPage() {
         reception.items
             .map((item, index) => ({ item, index })) // Get original index
             .filter(({ item }) => item.status === 'Almacenado' && item.storageLocation?.chamberId === sourceChamberId && item.storageLocation?.coordinate === sourceCoordinate)
-            .filter(({ item }) => !selectedPalletId || item.palletId === selectedPalletId) // Filter by selected pallet ID
+            .filter(({ item, index }) => !selectedItemIds || selectedItemIds.includes(`${reception.id}-${index}`)) // Filter by selected bin IDs
             .map(({item, index}) => ({ reception, item, index })) // Pass original index
     );
 
