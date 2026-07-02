@@ -291,26 +291,27 @@ export function FallCreekReceptionWorkflow({
 
             toast({ title: 'Éxito', description: `Pallet ${selectedPalletId} actualizado.` });
             
-            // If directStorageMode is ON, trigger storage dialog
+            // If directStorageMode is ON, trigger storage dialog (only for successfully received bins with QR)
             if (directStorageMode && onTriggerStorage) {
-                // Construct a consolidated item for storage
-                const palletItems = updatedItems.filter(i => i.palletId === selectedPalletId);
+                const palletItems = updatedItems.filter(i => i.palletId === selectedPalletId && i.status === 'Pendiente de almacenar');
                 const itemIndices = updatedItems
-                    .map((it, idx) => it.palletId === selectedPalletId ? idx : -1)
+                    .map((it, idx) => (it.palletId === selectedPalletId && it.status === 'Pendiente de almacenar') ? idx : -1)
                     .filter(idx => idx !== -1);
 
-                const itemToStore = {
-                    ...palletItems[0],
-                    receptionId: activeManifest.id,
-                    clientId: activeManifest.clientId,
-                    clientName: activeManifest.clientName,
-                    document: activeManifest.document,
-                    itemIndices: itemIndices,
-                    unit: activeManifest.unit,
-                    quantity: palletItems.length // Usually 3
-                };
+                if (palletItems.length > 0) {
+                    const itemToStore = {
+                        ...palletItems[0],
+                        receptionId: activeManifest.id,
+                        clientId: activeManifest.clientId,
+                        clientName: activeManifest.clientName,
+                        document: activeManifest.document,
+                        itemIndices: itemIndices,
+                        unit: activeManifest.unit,
+                        quantity: palletItems.length
+                    };
 
-                onTriggerStorage(itemToStore);
+                    onTriggerStorage(itemToStore);
+                }
             }
             
             // Check if manifest is fully received

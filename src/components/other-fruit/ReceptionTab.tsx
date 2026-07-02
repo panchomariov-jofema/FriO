@@ -322,6 +322,17 @@ export function OtherFruitReceptionTab({ clientId: fixedClientId }: { clientId?:
     let newLastCoord: string | null = null;
 
     const isFallCreek = originalReception.clientName?.toUpperCase() === 'FALL CREEK';
+    if (isFallCreek) {
+        const missingQrItems = itemsToProcess.filter((item: any) => !item.containerId || item.containerId.trim() === '' || item.containerId === '-');
+        if (missingQrItems.length > 0) {
+            toast({
+                title: "Bloqueo de Seguridad",
+                description: `No se puede almacenar el Pallet porque tiene bin(s) sin código QR registrado. Por favor, realice la recepción y escaneo de los QR primero.`,
+                variant: "destructive"
+            });
+            return;
+        }
+    }
     const unitsPerItem = (isFallCreek && originalReception.unit === 'Pallets') ? 3 : (originalReception.unit === 'Bins' ? 1 : 2);
 
     for (const itemToProcess of itemsToProcess) {
