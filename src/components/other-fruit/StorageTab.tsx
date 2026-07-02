@@ -21,7 +21,7 @@ import type { ClientStorageConfig, Exporter, OtherClient } from '@/lib/types';
 import { ClientSelector } from './ClientSelector';
 import { BarcodeScanner } from '../BarcodeScanner';
 import { Switch } from '@/components/ui/switch';
-import { cn } from '@/lib/utils';
+import { cn, safeToDate, safeToMillis, safeFormatQuantity, safeStringCompare } from '@/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { notifyPalletLogStored } from '@/lib/telegram';
 import { ChevronDown } from 'lucide-react';
@@ -204,9 +204,9 @@ export function OtherFruitStorageTab({ clientId: fixedClientId }: { clientId?: s
             const allReceptions = [...(otherFruitReceptions || []), ...(packagingReceptions || [])];
             const lotA = allReceptions.find(l => l.id === a.receptionId);
             const lotB = allReceptions.find(l => l.id === b.receptionId);
-            if (!lotA?.createdAt?.toMillis) return 1;
-            if (!lotB?.createdAt?.toMillis) return -1;
-            return lotA.createdAt.toMillis() - lotB.createdAt.toMillis();
+            const timeA = lotA ? safeToMillis(lotA.createdAt) : 0;
+            const timeB = lotB ? safeToMillis(lotB.createdAt) : 0;
+            return timeA - timeB;
         });
   }, [otherFruitReceptions, packagingReceptions, fixedClientId, selectedClientId]);
 
@@ -281,7 +281,7 @@ export function OtherFruitStorageTab({ clientId: fixedClientId }: { clientId?: s
     (allChamberLots || []).forEach(l => {
         if (l.status === 'Almacenado' && l.chamberId === chamberId && l.coordinate) {
             occupancyMap.set(l.coordinate, (occupancyMap.get(l.coordinate) || 0) + l.binCount);
-            const time = (l as any).storedAt?.toMillis ? (l as any).storedAt.toMillis() : 0;
+            const time = safeToMillis(l.storedAt);
             if (time > latestTimestamp) {
                 latestTimestamp = time;
                 lastCoordInChamber = l.coordinate;
@@ -298,7 +298,7 @@ export function OtherFruitStorageTab({ clientId: fixedClientId }: { clientId?: s
                 const coord = it.storageLocation.coordinate;
                 occupancyMap.set(coord, (occupancyMap.get(coord) || 0) + equivalentUnits);
                 
-                const time = (it as any).storedAt?.toMillis ? (it as any).storedAt.toMillis() : (it as any).storedAt instanceof Date ? (it as any).storedAt.getTime() : 0;
+                const time = safeToMillis(it.storedAt);
                 if (time > latestTimestamp) {
                     latestTimestamp = time;
                     lastCoordInChamber = coord;
@@ -521,7 +521,10 @@ export function OtherFruitStorageTab({ clientId: fixedClientId }: { clientId?: s
     const finalItemsArray = originalReception.items.filter((_, index) => !itemToProcessScope.itemIndices.includes(index));
     finalItemsArray.push(...newStoredItems);
     
-    const stillHasPending = finalItemsArray.some(item => item.status === 'Pendiente de almacenar' && item.quantity > 0);
+    const stillHasPending = finalItemsArray.some(item => 
+        (item.status === 'Pendiente de recibir' || item.status === 'Pendiente de almacenar') && 
+        item.quantity > 0
+    );
     const newStatus = stillHasPending ? 'Parcialmente Almacenado' : 'Almacenado';
 
     const receptionRef = doc(firestore, 'otherFruitReceptions', itemToProcessScope.receptionId);

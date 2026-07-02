@@ -17,6 +17,7 @@ import { useFirestore } from '@/firebase';
 import { writeBatch, doc, collection, serverTimestamp, addDoc } from 'firebase/firestore';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
+import { safeToMillis, safeFormatQuantity } from '@/lib/utils';
 import { Input } from '../ui/input';
 
 const varieties: Variety[] = ['SANTINA', 'LAPINS', 'REGINA', 'KORDIA', 'SKEENA', 'SWEETHEART', 'SYLVIA', 'SUNBURST'];
@@ -57,11 +58,7 @@ export function ManualDispatchTab({ exporters, loadingExporters, chamberLots, lo
                 (!chamberId || lot.chamberId === chamberId) &&
                 (!variety || lot.variety === variety)
             )
-            .sort((a, b) => {
-                if (!a.receptionDate) return 1;
-                if (!b.receptionDate) return -1;
-                return a.receptionDate.toMillis() - b.receptionDate.toMillis();
-            }); // FIFO Sort
+            .sort((a, b) => safeToMillis(a.receptionDate) - safeToMillis(b.receptionDate)); // FIFO Sort
     }, [chamberLots, form.watch()]);
 
     const handleSelectLot = (lot: ChamberLot, isSelected: boolean) => {
@@ -286,7 +283,7 @@ export function ManualDispatchTab({ exporters, loadingExporters, chamberLots, lo
                                                 max={lot.binCount}
                                             />
                                         </TableCell>
-                                        <TableCell className="hidden md:table-cell">{lot.netWeightPerBin ? `${lot.netWeightPerBin.toFixed(2)} kg` : '-'}</TableCell>
+                                        <TableCell className="hidden md:table-cell">{lot.netWeightPerBin ? `${safeFormatQuantity(lot.netWeightPerBin, 2)} kg` : '-'}</TableCell>
                                         <TableCell className="hidden md:table-cell">{lot.producerShortName}</TableCell>
                                         <TableCell className="hidden md:table-cell">{lot.variety}</TableCell>
                                     </TableRow>
@@ -300,7 +297,7 @@ export function ManualDispatchTab({ exporters, loadingExporters, chamberLots, lo
                  <div className="flex justify-between items-center pt-4">
                     <div className="text-sm font-medium">
                         {Object.keys(selectedLots).length} lote(s) seleccionados ({totalSelectedBins} bins). 
-                        <span className="font-semibold"> Peso Neto Total: {totalSelectedNetWeight.toFixed(2)} kg</span>
+                        <span className="font-semibold"> Peso Neto Total: {safeFormatQuantity(totalSelectedNetWeight, 2)} kg</span>
                     </div>
                     <Button onClick={handleCreateDispatch} disabled={isSubmitting || Object.keys(selectedLots).length === 0}>
                         {isSubmitting ? 'Creando Solicitud...' : 'Crear Solicitud de Despacho'}

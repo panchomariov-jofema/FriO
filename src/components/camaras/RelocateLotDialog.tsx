@@ -20,7 +20,7 @@ import type { ClientStorageConfig, Exporter } from '@/lib/types';
 interface RelocateLotDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onRelocate: (data: { targetChamberId: string; targetCoordinate: string; quantityToRelocate: number }) => void;
+  onRelocate: (data: { targetChamberId: string; targetCoordinate: string; quantityToRelocate: number; selectedPalletId?: string }) => void;
   sourceChamberId: string;
   sourceCoordinate: string;
   lotsInCoordinate: StoredItem[];
@@ -35,6 +35,7 @@ const relocateSchema = z.object({
   targetCoordinate: z.string({ required_error: 'Debe seleccionar una coordenada de destino.' }),
   quantityToRelocate: z.coerce.number({ required_error: 'Debe ingresar una cantidad.' })
     .positive('La cantidad debe ser mayor a 0.'),
+  selectedPalletId: z.string().optional(),
 });
 
 type RelocateFormValues = z.infer<typeof relocateSchema>;
@@ -54,6 +55,11 @@ export function RelocateLotDialog({
   const { toast } = useToast();
   
   const { data: chamberSettings } = useFirestoreCollection<{ id: string; row13Enabled?: boolean }>('chamberSettings');
+  
+  const palletIds = React.useMemo(() => {
+    return Array.from(new Set(lotsInCoordinate.map(i => i.palletId).filter((pid): pid is string => !!pid)));
+  }, [lotsInCoordinate]);
+
   const totalQuantityInCoord = React.useMemo(() => {
     return lotsInCoordinate.reduce((sum, item) => sum + item.quantity, 0);
   }, [lotsInCoordinate]);
@@ -64,11 +70,23 @@ export function RelocateLotDialog({
       targetChamberId: undefined,
       targetCoordinate: undefined,
       quantityToRelocate: undefined,
+      selectedPalletId: 'all',
     },
   });
   
   const targetChamberId = form.watch('targetChamberId');
   const watchQuantityToRelocate = form.watch('quantityToRelocate');
+  const watchSelectedPalletId = form.watch('selectedPalletId');
+
+  React.useEffect(() => {
+    if (watchSelectedPalletId && watchSelectedPalletId !== 'all') {
+      const palletItems = lotsInCoordinate.filter(item => item.palletId === watchSelectedPalletId);
+      const palletQty = palletItems.reduce((sum, item) => sum + item.quantity, 0);
+      form.setValue('quantityToRelocate', palletQty);
+    } else {
+      form.setValue('quantityToRelocate', totalQuantityInCoord);
+    }
+  }, [watchSelectedPalletId, lotsInCoordinate, totalQuantityInCoord, form]);
 
   const { availableCoordinates, occupancyMap } = React.useMemo(() => {
     if (!targetChamberId) return { availableCoordinates: [], occupancyMap: new Map() };
@@ -196,6 +214,7 @@ export function RelocateLotDialog({
         targetChamberId: undefined,
         targetCoordinate: undefined,
         quantityToRelocate: totalQuantityInCoord,
+        selectedPalletId: 'all',
       });
     }
   }, [open, form, totalQuantityInCoord]);
@@ -237,7 +256,12 @@ export function RelocateLotDialog({
         return;
     }
 
-    onRelocate(values);
+    onRelocate({
+        targetChamberId: values.targetChamberId,
+        targetCoordinate: values.targetCoordinate,
+        quantityToRelocate: values.quantityToRelocate,
+        selectedPalletId: values.selectedPalletId === 'all' ? undefined : values.selectedPalletId,
+    });
   };
 
   const item = lotsInCoordinate[0];
@@ -269,6 +293,32 @@ export function RelocateLotDialog({
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-4">
+            {palletIds.length > 0 && (
+              <FormField
+                control={form.control}
+                name="selectedPalletId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Pallet ID a Reubicar</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Seleccione un Pallet ID" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="all">Todo (Reubicación general)</SelectItem>
+                        {palletIds.map(pid => (
+                          <SelectItem key={pid} value={pid}>{pid}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
+
             <FormField
               control={form.control}
               name="quantityToRelocate"
@@ -281,6 +331,7 @@ export function RelocateLotDialog({
                       min={1} 
                       max={totalQuantityInCoord} 
                       placeholder="Ingrese cantidad..." 
+                      disabled={watchSelectedPalletId !== undefined && watchSelectedPalletId !== 'all'}
                       {...field} 
                     />
                   </FormControl>

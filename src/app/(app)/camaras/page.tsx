@@ -19,7 +19,7 @@ import { FirestorePermissionError } from '@/firebase/errors';
 import { chambersConfig } from '@/lib/chambers-config';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { cn, getSortedCoordinates } from '@/lib/utils';
+import { cn, getSortedCoordinates, safeToDate, safeToMillis, safeStringCompare, safeFormatDate, safeFormatQuantity, formatLocaleDate, formatLocaleDateString } from '@/lib/utils';
 import { Progress } from '@/components/ui/progress';
 import { RelocateLotDialog } from '@/components/camaras/RelocateLotDialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
@@ -165,9 +165,8 @@ export default function CamarasPage() {
       acc[exp.exporterId] = exp.name;
       return acc;
     }, {} as Record<string, string>);
-
     const calculatedPendingLots = (pendingLots || [])
-      .sort((a, b) => b.receptionDate && a.receptionDate ? a.receptionDate.toMillis() - b.receptionDate.toMillis() : 0);
+      .sort((a, b) => safeToMillis(a.receptionDate) - safeToMillis(b.receptionDate));
 
     const configs = clientConfigs || [];
       
@@ -478,13 +477,13 @@ export default function CamarasPage() {
     }
   };
 
-  const handleRelocate = async ({ targetChamberId, targetCoordinate, quantityToRelocate }: { targetChamberId: string; targetCoordinate: string; quantityToRelocate: number }) => {
+  const handleRelocate = async ({ targetChamberId, targetCoordinate, quantityToRelocate, selectedPalletId }: { targetChamberId: string; targetCoordinate: string; quantityToRelocate: number; selectedPalletId?: string }) => {
     if (!coordToRelocate || !firestore) return;
 
     const { chamberId: sourceChamberId, coordinate: sourceCoordinate } = coordToRelocate;
 
-    // Find all lot documents that are in the source coordinate
-    const lotsToMove = (storedLots || []).filter(
+    // Find all lot documents that are in the source coordinate (none if relocating a specific pallet)
+    const lotsToMove = selectedPalletId ? [] : (storedLots || []).filter(
       (lot) =>
         lot.chamberId === sourceChamberId &&
         lot.coordinate === sourceCoordinate
@@ -494,6 +493,7 @@ export default function CamarasPage() {
         reception.items
             .map((item, index) => ({ item, index })) // Get original index
             .filter(({ item }) => item.status === 'Almacenado' && item.storageLocation?.chamberId === sourceChamberId && item.storageLocation?.coordinate === sourceCoordinate)
+            .filter(({ item }) => !selectedPalletId || item.palletId === selectedPalletId) // Filter by selected pallet ID
             .map(({item, index}) => ({ reception, item, index })) // Pass original index
     );
 
@@ -739,7 +739,7 @@ export default function CamarasPage() {
         const chId = data.chamberId;
         const ts = data.timestamp;
         if (chId && ts) {
-          const time = typeof ts.toMillis === 'function' ? ts.toMillis() : new Date(ts).getTime();
+          const time = safeToMillis(ts);
           existingKeys.add(`${chId}_${time}`);
         }
       });
@@ -856,7 +856,7 @@ export default function CamarasPage() {
                           </div>
                           <div className="mt-4 text-sm">
                               <p><strong>Bins:</strong> {lot.binCount}</p>
-                              <p><strong>Fecha Recepción:</strong> {lot.receptionDate?.toDate()?.toLocaleString('es-CL') ?? 'Sin fecha'}</p>
+                              <p><strong>Fecha Recepción:</strong> {formatLocaleDate(lot.receptionDate)}</p>
                           </div>
                       </Card>
                   ))
@@ -886,7 +886,7 @@ export default function CamarasPage() {
                 ) : (sortedPendingLots || []).length > 0 ? (
                   sortedPendingLots.map((lot) => (
                     <TableRow key={lot.id}>
-                      <TableCell className="text-sm">{lot.receptionDate?.toDate()?.toLocaleString('es-CL', { year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute:'2-digit' }) ?? 'Sin fecha'}</TableCell>
+                      <TableCell className="text-sm">{formatLocaleDate(lot.receptionDate, { year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute:'2-digit' })}</TableCell>
                       <TableCell className="font-medium">{lot.displayLotId}</TableCell>
                       <TableCell className="hidden md:table-cell">{lot.producerShortName}</TableCell>
                       <TableCell>{lot.binCount}</TableCell>
@@ -967,7 +967,7 @@ export default function CamarasPage() {
                                     <div className="text-left sm:text-right w-full sm:w-auto">
                                         <p className={cn("font-mono font-semibold text-sm", (chamberOccupancy[chamberId]?.percentage ?? 0) > 50 ? 'text-destructive' : 'text-foreground')}>
                                             {chamberOccupancy[chamberId]?.occupied ?? 0} / {chamberOccupancy[chamberId]?.total ?? 0} Bins Equiv.
-                                            ({(chamberOccupancy[chamberId]?.percentage ?? 0).toFixed(1)}%)
+                                            ({safeFormatQuantity(chamberOccupancy[chamberId]?.percentage ?? 0, 1)}%)
                                         </p>
                                         <Progress value={chamberOccupancy[chamberId]?.percentage ?? 0} className="w-full sm:w-48 h-2 mt-1" />
                                     </div>
@@ -1060,7 +1060,7 @@ export default function CamarasPage() {
                                                       return { lotId: colorKey, quantity: totalQty, color: getColorForLot(colorKey) };
                                                   });
                                                   // Sort alphabetically to maintain stable color slice ordering
-                                                  lotQuantities.sort((a, b) => a.lotId.localeCompare(b.lotId));
+                                                  lotQuantities.sort((a, b) => safeStringCompare(a.lotId, b.lotId));
                                                   const totalCoordQuantity = lotQuantities.reduce((sum, l) => sum + l.quantity, 0);
 
                                                   let accumulatedPct = 0;
@@ -1194,7 +1194,7 @@ export default function CamarasPage() {
                                                       <div className="grid grid-cols-2 gap-x-4 pt-1 text-xs font-semibold border-t">
                                                           <p>Bins: {totalBins}</p>
                                                           <p>Pallets: {totalPallets}</p>
-                                                          {totalNetWeight > 0 && <p className="col-span-2 mt-0.5">Peso Neto: {totalNetWeight.toFixed(1)} kg</p>}
+                                                           {totalNetWeight > 0 && <p className="col-span-2 mt-0.5">Peso Neto: {safeFormatQuantity(totalNetWeight, 1)} kg</p>}
                                                       </div>
                                                       <Button size="sm" className="w-full mt-2" onClick={() => handleRelocateClick(chamberId, coord)}>Reubicar</Button>
                                                     </div>

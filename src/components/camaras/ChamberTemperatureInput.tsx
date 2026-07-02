@@ -15,7 +15,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { ChamberTemperature } from '@/lib/types';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
-import { cn } from '@/lib/utils';
+import { cn, safeToMillis, safeFormatQuantity } from '@/lib/utils';
 import { Button } from '../ui/button';
 
 const tempSchema = z.object({
@@ -57,7 +57,7 @@ export function ChamberTemperatureInput({ chamberId, readOnly = false }: Chamber
     const unsubscribe = onSnapshot(q, (snapshot) => {
       if (!snapshot.empty) {
         const temps = snapshot.docs.map(doc => doc.data() as ChamberTemperature);
-        temps.sort((a,b) => (b.timestamp?.toMillis() ?? 0) - (a.timestamp?.toMillis() ?? 0));
+        temps.sort((a,b) => safeToMillis(b.timestamp) - safeToMillis(a.timestamp));
         setLatestTemp(temps[0] || null);
       } else {
         setLatestTemp(null);
@@ -115,7 +115,7 @@ export function ChamberTemperatureInput({ chamberId, readOnly = false }: Chamber
     >
       <div className="flex items-center gap-1">
         <Thermometer className="h-4 w-4 text-blue-500" />
-        <span className="font-mono text-sm">{latestTemp ? `${latestTemp.temperature.toFixed(1)}°C` : '--.- °C'}</span>
+        <span className="font-mono text-sm">{latestTemp ? `${safeFormatQuantity(latestTemp.temperature, 1)}°C` : '--.- °C'}</span>
       </div>
       <div className="flex items-center gap-1">
         <Droplets className="h-4 w-4 text-sky-500" />

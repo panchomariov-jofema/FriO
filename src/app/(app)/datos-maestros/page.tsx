@@ -387,7 +387,7 @@ const BinMaterialForm = ({ form, exporters, binMaterials }: { form: any, exporte
       <FormField control={form.control} name="exporterId" render={({ field }) => (
         <FormItem><FormLabel>Exportador</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
           <FormControl><SelectTrigger><SelectValue placeholder="Seleccione un exportador" /></SelectTrigger></FormControl>
-          <SelectContent>{exporters?.map(e => <SelectItem key={e.id} value={e.exporterId}>{e.name}</SelectItem>)}</SelectContent>
+          <SelectContent>{exporters?.filter(e => e && e.exporterId).map(e => <SelectItem key={e.id || e.exporterId} value={e.exporterId}>{e.name || 'Sin Nombre'}</SelectItem>)}</SelectContent>
         </Select><FormMessage /></FormItem>
       )} />
       <FormField control={form.control} name="type" render={({ field }) => (
@@ -464,7 +464,7 @@ const PackagingMasterForm = ({ form, otherClients }: { form: any, otherClients: 
        <FormField control={form.control} name="clientId" render={({ field }) => (
         <FormItem><FormLabel>Cliente</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
           <FormControl><SelectTrigger><SelectValue placeholder="Seleccione un cliente" /></SelectTrigger></FormControl>
-          <SelectContent>{otherClients?.map(c => <SelectItem key={c.id} value={c.clientId}>{c.name}</SelectItem>)}</SelectContent>
+          <SelectContent>{otherClients?.filter(c => c && c.clientId).map(c => <SelectItem key={c.id || c.clientId} value={c.clientId}>{c.name || 'Sin Nombre'}</SelectItem>)}</SelectContent>
         </Select><FormMessage /></FormItem>
       )} />
     </>
@@ -477,7 +477,7 @@ const PackingForm = ({ form, exporters }: { form: any; exporters: Exporter[] }) 
       <FormField control={form.control} name="exporterId" render={({ field }) => (
         <FormItem><FormLabel>Exportador</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
           <FormControl><SelectTrigger><SelectValue placeholder="Seleccione un exportador" /></SelectTrigger></FormControl>
-          <SelectContent>{exporters?.map(e => <SelectItem key={e.id} value={e.exporterId}>{e.name}</SelectItem>)}</SelectContent>
+          <SelectContent>{exporters?.filter(e => e && e.exporterId).map(e => <SelectItem key={e.id || e.exporterId} value={e.exporterId}>{e.name || 'Sin Nombre'}</SelectItem>)}</SelectContent>
         </Select><FormMessage /></FormItem>
       )} />
       <FormField control={form.control} name="name" render={({ field }) => (
@@ -496,7 +496,7 @@ const UserMasterForm = ({ form, profiles }: { form: any, profiles: Profile[] }) 
       <FormField control={form.control} name="profileId" render={({ field }) => (
         <FormItem><FormLabel>Perfil</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
           <FormControl><SelectTrigger><SelectValue placeholder="Seleccione un perfil" /></SelectTrigger></FormControl>
-          <SelectContent>{profiles?.map(p => <SelectItem key={p.id} value={p.profileId}>{p.name}</SelectItem>)}</SelectContent>
+          <SelectContent>{profiles?.filter(p => p && p.profileId).map(p => <SelectItem key={p.id || p.profileId} value={p.profileId}>{p.name || 'Sin Nombre'}</SelectItem>)}</SelectContent>
         </Select><FormMessage /></FormItem>
       )} />
     </>

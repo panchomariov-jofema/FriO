@@ -107,3 +107,49 @@ export async function notifyPalletLogStored(firestore: Firestore, reception: Oth
     console.warn(`No se pudo enviar la notificación de Telegram para el Pallet Log: ${reception.document}`);
   }
 }
+
+/**
+ * Envía una notificación formateada a Telegram cuando se inicia/carga un Pallet Log.
+ */
+export async function notifyPalletLogStarted(firestore: Firestore, reception: OtherFruitReception): Promise<void> {
+  const config = await getTelegramConfig(firestore);
+  if (!config.botToken || !config.chatId) {
+    console.log('Telegram no está configurado. Se omite la notificación.');
+    return;
+  }
+
+  // Calcular la cantidad total de Bins
+  const totalBins = (reception.items || []).reduce((sum, item) => {
+    const isFC = reception.clientName?.toUpperCase() === 'FALL CREEK';
+    const multiplier = (isFC && item.unit === 'Pallets') ? 3 : (item.unit === 'Bins' ? 1 : 2);
+    return sum + ((item.quantity || 0) * multiplier);
+  }, 0);
+
+  // Obtener y formatear fecha/hora (Santiago de Chile)
+  const date = new Date();
+  const formattedDate = date.toLocaleString('es-CL', {
+    timeZone: 'America/Santiago',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  });
+
+  const message = 
+    `📤 *Pallet Log Iniciado / Cargado*\n\n` +
+    `*Socio Comercial:* ${reception.clientName || 'N/A'}\n` +
+    `*Nombre del Pallet Log:* ${reception.document || 'N/A'}\n` +
+    `*Fecha / Hora:* ${formattedDate}\n` +
+    `*Cantidad de Bins:* ${totalBins}\n\n` +
+    `*Estado:* Ingresado - Pendiente de Recepción`;
+
+  const success = await sendTelegramMessage(config.botToken, config.chatId, message);
+  if (success) {
+    console.log(`Notificación de inicio de Telegram enviada para: ${reception.document}`);
+  } else {
+    console.warn(`No se pudo enviar la notificación de inicio de Telegram para: ${reception.document}`);
+  }
+}
+

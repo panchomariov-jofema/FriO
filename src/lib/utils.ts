@@ -338,3 +338,102 @@ export function generateDteXml(doc: DTEGuiaDespacho): string {
 </EnvioDTE>
 `;
 }
+
+export function safeToDate(val: any): Date {
+  if (!val) return new Date(NaN);
+  if (typeof val.toDate === 'function') {
+    try {
+      return val.toDate();
+    } catch {
+      // fallback
+    }
+  }
+  if (val instanceof Date) {
+    return val;
+  }
+  if (typeof val.toMillis === 'function') {
+    try {
+      return new Date(val.toMillis());
+    } catch {
+      // fallback
+    }
+  }
+  if (typeof val === 'object') {
+    const seconds = val.seconds !== undefined ? val.seconds : val._seconds;
+    if (seconds !== undefined) {
+      return new Date(seconds * 1000 + Math.floor((val.nanoseconds || val._nanoseconds || 0) / 1000000));
+    }
+  }
+  if (typeof val === 'string' || typeof val === 'number') {
+    const parsed = new Date(val);
+    if (!isNaN(parsed.getTime())) return parsed;
+  }
+  return new Date(NaN);
+}
+
+export function safeToMillis(val: any): number {
+  if (!val) return 0;
+  if (typeof val.toMillis === 'function') {
+    try {
+      return val.toMillis();
+    } catch {
+      // fallback
+    }
+  }
+  if (typeof val.getTime === 'function') {
+    return val.getTime();
+  }
+  if (typeof val === 'object') {
+    const seconds = val.seconds !== undefined ? val.seconds : val._seconds;
+    if (seconds !== undefined) {
+      return seconds * 1000 + Math.floor((val.nanoseconds || val._nanoseconds || 0) / 1000000);
+    }
+  }
+  if (typeof val === 'string' || typeof val === 'number') {
+    const num = Number(val);
+    if (!isNaN(num)) return num;
+    const parsed = Date.parse(val as string);
+    if (!isNaN(parsed)) return parsed;
+  }
+  return 0;
+}
+
+export function safeStringCompare(a: any, b: any, options?: Intl.CollatorOptions): number {
+  const strA = typeof a === 'string' ? a : (a !== null && a !== undefined ? String(a) : '');
+  const strB = typeof b === 'string' ? b : (b !== null && b !== undefined ? String(b) : '');
+  return strA.localeCompare(strB, undefined, options);
+}
+
+import { format as dateFnsFormat } from 'date-fns';
+
+export function safeFormatDate(dateVal: any, formatStr: string, fallback: string = '-'): string {
+  const date = safeToDate(dateVal);
+  if (!date || isNaN(date.getTime())) {
+    return fallback;
+  }
+  try {
+    return dateFnsFormat(date, formatStr);
+  } catch (err) {
+    console.error("Error formatting date:", err, dateVal);
+    return fallback;
+  }
+}
+
+export function safeFormatQuantity(val: any, decimals: number = 2): string {
+  const num = Number(val);
+  if (isNaN(num) || num === 0) return "0";
+  return Number.isInteger(num) ? num.toString() : parseFloat(num.toFixed(decimals)).toString();
+}
+
+export function formatLocaleDate(val: any, options?: Intl.DateTimeFormatOptions, fallback: string = 'Sin fecha'): string {
+  const date = safeToDate(val);
+  if (!date || isNaN(date.getTime())) return fallback;
+  return date.toLocaleString('es-CL', options);
+}
+
+export function formatLocaleDateString(val: any, options?: Intl.DateTimeFormatOptions, fallback: string = 'Sin fecha'): string {
+  const date = safeToDate(val);
+  if (!date || isNaN(date.getTime())) return fallback;
+  return date.toLocaleDateString('es-CL', options);
+}
+

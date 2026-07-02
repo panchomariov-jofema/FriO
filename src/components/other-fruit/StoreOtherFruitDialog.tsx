@@ -15,7 +15,7 @@ import { OtherFruitReception, ChamberLot, OtherFruitReceptionItem, Chamber, Clie
 import { chambersConfig } from '@/lib/chambers-config';
 import { useToast } from '@/hooks/use-toast';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
-import { getSortedCoordinates, getPairedCoordinates } from '@/lib/utils';
+import { getSortedCoordinates, getPairedCoordinates, safeToMillis } from '@/lib/utils';
 import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
 import { Zap } from 'lucide-react';
 
@@ -110,7 +110,7 @@ export function StoreOtherFruitDialog({
             clientId: lot.exporterId 
           });
 
-          const time = (lot as any).storedAt?.toMillis ? (lot as any).storedAt.toMillis() : 0;
+          const time = safeToMillis(lot.storedAt);
           if (time > latestTimestamp) {
               latestTimestamp = time;
               lastCoordInChamber = lot.coordinate;
@@ -138,7 +138,7 @@ export function StoreOtherFruitDialog({
                    });
                 }
 
-                const time = (storedItem as any).storedAt?.toMillis ? (storedItem as any).storedAt.toMillis() : (storedItem as any).storedAt instanceof Date ? (storedItem as any).storedAt.getTime() : 0;
+                const time = safeToMillis(storedItem.storedAt);
                 if (time > latestTimestamp) {
                     latestTimestamp = time;
                     lastCoordInChamber = storedItem.storageLocation.coordinate;

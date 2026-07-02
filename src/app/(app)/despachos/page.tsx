@@ -38,6 +38,7 @@ import { errorEmitter } from '@/firebase/error-emitter';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { safeToMillis, safeToDate, safeFormatQuantity, formatLocaleDate, safeStringCompare } from '@/lib/utils';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -103,7 +104,7 @@ function DespachosPageContent() {
 
   const filteredDispatches = React.useMemo(() => {
     if (!dispatches) return [];
-    return [...dispatches].sort((a,b) => (b.createdAt?.toMillis() ?? 0) - (a.createdAt?.toMillis() ?? 0));
+    return [...dispatches].sort((a,b) => safeToMillis(b.createdAt) - safeToMillis(a.createdAt));
   }, [dispatches]);
 
 
@@ -213,9 +214,7 @@ function DespachosPageContent() {
         }, {} as Record<string, { totalBins: number, receptionDate: any, fractions: ChamberLot[] }>);
 
         const sortedGroupedLots = Object.values(groupedLots).sort((a, b) => {
-            if (!a.receptionDate) return 1;
-            if (!b.receptionDate) return -1;
-            return a.receptionDate.toMillis() - b.receptionDate.toMillis();
+            return safeToMillis(a.receptionDate) - safeToMillis(b.receptionDate);
         });
 
         const binsToDispatch: ChamberLot[] = [];
@@ -442,10 +441,10 @@ function DespachosPageContent() {
                 ) : filteredDispatches.length > 0 ? (
                   filteredDispatches.map((dispatch) => (
                     <TableRow key={dispatch.id}>
-                      <TableCell>{dispatch.createdAt?.toDate().toLocaleString()}</TableCell>
+                      <TableCell>{formatLocaleDate(dispatch.createdAt)}</TableCell>
                       <TableCell>{dispatch.exporterName}</TableCell>
                       <TableCell>{dispatch.totalBins}</TableCell>
-                      <TableCell>{dispatch.totalNetWeight ? `${dispatch.totalNetWeight.toFixed(2)} kg` : '-'}</TableCell>
+                      <TableCell>{dispatch.totalNetWeight ? `${safeFormatQuantity(dispatch.totalNetWeight, 2)} kg` : '-'}</TableCell>
                       <TableCell><Badge variant={dispatch.status === 'Completado' ? 'default' : 'secondary'}>{dispatch.status}</Badge></TableCell>
                       <TableCell className="text-right">
                         {dispatch.status === 'Pendiente de Picking' ? (

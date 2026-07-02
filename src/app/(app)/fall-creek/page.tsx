@@ -16,7 +16,7 @@ import { FirestorePermissionError } from '@/firebase/errors';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { cn } from '@/lib/utils';
+import { cn, safeToMillis, safeToDate, safeFormatDate, safeFormatQuantity, formatLocaleDate, formatLocaleDateString, safeStringCompare } from '@/lib/utils';
 import { chambersConfig } from '@/lib/chambers-config';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -32,6 +32,7 @@ import { PlaceHolderImages } from '@/lib/placeholder-images';
 import { parseFallCreekManifest, decomposePalletsIntoBins, type FallCreekManifestRow, fileToBase64 } from '@/lib/fall-creek-utils';
 import { parseManifestAIAction } from './actions';
 import { FileUp, ClipboardList, Loader2, Search, Printer, Download } from 'lucide-react';
+import { notifyPalletLogStarted } from '@/lib/telegram';
 import type { PendingItem } from '@/lib/types';
 import { StoreOtherFruitDialog } from '@/components/other-fruit/StoreOtherFruitDialog';
 import { ChamberTemperatureInput } from '@/components/camaras/ChamberTemperatureInput';
@@ -163,13 +164,7 @@ export default function FallCreekPage() {
                     humidity: Number(t.humidity),
                 };
             })
-            .sort((a, b) => {
-                const tsA = a.timestamp as any;
-                const tsB = b.timestamp as any;
-                const timeA = tsA && typeof tsA.toMillis === 'function' ? tsA.toMillis() : new Date(tsA).getTime();
-                const timeB = tsB && typeof tsB.toMillis === 'function' ? tsB.toMillis() : new Date(tsB).getTime();
-                return timeA - timeB;
-            });
+            .sort((a, b) => safeToMillis(a.timestamp) - safeToMillis(b.timestamp));
     }, [allTemperatures, selectedChamber]);
 
     const { storedItemsByChamber, chamberOccupancy, chambersWithFallCreekStock, reservedCoords, pendingItems, fallCreekStoredItems } = React.useMemo(() => {
@@ -617,7 +612,15 @@ export default function FallCreekPage() {
                 userName: user?.email || (user?.isAnonymous ? 'Anónimo' : user?.displayName || 'N/A'),
             };
 
-            await addDoc(collection(firestore, 'otherFruitReceptions'), receptionData);
+            const docRef = await addDoc(collection(firestore, 'otherFruitReceptions'), receptionData);
+            
+            notifyPalletLogStarted(firestore, {
+                ...receptionData,
+                id: docRef.id
+            } as any).catch(err => {
+                console.error("Error al enviar la notificación de Telegram de inicio:", err);
+            });
+
             toast({ title: 'Éxito', description: 'Manifiesto cargado correctamente. Se han generado los bins correspondientes para su recepción.' });
             setShowPreview(false);
             setPreviewItems([]);
@@ -703,11 +706,7 @@ export default function FallCreekPage() {
         if (!fallCreekClient || !allMovements) return [];
         const sortedMovements = (allMovements || [])
             .filter(m => m.clientId === fallCreekClient.clientId && m.type === 'salida')
-            .sort((a,b) => {
-                const timeA = a.createdAt?.toMillis() ?? 0;
-                const timeB = b.createdAt?.toMillis() ?? 0;
-                return timeB - timeA;
-            });
+            .sort((a,b) => safeToMillis(b.createdAt) - safeToMillis(a.createdAt));
 
         return sortedMovements.map(mov => {
             const totalQuantity = mov.items.reduce((sum, item) => sum + item.quantity, 0);
@@ -876,7 +875,7 @@ export default function FallCreekPage() {
                                                                         const totalQty = itemsForLot.reduce((sum, item) => sum + item.quantity, 0);
                                                                         return { lotId, quantity: totalQty, color: getColorForLot(lotId) };
                                                                     });
-                                                                    lotQuantities.sort((a, b) => a.lotId.localeCompare(b.lotId));
+                                                                    lotQuantities.sort((a, b) => safeStringCompare(a.lotId, b.lotId));
                                                                     const totalCoordQuantity = lotQuantities.reduce((sum, l) => sum + l.quantity, 0);
 
                                                                     let accumulatedPct = 0;
@@ -1268,10 +1267,10 @@ export default function FallCreekPage() {
                                         <TableBody>
                                             {(allReceptions || [])
                                                 .filter(r => r.clientId === fallCreekClient.clientId)
-                                                .sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0))
+                                                .sort((a, b) => safeToMillis(b.createdAt) - safeToMillis(a.createdAt))
                                                 .map(reception => (
                                                     <TableRow key={reception.id}>
-                                                        <TableCell>{reception.createdAt?.toDate()?.toLocaleDateString() ?? 'Sin fecha'}</TableCell>
+                                                        <TableCell>{formatLocaleDateString(reception.createdAt)}</TableCell>
                                                         <TableCell className="font-mono font-bold">
                                                             <div>{reception.document}</div>
                                                             {reception.documentNumber && (
@@ -1578,7 +1577,29 @@ export default function FallCreekPage() {
                                                 <TableCell className="font-mono font-bold">{item['Pallet ID']}</TableCell>
                                                 <TableCell>{item['Item Description']}</TableCell>
                                                 <TableCell className="font-mono text-xs text-muted-foreground">{item['Lot Number (Batch)']}</TableCell>
-                                                <TableCell className="text-right font-bold">{item['# of Packages']}</TableCell>
+                                                <TableCell className="text-right font-bold w-24">
+                                                    <Input
+                                                        type="number"
+                                                        value={item['# of Packages']}
+                                                        onChange={(e) => {
+                                                            const newBins = Number(e.target.value) || 0;
+                                                            const currentBins = Number(item['# of Packages']) || 0;
+                                                            const currentPlants = Number(item['Qty of Plants']) || 0;
+                                                            const plantsPerBin = currentBins > 0 ? (currentPlants / currentBins) : 0;
+                                                            const newPlants = Math.round(newBins * plantsPerBin);
+
+                                                            const updated = [...previewItems];
+                                                            updated[index] = {
+                                                                ...item,
+                                                                '# of Packages': newBins,
+                                                                'Qty of Plants': newPlants
+                                                            };
+                                                            setPreviewItems(updated);
+                                                        }}
+                                                        className="h-8 text-right font-bold w-20 ml-auto border-muted focus:border-primary"
+                                                        min={1}
+                                                    />
+                                                </TableCell>
                                                 <TableCell className="text-right font-semibold text-[#7aba28]">{item['Qty of Plants']}</TableCell>
                                             </TableRow>
                                         ))}
@@ -1592,6 +1613,12 @@ export default function FallCreekPage() {
                                 <div className="flex flex-col">
                                     <span className="text-muted-foreground text-xs uppercase tracking-wider font-semibold">Total Pallets ID</span>
                                     <span className="text-xl font-bold text-[#004b8d]">{previewItems.length}</span>
+                                </div>
+                                <div className="flex flex-col">
+                                    <span className="text-muted-foreground text-xs uppercase tracking-wider font-semibold">Total Bins</span>
+                                    <span className="text-xl font-bold text-amber-600">
+                                        {previewItems.reduce((sum, item) => sum + (Number(item['# of Packages']) || 0), 0).toLocaleString()}
+                                    </span>
                                 </div>
                                 <div className="flex flex-col">
                                     <span className="text-muted-foreground text-xs uppercase tracking-wider font-semibold">Total Plantas</span>

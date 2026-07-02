@@ -18,6 +18,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { parseFallCreekManifest, decomposePalletsIntoBins, type FallCreekManifestRow, fileToBase64 } from '@/lib/fall-creek-utils';
 import { parseManifestAIAction } from '@/app/(app)/fall-creek/actions';
+import { notifyPalletLogStarted } from '@/lib/telegram';
 
 const cleanVarietyName = (name: string) => {
     if (!name) return 'N/A';
@@ -166,6 +167,13 @@ export function FallCreekReceptionWorkflow({
 
             const docRef = await addDoc(collection(firestore, 'otherFruitReceptions'), receptionData);
             
+            notifyPalletLogStarted(firestore, {
+                ...receptionData,
+                id: docRef.id
+            } as any).catch(err => {
+                console.error("Error al enviar la notificación de Telegram de inicio:", err);
+            });
+
             toast({ title: 'Éxito', description: 'Manifiesto cargado correctamente. Se han generado los bins correspondientes para su recepción.' });
             
             // Auto-select newly loaded manifest
@@ -653,7 +661,29 @@ export function FallCreekReceptionWorkflow({
                                                     <TableCell className="font-mono font-bold">{item['Pallet ID']}</TableCell>
                                                     <TableCell>{item['Item Description']}</TableCell>
                                                     <TableCell className="font-mono text-xs text-muted-foreground">{item['Lot Number (Batch)']}</TableCell>
-                                                    <TableCell className="text-right font-bold">{item['# of Packages']}</TableCell>
+                                                    <TableCell className="text-right font-bold w-24">
+                                                        <Input
+                                                            type="number"
+                                                            value={item['# of Packages']}
+                                                            onChange={(e) => {
+                                                                const newBins = Number(e.target.value) || 0;
+                                                                const currentBins = Number(item['# of Packages']) || 0;
+                                                                const currentPlants = Number(item['Qty of Plants']) || 0;
+                                                                const plantsPerBin = currentBins > 0 ? (currentPlants / currentBins) : 0;
+                                                                const newPlants = Math.round(newBins * plantsPerBin);
+
+                                                                const updated = [...previewItems];
+                                                                updated[index] = {
+                                                                    ...item,
+                                                                    '# of Packages': newBins,
+                                                                    'Qty of Plants': newPlants
+                                                                };
+                                                                setPreviewItems(updated);
+                                                            }}
+                                                            className="h-8 text-right font-bold w-20 ml-auto border-muted focus:border-primary"
+                                                            min={1}
+                                                        />
+                                                    </TableCell>
                                                     <TableCell className="text-right font-semibold text-[#7aba28]">{item['Qty of Plants']}</TableCell>
                                                 </TableRow>
                                             ))}
@@ -667,6 +697,12 @@ export function FallCreekReceptionWorkflow({
                                     <div className="flex flex-col">
                                         <span className="text-muted-foreground text-xs uppercase tracking-wider font-semibold">Total Pallets ID</span>
                                         <span className="text-xl font-bold text-[#004b8d]">{previewItems.length}</span>
+                                    </div>
+                                    <div className="flex flex-col">
+                                        <span className="text-muted-foreground text-xs uppercase tracking-wider font-semibold">Total Bins</span>
+                                        <span className="text-xl font-bold text-amber-600">
+                                            {previewItems.reduce((sum, item) => sum + (Number(item['# of Packages']) || 0), 0).toLocaleString()}
+                                        </span>
                                     </div>
                                     <div className="flex flex-col">
                                         <span className="text-muted-foreground text-xs uppercase tracking-wider font-semibold">Total Plantas</span>

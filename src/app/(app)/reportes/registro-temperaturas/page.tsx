@@ -8,6 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Skeleton } from '@/components/ui/skeleton';
 import { ReportHeader } from '@/components/reports/ReportHeader';
 import { chambersConfig } from '@/lib/chambers-config';
+import { safeToDate, safeToMillis, safeFormatQuantity, formatLocaleDate } from '@/lib/utils';
 
 function convertToCSV(data: any[], headers: { key: string, label: string }[]) {
     const headerRow = headers.map(h => h.label).join(';');
@@ -16,8 +17,8 @@ function convertToCSV(data: any[], headers: { key: string, label: string }[]) {
             let value = row[header.key];
             if (value instanceof Date) {
                 value = value.toLocaleString('es-CL');
-            } else if (typeof value === 'object' && value !== null && value.toDate) { // Firebase Timestamp
-                value = value.toDate().toLocaleString('es-CL');
+            } else if (typeof value === 'object' && value !== null) { // Firebase Timestamp
+                value = safeToDate(value).toLocaleString('es-CL');
             }
             const stringValue = String(value ?? '');
             return `"${stringValue.replace(/"/g, '""')}"`;
@@ -45,7 +46,7 @@ export default function TemperatureLogReportPage() {
 
     const sortedData = React.useMemo(() => {
         if (!temperatures) return [];
-        return [...temperatures].sort((a, b) => (b.timestamp?.toMillis() ?? 0) - (a.timestamp?.toMillis() ?? 0));
+        return [...temperatures].sort((a, b) => safeToMillis(b.timestamp) - safeToMillis(a.timestamp));
     }, [temperatures]);
 
     const handleExport = () => {
@@ -95,9 +96,9 @@ export default function TemperatureLogReportPage() {
                                 ) : sortedData && sortedData.length > 0 ? (
                                     sortedData.map(temp => (
                                         <TableRow key={temp.id}>
-                                            <TableCell>{temp.timestamp?.toDate()?.toLocaleString('es-CL') ?? 'Sin fecha'}</TableCell>
-                                            <TableCell>{chambersConfig[temp.chamberId]?.name || temp.chamberId}</TableCell>
-                                            <TableCell>{temp.temperature.toFixed(1)} °C</TableCell>
+                                             <TableCell>{formatLocaleDate(temp.timestamp)}</TableCell>
+                                             <TableCell>{chambersConfig[temp.chamberId]?.name || temp.chamberId}</TableCell>
+                                             <TableCell>{safeFormatQuantity(temp.temperature, 1)} °C</TableCell>
                                             <TableCell>{temp.humidity !== undefined ? `${temp.humidity}%` : '-'}</TableCell>
                                             <TableCell>{temp.userName || (temp.userId ? 'Usuario Desconocido' : 'N/A')}</TableCell>
                                         </TableRow>

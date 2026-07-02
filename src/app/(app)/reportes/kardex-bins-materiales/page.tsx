@@ -39,7 +39,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
-import { cn } from '@/lib/utils';
+import { cn, safeToMillis, safeToDate, safeFormatDate, safeFormatQuantity, formatLocaleDate, formatLocaleDateString } from '@/lib/utils';
 import { DateRange } from 'react-day-picker';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useForm } from 'react-hook-form';
@@ -73,8 +73,8 @@ function convertToCSV(data: any[], headers: {key: string, label: string}[]) {
             let value = row[header.key];
              if (value instanceof Date) {
                 value = value.toLocaleString('es-CL');
-            } else if (typeof value === 'object' && value !== null && (value as any).toDate) {
-                value = (value as any).toDate().toLocaleString('es-CL');
+            } else if (typeof value === 'object' && value !== null) {
+                value = safeToDate(value).toLocaleString('es-CL');
             }
             const stringValue = String(value ?? '');
             return `"${stringValue.replace(/"/g, '""')}"`;
@@ -185,7 +185,7 @@ export default function BinMaterialKardexReportPage() {
 
         const getCorrectedTimestamp = (ts: Timestamp) => {
             if (!ts) return ts;
-            const d = ts.toDate();
+            const d = safeToDate(ts);
             if (d.getFullYear() === 2026 && d.getMonth() === 3 && d.getDate() === 27) {
                 const hours = d.getHours();
                 const minutes = d.getMinutes();
@@ -274,13 +274,13 @@ export default function BinMaterialKardexReportPage() {
             }
         });
 
-        return allItems.sort((a, b) => b.fecha.toMillis() - a.fecha.toMillis());
+        return allItems.sort((a, b) => safeToMillis(b.fecha) - safeToMillis(a.fecha));
     }, [loading, movements, chamberLots, dispatches, exporterMap, producerMap, receptionLotMap, materialMasterMap]);
 
     const filteredKardexData = React.useMemo(() => {
         return rawKardexData.filter(item => {
             if (dateRange?.from) {
-                const itemDate = item.fecha.toDate();
+                const itemDate = safeToDate(item.fecha);
                 const start = startOfDay(dateRange.from);
                 const end = dateRange.to ? endOfDay(dateRange.to) : endOfDay(dateRange.from);
                 if (!isWithinInterval(itemDate, { start, end })) return false;
@@ -589,11 +589,11 @@ export default function BinMaterialKardexReportPage() {
                                         )}
                                     >
                                         <CalendarIcon className="mr-2 h-4 w-4" />
-                                        {dateRange?.from ? (
-                                            dateRange.to ? (
-                                                <>{format(dateRange.from, "dd/MM/yy")} - {format(dateRange.to, "dd/MM/yy")}</>
+                                        {dateRange?.from && !isNaN(safeToDate(dateRange.from).getTime()) ? (
+                                            dateRange.to && !isNaN(safeToDate(dateRange.to).getTime()) ? (
+                                                <>{safeFormatDate(dateRange.from, "dd/MM/yy")} - {safeFormatDate(dateRange.to, "dd/MM/yy")}</>
                                             ) : (
-                                                format(dateRange.from, "dd/MM/yy")
+                                                safeFormatDate(dateRange.from, "dd/MM/yy")
                                             )
                                         ) : (
                                             <span>Desde - Hasta</span>
@@ -683,7 +683,7 @@ export default function BinMaterialKardexReportPage() {
                                 ) : filteredKardexData.length > 0 ? (
                                     filteredKardexData.map(item => (
                                         <TableRow key={item.key}>
-                                            <TableCell className="text-xs">{item.fecha?.toDate()?.toLocaleString('es-CL', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' }) ?? 'Sin fecha'}</TableCell>
+                                            <TableCell className="text-xs">{formatLocaleDate(item.fecha, { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })}</TableCell>
                                             <TableCell className="font-mono text-xs">{item.documento || '-'}</TableCell>
                                             <TableCell className="text-xs">{item.exportador}</TableCell>
                                             <TableCell className="text-xs">{item.productor}</TableCell>
@@ -770,10 +770,10 @@ export default function BinMaterialKardexReportPage() {
                                                         uniqueProdsMap.set(field.value, currentProd);
                                                     }
                                                     return Array.from(uniqueProdsMap.values())
-                                                        .filter(p => p.status !== 'inactivo' || p.producerId === field.value)
+                                                        .filter(p => p && p.producerId && (p.status !== 'inactivo' || p.producerId === field.value))
                                                         .map((prod) => (
-                                                            <SelectItem key={prod.id} value={prod.producerId}>
-                                                                {prod.shortName} ({prod.producerId})
+                                                            <SelectItem key={prod.id || prod.producerId} value={prod.producerId}>
+                                                                {prod.shortName || 'Sin Nombre'} ({prod.producerId})
                                                             </SelectItem>
                                                         ));
                                                 })()}

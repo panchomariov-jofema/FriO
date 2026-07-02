@@ -12,6 +12,7 @@ import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '../ui/dialog';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
+import { safeFormatQuantity } from '@/lib/utils';
 
 
 interface WeightCalculatorProps {
@@ -163,7 +164,7 @@ export function WeightCalculator({ lot, open, onOpenChange, onWeightSaved }: Wei
             )}
 
             <div className="text-lg font-bold text-center pt-2">
-              Peso Total Acumulado: {totalWeight.toFixed(2)} kg
+              Peso Total Acumulado: {safeFormatQuantity(totalWeight, 2)} kg
             </div>
         </div>
         <DialogFooter>

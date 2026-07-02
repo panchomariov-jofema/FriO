@@ -8,6 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Skeleton } from '@/components/ui/skeleton';
 import { ReportHeader } from '@/components/reports/ReportHeader';
 import { differenceInDays, format } from 'date-fns';
+import { safeToDate, safeFormatDate } from '@/lib/utils';
 
 function convertToCSV(data: any[], headers: { key: string; label: string }[]) {
     const headerRow = headers.map(h => h.label).join(';');
@@ -51,10 +52,10 @@ export default function PermanenceReportPage() {
             if (movement.type === 'salida' && movement.status === 'Completado' && movement.locations) {
                 movement.locations.forEach((loc, index) => {
                     const reception = receptionMap.get(loc.receptionId);
-                    if (reception && reception.createdAt && movement.createdAt) {
-                        const fechaRecepcion = reception.createdAt.toDate();
-                        const fechaSalida = movement.createdAt.toDate();
-                        const diasPermanencia = differenceInDays(fechaSalida, fechaRecepcion);
+                    if (reception && (reception.createdAt || (reception as any).storedAt) && (movement.createdAt || (movement as any).dispatchDate)) {
+                        const fechaRecepcion = safeToDate(reception.createdAt || (reception as any).storedAt);
+                        const fechaSalida = safeToDate(movement.createdAt || (movement as any).dispatchDate);
+                        const diasPermanencia = !isNaN(fechaRecepcion.getTime()) && !isNaN(fechaSalida.getTime()) ? differenceInDays(fechaSalida, fechaRecepcion) : 0;
 
                         data.push({
                             id: `${movement.id}-${index}`,
@@ -93,8 +94,8 @@ export default function PermanenceReportPage() {
         
         const dataForExport = reportData.map(item => ({
             ...item,
-            fechaRecepcion: format(item.fechaRecepcion, 'yyyy-MM-dd HH:mm'),
-            fechaSalida: format(item.fechaSalida, 'yyyy-MM-dd HH:mm'),
+            fechaRecepcion: safeFormatDate(item.fechaRecepcion, 'yyyy-MM-dd HH:mm'),
+            fechaSalida: safeFormatDate(item.fechaSalida, 'yyyy-MM-dd HH:mm'),
         }));
         
         const csv = convertToCSV(dataForExport, headers);
@@ -131,8 +132,8 @@ export default function PermanenceReportPage() {
                                 ) : reportData && reportData.length > 0 ? (
                                     reportData.map(item => (
                                         <TableRow key={item.id}>
-                                            <TableCell>{format(item.fechaRecepcion, 'dd/MM/yyyy HH:mm')}</TableCell>
-                                            <TableCell>{format(item.fechaSalida, 'dd/MM/yyyy HH:mm')}</TableCell>
+                                            <TableCell>{safeFormatDate(item.fechaRecepcion, 'dd/MM/yyyy HH:mm')}</TableCell>
+                                            <TableCell>{safeFormatDate(item.fechaSalida, 'dd/MM/yyyy HH:mm')}</TableCell>
                                             <TableCell>{item.cliente}</TableCell>
                                             <TableCell>{item.documento}</TableCell>
                                             <TableCell>{item.loteCliente || '-'}</TableCell>

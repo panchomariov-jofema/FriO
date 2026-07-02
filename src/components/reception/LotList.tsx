@@ -14,6 +14,7 @@ import { TemperatureForm } from './TemperatureForm';
 import { Checkbox } from '../ui/checkbox';
 import { Label } from '../ui/label';
 import { EditLotDialog } from './EditLotDialog';
+import { safeToMillis, safeFormatQuantity } from '@/lib/utils';
 import { Pencil } from 'lucide-react';
 
 interface LotListProps {
@@ -51,11 +52,7 @@ export function LotList({ exporterId }: LotListProps) {
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const fetchedLots = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ReceptionLot))
-        .sort((a, b) => {
-            if (!b.createdAt) return -1;
-            if (!a.createdAt) return 1;
-            return b.createdAt.toMillis() - a.createdAt.toMillis();
-        });
+        .sort((a, b) => safeToMillis(b.createdAt) - safeToMillis(a.createdAt));
         
       setLots(fetchedLots);
       setLoading(false);
@@ -107,21 +104,21 @@ export function LotList({ exporterId }: LotListProps) {
         if (status === 'Pendiente de Peso') {
             return <Button size="sm" variant="outline" onClick={() => handleActionClick(lot)}>Pesar</Button>;
         }
-        return lot.totalWeight ? `${lot.totalWeight.toFixed(2)} kg` : '-';
+        return lot.totalWeight ? `${safeFormatQuantity(lot.totalWeight, 2)} kg` : '-';
     }
     
     if (field === 'preHydroTemp') {
         if (status === 'Pendiente de Pre-Hidro') {
             return <Button size="sm" variant="outline" onClick={() => handleActionClick(lot)}>Registrar T°</Button>;
         }
-        return lot.preHydroTemp ? `${lot.preHydroTemp.toFixed(1)} °C` : '-';
+        return lot.preHydroTemp ? `${safeFormatQuantity(lot.preHydroTemp, 1)} °C` : '-';
     }
 
     if (field === 'postHydroTemp') {
         if (status === 'Pendiente de Post-Hidro') {
             return <Button size="sm" variant="outline" onClick={() => handleActionClick(lot)}>Registrar T°</Button>;
         }
-        return lot.postHydroTemp ? `${lot.postHydroTemp.toFixed(1)} °C` : '-';
+        return lot.postHydroTemp ? `${safeFormatQuantity(lot.postHydroTemp, 1)} °C` : '-';
     }
   }
 
@@ -181,7 +178,7 @@ export function LotList({ exporterId }: LotListProps) {
                         <Badge variant={getStatusVariant(lot.status)}>{lot.status}</Badge>
                       </TableCell>
                       <TableCell>{renderCellContent(lot, 'totalWeight')}</TableCell>
-                      <TableCell className="hidden md:table-cell">{pesoNeto !== null ? `${pesoNeto.toFixed(2)} kg` : '-'}</TableCell>
+                      <TableCell className="hidden md:table-cell">{pesoNeto !== null ? `${safeFormatQuantity(pesoNeto, 2)} kg` : '-'}</TableCell>
                       <TableCell>{renderCellContent(lot, 'preHydroTemp')}</TableCell>
                       <TableCell>{renderCellContent(lot, 'postHydroTemp')}</TableCell>
                        <TableCell className="text-right">

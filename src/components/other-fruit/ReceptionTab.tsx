@@ -27,7 +27,7 @@ import { notifyPalletLogStored } from '@/lib/telegram';
 import { BarcodeScanner } from '../BarcodeScanner';
 import { FallCreekReceptionWorkflow } from './FallCreekReceptionWorkflow';
 import { chambersConfig } from '@/lib/chambers-config';
-import { getSortedCoordinates, getPairedCoordinates } from '@/lib/utils';
+import { getSortedCoordinates, getPairedCoordinates, cn } from '@/lib/utils';
 import { Switch } from '@/components/ui/switch';
 import { StoreOtherFruitDialog } from './StoreOtherFruitDialog';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -402,7 +402,10 @@ export function OtherFruitReceptionTab({ clientId: fixedClientId }: { clientId?:
     finalItemsArray.push(...newStoredItems);
 
     try {
-        const stillHasPending = finalItemsArray.some(item => item.status === 'Pendiente de almacenar' && item.quantity > 0);
+        const stillHasPending = finalItemsArray.some(item => 
+            (item.status === 'Pendiente de recibir' || item.status === 'Pendiente de almacenar') && 
+            item.quantity > 0
+        );
         const newStatus = stillHasPending ? 'Parcialmente Almacenado' : 'Almacenado';
 
         await updateDoc(doc(firestore, 'otherFruitReceptions', originalReception.id!), {
@@ -740,14 +743,25 @@ export function OtherFruitReceptionTab({ clientId: fixedClientId }: { clientId?:
                 <CardDescription>Socio: <span className="font-bold text-[#004b8d]">{selectedClient.name}</span></CardDescription>
               </div>
               <div className="flex flex-wrap items-center gap-2">
-                  <div className="flex items-center space-x-2 bg-[#7aba28]/10 px-4 py-2 rounded-full border border-[#7aba28]/20">
-                      <Label htmlFor="physical-scanner-fc" className="text-xs font-bold uppercase text-[#004b8d] cursor-pointer">Lector / Cámara</Label>
+                  <div className="flex items-center space-x-2 bg-[#7aba28]/10 px-4 py-2 rounded-full border border-[#7aba28]/20 text-xs font-semibold select-none">
+                      <span 
+                          onClick={() => handleTogglePhysical(true)} 
+                          className={cn("uppercase text-[#004b8d] cursor-pointer transition-all", usePhysicalScanner ? "font-extrabold text-[#004b8d]" : "font-normal text-[#004b8d]/60")}
+                      >
+                          Lector
+                      </span>
                       <Switch 
                           id="physical-scanner-fc" 
-                          checked={usePhysicalScanner} 
-                          onCheckedChange={handleTogglePhysical}
+                          checked={!usePhysicalScanner} 
+                          onCheckedChange={(checked) => handleTogglePhysical(!checked)}
                           className="data-[state=checked]:bg-[#7aba28]"
                       />
+                      <span 
+                          onClick={() => handleTogglePhysical(false)} 
+                          className={cn("uppercase text-[#004b8d] cursor-pointer transition-all", !usePhysicalScanner ? "font-extrabold text-[#004b8d]" : "font-normal text-[#004b8d]/60")}
+                      >
+                          Cámara
+                      </span>
                   </div>
                   <div className="flex items-center space-x-2 bg-[#7aba28]/10 px-4 py-2 rounded-full border border-[#7aba28]/20">
                       <Label htmlFor="direct-storage-fc" className="text-xs font-bold uppercase text-[#004b8d] cursor-pointer">Almacenamiento Directo</Label>

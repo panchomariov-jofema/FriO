@@ -29,7 +29,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover"
-import { cn } from "@/lib/utils"
+import { cn, safeToDate, safeToMillis, safeStringCompare, safeFormatDate, safeFormatQuantity, formatLocaleDate, formatLocaleDateString } from "@/lib/utils"
 import { collection, onSnapshot, query, where } from 'firebase/firestore';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
@@ -52,8 +52,8 @@ function convertToCSV(data: any[], headers: {key: string, label: string}[]) {
             let value = row[header.key];
              if (value instanceof Date) {
                 value = value.toLocaleString();
-            } else if (typeof value === 'object' && value !== null && value?.toDate) {
-                value = value.toDate().toLocaleString();
+            } else if (typeof value === 'object' && value !== null) {
+                value = safeToDate(value).toLocaleString();
             }
             const stringValue = String(value ?? '');
             return `"${stringValue.replace(/"/g, '""')}"`;
@@ -143,7 +143,7 @@ function FallCreekExecutiveView({ dashboardData, clientName }: { dashboardData: 
                                 <TableBody>
                                     {summaryData && summaryData.length > 0 ? summaryData.map((item: any) => (
                                         <TableRow key={item.id}>
-                                             <TableCell>{item.receptionDate?.toDate()?.toLocaleDateString('es-CL') ?? 'Sin fecha'}</TableCell>
+                                             <TableCell>{formatLocaleDateString(item.receptionDate)}</TableCell>
                                              <TableCell className="font-mono">{item.lot}</TableCell>
                                             <TableCell>{item.quantity} {item.unit}</TableCell>
                                             <TableCell>{item.chamber}</TableCell>
@@ -244,7 +244,7 @@ function FallCreekExecutiveView({ dashboardData, clientName }: { dashboardData: 
                                 {dispatchReportData && dispatchReportData.length > 0 ? (
                                     dispatchReportData.map((dispatch: any) => (
                                      <TableRow key={dispatch.id}>
-                                         <TableCell>{dispatch.dispatchDate?.toDate()?.toLocaleString('es-CL') ?? 'Sin fecha'}</TableCell>
+                                         <TableCell>{formatLocaleDate(dispatch.dispatchDate)}</TableCell>
                                          <TableCell className="font-mono">{dispatch.document}</TableCell>
                                         <TableCell className="font-mono">{dispatch.clientLotIds}</TableCell>
                                         <TableCell>{dispatch.productNames}</TableCell>
@@ -324,7 +324,7 @@ export default function DashboardPage() {
             const temps = snapshot.docs.map(doc => ({...doc.data(), id: doc.id} as ChamberTemperature));
             
             const newLatestTemps = temps.reduce((acc, temp) => {
-                if (!acc[temp.chamberId] || (temp.timestamp?.toMillis() ?? 0) > (acc[temp.chamberId]!.timestamp?.toMillis() ?? 0)) {
+                if (!acc[temp.chamberId] || safeToMillis(temp.timestamp) > safeToMillis(acc[temp.chamberId]!.timestamp)) {
                     acc[temp.chamberId] = temp;
                 }
                 return acc;
@@ -359,7 +359,7 @@ export default function DashboardPage() {
                 type: 'otherclient' as const
             }));
 
-        return [...exporterOptions, ...clientOptions].sort((a, b) => a.label.localeCompare(b.label));
+        return [...exporterOptions, ...clientOptions].sort((a, b) => safeStringCompare(a.label, b.label));
     }, [exporters, otherClients]);
     
     React.useEffect(() => {
@@ -555,7 +555,7 @@ export default function DashboardPage() {
         (chamberLots || []).forEach(lot => {
             if (isOtherClientSelected) return;
             if (lot.hidrocooler !== 'EXTERNO') return; 
-            if (!isDateInRange(lot.storedAt?.toDate())) return;
+            if (!isDateInRange(safeToDate(lot.storedAt))) return;
             if (isExporterSelected && lot.exporterId !== selectedClient.id) return;
 
             const weight = (lot.netWeightPerBin || 0) * lot.binCount;
@@ -571,7 +571,7 @@ export default function DashboardPage() {
         }));
         
         const sortedReceptions = (receptionLots || [])
-            .sort((a,b) => (b.createdAt?.toMillis() ?? 0) - (a.createdAt?.toMillis() ?? 0))
+            .sort((a,b) => safeToMillis(b.createdAt) - safeToMillis(a.createdAt))
             .slice(0, 5);
         
         return {
@@ -608,7 +608,7 @@ export default function DashboardPage() {
         );
 
         const groupedSummary = summaryItems.reduce((acc, item) => {
-            const dateString = item.receptionDate?.toDate()?.toLocaleDateString('es-CL') || 'Sin fecha';
+            const dateString = formatLocaleDateString(item.receptionDate);
             const key = `${dateString}-${item.lot}-${item.chamber}`;
             
             if (!acc[key]) {
@@ -628,7 +628,7 @@ export default function DashboardPage() {
         }, {} as Record<string, { id: string, receptionDate: any, lot: string, quantity: number, unit: string, chamber: string }>);
 
         const summaryTableData = Object.values(groupedSummary)
-            .sort((a, b) => (b.receptionDate?.toMillis() ?? 0) - (a.receptionDate?.toMillis() ?? 0));
+            .sort((a, b) => safeToMillis(b.receptionDate) - safeToMillis(a.receptionDate));
 
 
         const quantityByProduct: Record<string, {name: string, quantity: number, unit: 'Bins' | 'Pallets'}> = {};
@@ -684,7 +684,7 @@ export default function DashboardPage() {
                     unit: movement.unit,
                 };
             })
-            .sort((a,b) => b.dispatchDate.toMillis() - a.dispatchDate.toMillis());
+            .sort((a,b) => safeToMillis(b.dispatchDate) - safeToMillis(a.dispatchDate));
 
 
         return {
@@ -746,14 +746,14 @@ export default function DashboardPage() {
                                     )}
                                 >
                                     <CalendarIcon className="mr-2 h-4 w-4" />
-                                    {dateRange?.from ? (
-                                    dateRange.to ? (
+                                    {dateRange?.from && !isNaN(safeToDate(dateRange.from).getTime()) ? (
+                                    dateRange.to && !isNaN(safeToDate(dateRange.to).getTime()) ? (
                                         <>
-                                        {format(dateRange.from, "LLL dd, y")} -{" "}
-                                        {format(dateRange.to, "LLL dd, y")}
+                                        {safeFormatDate(dateRange.from, "LLL dd, y")} -{" "}
+                                        {safeFormatDate(dateRange.to, "LLL dd, y")}
                                         </>
                                     ) : (
-                                        format(dateRange.from, "LLL dd, y")
+                                        safeFormatDate(dateRange.from, "LLL dd, y")
                                     )
                                     ) : (
                                     <span>Seleccione un rango</span>
@@ -965,7 +965,7 @@ export default function DashboardPage() {
                                         <Badge variant="secondary">{lot.status}</Badge>
                                     </div>
                                     <div className="mt-2 text-sm grid grid-cols-2 gap-x-4">
-                                         <p><strong>Fecha:</strong> {lot.createdAt?.toDate()?.toLocaleString() ?? 'Sin fecha'}</p>
+                                         <p><strong>Fecha:</strong> {formatLocaleDate(lot.createdAt)}</p>
                                         <p><strong>Bins:</strong> {lot.binCount}</p>
                                     </div>
                                 </Card>
@@ -994,7 +994,7 @@ export default function DashboardPage() {
                                 ) : latestReceptions.length > 0 ? (
                                     latestReceptions.map(lot => (
                                         <TableRow key={lot.id}>
-                                             <TableCell>{lot.createdAt?.toDate()?.toLocaleString() ?? 'Sin fecha'}</TableCell>
+                                             <TableCell>{formatLocaleDate(lot.createdAt)}</TableCell>
                                             <TableCell className="font-mono">{lot.displayLotId}</TableCell>
                                             <TableCell className="hidden sm:table-cell">{lot.producerId}</TableCell>
                                             <TableCell className="hidden md:table-cell">{lot.variety}</TableCell>

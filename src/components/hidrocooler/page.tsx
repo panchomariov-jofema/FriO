@@ -17,6 +17,7 @@ import { FirestorePermissionError } from '@/firebase/errors';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { EditProcessingLotDialog } from '@/components/hidrocooler/EditProcessingLotDialog';
+import { safeToDate, safeToMillis, safeFormatQuantity, formatLocaleDate, formatLocaleDateString } from '@/lib/utils';
 import { Pencil } from 'lucide-react';
 
 export default function HidrocoolerPage() {
@@ -38,15 +39,13 @@ export default function HidrocoolerPage() {
   const sortedPendingLots = React.useMemo(() => {
     if (!pendingLots) return [];
     return pendingLots.filter(l => l.status === 'Pendiente de Pre-Hidro').sort((a, b) => {
-        if (!b.receptionDate) return -1;
-        if (!a.receptionDate) return 1;
-        return a.receptionDate.toMillis() - b.receptionDate.toMillis();
+        return safeToMillis(a.receptionDate) - safeToMillis(b.receptionDate);
     });
   }, [pendingLots]);
 
   const filteredProcessingLots = React.useMemo(() => {
     if (!processingLots) return [];
-    const sorted = [...processingLots].sort((a,b) => b.createdAt.toMillis() - a.createdAt.toMillis());
+    const sorted = [...processingLots].sort((a,b) => safeToMillis(b.createdAt) - safeToMillis(a.createdAt));
     if (showOnlyOpen) {
       return sorted.filter(lot => lot.status === 'En Proceso');
     }
@@ -274,11 +273,11 @@ export default function HidrocoolerPage() {
                 ) : sortedPendingLots.length > 0 ? (
                   sortedPendingLots.map((lot) => (
                     <TableRow key={lot.id}>
-                      <TableCell className="text-sm">{lot.receptionDate?.toDate()?.toLocaleString('es-CL', { year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute:'2-digit' }) ?? 'Sin fecha'}</TableCell>
+                      <TableCell className="text-sm">{formatLocaleDate(lot.receptionDate, { year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute:'2-digit' })}</TableCell>
                       <TableCell className="font-medium">{lot.displayLotId}</TableCell>
                       <TableCell className="hidden md:table-cell">{lot.producerShortName}</TableCell>
                       <TableCell>{lot.binCount}</TableCell>
-                      <TableCell>{lot.netWeightPerBin?.toFixed(2) ?? '-'}</TableCell>
+                      <TableCell>{lot.netWeightPerBin !== undefined ? safeFormatQuantity(lot.netWeightPerBin, 2) : '-'}</TableCell>
                       <TableCell className="text-right">
                         <Button size="sm" onClick={() => handleProcessClick(lot)}>Procesar</Button>
                       </TableCell>
@@ -330,7 +329,7 @@ export default function HidrocoolerPage() {
                       <TableCell className="font-medium">{lot.displayLotId}</TableCell>
                       <TableCell>{lot.hidrocooler}</TableCell>
                       <TableCell>{lot.binCount}</TableCell>
-                      <TableCell>{lot.netWeightPerBin?.toFixed(2) ?? '-'}</TableCell>
+                      <TableCell>{lot.netWeightPerBin !== undefined ? safeFormatQuantity(lot.netWeightPerBin, 2) : '-'}</TableCell>
                       <TableCell><Badge variant={getStatusVariant(lot.status)}>{lot.status}</Badge></TableCell>
                       <TableCell className="text-right">
                         {lot.status === 'En Proceso' ? (
