@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
-import type { BinMaterialMovement, ChamberLot, Dispatch, Exporter, Producer, ReceptionLot, BinMaterial } from '@/lib/types';
+import type { BinMaterialMovement, ChamberLot, Dispatch, Exporter, Producer, ReceptionLot, BinMaterial, OtherClient } from '@/lib/types';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ReportHeader } from '@/components/reports/ReportHeader';
@@ -148,6 +148,7 @@ export default function BinMaterialKardexReportPage() {
     const { data: producers, loading: loadingProducers } = useFirestoreCollection<Producer>('producers');
     const { data: receptionLots, loading: loadingReceptions } = useFirestoreCollection<ReceptionLot>('receptionLots');
     const { data: allMaterials } = useFirestoreCollection<BinMaterial>('binMaterials');
+    const { data: otherClients, loading: loadingOtherClients } = useFirestoreCollection<OtherClient>('otherClients');
 
     const editForm = useForm<z.infer<typeof editMovementSchema>>({
         resolver: zodResolver(editMovementSchema),
@@ -172,15 +173,18 @@ export default function BinMaterialKardexReportPage() {
         }
     }, [itemToEdit, editForm, movements]);
 
-    const loading = loadingMovements || loadingChamberLots || loadingDispatches || loadingExporters || loadingProducers || loadingReceptions;
+    const loading = loadingMovements || loadingChamberLots || loadingDispatches || loadingExporters || loadingProducers || loadingReceptions || loadingOtherClients;
 
     const { exporterMap, producerMap, receptionLotMap, materialMasterMap } = React.useMemo(() => {
         const expMap = new Map((exporters || []).map(e => [e.exporterId, e.name]));
+        (otherClients || []).forEach(c => {
+            expMap.set(c.clientId, c.name);
+        });
         const prodMap = new Map((producers || []).map(p => [p.producerId, p.shortName]));
         const recLotMap = new Map((receptionLots || []).map(l => [l.displayLotId, l]));
         const matMasterMap = new Map((allMaterials || []).map(m => [m.code, m.name]));
         return { exporterMap: expMap, producerMap: prodMap, receptionLotMap: recLotMap, materialMasterMap: matMasterMap };
-    }, [exporters, producers, receptionLots, allMaterials]);
+    }, [exporters, producers, receptionLots, allMaterials, otherClients]);
 
     const formatUserName = (name?: string) => {
         if (!name) return 'N/A';
@@ -855,18 +859,21 @@ export default function BinMaterialKardexReportPage() {
                                                 </FormControl>
                                                 <SelectContent>
                                                     {(() => {
-                                                        const uniqueExportersMap = new Map<string, typeof exporters[0]>();
-                                                        (exporters || []).forEach(e => {
-                                                            uniqueExportersMap.set(e.exporterId, e);
+                                                        const uniqueClientsMap = new Map<string, typeof otherClients[0]>();
+                                                        (otherClients || []).forEach(c => {
+                                                            if (!uniqueClientsMap.has(c.clientId) || c.status !== 'inactivo') {
+                                                                uniqueClientsMap.set(c.clientId, c);
+                                                            }
                                                         });
-                                                        const currentExp = (exporters || []).find(e => e.exporterId === field.value);
-                                                        if (field.value && currentExp && !uniqueExportersMap.has(field.value)) {
-                                                            uniqueExportersMap.set(field.value, currentExp);
+                                                        const currentClient = (otherClients || []).find(c => c.clientId === field.value);
+                                                        if (field.value && currentClient && !uniqueClientsMap.has(field.value)) {
+                                                            uniqueClientsMap.set(field.value, currentClient);
                                                         }
-                                                        return Array.from(uniqueExportersMap.values())
-                                                            .map((exp) => (
-                                                                <SelectItem key={exp.id || exp.exporterId} value={exp.exporterId}>
-                                                                    {exp.name || 'Sin Nombre'} ({exp.exporterId})
+                                                        return Array.from(uniqueClientsMap.values())
+                                                            .filter(c => c && c.clientId && (c.status !== 'inactivo' || c.clientId === field.value))
+                                                            .map((client) => (
+                                                                <SelectItem key={client.id || client.clientId} value={client.clientId}>
+                                                                    {client.name || 'Sin Nombre'} ({client.clientId})
                                                                 </SelectItem>
                                                             ));
                                                     })()}
