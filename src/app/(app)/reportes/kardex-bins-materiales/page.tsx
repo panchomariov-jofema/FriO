@@ -65,8 +65,7 @@ const editMovementSchema = z.object({
   driverName: z.string().optional(),
   cantidad: z.coerce.number().positive('Debe ser mayor a 0'),
   associationType: z.enum(['producer', 'client']),
-  producerId: z.string().optional(),
-  exporterId: z.string().optional(),
+  producerId: z.string().min(1, 'Obligatorio'),
 });
 
 function convertToCSV(data: any[], headers: {key: string, label: string}[]) {
@@ -158,20 +157,19 @@ export default function BinMaterialKardexReportPage() {
     React.useEffect(() => {
         if (itemToEdit) {
             const movSnap = (movements || []).find(m => m.id === itemToEdit.movementId);
-            const hasProducer = !!movSnap?.producerId;
-            const hasExporter = !!movSnap?.exporterId;
-            const associationType = (hasExporter && !hasProducer) ? 'client' : 'producer';
+            const currentProducerId = movSnap?.producerId || '';
+            const isClient = (otherClients || []).some(c => c.clientId === currentProducerId);
+            const associationType = isClient ? 'client' : 'producer';
             
             editForm.reset({
                 documento: itemToEdit.documento || '',
                 driverName: itemToEdit.driverName || '',
                 cantidad: itemToEdit.cantidad,
                 associationType: associationType,
-                producerId: movSnap?.producerId || '',
-                exporterId: movSnap?.exporterId || '',
+                producerId: currentProducerId,
             });
         }
-    }, [itemToEdit, editForm, movements]);
+    }, [itemToEdit, editForm, movements, otherClients]);
 
     const loading = loadingMovements || loadingChamberLots || loadingDispatches || loadingExporters || loadingProducers || loadingReceptions || loadingOtherClients;
 
@@ -217,7 +215,7 @@ export default function BinMaterialKardexReportPage() {
             const typeLabel = (mov.type === 'entrada' && !isDirectDispatch) ? 'Entrada' : 'Salida';
             
             mov.items.forEach((item, index) => {
-                let currentProductorName = producerMap.get(mov.producerId) || mov.producerId;
+                let currentProductorName = producerMap.get(mov.producerId) || exporterMap.get(mov.producerId) || mov.producerId;
                 
                 if (mov.document === 'SALDO-INICIAL-2028' && item.binMaterialCode === '10017') {
                     currentProductorName = 'PALOGIX';
@@ -513,16 +511,9 @@ export default function BinMaterialKardexReportPage() {
             const updateData: any = {
                 document: values.documento,
                 driverName: values.driverName,
+                producerId: values.producerId,
                 items: newItems,
             };
-
-            if (values.associationType === 'producer') {
-                updateData.producerId = values.producerId || '';
-                updateData.exporterId = '';
-            } else {
-                updateData.exporterId = values.exporterId || '';
-                updateData.producerId = '';
-            }
 
             await updateDoc(movementRef, updateData);
 
@@ -847,7 +838,7 @@ export default function BinMaterialKardexReportPage() {
                             {watchAssociationType === 'client' && (
                                 <FormField
                                     control={editForm.control}
-                                    name="exporterId"
+                                    name="producerId"
                                     render={({ field }) => (
                                         <FormItem>
                                             <FormLabel>Cliente</FormLabel>
