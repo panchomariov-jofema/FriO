@@ -10,6 +10,7 @@ import { ReportHeader } from '@/components/reports/ReportHeader';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { chambersConfig } from '@/lib/chambers-config';
+import { safeToDate } from '@/lib/utils';
 
 function convertToCSV(data: any[], headers: string[]) {
     const headerRow = headers.join(';');
@@ -147,10 +148,10 @@ export default function OtherFruitStockReportPage() {
         const dataToExport = filteredData.map(item => {
             let formattedDate = '';
             if (item.receptionDate) {
-                const date = typeof (item.receptionDate as any).toDate === 'function'
-                    ? (item.receptionDate as any).toDate()
-                    : new Date(item.receptionDate as any);
-                formattedDate = `${date.toLocaleDateString('es-CL')} ${date.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}`;
+                const date = safeToDate(item.receptionDate);
+                if (!isNaN(date.getTime())) {
+                    formattedDate = `${date.toLocaleDateString('es-CL')} ${date.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}`;
+                }
             }
             return {
                 "Fecha Recepción": formattedDate,
@@ -246,9 +247,8 @@ export default function OtherFruitStockReportPage() {
                                                 <TableCell>
                                                     {(() => {
                                                         if (!item.receptionDate) return 'Sin fecha';
-                                                        const date = typeof (item.receptionDate as any).toDate === 'function'
-                                                            ? (item.receptionDate as any).toDate()
-                                                            : new Date(item.receptionDate as any);
+                                                        const date = safeToDate(item.receptionDate);
+                                                        if (isNaN(date.getTime())) return 'Fecha inválida';
                                                         return `${date.toLocaleDateString('es-CL')} ${date.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}`;
                                                     })()}
                                                 </TableCell>

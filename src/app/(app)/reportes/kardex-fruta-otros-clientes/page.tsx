@@ -17,6 +17,7 @@ import { doc, deleteDoc, writeBatch, serverTimestamp, getDoc, Timestamp } from '
 import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
+import { safeToDate } from '@/lib/utils';
 
 function convertToCSV(data: any[], headers: string[]) {
     const headerRow = headers.join(';');
@@ -68,7 +69,8 @@ function EditMovementDialog({ open, onOpenChange, item, onSave }: EditMovementDi
     React.useEffect(() => {
         if (open && item && firestore) {
             setDocument(item.document || '');
-            const date = item.date?.toDate() || new Date();
+            const parsedDate = safeToDate(item.date);
+            const date = isNaN(parsedDate.getTime()) ? new Date() : parsedDate;
             const tzoffset = date.getTimezoneOffset() * 60000;
             setDateStr(new Date(date.getTime() - tzoffset).toISOString().slice(0, 16));
             setTemperature(item.temperature !== undefined ? item.temperature : '');
@@ -407,10 +409,13 @@ export default function OtherFruitKardexReportPage() {
     }, [kardexData]);
 
     const handleExport = () => {
-        const dataToExport = filteredData.map(item => ({
-            "Fecha": item.date?.toDate(),
-            "Tipo": item.type,
-            "Cliente": item.clientName,
+        const dataToExport = filteredData.map(item => {
+            const dateVal = safeToDate(item.date);
+            const formattedDate = isNaN(dateVal.getTime()) ? '' : `${dateVal.toLocaleDateString('es-CL')} ${dateVal.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}`;
+            return {
+                "Fecha": formattedDate,
+                "Tipo": item.type,
+                "Cliente": item.clientName,
             "Documento": item.document,
             "N° Documento": (item as any).documentNumber || '',
             "Temperatura": item.temperature ? `${item.temperature.toFixed(1)}°C` : '',
@@ -420,7 +425,7 @@ export default function OtherFruitKardexReportPage() {
             "Cantidad": `${item.quantity} ${item.unit}`,
             "Observación": item.observation || '',
             "Usuario": item.userName || '',
-        }));
+        }; });
         const headers = ["Fecha", "Tipo", "Cliente", "Documento", "N° Documento", "Temperatura", "Lote Cliente", "Codigo Producto", "Nombre Producto", "Cantidad", "Observación", "Usuario"];
         const csv = convertToCSV(dataToExport, headers);
         downloadCSV(csv, 'kardex_fruta_otros_clientes.csv');
@@ -562,7 +567,13 @@ export default function OtherFruitKardexReportPage() {
                                 ) : filteredData.length > 0 ? (
                                     filteredData.map((item) => (
                                     <TableRow key={item.key}>
-                                        <TableCell>{item.date?.toDate()?.toLocaleString() ?? 'Sin fecha'}</TableCell>
+                                        <TableCell>
+                                            {(() => {
+                                                const dateVal = safeToDate(item.date);
+                                                if (isNaN(dateVal.getTime())) return 'Sin fecha';
+                                                return `${dateVal.toLocaleDateString('es-CL')} ${dateVal.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}`;
+                                            })()}
+                                        </TableCell>
                                         <TableCell>
                                             <Badge variant={item.type === 'entrada' ? 'default' : 'secondary'}>
                                                 {item.type.charAt(0).toUpperCase() + item.type.slice(1)}
