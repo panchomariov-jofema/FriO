@@ -94,7 +94,7 @@ export function StoreOtherFruitDialog({
       return { availableCoordinates: [], suggestion: null };
     }
 
-    const occupancyMap = new Map<string, { lots: {displayLotId: string, binCount: number, clientId: string }[] }>();
+    const occupancyMap = new Map<string, { lots: {displayLotId: string, binCount: number, clientId: string, productCode?: string }[] }>();
     let lastCoordInChamber: string | null = null;
     let latestTimestamp = 0;
     
@@ -134,7 +134,8 @@ export function StoreOtherFruitDialog({
                    occupancyMap.get(storedItem.storageLocation.coordinate)!.lots.push({ 
                      displayLotId: lotId, 
                      binCount: equivalentUnits,
-                     clientId: reception.clientId 
+                     clientId: reception.clientId,
+                     productCode: storedItem.productCode
                    });
                 }
 
@@ -216,6 +217,13 @@ export function StoreOtherFruitDialog({
         const hasDifferentClient = entry.lots.some(l => l.clientId !== item.clientId);
         if (hasDifferentClient) return false;
 
+        // Prevent mixing different varieties/products in the same coordinate
+        const hasDifferentProduct = entry.lots.some(l => {
+            if (!l.productCode) return true;
+            return l.productCode !== item.productCode;
+        });
+        if (hasDifferentProduct) return false;
+
         const currentOccupancy = entry.lots.reduce((sum, l) => sum + l.binCount, 0);
         return currentOccupancy + unitsPerItem <= occupancyThreshold;
     }) || null;
@@ -229,6 +237,13 @@ export function StoreOtherFruitDialog({
         // Compatibility: only same client allowed for Exportador/Other Fruit
         const hasDifferentClient = entry.lots.some(l => l.clientId !== item.clientId);
         if (hasDifferentClient) return false;
+
+        // Prevent mixing different varieties/products in the same coordinate
+        const hasDifferentProduct = entry.lots.some(l => {
+            if (!l.productCode) return true;
+            return l.productCode !== item.productCode;
+        });
+        if (hasDifferentProduct) return false;
 
         const currentOccupancy = entry.lots.reduce((sum, l) => sum + l.binCount, 0);
         return currentOccupancy + unitsPerItem <= occupancyThreshold;
@@ -247,6 +262,12 @@ export function StoreOtherFruitDialog({
 
             const hasDifferentClient = entry.lots.some(l => l.clientId !== item.clientId);
             if (hasDifferentClient) return false;
+
+            const hasDifferentProduct = entry.lots.some(l => {
+                if (!l.productCode) return true;
+                return l.productCode !== item.productCode;
+            });
+            if (hasDifferentProduct) return false;
 
             const currentOccupancy = entry.lots.reduce((sum, l) => sum + l.binCount, 0);
             return currentOccupancy + unitsPerItem <= occupancyThreshold;

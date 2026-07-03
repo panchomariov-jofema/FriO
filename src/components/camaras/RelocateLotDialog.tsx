@@ -98,18 +98,19 @@ export function RelocateLotDialog({
     }
 
     // 1. Calculate current occupancy and document set for all coordinates in target chamber
-    const occupancyMap = new Map<string, { quantity: number; ownerName: string; unit: string; documents: Set<string> }>();
+    const occupancyMap = new Map<string, { quantity: number; ownerName: string; unit: string; documents: Set<string>; productCodes: Set<string> }>();
     
     allChamberLots.forEach(lot => {
       if (lot.status === 'Almacenado' && lot.chamberId === targetChamberId && lot.coordinate) {
-        const current = occupancyMap.get(lot.coordinate) || { quantity: 0, ownerName: lot.producerShortName, unit: 'Bins', documents: new Set<string>() };
+        const current = occupancyMap.get(lot.coordinate) || { quantity: 0, ownerName: lot.producerShortName, unit: 'Bins', documents: new Set<string>(), productCodes: new Set<string>() };
         const lotDoc = lot.displayLotId.split('-').slice(1).join('-');
         current.documents.add(lotDoc);
         occupancyMap.set(lot.coordinate, { 
             quantity: current.quantity + lot.binCount, 
             ownerName: lot.producerShortName, 
             unit: 'Bins',
-            documents: current.documents
+            documents: current.documents,
+            productCodes: current.productCodes
         });
       }
     });
@@ -117,8 +118,11 @@ export function RelocateLotDialog({
     allOtherFruitReceptions.forEach(reception => {
         (reception.items || []).forEach(item => {
             if(item.status === 'Almacenado' && item.storageLocation?.chamberId === targetChamberId && item.storageLocation.coordinate) {
-                const current = occupancyMap.get(item.storageLocation.coordinate) || { quantity: 0, ownerName: reception.clientName, unit: reception.unit, documents: new Set<string>() };
+                const current = occupancyMap.get(item.storageLocation.coordinate) || { quantity: 0, ownerName: reception.clientName, unit: reception.unit, documents: new Set<string>(), productCodes: new Set<string>() };
                 current.documents.add(reception.document);
+                if (item.productCode) {
+                    current.productCodes.add(item.productCode);
+                }
                 
                 // Determine units: if it's Fall Creek, 1 pallet = 3 bins.
                 const multiplier = (reception.clientName?.toUpperCase() === 'FALL CREEK' && reception.unit === 'Pallets') ? 3 : (reception.unit === 'Bins' ? 1 : 2);
@@ -128,7 +132,8 @@ export function RelocateLotDialog({
                     quantity: current.quantity + equivalentUnits, 
                     ownerName: reception.clientName, 
                     unit: reception.unit,
-                    documents: current.documents
+                    documents: current.documents,
+                    productCodes: current.productCodes
                 });
             }
         });
@@ -172,8 +177,17 @@ export function RelocateLotDialog({
             const existingType = existingExporter?.type?.toUpperCase() || 'EXPORTADOR';
             const incomingType = incomingExporter?.type?.toUpperCase() || 'EXPORTADOR';
 
+            // If other fruit relocation, prevent mixing different varieties/products
+            if (firstItemToRelocate?.type === 'otherFruit') {
+                if (existingOwnerName.toUpperCase() !== incomingOwnerName.toUpperCase()) return false;
+                
+                if (firstItemToRelocate.displayId) { // displayId contains productCode for otherFruit
+                    const targetHasDifferentProduct = Array.from(occupancyData.productCodes || []).some(code => code !== firstItemToRelocate.displayId);
+                    if (targetHasDifferentProduct) return false;
+                }
+            }
             // REGLA CEREZA: Solo mismo cliente y mismo documento
-            if (existingType === 'CEREZA') {
+            else if (existingType === 'CEREZA') {
                 if (existingOwnerName.toUpperCase() !== incomingOwnerName.toUpperCase()) return false;
                 if (!incomingDocument || !occupancyData.documents.has(incomingDocument)) return false;
             } 

@@ -15,6 +15,7 @@ import type { OtherFruitReception, OtherFruitReceptionItem } from '@/lib/types';
 import { BarcodeScanner } from '../BarcodeScanner';
 import { cn } from '@/lib/utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { parseFallCreekManifest, decomposePalletsIntoBins, type FallCreekManifestRow, fileToBase64 } from '@/lib/fall-creek-utils';
 import { parseManifestAIAction } from '@/app/(app)/fall-creek/actions';
@@ -85,6 +86,35 @@ export function FallCreekReceptionWorkflow({
     const fallCreekClient = React.useMemo(() => {
         return otherClients?.find((c: any) => c.name.toUpperCase() === 'FALL CREEK') || null;
     }, [otherClients]);
+
+    const currentManifest = React.useMemo(() => {
+        return allReceptions?.find(r => r.id === selectedManifestId) || null;
+    }, [allReceptions, selectedManifestId]);
+
+    const manifestWarningInfo = React.useMemo(() => {
+        if (!currentManifest || !currentManifest.items) return null;
+        
+        const varieties = new Set<string>();
+        const lots = new Set<string>();
+        
+        currentManifest.items.forEach(item => {
+            if (item.productName) {
+                varieties.add(item.productName);
+            }
+            if (item.clientLotId) {
+                lots.add(item.clientLotId);
+            }
+        });
+        
+        const isMultiVariety = varieties.size > 1;
+        const isMultiLot = lots.size > 1;
+        
+        return {
+            isMultiVariety,
+            isMultiLot,
+            showWarning: isMultiVariety || isMultiLot
+        };
+    }, [currentManifest]);
 
     const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -466,6 +496,20 @@ export function FallCreekReceptionWorkflow({
                         </Select>
                     </div>
                 </div>
+
+                {manifestWarningInfo?.showWarning && (
+                    <Alert className="border-amber-500 bg-amber-500/10 text-amber-900 dark:text-amber-100 flex items-start gap-3 my-2">
+                        <AlertTriangle className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
+                        <div>
+                            <AlertTitle className="font-bold text-amber-800 dark:text-amber-200 text-sm">
+                                Atención: Pallet Log con Múltiples Lotes / Variedades
+                            </AlertTitle>
+                            <AlertDescription className="text-xs mt-1 text-amber-700 dark:text-amber-300 leading-normal">
+                                Este Pallet Log contiene variedades y lotes distintos. Recuerde ordenar y separar físicamente los bins por variedad/lote en el andén antes de iniciar la recepción.
+                            </AlertDescription>
+                        </div>
+                    </Alert>
+                )}
 
                 {/* Step 3: Scanning Bins */}
                 {selectedPalletId && (
