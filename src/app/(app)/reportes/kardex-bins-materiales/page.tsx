@@ -43,6 +43,7 @@ import { cn, safeToMillis, safeToDate, safeFormatDate, safeFormatQuantity, forma
 import { DateRange } from 'react-day-picker';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useForm } from 'react-hook-form';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 
@@ -63,7 +64,9 @@ const editMovementSchema = z.object({
   documento: z.string().min(1, 'Obligatorio'),
   driverName: z.string().optional(),
   cantidad: z.coerce.number().positive('Debe ser mayor a 0'),
-  producerId: z.string().min(1, 'Obligatorio'),
+  associationType: z.enum(['producer', 'client']),
+  producerId: z.string().optional(),
+  exporterId: z.string().optional(),
 });
 
 function convertToCSV(data: any[], headers: {key: string, label: string}[]) {
@@ -149,15 +152,22 @@ export default function BinMaterialKardexReportPage() {
     const editForm = useForm<z.infer<typeof editMovementSchema>>({
         resolver: zodResolver(editMovementSchema),
     });
+    const watchAssociationType = editForm.watch('associationType');
 
     React.useEffect(() => {
         if (itemToEdit) {
             const movSnap = (movements || []).find(m => m.id === itemToEdit.movementId);
+            const hasProducer = !!movSnap?.producerId;
+            const hasExporter = !!movSnap?.exporterId;
+            const associationType = (hasExporter && !hasProducer) ? 'client' : 'producer';
+            
             editForm.reset({
                 documento: itemToEdit.documento || '',
                 driverName: itemToEdit.driverName || '',
                 cantidad: itemToEdit.cantidad,
+                associationType: associationType,
                 producerId: movSnap?.producerId || '',
+                exporterId: movSnap?.exporterId || '',
             });
         }
     }, [itemToEdit, editForm, movements]);
@@ -496,12 +506,21 @@ export default function BinMaterialKardexReportPage() {
                 quantity: values.cantidad,
             };
 
-            await updateDoc(movementRef, {
+            const updateData: any = {
                 document: values.documento,
                 driverName: values.driverName,
-                producerId: values.producerId,
                 items: newItems,
-            });
+            };
+
+            if (values.associationType === 'producer') {
+                updateData.producerId = values.producerId || '';
+                updateData.exporterId = '';
+            } else {
+                updateData.exporterId = values.exporterId || '';
+                updateData.producerId = '';
+            }
+
+            await updateDoc(movementRef, updateData);
 
             toast({ title: 'Actualizado', description: 'El registro ha sido modificado correctamente.' });
             setItemToEdit(null);
@@ -747,42 +766,117 @@ export default function BinMaterialKardexReportPage() {
                             />
                             <FormField
                                 control={editForm.control}
-                                name="producerId"
+                                name="associationType"
                                 render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Productor</FormLabel>
-                                        <Select onValueChange={field.onChange} value={field.value}>
-                                            <FormControl>
-                                                <SelectTrigger>
-                                                    <SelectValue placeholder="Seleccione un productor" />
-                                                </SelectTrigger>
-                                            </FormControl>
-                                            <SelectContent>
-                                                {(() => {
-                                                    const uniqueProdsMap = new Map<string, typeof producers[0]>();
-                                                    (producers || []).forEach(p => {
-                                                        if (!uniqueProdsMap.has(p.producerId) || p.status !== 'inactivo') {
-                                                            uniqueProdsMap.set(p.producerId, p);
-                                                        }
-                                                    });
-                                                    const currentProd = (producers || []).find(p => p.producerId === field.value);
-                                                    if (currentProd && !uniqueProdsMap.has(field.value)) {
-                                                        uniqueProdsMap.set(field.value, currentProd);
-                                                    }
-                                                    return Array.from(uniqueProdsMap.values())
-                                                        .filter(p => p && p.producerId && (p.status !== 'inactivo' || p.producerId === field.value))
-                                                        .map((prod) => (
-                                                            <SelectItem key={prod.id || prod.producerId} value={prod.producerId}>
-                                                                {prod.shortName || 'Sin Nombre'} ({prod.producerId})
-                                                            </SelectItem>
-                                                        ));
-                                                })()}
-                                            </SelectContent>
-                                        </Select>
+                                    <FormItem className="space-y-3">
+                                        <FormLabel>Asociar Movimiento a</FormLabel>
+                                        <FormControl>
+                                            <RadioGroup
+                                                onValueChange={field.onChange}
+                                                value={field.value}
+                                                className="flex flex-row space-x-4"
+                                            >
+                                                <FormItem className="flex items-center space-x-2 space-y-0">
+                                                    <FormControl>
+                                                        <RadioGroupItem value="producer" />
+                                                    </FormControl>
+                                                    <FormLabel className="font-normal cursor-pointer">
+                                                        Productor
+                                                    </FormLabel>
+                                                </FormItem>
+                                                <FormItem className="flex items-center space-x-2 space-y-0">
+                                                    <FormControl>
+                                                        <RadioGroupItem value="client" />
+                                                    </FormControl>
+                                                    <FormLabel className="font-normal cursor-pointer">
+                                                        Cliente
+                                                    </FormLabel>
+                                                </FormItem>
+                                            </RadioGroup>
+                                        </FormControl>
                                         <FormMessage />
                                     </FormItem>
                                 )}
                             />
+
+                            {watchAssociationType === 'producer' && (
+                                <FormField
+                                    control={editForm.control}
+                                    name="producerId"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>Productor</FormLabel>
+                                            <Select onValueChange={field.onChange} value={field.value}>
+                                                <FormControl>
+                                                    <SelectTrigger>
+                                                        <SelectValue placeholder="Seleccione un productor" />
+                                                    </SelectTrigger>
+                                                </FormControl>
+                                                <SelectContent>
+                                                    {(() => {
+                                                        const uniqueProdsMap = new Map<string, typeof producers[0]>();
+                                                        (producers || []).forEach(p => {
+                                                            if (!uniqueProdsMap.has(p.producerId) || p.status !== 'inactivo') {
+                                                                uniqueProdsMap.set(p.producerId, p);
+                                                            }
+                                                        });
+                                                        const currentProd = (producers || []).find(p => p.producerId === field.value);
+                                                        if (field.value && currentProd && !uniqueProdsMap.has(field.value)) {
+                                                            uniqueProdsMap.set(field.value, currentProd);
+                                                        }
+                                                        return Array.from(uniqueProdsMap.values())
+                                                            .filter(p => p && p.producerId && (p.status !== 'inactivo' || p.producerId === field.value))
+                                                            .map((prod) => (
+                                                                <SelectItem key={prod.id || prod.producerId} value={prod.producerId}>
+                                                                    {prod.shortName || 'Sin Nombre'} ({prod.producerId})
+                                                                </SelectItem>
+                                                            ));
+                                                    })()}
+                                                </SelectContent>
+                                            </Select>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+                            )}
+
+                            {watchAssociationType === 'client' && (
+                                <FormField
+                                    control={editForm.control}
+                                    name="exporterId"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>Cliente</FormLabel>
+                                            <Select onValueChange={field.onChange} value={field.value}>
+                                                <FormControl>
+                                                    <SelectTrigger>
+                                                        <SelectValue placeholder="Seleccione un cliente" />
+                                                    </SelectTrigger>
+                                                </FormControl>
+                                                <SelectContent>
+                                                    {(() => {
+                                                        const uniqueExportersMap = new Map<string, typeof exporters[0]>();
+                                                        (exporters || []).forEach(e => {
+                                                            uniqueExportersMap.set(e.exporterId, e);
+                                                        });
+                                                        const currentExp = (exporters || []).find(e => e.exporterId === field.value);
+                                                        if (field.value && currentExp && !uniqueExportersMap.has(field.value)) {
+                                                            uniqueExportersMap.set(field.value, currentExp);
+                                                        }
+                                                        return Array.from(uniqueExportersMap.values())
+                                                            .map((exp) => (
+                                                                <SelectItem key={exp.id || exp.exporterId} value={exp.exporterId}>
+                                                                    {exp.name || 'Sin Nombre'} ({exp.exporterId})
+                                                                </SelectItem>
+                                                            ));
+                                                    })()}
+                                                </SelectContent>
+                                            </Select>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+                            )}
                             <FormField
                                 control={editForm.control}
                                 name="driverName"
