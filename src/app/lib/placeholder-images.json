@@ -54,6 +54,42 @@
       "description": "Logo corporativo oficial de Fall Creek",
       "imageUrl": "https://www.fallcreeknursery.com/assets/images/logo.png",
       "imageHint": "fall creek"
+    },
+    {
+      "id": "report-stock-bins-planta",
+      "description": "Stock de Bins y Mat. En Planta",
+      "imageUrl": "/images/reportes/stock_bins_en_planta.jpeg",
+      "imageHint": "stock bins planta"
+    },
+    {
+      "id": "report-saldo-bins-entregados",
+      "description": "Saldo de Bins y Mat. Entregados",
+      "imageUrl": "/images/reportes/saldo_bins_entregados.jpeg",
+      "imageHint": "saldo bins entregados"
+    },
+    {
+      "id": "report-stock-ubicacion-clientes",
+      "description": "Stock por Ubicación Clientes",
+      "imageUrl": "/images/reportes/stock_ubicacion_clientes.jpeg",
+      "imageHint": "stock ubicacion clientes"
+    },
+    {
+      "id": "report-kardex-bins-materiales",
+      "description": "Kardex de Movimientos de Bins y Materiales",
+      "imageUrl": "/images/reportes/kardex_bins_materiales.png",
+      "imageHint": "kardex bins materiales"
+    },
+    {
+      "id": "report-kardex-movimientos-fruta",
+      "description": "Kardex de Movimientos de Fruta (Clientes)",
+      "imageUrl": "/images/reportes/kardex_movimientos_fruta.png",
+      "imageHint": "kardex movimientos fruta"
+    },
+    {
+      "id": "report-stock-bins-camaras",
+      "description": "Stock Bins en Cámaras",
+      "imageUrl": "/images/reportes/stock_bins_camaras.jpeg",
+      "imageHint": "stock bins camaras"
     }
   ]
 }

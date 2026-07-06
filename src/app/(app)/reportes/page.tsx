@@ -39,7 +39,7 @@ const reportList = [
         href: '/reportes/stock-bins-materiales',
         icon: Package,
         color: 'text-blue-500',
-        image: PlaceHolderImages.find(img => img.id === 'report-stock')
+        image: PlaceHolderImages.find(img => img.id === 'report-stock-bins-planta')
     },
     {
         id: 'saldo-productor',
@@ -48,16 +48,16 @@ const reportList = [
         href: "/reportes/saldo-por-productor",
         icon: Calculator,
         color: 'text-green-500',
-        image: PlaceHolderImages.find(img => img.id === 'report-accounting')
+        image: PlaceHolderImages.find(img => img.id === 'report-saldo-bins-entregados')
     },
     { 
         id: 'kardex-bins',
-        title: 'Kardex de Movimientos de Bins', 
+        title: 'Kardex de Movimientos de Bins y Materiales', 
         description: 'Historial detallado de cada entrada y salida registrada en el sistema.',
         href: '/reportes/kardex-bins-materiales',
         icon: Table2,
         color: 'text-indigo-500',
-        image: PlaceHolderImages.find(img => img.id === 'report-logistics')
+        image: PlaceHolderImages.find(img => img.id === 'report-kardex-bins-materiales')
     },
     { 
         id: 'recepcion-fruta',
@@ -75,16 +75,16 @@ const reportList = [
         href: '/reportes/stock-fruta-otros-clientes',
         icon: MapPin,
         color: 'text-rose-500',
-        image: PlaceHolderImages.find(img => img.id === 'report-chamber')
+        image: PlaceHolderImages.find(img => img.id === 'report-stock-ubicacion-clientes')
     },
     { 
         id: 'kardex-fruta-otros',
-        title: 'Movimientos de Fruta (Socios)', 
+        title: 'Kardex de Movimientos de Fruta (Clientes)', 
         description: 'Historial de entradas y salidas de fruta de terceros. Permite ver cuándo llegó cada artículo.',
         href: '/reportes/kardex-fruta-otros-clientes',
         icon: History,
         color: 'text-purple-500',
-        image: PlaceHolderImages.find(img => img.id === 'report-logistics')
+        image: PlaceHolderImages.find(img => img.id === 'report-kardex-movimientos-fruta')
     },
     { 
         id: 'despachos-packing',
@@ -129,7 +129,7 @@ const reportList = [
         href: '/reportes/stock-bins-camaras',
         icon: FileText,
         color: 'text-indigo-600',
-        image: PlaceHolderImages.find(img => img.id === 'report-chamber')
+        image: PlaceHolderImages.find(img => img.id === 'report-stock-bins-camaras')
     },
 ];
 
