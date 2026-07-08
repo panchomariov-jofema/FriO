@@ -214,6 +214,7 @@ export default function CamarasPage() {
                 observation: item.observation,
                 exporterId: reception.clientId,
                 document: reception.document,
+                documentNumber: reception.documentNumber,
                 palletId: item.palletId,
             }))
         )
@@ -1167,7 +1168,7 @@ export default function CamarasPage() {
                                                                               <p>Pallet Log: {firstItem.document || '-'}</p>
                                                                               <p>Pallet ID: <span className="font-mono">{uniquePalletIds.join(', ') || '-'}</span></p>
                                                                               <p>Variedad: {firstItem.varietyOrProduct}</p>
-                                                                              <p>Documento: {firstItem.document || '-'}</p>
+                                                                              <p>Documento: {firstItem.documentNumber || '-'}</p>
                                                                           </>
                                                                       ) : (
                                                                           <>

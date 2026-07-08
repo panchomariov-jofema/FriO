@@ -12,14 +12,14 @@ import {
   CardDescription,
 } from '@/components/ui/card';
 import { useCollection, useMemoFirebase, useUser, useFirestore } from '@/firebase';
-import type { ChamberLot, Dispatch, Exporter, ProcessingLot, ReceptionLot, BinMaterialStock, OtherFruitReception, Profile, UserMaster, HidrocoolerLot, OtherClient, ChamberTemperature, OtherFruitMovement } from '@/lib/types';
+import type { ChamberLot, Dispatch, Exporter, ProcessingLot, ReceptionLot, BinMaterialStock, OtherFruitReception, Profile, UserMaster, HidrocoolerLot, OtherClient, ChamberTemperature, OtherFruitMovement, Producer, BinMaterial, BinMaterialMovement } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis, Cell, Legend, LabelList } from 'recharts';
 import { ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { chambersConfig } from '@/lib/chambers-config';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Boxes, PackageCheck, Truck, Warehouse, Archive, ChevronsLeft, Waves, Download } from 'lucide-react';
+import { Boxes, PackageCheck, Truck, Warehouse, Archive, ChevronsLeft, Waves, Download, ChevronDown, ChevronUp } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Button } from "@/components/ui/button"
@@ -100,57 +100,55 @@ function FallCreekExecutiveView({ dashboardData, clientName }: { dashboardData: 
 
     if (summaryData.length === 0 && dispatchReportData.length === 0) {
         return (
-             <Card>
+             <Card className="bg-white/60 dark:bg-zinc-900/60 backdrop-blur-md border border-zinc-200/50 dark:border-zinc-800/50 shadow-md rounded-2xl">
                 <CardHeader className="flex flex-row items-start justify-between">
                     <div>
-                        <CardTitle>Resumen Ejecutivo: {clientName}</CardTitle>
+                        <CardTitle className="text-lg font-bold text-[#004b8d]">Resumen Ejecutivo: {clientName}</CardTitle>
                         <CardDescription>Resumen de lotes de cliente almacenados en cámara.</CardDescription>
                     </div>
                 </CardHeader>
                 <CardContent className="h-48 flex items-center justify-center">
                     <p className="text-muted-foreground">No se encontraron datos para {clientName}.</p>
                 </CardContent>
-            </Card>
+             </Card>
         )
     }
     
     const productChartConfig: ChartConfig = {
-        quantity: { label: "Cantidad", color: "hsl(var(--chart-1))" },
+        quantity: { label: "Cantidad", color: "#7aba28" },
     };
     const occupancyChartConfig: ChartConfig = {
-        ocupacion: { label: "Bins Equivalentes", color: "hsl(var(--chart-2))" },
+        ocupacion: { label: "Bins Equivalentes", color: "#004b8d" },
     };
 
     return (
         <div className="space-y-6">
-            <Card>
+            <Card className="bg-white/60 dark:bg-zinc-900/60 backdrop-blur-md border border-zinc-200/50 dark:border-zinc-800/50 shadow-md rounded-2xl transition-all duration-300 hover:shadow-lg">
                 <CardHeader>
-                    <CardTitle>Resumen de Stock en Cámara</CardTitle>
-                    <CardDescription>Detalle de lotes del cliente actualmente almacenados.</CardDescription>
+                    <CardTitle className="text-lg font-bold text-[#004b8d]">Resumen de Stock por Cámara y Variedad</CardTitle>
+                    <CardDescription>Consolidado del stock de fruta almacenado en frío.</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <ScrollArea className="h-72">
-                        <div className="rounded-md border">
+                        <div className="rounded-xl border overflow-hidden">
                             <Table>
-                                <TableHeader>
+                                <TableHeader className="bg-muted/40">
                                     <TableRow>
-                                        <TableHead>Fecha Recepción</TableHead>
-                                        <TableHead>Lote</TableHead>
-                                        <TableHead>Cantidad</TableHead>
-                                        <TableHead>Cámara</TableHead>
+                                        <TableHead className="font-bold text-xs uppercase">Cámara</TableHead>
+                                        <TableHead className="font-bold text-xs uppercase">Variedad</TableHead>
+                                        <TableHead className="font-bold text-xs uppercase">Cantidad</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
                                     {summaryData && summaryData.length > 0 ? summaryData.map((item: any) => (
-                                        <TableRow key={item.id}>
-                                             <TableCell>{formatLocaleDateString(item.receptionDate)}</TableCell>
-                                             <TableCell className="font-mono">{item.lot}</TableCell>
-                                            <TableCell>{item.quantity} {item.unit}</TableCell>
-                                            <TableCell>{item.chamber}</TableCell>
+                                        <TableRow key={item.id} className="hover:bg-muted/30">
+                                            <TableCell className="text-xs font-semibold">{item.chamber}</TableCell>
+                                            <TableCell className="text-xs">{item.productName}</TableCell>
+                                            <TableCell className="text-xs font-medium">{item.quantity} {item.unit}</TableCell>
                                         </TableRow>
                                     )) : (
                                         <TableRow>
-                                            <TableCell colSpan={4} className="h-24 text-center">No hay stock en cámara.</TableCell>
+                                            <TableCell colSpan={3} className="h-24 text-center text-xs text-muted-foreground">No hay stock en cámara.</TableCell>
                                         </TableRow>
                                     )}
                                 </TableBody>
@@ -161,54 +159,67 @@ function FallCreekExecutiveView({ dashboardData, clientName }: { dashboardData: 
             </Card>
 
             <div className="grid gap-6 md:grid-cols-2">
-                <Card>
+                <Card className="bg-white/60 dark:bg-zinc-900/60 backdrop-blur-md border border-zinc-200/50 dark:border-zinc-800/50 shadow-md rounded-2xl transition-all duration-300 hover:shadow-lg">
                     <CardHeader>
-                        <CardTitle>Cantidad por Producto</CardTitle>
+                        <CardTitle className="text-lg font-bold text-[#004b8d]">Cantidad por Producto</CardTitle>
                         <CardDescription>Total de Bins/Pallets por cada tipo de producto en stock.</CardDescription>
                     </CardHeader>
                     <CardContent>
                         <ChartContainer config={productChartConfig} className="h-[250px] w-full">
                            <BarChart data={charts.quantityByProduct} layout="vertical" margin={{ right: 80, left: 20 }}>
+                                <defs>
+                                    <linearGradient id="productGradient" x1="0" y1="0" x2="1" y2="0">
+                                        <stop offset="0%" stopColor="#7aba28" stopOpacity={0.15} />
+                                        <stop offset="100%" stopColor="#7aba28" stopOpacity={0.85} />
+                                    </linearGradient>
+                                </defs>
                                 <XAxis type="number" dataKey="quantity" hide />
-                                <YAxis dataKey="name" type="category" tickLine={false} axisLine={false} tickMargin={10} width={80} />
-                                <ChartTooltip content={<ChartTooltipContent />} />
-                                <Bar dataKey="quantity" layout="vertical" radius={5} fill="var(--color-quantity)">
+                                <YAxis dataKey="name" type="category" tickLine={false} axisLine={false} tickMargin={10} width={80} className="text-[10px] font-semibold text-muted-foreground" />
+                                <ChartTooltip content={<ChartTooltipContent className="bg-white/90 dark:bg-zinc-900/90 backdrop-blur-md border border-zinc-200 dark:border-zinc-800 shadow-md rounded-xl" />} />
+                                <Bar dataKey="quantity" layout="vertical" radius={[0, 6, 6, 0]} fill="url(#productGradient)">
                                     <LabelList 
                                         dataKey="quantity" 
                                         position="right" 
                                         offset={8} 
-                                        className="fill-foreground font-semibold"
-                                        formatter={(value: number) => value.toLocaleString('es-CL')}
+                                        className="fill-foreground font-bold text-xs"
+                                        formatter={(value: number) => `${value.toLocaleString('es-CL')} Unid.`}
                                     />
                                 </Bar>
                             </BarChart>
                         </ChartContainer>
                     </CardContent>
                 </Card>
-                <Card>
+
+                <Card className="bg-white/60 dark:bg-zinc-900/60 backdrop-blur-md border border-zinc-200/50 dark:border-zinc-800/50 shadow-md rounded-2xl transition-all duration-300 hover:shadow-lg">
                     <CardHeader>
-                        <CardTitle>Ocupación por Cámara</CardTitle>
+                        <CardTitle className="text-lg font-bold text-[#004b8d]">Ocupación por Cámara</CardTitle>
                         <CardDescription>Capacidad utilizada en cada cámara para {clientName}.</CardDescription>
                     </CardHeader>
                     <CardContent>
                         <ChartContainer config={occupancyChartConfig} className="h-[250px] w-full">
                            <BarChart data={charts.occupancyByChamber} layout="vertical" margin={{ left: 20, right: 120 }}>
+                                <defs>
+                                    <linearGradient id="chamberGradient" x1="0" y1="0" x2="1" y2="0">
+                                        <stop offset="0%" stopColor="#004b8d" stopOpacity={0.15} />
+                                        <stop offset="100%" stopColor="#004b8d" stopOpacity={0.85} />
+                                    </linearGradient>
+                                </defs>
                                 <XAxis type="number" hide />
-                                <YAxis dataKey="name" type="category" tickLine={false} axisLine={false} tickMargin={10} width={80} />
-                                <ChartTooltip formatter={(value, name, props) => [`${value} Bins Equiv.`, name]} content={<ChartTooltipContent />} />
-                                <Bar dataKey="ocupacion" layout="vertical" radius={5} fill="var(--color-ocupacion)">
+                                <YAxis dataKey="name" type="category" tickLine={false} axisLine={false} tickMargin={10} width={80} className="text-[10px] font-semibold text-muted-foreground" />
+                                <ChartTooltip formatter={(value, name) => [`${value} Bins Equiv.`, name]} content={<ChartTooltipContent className="bg-white/90 dark:bg-zinc-900/90 backdrop-blur-md border border-zinc-200 dark:border-zinc-800 shadow-md rounded-xl" />} />
+                                <Bar dataKey="ocupacion" layout="vertical" radius={[0, 6, 6, 0]} fill="url(#chamberGradient)">
                                      <LabelList
                                         dataKey="percentage"
                                         position="right"
                                         offset={8}
-                                        className="fill-foreground font-semibold"
+                                        className="fill-foreground font-bold text-xs"
                                         formatter={(value: number) => `${value.toFixed(1)}%`}
                                     />
                                     <LabelList 
                                         dataKey="ocupacion"
                                         position="insideLeft"
                                         offset={8}
-                                        className="fill-primary-foreground font-bold"
+                                        className="fill-white font-bold text-[9px]"
                                         formatter={(value: number) => value > 0 ? `${value.toLocaleString('es-CL')}` : ''}
                                     />
                                 </Bar>
@@ -218,41 +229,42 @@ function FallCreekExecutiveView({ dashboardData, clientName }: { dashboardData: 
                 </Card>
             </div>
 
-            <Card>
-                <CardHeader className="flex flex-row items-start justify-between">
+            <Card className="bg-white/60 dark:bg-zinc-900/60 backdrop-blur-md border border-zinc-200/50 dark:border-zinc-800/50 shadow-md rounded-2xl transition-all duration-300 hover:shadow-lg">
+                <CardHeader className="flex flex-row items-center justify-between pb-4">
                     <div>
-                        <CardTitle>Reporte de Despachos</CardTitle>
+                        <CardTitle className="text-lg font-bold text-[#004b8d]">Reporte de Despachos</CardTitle>
+                        <CardDescription>Historial de salidas de fruta realizadas para el cliente.</CardDescription>
                     </div>
-                     <Button onClick={handleExport} variant="outline" size="sm" disabled={dispatchReportData.length === 0}>
+                     <Button onClick={handleExport} variant="outline" size="sm" disabled={dispatchReportData.length === 0} className="border-2 rounded-xl">
                         <Download className="mr-2 h-4 w-4" />
                         Exportar
                     </Button>
                 </CardHeader>
                 <CardContent>
-                    <div className="rounded-md border">
+                    <div className="rounded-xl border overflow-hidden">
                         <Table>
-                            <TableHeader>
+                            <TableHeader className="bg-muted/40">
                                 <TableRow>
-                                    <TableHead>Fecha Despacho</TableHead>
-                                    <TableHead>Documento</TableHead>
-                                    <TableHead>Lotes Cliente</TableHead>
-                                    <TableHead>Productos</TableHead>
-                                    <TableHead>Cantidad Total</TableHead>
+                                    <TableHead className="font-bold text-xs uppercase">Fecha Despacho</TableHead>
+                                    <TableHead className="font-bold text-xs uppercase">Documento</TableHead>
+                                    <TableHead className="font-bold text-xs uppercase">Lotes Cliente</TableHead>
+                                    <TableHead className="font-bold text-xs uppercase">Productos</TableHead>
+                                    <TableHead className="font-bold text-xs uppercase">Cantidad Total</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
                                 {dispatchReportData && dispatchReportData.length > 0 ? (
                                     dispatchReportData.map((dispatch: any) => (
-                                     <TableRow key={dispatch.id}>
-                                         <TableCell>{formatLocaleDate(dispatch.dispatchDate)}</TableCell>
-                                         <TableCell className="font-mono">{dispatch.document}</TableCell>
-                                        <TableCell className="font-mono">{dispatch.clientLotIds}</TableCell>
-                                        <TableCell>{dispatch.productNames}</TableCell>
-                                        <TableCell className="font-semibold">{dispatch.totalQuantity} {dispatch.unit}</TableCell>
-                                    </TableRow>
+                                     <TableRow key={dispatch.id} className="hover:bg-muted/30">
+                                         <TableCell className="text-xs">{formatLocaleDate(dispatch.dispatchDate)}</TableCell>
+                                         <TableCell className="font-mono text-xs font-semibold">{dispatch.document}</TableCell>
+                                        <TableCell className="font-mono text-xs text-muted-foreground">{dispatch.clientLotIds}</TableCell>
+                                        <TableCell className="text-xs">{dispatch.productNames}</TableCell>
+                                        <TableCell className="text-xs font-semibold text-[#004b8d]">{dispatch.totalQuantity} {dispatch.unit}</TableCell>
+                                     </TableRow>
                                 ))) : (
                                     <TableRow>
-                                        <TableCell colSpan={5} className="h-24 text-center">No hay despachos registrados para este cliente.</TableCell>
+                                        <TableCell colSpan={5} className="h-24 text-center text-xs text-muted-foreground">No hay despachos registrados para este cliente.</TableCell>
                                     </TableRow>
                                 )}
                             </TableBody>
@@ -276,12 +288,16 @@ export default function DashboardPage() {
         to: new Date(),
     });
     const [latestTemperatures, setLatestTemperatures] = React.useState<Record<string, ChamberTemperature | null>>({});
+    const [isCherrySectionOpen, setIsCherrySectionOpen] = React.useState(false);
 
     const { data: users, loading: loadingUsers } = useFirestoreCollection<UserMaster>('usersMaster');
     const { data: profiles, loading: loadingProfiles } = useFirestoreCollection<Profile>('profiles');
     const { data: allExporters, loading: loadingExporters } = useFirestoreCollection<Exporter>('exporters');
     const { data: otherClients, loading: loadingOtherClients } = useFirestoreCollection<OtherClient>('otherClients');
     const { data: binMaterialStock, loading: loadingBinStock } = useFirestoreCollection<BinMaterialStock>('binMaterialStock');
+    const { data: producers, loading: loadingProducers } = useFirestoreCollection<Producer>('producers');
+    const { data: binMaterialMovements, loading: loadingBinMaterialMovements } = useFirestoreCollection<BinMaterialMovement>('binMaterialMovements');
+    const { data: binMaterials, loading: loadingBinMaterials } = useFirestoreCollection<BinMaterial>('binMaterials');
     
     const exporters = React.useMemo(() => allExporters.filter(e => e.status !== 'inactivo'), [allExporters]);
 
@@ -310,7 +326,7 @@ export default function DashboardPage() {
 
 
     const { data: chamberLots, isLoading: loadingChamber } = useCollection<ChamberLot>(chamberLotsQuery);
-    const { data: otherFruitReceptions, isLoading: loadingOtherFruit } = useCollection<OtherFruitReception>(createDateFilteredQuery('otherFruitReceptions', 'createdAt'));
+    const { data: otherFruitReceptions, loading: loadingOtherFruit } = useFirestoreCollection<OtherFruitReception>('otherFruitReceptions');
     const { data: otherFruitMovements, isLoading: loadingOtherFruitMovements } = useCollection<OtherFruitMovement>(createDateFilteredQuery('otherFruitMovements', 'createdAt'));
     const { data: processingLots, isLoading: loadingProcessing } = useCollection<ProcessingLot>(createDateFilteredQuery('processingLots', 'createdAt'));
     const { data: dispatches, isLoading: loadingDispatches } = useCollection<Dispatch>(createDateFilteredQuery('dispatches', 'createdAt'));
@@ -599,8 +615,7 @@ export default function DashboardPage() {
             (reception.items || [])
                 .filter(item => item && item.status === 'Almacenado' && item.storageLocation?.chamberId && item.quantity > 0)
                 .map((item, index) => ({
-                    receptionDate: reception.createdAt,
-                    lot: item.clientLotId || reception.displayLotId || 'N/A',
+                    productName: item.productName || 'Variedad N/A',
                     quantity: item.quantity,
                     unit: reception.unit,
                     chamber: chambersConfig[item.storageLocation!.chamberId]?.name || item.storageLocation!.chamberId,
@@ -608,27 +623,25 @@ export default function DashboardPage() {
         );
 
         const groupedSummary = summaryItems.reduce((acc, item) => {
-            const dateString = formatLocaleDateString(item.receptionDate);
-            const key = `${dateString}-${item.lot}-${item.chamber}`;
+            const key = `${item.chamber}-${item.productName}-${item.unit}`;
             
             if (!acc[key]) {
                 acc[key] = {
                     id: key,
-                    receptionDate: item.receptionDate,
-                    lot: item.lot,
+                    chamber: item.chamber,
+                    productName: item.productName,
                     quantity: 0,
                     unit: item.unit,
-                    chamber: item.chamber,
                 };
             }
             
             acc[key].quantity += item.quantity;
             
             return acc;
-        }, {} as Record<string, { id: string, receptionDate: any, lot: string, quantity: number, unit: string, chamber: string }>);
+        }, {} as Record<string, { id: string, chamber: string, productName: string, quantity: number, unit: string }>);
 
         const summaryTableData = Object.values(groupedSummary)
-            .sort((a, b) => safeToMillis(b.receptionDate) - safeToMillis(a.receptionDate));
+            .sort((a, b) => a.chamber.localeCompare(b.chamber) || a.productName.localeCompare(b.productName));
 
 
         const quantityByProduct: Record<string, {name: string, quantity: number, unit: 'Bins' | 'Pallets'}> = {};
@@ -698,14 +711,138 @@ export default function DashboardPage() {
     }, [selectedClient, otherFruitReceptions, otherFruitMovements]);
 
 
-    const loading = loadingChamber || loadingOtherFruit || loadingProcessing || loadingDispatches || loadingExporters || loadingReception || loadingBinStock || loadingUsers || loadingProfiles || loadingHidroLots || loadingOtherClients || loadingOtherFruitMovements;
+    const emptyBinsStockInPlant = React.useMemo(() => {
+        if (loadingBinMaterialMovements || loadingBinMaterials) return 0;
+        
+        const fnoBinMaterialCodes = new Set(
+            (binMaterials || [])
+                .filter(m => m.exporterId === 'EXP005' && m.type === 'BINS')
+                .map(m => m.code)
+        );
 
-    const kpiCards = [
-        { title: "Total Bins en Cámara (Fruta)", value: totalBinsInStock, icon: Warehouse },
-        { title: "Total Bins Vacíos (Stock)", value: totalEmptyBins, icon: Archive },
-        { title: "Bins Pend. de Hidro", value: pendingHidroBins, icon: Waves },
-        { title: "Bins en Proceso (Hidro)", value: inProcess, icon: Boxes },
-        { title: "Pend. por Almacenar en Camara", value: pendingStorage, icon: PackageCheck },
+        let stock = 0;
+        (binMaterialMovements || []).forEach(mov => {
+            if (mov.exporterId !== 'EXP005') return;
+            if (mov.observation === 'Despacho Directo') return;
+            
+            mov.items.forEach(item => {
+                if (fnoBinMaterialCodes.has(item.binMaterialCode)) {
+                    const qty = mov.type === 'entrada' ? item.quantity : -item.quantity;
+                    stock += qty;
+                }
+            });
+        });
+        return stock;
+    }, [binMaterials, binMaterialMovements, loadingBinMaterialMovements, loadingBinMaterials]);
+
+    const leasedBinsData = React.useMemo(() => {
+        if (loadingBinMaterialMovements || loadingBinMaterials || loadingProducers) return [];
+
+        const fnoBinMaterialCodes = new Set(
+            (binMaterials || [])
+                .filter(m => m.exporterId === 'EXP005' && m.type === 'BINS')
+                .map(m => m.code)
+        );
+
+        const producerMap = (producers || []).reduce((acc, p) => {
+            if (p.producerId) {
+                acc[p.producerId.trim()] = p.shortName || p.name;
+            }
+            return acc;
+        }, {} as Record<string, string>);
+
+        const leasedBalances: Record<string, { id: string; producerId: string; producerName: string; rut: string; quantity: number }> = {};
+
+        (binMaterialMovements || []).forEach(mov => {
+            if (mov.exporterId !== 'EXP005') return;
+            if (mov.observation === 'Despacho Directo') return;
+            if (!mov.producerId || mov.producerId.trim() === 'SISTEMA') return;
+
+            const cleanProducerId = mov.producerId.trim();
+
+            mov.items.forEach(item => {
+                if (fnoBinMaterialCodes.has(item.binMaterialCode)) {
+                    const qty = mov.type === 'salida' ? item.quantity : -item.quantity;
+                    
+                    if (!leasedBalances[cleanProducerId]) {
+                        const producerObj = (producers || []).find(p => p.producerId && p.producerId.trim() === cleanProducerId);
+                        leasedBalances[cleanProducerId] = {
+                            id: cleanProducerId,
+                            producerId: cleanProducerId,
+                            producerName: producerMap[cleanProducerId] || cleanProducerId,
+                            rut: producerObj?.rut ? producerObj.rut.trim() : cleanProducerId,
+                            quantity: 0
+                        };
+                    }
+                    leasedBalances[cleanProducerId].quantity += qty;
+                }
+            });
+        });
+
+        return Object.values(leasedBalances)
+            .filter(item => item.quantity > 0)
+            .sort((a, b) => b.quantity - a.quantity);
+    }, [binMaterials, binMaterialMovements, producers, loadingBinMaterialMovements, loadingBinMaterials, loadingProducers]);
+
+    const totalLeasedBins = React.useMemo(() => {
+        return leasedBinsData.reduce((sum, item) => sum + item.quantity, 0);
+    }, [leasedBinsData]);
+
+    const loading = loadingChamber || loadingOtherFruit || loadingProcessing || loadingDispatches || loadingExporters || loadingReception || loadingBinStock || loadingUsers || loadingProfiles || loadingHidroLots || loadingOtherClients || loadingOtherFruitMovements || loadingProducers || loadingBinMaterialMovements || loadingBinMaterials;
+
+    const activeKpiCards = [
+        { 
+            title: "Total Bins en Cámara (Fruta)", 
+            value: totalBinsInStock, 
+            icon: Warehouse,
+            borderColor: "border-l-4 border-l-green-600",
+            iconBg: "bg-green-600/10 text-green-600" 
+        },
+        { 
+            title: "Bins Vacíos en Planta (Arriendo)", 
+            value: emptyBinsStockInPlant, 
+            icon: Archive,
+            borderColor: "border-l-4 border-l-amber-500",
+            iconBg: "bg-amber-500/10 text-amber-600"
+        },
+        { 
+            title: "Total Bins en Arriendo", 
+            value: totalLeasedBins, 
+            icon: Truck,
+            borderColor: "border-l-4 border-l-[#004b8d]",
+            iconBg: "bg-[#004b8d]/10 text-[#004b8d]"
+        },
+    ];
+
+    const cherryKpiCards = [
+        { 
+            title: "Bins Pend. de Hidro", 
+            value: pendingHidroBins, 
+            icon: Waves,
+            borderColor: "border-l-4 border-l-sky-500",
+            iconBg: "bg-sky-500/10 text-sky-600"
+        },
+        { 
+            title: "Bins en Proceso (Hidro)", 
+            value: inProcess, 
+            icon: Boxes,
+            borderColor: "border-l-4 border-l-emerald-500",
+            iconBg: "bg-emerald-500/10 text-emerald-600"
+        },
+        { 
+            title: "Pend. por Almacenar en Cámara", 
+            value: pendingStorage, 
+            icon: PackageCheck,
+            borderColor: "border-l-4 border-l-purple-500",
+            iconBg: "bg-purple-500/10 text-purple-600"
+        },
+        { 
+            title: "Bins Vacíos (Stock Cereza)", 
+            value: totalEmptyBins, 
+            icon: Archive,
+            borderColor: "border-l-4 border-l-zinc-400",
+            iconBg: "bg-zinc-400/10 text-zinc-600"
+        },
     ];
 
     const kpiChartConfig: ChartConfig = {
@@ -819,52 +956,212 @@ export default function DashboardPage() {
         <div className="space-y-6">
             {renderDashboardHeader()}
 
-            <div className="grid gap-4 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5">
-                {kpiCards.map(kpi => (
-                    <Card key={kpi.title}>
-                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                            <CardTitle className="text-sm font-medium">{kpi.title}</CardTitle>
-                            <kpi.icon className="h-4 w-4 text-muted-foreground" />
-                        </CardHeader>
-                        <CardContent>
-                            {loading ? (
-                                <Skeleton className="h-8 w-1/2" />
-                            ) : (
-                                <div className="text-3xl md:text-4xl font-bold">{kpi.value.toLocaleString('es-CL')}</div>
-                            )}
-                        </CardContent>
-                    </Card>
-                ))}
-            </div>
-            
-            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-4">
-                {Object.values(chambersConfig).map(chamber => {
-                    const latestTemp = latestTemperatures[chamber.id];
-                    return (
-                        <Card key={chamber.id}>
-                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                <CardTitle className="text-sm font-medium">{chamber.name}</CardTitle>
-                                <Thermometer className="h-4 w-4 text-muted-foreground" />
+            {/* SECCIÓN 1: GESTIÓN DE ARRIENDOS (FÑO) */}
+            {(!selectedClient || selectedClient.id === 'EXP005') && (
+                <div className="space-y-4">
+                    <div className="flex items-center justify-between border-b pb-2">
+                        <h3 className="text-sm font-bold text-zinc-800 dark:text-zinc-200 uppercase tracking-wider">Gestión de Arriendos de Bins (FÑO)</h3>
+                    </div>
+
+                    <div className="grid gap-6 md:grid-cols-3">
+                        {/* Bins para Arriendo KPIs */}
+                        <div className="md:col-span-1 flex flex-col gap-4">
+                            {activeKpiCards.slice(1).map(kpi => (
+                                <Card key={kpi.title} className={cn("bg-white/60 dark:bg-zinc-900/60 backdrop-blur-md border border-zinc-200/50 dark:border-zinc-800/50 shadow-md rounded-2xl transition-all duration-300 hover:shadow-lg hover:scale-[1.02] relative overflow-hidden group flex-1 flex flex-col justify-center", kpi.borderColor)}>
+                                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1">
+                                        <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{kpi.title}</CardTitle>
+                                        <div className={cn("p-2 rounded-xl transition-all duration-300 group-hover:scale-110", kpi.iconBg)}>
+                                            <kpi.icon className="h-4 w-4" />
+                                        </div>
+                                    </CardHeader>
+                                    <CardContent className="pt-2">
+                                        {loading ? (
+                                            <Skeleton className="h-8 w-1/2" />
+                                        ) : (
+                                            <div className="text-2xl md:text-3xl font-extrabold tracking-tight text-[#004b8d] dark:text-[#5fa2dd]">
+                                                {kpi.value.toLocaleString('es-CL')}
+                                            </div>
+                                        )}
+                                    </CardContent>
+                                </Card>
+                            ))}
+                        </div>
+
+                        {/* Detalle de Arrendatarios */}
+                        <Card className="md:col-span-2 bg-white/60 dark:bg-zinc-900/60 backdrop-blur-md border border-zinc-200/50 dark:border-zinc-800/50 shadow-md rounded-2xl transition-all duration-300 hover:shadow-lg">
+                            <CardHeader className="pb-2">
+                                <CardTitle className="text-sm font-bold text-[#004b8d]">Detalle de Bins Arrendados por Arrendatario</CardTitle>
+                                <CardDescription>Consolidado de bins vacíos de arriendo en posesión externa de los clientes.</CardDescription>
                             </CardHeader>
                             <CardContent>
-                                {loading ? (
-                                    <Skeleton className="h-8 w-3/4" />
-                                ) : (
-                                    <div className="text-lg font-bold flex flex-col leading-tight">
-                                        <span className="text-base">T: {latestTemp ? `${latestTemp.temperature.toFixed(1)}°C` : '--.-°C'}</span>
-                                        <span className="text-xs text-muted-foreground font-normal">H: {latestTemp && latestTemp.humidity !== undefined ? `${latestTemp.humidity}%` : '--%'}</span>
+                                <ScrollArea className="h-[180px]">
+                                    <div className="rounded-xl border overflow-hidden">
+                                        <Table>
+                                            <TableHeader className="bg-muted/40">
+                                                <TableRow>
+                                                    <TableHead className="font-bold text-xs uppercase">Cliente / Arrendatario</TableHead>
+                                                    <TableHead className="font-bold text-xs uppercase">RUT</TableHead>
+                                                    <TableHead className="font-bold text-xs uppercase text-right">Bins Arrendados</TableHead>
+                                                </TableRow>
+                                            </TableHeader>
+                                            <TableBody>
+                                                {loading ? (
+                                                    Array.from({ length: 3 }).map((_, i) => <TableRow key={i}><TableCell colSpan={3}><Skeleton className="h-4 w-full" /></TableCell></TableRow>)
+                                                ) : leasedBinsData.length > 0 ? (
+                                                    leasedBinsData.map(item => (
+                                                        <TableRow key={item.id} className="hover:bg-muted/30">
+                                                            <TableCell className="text-xs font-semibold">{item.producerName}</TableCell>
+                                                            <TableCell className="text-xs font-mono text-muted-foreground">{item.rut}</TableCell>
+                                                            <TableCell className="text-xs font-bold text-[#004b8d] text-right">{item.quantity.toLocaleString('es-CL')}</TableCell>
+                                                        </TableRow>
+                                                    ))
+                                                ) : (
+                                                    <TableRow>
+                                                        <TableCell colSpan={3} className="h-24 text-center text-xs text-muted-foreground">No hay arriendos de bins activos en este momento.</TableCell>
+                                                    </TableRow>
+                                                )}
+                                            </TableBody>
+                                        </Table>
                                     </div>
-                                )}
+                                </ScrollArea>
                             </CardContent>
                         </Card>
-                    );
-                })}
+                    </div>
+                </div>
+            )}
+
+            {/* SECCIÓN 2: CONTROL DE FRUTA EN PLANTA */}
+            <div className="space-y-4">
+                <div className="flex items-center justify-between border-b pb-2">
+                    <h3 className="text-sm font-bold text-zinc-800 dark:text-zinc-200 uppercase tracking-wider">Control de Fruta y Temperaturas en Planta</h3>
+                </div>
+
+                <div className="grid gap-6 md:grid-cols-4">
+                    {/* KPI Total Bins en Cámara (Fruta) */}
+                    <div className="md:col-span-1 h-full">
+                        {activeKpiCards.slice(0, 1).map(kpi => (
+                            <Card key={kpi.title} className={cn("bg-white/60 dark:bg-zinc-900/60 backdrop-blur-md border border-zinc-200/50 dark:border-zinc-800/50 shadow-md rounded-2xl transition-all duration-300 hover:shadow-lg hover:scale-[1.02] relative overflow-hidden group h-full flex flex-col justify-center", kpi.borderColor)}>
+                                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1">
+                                    <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{kpi.title}</CardTitle>
+                                    <div className={cn("p-2 rounded-xl transition-all duration-300 group-hover:scale-110", kpi.iconBg)}>
+                                        <kpi.icon className="h-4 w-4" />
+                                    </div>
+                                </CardHeader>
+                                <CardContent className="pt-2">
+                                    {loading ? (
+                                        <Skeleton className="h-8 w-1/2" />
+                                    ) : (
+                                        <div className="text-3xl md:text-4xl font-extrabold tracking-tight text-green-600 dark:text-green-400">
+                                            {kpi.value.toLocaleString('es-CL')}
+                                        </div>
+                                    )}
+                                </CardContent>
+                            </Card>
+                        ))}
+                    </div>
+
+                    {/* Chambers Grid */}
+                    <div className="md:col-span-3 grid grid-cols-2 sm:grid-cols-3 gap-3">
+                        {Object.values(chambersConfig).map(chamber => {
+                            const latestTemp = latestTemperatures[chamber.id];
+                            const temp = latestTemp?.temperature;
+                            const hasTemp = temp !== undefined && temp !== null;
+                            
+                            let dotColor = "bg-zinc-300 dark:bg-zinc-700";
+                            let dotPing = "bg-zinc-300 dark:bg-zinc-700";
+                            let tempClass = "text-muted-foreground";
+
+                            if (hasTemp) {
+                                if (temp <= 4.0) {
+                                    dotColor = "bg-sky-500 shadow-[0_0_8px_rgba(14,165,233,0.5)]";
+                                    dotPing = "bg-sky-400";
+                                    tempClass = "text-[#004b8d] dark:text-sky-400";
+                                } else if (temp <= 8.0) {
+                                    dotColor = "bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.5)]";
+                                    dotPing = "bg-amber-400";
+                                    tempClass = "text-amber-600 dark:text-amber-400";
+                                } else {
+                                    dotColor = "bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]";
+                                    dotPing = "bg-red-400";
+                                    tempClass = "text-red-600 dark:text-red-400";
+                                }
+                            }
+
+                            return (
+                                <Card key={chamber.id} className="bg-white/60 dark:bg-zinc-900/60 backdrop-blur-md border border-zinc-200/50 dark:border-zinc-800/50 shadow-md rounded-2xl hover:shadow-lg transition-all duration-300 hover:scale-[1.02]">
+                                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1">
+                                        <CardTitle className="text-xs font-bold text-muted-foreground uppercase tracking-wider">{chamber.name}</CardTitle>
+                                        <div className="relative flex h-2 w-2">
+                                            {hasTemp && (
+                                                <span className={cn("animate-ping absolute inline-flex h-full w-full rounded-full opacity-75", dotPing)}></span>
+                                            )}
+                                            <span className={cn("relative inline-flex rounded-full h-2 w-2", dotColor)}></span>
+                                        </div>
+                                    </CardHeader>
+                                    <CardContent className="pt-2">
+                                        {loading ? (
+                                            <Skeleton className="h-8 w-3/4" />
+                                        ) : (
+                                            <div className="flex flex-col">
+                                                <span className={cn("text-base font-extrabold tracking-tight", tempClass)}>
+                                                    {hasTemp ? `${temp.toFixed(1)}°C` : '--.-°C'}
+                                                </span>
+                                                <span className="text-[9px] text-muted-foreground font-semibold mt-0.5">
+                                                    Hum: {latestTemp && latestTemp.humidity !== undefined ? `${latestTemp.humidity}%` : '--%'}
+                                                </span>
+                                            </div>
+                                        )}
+                                    </CardContent>
+                                </Card>
+                            );
+                        })}
+                    </div>
+                </div>
             </div>
 
+            {/* SECCIÓN 3: PROCESO CEREZAS (FUERA DE TEMPORADA) */}
+            <Card className="bg-white/60 dark:bg-zinc-900/60 backdrop-blur-md border border-zinc-200/50 dark:border-zinc-800/50 shadow-md rounded-2xl transition-all duration-300">
+                <button
+                    onClick={() => setIsCherrySectionOpen(!isCherrySectionOpen)}
+                    className="w-full flex items-center justify-between p-4 font-bold text-xs text-zinc-600 dark:text-zinc-400 uppercase tracking-wider"
+                >
+                    <div className="flex items-center gap-2">
+                        <Boxes className="h-4 w-4 text-[#004b8d]" />
+                        <span>Proceso Cerezas (Fuera de Temporada)</span>
+                    </div>
+                    {isCherrySectionOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                </button>
+                {isCherrySectionOpen && (
+                    <CardContent className="pb-4 pt-0 border-t border-zinc-200/50 dark:border-zinc-800/50 mt-2">
+                        <div className="grid gap-4 grid-cols-2 sm:grid-cols-4 pt-4">
+                            {cherryKpiCards.map(kpi => (
+                                <Card key={kpi.title} className={cn("bg-white/40 dark:bg-zinc-800/40 border border-zinc-200/50 dark:border-zinc-800/50 shadow-sm rounded-xl transition-all duration-300 hover:shadow-md relative overflow-hidden group", kpi.borderColor)}>
+                                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1">
+                                        <CardTitle className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{kpi.title}</CardTitle>
+                                        <div className={cn("p-1.5 rounded-lg transition-all duration-300 group-hover:scale-110", kpi.iconBg)}>
+                                            <kpi.icon className="h-3 w-3" />
+                                        </div>
+                                    </CardHeader>
+                                    <CardContent className="pt-1">
+                                        {loading ? (
+                                            <Skeleton className="h-6 w-1/2" />
+                                        ) : (
+                                            <div className="text-lg font-extrabold tracking-tight text-zinc-600 dark:text-zinc-400">
+                                                {kpi.value.toLocaleString('es-CL')}
+                                            </div>
+                                        )}
+                                    </CardContent>
+                                </Card>
+                            ))}
+                        </div>
+                    </CardContent>
+                )}
+            </Card>
+
             <div className="grid gap-6 md:grid-cols-2">
-                <Card>
+                <Card className="bg-white/60 dark:bg-zinc-900/60 backdrop-blur-md border border-zinc-200/50 dark:border-zinc-800/50 shadow-md rounded-2xl transition-all duration-300 hover:shadow-lg">
                     <CardHeader>
-                        <CardTitle>Kilos Netos Recepcionados por Exportador</CardTitle>
+                        <CardTitle className="text-lg font-bold text-[#004b8d]">Kilos Netos Recepcionados por Exportador</CardTitle>
                         <CardDescription>Total de kilos netos ingresados a la planta por cada cliente.</CardDescription>
                     </CardHeader>
                     <CardContent>
@@ -875,31 +1172,37 @@ export default function DashboardPage() {
                         ) : kilosPorExportador.length > 0 ? (
                         <ChartContainer config={kpiChartConfig} className="h-[250px] w-full">
                            <BarChart data={kilosPorExportador} layout="vertical" margin={{ right: 80, left: 20 }}>
+                                <defs>
+                                    <linearGradient id="kilosGradient" x1="0" y1="0" x2="1" y2="0">
+                                        <stop offset="0%" stopColor="#7aba28" stopOpacity={0.15} />
+                                        <stop offset="100%" stopColor="#7aba28" stopOpacity={0.85} />
+                                    </linearGradient>
+                                </defs>
                                 <XAxis type="number" dataKey="kilos" hide />
-                                <YAxis dataKey="name" type="category" tickLine={false} axisLine={false} tickMargin={10} width={80} />
-                                <ChartTooltip content={<ChartTooltipContent />} />
-                                <Bar dataKey="kilos" layout="vertical" radius={5} fill="var(--color-kilos)">
+                                <YAxis dataKey="name" type="category" tickLine={false} axisLine={false} tickMargin={10} width={80} className="text-[10px] font-semibold text-muted-foreground" />
+                                <ChartTooltip content={<ChartTooltipContent className="bg-white/90 dark:bg-zinc-900/90 backdrop-blur-md border border-zinc-200 dark:border-zinc-800 shadow-md rounded-xl" />} />
+                                <Bar dataKey="kilos" layout="vertical" radius={[0, 6, 6, 0]} fill="url(#kilosGradient)">
                                     <LabelList 
                                         dataKey="kilos" 
                                         position="right" 
                                         offset={8} 
-                                        className="fill-foreground font-semibold"
-                                        formatter={(value: number) => value.toLocaleString('es-CL', { maximumFractionDigits: 0 })}
+                                        className="fill-foreground font-bold text-xs"
+                                        formatter={(value: number) => `${value.toLocaleString('es-CL', { maximumFractionDigits: 0 })} Kg.`}
                                     />
                                 </Bar>
                             </BarChart>
                         </ChartContainer>
                         ) : (
                              <div className="flex justify-center items-center h-[250px]">
-                                <p className="text-muted-foreground">No hay datos de recepción para mostrar.</p>
+                                <p className="text-muted-foreground text-sm">No hay datos de recepción para mostrar.</p>
                             </div>
                         )}
                     </CardContent>
                 </Card>
 
-                <Card>
+                <Card className="bg-white/60 dark:bg-zinc-900/60 backdrop-blur-md border border-zinc-200/50 dark:border-zinc-800/50 shadow-md rounded-2xl transition-all duration-300 hover:shadow-lg">
                     <CardHeader>
-                        <CardTitle>Ocupación por Cámara</CardTitle>
+                        <CardTitle className="text-lg font-bold text-[#004b8d]">Ocupación por Cámara</CardTitle>
                         <CardDescription>Porcentaje de capacidad de bins equivalentes utilizada en cada cámara.</CardDescription>
                     </CardHeader>
                     <CardContent>
@@ -913,29 +1216,35 @@ export default function DashboardPage() {
                         ) : (
                         <ChartContainer config={occupancyChartConfig} className="h-[250px] w-full">
                            <BarChart data={occupancyByChamber} layout="vertical" margin={{ left: 20, right: 120 }}>
+                                <defs>
+                                    <linearGradient id="generalOccupancyGradient" x1="0" y1="0" x2="1" y2="0">
+                                        <stop offset="0%" stopColor="#004b8d" stopOpacity={0.15} />
+                                        <stop offset="100%" stopColor="#004b8d" stopOpacity={0.85} />
+                                    </linearGradient>
+                                </defs>
                                 <XAxis type="number" hide />
-                                <YAxis dataKey="name" type="category" tickLine={false} axisLine={false} tickMargin={10} width={80} />
+                                <YAxis dataKey="name" type="category" tickLine={false} axisLine={false} tickMargin={10} width={80} className="text-[10px] font-semibold text-muted-foreground" />
                                 <ChartTooltip 
                                     formatter={(value, name, props) => {
                                         const { payload } = props;
                                         if (!payload) return [`${value}`, name];
                                         return [`${value} / ${payload.total} Bins`, name];
                                     }}
-                                    content={<ChartTooltipContent />} 
+                                    content={<ChartTooltipContent className="bg-white/90 dark:bg-zinc-900/90 backdrop-blur-md border border-zinc-200 dark:border-zinc-800 shadow-md rounded-xl" />} 
                                 />
-                                <Bar dataKey="ocupacion" layout="vertical" radius={5} fill="var(--color-ocupacion)">
+                                <Bar dataKey="ocupacion" layout="vertical" radius={[0, 6, 6, 0]} fill="url(#generalOccupancyGradient)">
                                      <LabelList
                                         dataKey="percentage"
                                         position="right"
                                         offset={8}
-                                        className="fill-foreground font-semibold"
+                                        className="fill-foreground font-bold text-xs"
                                         formatter={(value: number) => `${value.toFixed(1)}%`}
                                     />
                                     <LabelList 
                                         dataKey="ocupacion"
                                         position="insideLeft"
                                         offset={8}
-                                        className="fill-primary-foreground font-bold"
+                                        className="fill-white font-bold text-[9px]"
                                         formatter={(value: number) => value > 0 ? `${value.toLocaleString('es-CL')} BINS` : ''}
                                     />
                                 </Bar>
@@ -946,9 +1255,10 @@ export default function DashboardPage() {
                 </Card>
             </div>
             
-             <Card>
+             <Card className="bg-white/60 dark:bg-zinc-900/60 backdrop-blur-md border border-zinc-200/50 dark:border-zinc-800/50 shadow-md rounded-2xl transition-all duration-300 hover:shadow-lg">
                 <CardHeader>
-                    <CardTitle>Últimos Lotes Ingresados (Recepción)</CardTitle>
+                    <CardTitle className="text-lg font-bold text-[#004b8d]">Últimos Lotes Ingresados (Recepción)</CardTitle>
+                    <CardDescription>Resumen de los ingresos de fruta más recientes a la planta.</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <div className="md:hidden space-y-3">
@@ -956,36 +1266,36 @@ export default function DashboardPage() {
                             Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-28 w-full" />)
                         ) : (latestReceptions || []).length > 0 ? (
                             latestReceptions.map(lot => (
-                                <Card key={lot.id} className="p-4">
+                                <Card key={lot.id} className="p-4 border border-zinc-200/50 dark:border-zinc-800/50 shadow-sm rounded-xl">
                                     <div className="flex justify-between items-start">
                                         <div>
-                                            <CardTitle className="text-lg">{lot.displayLotId}</CardTitle>
-                                            <CardDescription>{lot.producerId} / {lot.variety}</CardDescription>
+                                            <CardTitle className="text-sm font-bold">{lot.displayLotId}</CardTitle>
+                                            <CardDescription className="text-xs">{lot.producerId} / {lot.variety}</CardDescription>
                                         </div>
-                                        <Badge variant="secondary">{lot.status}</Badge>
+                                        <Badge variant="secondary" className="text-[10px] px-2 py-0.5 rounded-full">{lot.status}</Badge>
                                     </div>
-                                    <div className="mt-2 text-sm grid grid-cols-2 gap-x-4">
+                                    <div className="mt-3 text-xs grid grid-cols-2 gap-x-4 text-muted-foreground">
                                          <p><strong>Fecha:</strong> {formatLocaleDate(lot.createdAt)}</p>
                                         <p><strong>Bins:</strong> {lot.binCount}</p>
                                     </div>
                                 </Card>
                             ))
                         ) : (
-                            <div className="h-24 text-center flex items-center justify-center">
+                            <div className="h-24 text-center flex items-center justify-center text-xs text-muted-foreground">
                                 <p>No hay registros de recepción recientes.</p>
                             </div>
                         )}
                     </div>
-                    <div className="hidden md:block rounded-md border">
+                    <div className="hidden md:block rounded-xl border overflow-hidden">
                         <Table>
-                            <TableHeader>
+                            <TableHeader className="bg-muted/40">
                                 <TableRow>
-                                    <TableHead>Fecha y Hora</TableHead>
-                                    <TableHead>ID Lote</TableHead>
-                                    <TableHead className="hidden sm:table-cell">Productor</TableHead>
-                                    <TableHead className="hidden md:table-cell">Variedad</TableHead>
-                                    <TableHead>N° Bins</TableHead>
-                                    <TableHead>Estado</TableHead>
+                                    <TableHead className="font-bold text-xs uppercase">Fecha y Hora</TableHead>
+                                    <TableHead className="font-bold text-xs uppercase">ID Lote</TableHead>
+                                    <TableHead className="hidden sm:table-cell font-bold text-xs uppercase">Productor</TableHead>
+                                    <TableHead className="hidden md:table-cell font-bold text-xs uppercase">Variedad</TableHead>
+                                    <TableHead className="font-bold text-xs uppercase">N° Bins</TableHead>
+                                    <TableHead className="font-bold text-xs uppercase">Estado</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -993,18 +1303,18 @@ export default function DashboardPage() {
                                     Array.from({ length: 5 }).map((_, i) => <TableRow key={i}><TableCell colSpan={6}><Skeleton className="h-4 w-full" /></TableCell></TableRow>)
                                 ) : latestReceptions.length > 0 ? (
                                     latestReceptions.map(lot => (
-                                        <TableRow key={lot.id}>
-                                             <TableCell>{formatLocaleDate(lot.createdAt)}</TableCell>
-                                            <TableCell className="font-mono">{lot.displayLotId}</TableCell>
-                                            <TableCell className="hidden sm:table-cell">{lot.producerId}</TableCell>
-                                            <TableCell className="hidden md:table-cell">{lot.variety}</TableCell>
-                                            <TableCell>{lot.binCount}</TableCell>
-                                            <TableCell><Badge variant="secondary">{lot.status}</Badge></TableCell>
+                                        <TableRow key={lot.id} className="hover:bg-muted/30">
+                                             <TableCell className="text-xs">{formatLocaleDate(lot.createdAt)}</TableCell>
+                                             <TableCell className="font-mono text-xs font-semibold">{lot.displayLotId}</TableCell>
+                                            <TableCell className="hidden sm:table-cell text-xs">{lot.producerId}</TableCell>
+                                            <TableCell className="hidden md:table-cell text-xs">{lot.variety}</TableCell>
+                                            <TableCell className="text-xs font-semibold">{lot.binCount}</TableCell>
+                                            <TableCell><Badge variant="secondary" className="text-[10px] px-2 py-0.5 rounded-full">{lot.status}</Badge></TableCell>
                                         </TableRow>
                                     ))
                                 ) : (
                                     <TableRow>
-                                        <TableCell colSpan={6} className="h-24 text-center">
+                                        <TableCell colSpan={6} className="h-24 text-center text-xs text-muted-foreground">
                                             No hay registros de recepción recientes.
                                         </TableCell>
                                     </TableRow>
@@ -1014,7 +1324,6 @@ export default function DashboardPage() {
                     </div>
                 </CardContent>
             </Card>
-
         </div>
     );
 }

@@ -459,6 +459,7 @@ export type StoredItem = {
   observation?: string;
   exporterId?: string;
   document?: string;
+  documentNumber?: string;
   palletId?: string;
   storedAt?: any;
 }

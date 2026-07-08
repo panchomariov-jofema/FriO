@@ -121,6 +121,23 @@ export default function FallCreekPage() {
     const [showPreview, setShowPreview] = React.useState(false);
     const [manifestDocument, setManifestDocument] = React.useState('');
     const [activeReception, setActiveReception] = React.useState<OtherFruitReception | null>(null);
+
+    const duplicatePalletIds = React.useMemo(() => {
+        const counts = new Map<string, number>();
+        previewItems.forEach(item => {
+            const pid = item['Pallet ID'] || '';
+            if (pid) {
+                counts.set(pid, (counts.get(pid) || 0) + 1);
+            }
+        });
+        const duplicates = new Set<string>();
+        counts.forEach((count, pid) => {
+            if (count > 1) {
+                duplicates.add(pid);
+            }
+        });
+        return duplicates;
+    }, [previewItems]);
     const [scannedBinId, setScannedBinId] = React.useState('');
     const [showReceptionDialog, setShowReceptionDialog] = React.useState(false);
     const [storingItem, setStoringItem] = React.useState<PendingItem | null>(null);
@@ -195,6 +212,7 @@ export default function FallCreekPage() {
                     isMixedVariety: item.isMixedVariety,
                     observation: item.observation,
                     document: reception.document,
+                    documentNumber: reception.documentNumber,
                     palletId: item.palletId,
                     storedAt: item.storedAt || reception.createdAt,
                 }))
@@ -1008,7 +1026,7 @@ export default function FallCreekPage() {
                                                                                             <p><span className="font-semibold">Pallet Log:</span> {firstItem.document || '-'}</p>
                                                                                             <p><span className="font-semibold">Pallet ID:</span> <span className="font-mono">{uniquePalletIds.join(', ') || '-'}</span></p>
                                                                                             <p><span className="font-semibold">Variedad:</span> {firstItem.varietyOrProduct}</p>
-                                                                                            <p><span className="font-semibold">Documento:</span> {firstItem.document || '-'}</p>
+                                                                                            <p><span className="font-semibold">Documento:</span> {firstItem.documentNumber || '-'}</p>
                                                                                             {firstItem.observation && (
                                                                                                 <p className="text-muted-foreground italic text-xs mt-0.5"><span className="font-semibold">Obs:</span> {firstItem.observation}</p>
                                                                                             )}
@@ -1572,37 +1590,40 @@ export default function FallCreekPage() {
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
-                                        {previewItems.map((item, index) => (
-                                            <TableRow key={index}>
-                                                <TableCell className="font-mono font-bold">{item['Pallet ID']}</TableCell>
-                                                <TableCell>{item['Item Description']}</TableCell>
-                                                <TableCell className="font-mono text-xs text-muted-foreground">{item['Lot Number (Batch)']}</TableCell>
-                                                <TableCell className="text-right font-bold w-24">
-                                                    <Input
-                                                        type="number"
-                                                        value={item['# of Packages']}
-                                                        onChange={(e) => {
-                                                            const newBins = Number(e.target.value) || 0;
-                                                            const currentBins = Number(item['# of Packages']) || 0;
-                                                            const currentPlants = Number(item['Qty of Plants']) || 0;
-                                                            const plantsPerBin = currentBins > 0 ? (currentPlants / currentBins) : 0;
-                                                            const newPlants = Math.round(newBins * plantsPerBin);
+                                        {previewItems.map((item, index) => {
+                                            const isDuplicate = duplicatePalletIds.has(item['Pallet ID'] || '');
+                                            return (
+                                                <TableRow key={index} className={isDuplicate ? "bg-amber-50/50 hover:bg-amber-100/50 border-l-4 border-l-amber-500" : ""}>
+                                                    <TableCell className={`font-mono font-bold ${isDuplicate ? "text-amber-700" : ""}`}>{item['Pallet ID']}</TableCell>
+                                                    <TableCell>{item['Item Description']}</TableCell>
+                                                    <TableCell className="font-mono text-xs text-muted-foreground">{item['Lot Number (Batch)']}</TableCell>
+                                                    <TableCell className="text-right font-bold w-24">
+                                                        <Input
+                                                            type="number"
+                                                            value={item['# of Packages']}
+                                                            onChange={(e) => {
+                                                                const newBins = Number(e.target.value) || 0;
+                                                                const currentBins = Number(item['# of Packages']) || 0;
+                                                                const currentPlants = Number(item['Qty of Plants']) || 0;
+                                                                const plantsPerBin = currentBins > 0 ? (currentPlants / currentBins) : 0;
+                                                                const newPlants = Math.round(newBins * plantsPerBin);
 
-                                                            const updated = [...previewItems];
-                                                            updated[index] = {
-                                                                ...item,
-                                                                '# of Packages': newBins,
-                                                                'Qty of Plants': newPlants
-                                                            };
-                                                            setPreviewItems(updated);
-                                                        }}
-                                                        className="h-8 text-right font-bold w-20 ml-auto border-muted focus:border-primary"
-                                                        min={1}
-                                                    />
-                                                </TableCell>
-                                                <TableCell className="text-right font-semibold text-[#7aba28]">{item['Qty of Plants']}</TableCell>
-                                            </TableRow>
-                                        ))}
+                                                                const updated = [...previewItems];
+                                                                updated[index] = {
+                                                                    ...item,
+                                                                    '# of Packages': newBins,
+                                                                    'Qty of Plants': newPlants
+                                                                };
+                                                                setPreviewItems(updated);
+                                                            }}
+                                                            className="h-8 text-right font-bold w-20 ml-auto border-muted focus:border-primary"
+                                                            min={1}
+                                                        />
+                                                    </TableCell>
+                                                    <TableCell className="text-right font-semibold text-[#7aba28]">{item['Qty of Plants']}</TableCell>
+                                                </TableRow>
+                                            );
+                                        })}
                                     </TableBody>
                                 </Table>
                             </div>
