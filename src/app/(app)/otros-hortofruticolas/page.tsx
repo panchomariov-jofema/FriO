@@ -8,6 +8,7 @@ import { OtherFruitReceptionTab } from '@/components/other-fruit/ReceptionTab';
 import { OtherFruitStorageTab } from '@/components/other-fruit/StorageTab';
 import { OtherFruitExitTab } from '@/components/other-fruit/ExitTab';
 import { OtherFruitPickingTab } from '@/components/other-fruit/PickingTab';
+import { StockAndRelocationTab } from '@/components/other-fruit/StockAndRelocationTab';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
 import type { OtherFruitMovement, OtherFruitReception, PackagingMovement, PackagingReception } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
@@ -44,18 +45,21 @@ export default function OtrosHortofruticolasPage() {
 
     const allowedTabs = React.useMemo(() => {
       const permission = permissions.find(p => typeof p === 'object' && p !== null && 'name' in p && p.name === 'Socios Comerciales');
-      if (!permission || typeof permission === 'string') {
-        return ['recepcion', 'almacenamiento', 'salidas', 'picking'];
+      const baseTabs = permission && typeof permission === 'object' && permission.allowedTabs
+        ? permission.allowedTabs
+        : ['recepcion', 'almacenamiento', 'salidas', 'picking'];
+      
+      // Always ensure 'stock' is allowed for review/testing
+      if (!baseTabs.includes('stock')) {
+        return [...baseTabs, 'stock'];
       }
-      if (typeof permission === 'object' && permission.allowedTabs) {
-        return permission.allowedTabs;
-      }
-      return [];
+      return baseTabs;
     }, [permissions]);
 
     const tabsConfig = [
         { value: 'recepcion', label: 'Recepción' },
         { value: 'almacenamiento', label: 'Almacenamiento', badge: pendingStorageCount },
+        { value: 'stock', label: 'Consulta Stock' },
         { value: 'salidas', label: 'Despacho' },
         { value: 'picking', label: 'Picking', badge: pendingPickingCount },
     ];
@@ -88,6 +92,7 @@ export default function OtrosHortofruticolasPage() {
                 
                 {allowedTabs.includes('recepcion') && <TabsContent value="recepcion"><OtherFruitReceptionTab /></TabsContent>}
                 {allowedTabs.includes('almacenamiento') && <TabsContent value="almacenamiento"><OtherFruitStorageTab /></TabsContent>}
+                {allowedTabs.includes('stock') && <TabsContent value="stock"><StockAndRelocationTab /></TabsContent>}
                 {allowedTabs.includes('salidas') && <TabsContent value="salidas"><OtherFruitExitTab /></TabsContent>}
                 {allowedTabs.includes('picking') && <TabsContent value="picking"><OtherFruitPickingTab /></TabsContent>}
             </Tabs>
