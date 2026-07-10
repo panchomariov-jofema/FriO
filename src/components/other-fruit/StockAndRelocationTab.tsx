@@ -26,6 +26,7 @@ interface StoredOtherFruitItem {
         coordinate: string;
     };
     palletId?: string;
+    containerId?: string;
     clientLotId?: string;
     document?: string;
     storedAt?: any;
@@ -54,6 +55,7 @@ export function StockAndRelocationTab({ clientId: fixedClientId }: { clientId?: 
                     unit: reception.unit,
                     location: item.storageLocation!,
                     palletId: item.palletId,
+                    containerId: item.containerId,
                     clientLotId: item.clientLotId,
                     document: reception.document,
                     storedAt: item.storedAt || reception.createdAt,
@@ -67,6 +69,7 @@ export function StockAndRelocationTab({ clientId: fixedClientId }: { clientId?: 
     if (!q) return storedItems;
     return storedItems.filter(item => {
         const palletIdStr = String(item.palletId || '').toLowerCase();
+        const containerIdStr = String(item.containerId || '').toLowerCase();
         const docStr = String(item.document || '').toLowerCase();
         const lotStr = String(item.clientLotId || '').toLowerCase();
         const clientStr = String(item.clientName || '').toLowerCase();
@@ -75,6 +78,7 @@ export function StockAndRelocationTab({ clientId: fixedClientId }: { clientId?: 
         const coordStr = String(item.location.coordinate || '').toLowerCase();
 
         return palletIdStr.includes(q) ||
+               containerIdStr.includes(q) ||
                docStr.includes(q) ||
                lotStr.includes(q) ||
                clientStr.includes(q) ||
@@ -91,25 +95,29 @@ export function StockAndRelocationTab({ clientId: fixedClientId }: { clientId?: 
     setSearchQuery(cleanCode);
 
     const foundItem = storedItems.find(item => 
-      String(item.palletId || '').toLowerCase().trim() === cleanCode.toLowerCase()
+      String(item.palletId || '').toLowerCase().trim() === cleanCode.toLowerCase() ||
+      String(item.containerId || '').toLowerCase().trim() === cleanCode.toLowerCase()
     );
 
     if (foundItem) {
+      const codeToDisplay = foundItem.palletId || foundItem.containerId || cleanCode;
       toast({
         title: 'Ubicación Encontrada',
-        description: `El bin/pallet ${cleanCode} está en ${chambersConfig[foundItem.location.chamberId]?.name || foundItem.location.chamberId} - Coordenada ${foundItem.location.coordinate}.`,
+        description: `El bin/pallet ${codeToDisplay} está en ${chambersConfig[foundItem.location.chamberId]?.name || foundItem.location.chamberId} - Coordenada ${foundItem.location.coordinate}.`,
       });
     } else {
-      // Try a fuzzy match in case the scanned code is part of the palletId or clientLotId
+      // Try a fuzzy match in case the scanned code is part of the palletId, containerId, or clientLotId
       const fuzzyItem = storedItems.find(item => 
         String(item.palletId || '').toLowerCase().includes(cleanCode.toLowerCase()) ||
+        String(item.containerId || '').toLowerCase().includes(cleanCode.toLowerCase()) ||
         String(item.clientLotId || '').toLowerCase().includes(cleanCode.toLowerCase())
       );
 
       if (fuzzyItem) {
+        const codeToDisplay = fuzzyItem.palletId || fuzzyItem.containerId || cleanCode;
         toast({
           title: 'Ubicación Encontrada (Coincidencia)',
-          description: `El código ${cleanCode} coincide con ${fuzzyItem.palletId} en ${chambersConfig[fuzzyItem.location.chamberId]?.name || fuzzyItem.location.chamberId} - Coordenada ${fuzzyItem.location.coordinate}.`,
+          description: `El código ${cleanCode} coincide con ${codeToDisplay} en ${chambersConfig[fuzzyItem.location.chamberId]?.name || fuzzyItem.location.chamberId} - Coordenada ${fuzzyItem.location.coordinate}.`,
         });
       } else {
         toast({
@@ -163,6 +171,7 @@ export function StockAndRelocationTab({ clientId: fixedClientId }: { clientId?: 
                   {!fixedClientId && <TableHead className="font-bold text-xs uppercase">Cliente</TableHead>}
                   <TableHead className="font-bold text-xs uppercase">Pallet Log (Documento)</TableHead>
                   <TableHead className="font-bold text-xs uppercase">Pallet ID</TableHead>
+                  <TableHead className="font-bold text-xs uppercase">QR</TableHead>
                   <TableHead className="font-bold text-xs uppercase">Lote Cliente</TableHead>
                   <TableHead className="font-bold text-xs uppercase">Variedad</TableHead>
                   <TableHead className="font-bold text-xs uppercase">Cámara</TableHead>
@@ -174,7 +183,7 @@ export function StockAndRelocationTab({ clientId: fixedClientId }: { clientId?: 
                 {loading ? (
                   Array.from({ length: 5 }).map((_, i) => (
                     <TableRow key={i}>
-                      <TableCell colSpan={fixedClientId ? 8 : 9}>
+                      <TableCell colSpan={fixedClientId ? 9 : 10}>
                         <Skeleton className="h-4 w-full" />
                       </TableCell>
                     </TableRow>
@@ -190,7 +199,12 @@ export function StockAndRelocationTab({ clientId: fixedClientId }: { clientId?: 
                         <TableCell className="text-xs">{storedDate}</TableCell>
                         {!fixedClientId && <TableCell className="text-xs font-semibold">{item.clientName}</TableCell>}
                         <TableCell className="font-mono text-xs">{item.document || '-'}</TableCell>
-                        <TableCell className="font-mono text-xs font-bold text-zinc-900 dark:text-zinc-100">{item.palletId || '-'}</TableCell>
+                        <TableCell className="font-mono text-xs font-bold text-zinc-900 dark:text-zinc-100">
+                          {item.palletId || '-'}
+                        </TableCell>
+                        <TableCell className="font-mono text-xs text-zinc-600 dark:text-zinc-400">
+                          {item.containerId || '-'}
+                        </TableCell>
                         <TableCell className="font-mono text-xs">{item.clientLotId || '-'}</TableCell>
                         <TableCell className="text-xs">{item.productName}</TableCell>
                         <TableCell className="text-xs">{chambersConfig[item.location.chamberId]?.name || item.location.chamberId}</TableCell>
@@ -201,7 +215,7 @@ export function StockAndRelocationTab({ clientId: fixedClientId }: { clientId?: 
                   })
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={fixedClientId ? 8 : 9} className="h-24 text-center text-xs text-muted-foreground">
+                    <TableCell colSpan={fixedClientId ? 9 : 10} className="h-24 text-center text-xs text-muted-foreground">
                       No se encontraron registros de stock con los criterios ingresados.
                     </TableCell>
                   </TableRow>
