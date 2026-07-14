@@ -4,7 +4,7 @@ import * as React from 'react';
 import Image from 'next/image';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
-import type { OtherClient, OtherFruitReception, OtherFruitReceptionItem, OtherFruitMovement, StoredItem, ChamberLot, OtherFruitMovementLocation, UserMaster, ChamberTemperature } from '@/lib/types';
+import type { OtherClient, OtherFruitReception, OtherFruitReceptionItem, OtherFruitMovement, StoredItem, ChamberLot, OtherFruitMovementLocation, UserMaster, ChamberTemperature, BinMaterialMovement, Producer, BinMaterial } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -31,7 +31,7 @@ import { Switch } from '@/components/ui/switch';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
 import { parseFallCreekManifest, decomposePalletsIntoBins, type FallCreekManifestRow, fileToBase64 } from '@/lib/fall-creek-utils';
 import { parseManifestAIAction } from './actions';
-import { FileUp, ClipboardList, Loader2, Search, Printer, Download } from 'lucide-react';
+import { FileUp, ClipboardList, Loader2, Search, Printer, Download, Truck, Warehouse, Info, Archive } from 'lucide-react';
 import { notifyPalletLogStarted } from '@/lib/telegram';
 import type { PendingItem } from '@/lib/types';
 import { StoreOtherFruitDialog } from '@/components/other-fruit/StoreOtherFruitDialog';
@@ -72,6 +72,9 @@ export default function FallCreekPage() {
     const { data: chamberSettings } = useFirestoreCollection<{ id: string; row13Enabled?: boolean }>('chamberSettings');
     const { data: usersMaster } = useFirestoreCollection<UserMaster>('usersMaster');
     const { data: allTemperatures } = useFirestoreCollection<ChamberTemperature>('chamberTemperatures');
+    const { data: allProducers, loading: loadingProducers } = useFirestoreCollection<Producer>('producers');
+    const { data: allBinMaterials, loading: loadingBinMaterials } = useFirestoreCollection<BinMaterial>('binMaterials');
+    const { data: allBinMovements, loading: loadingBinMovements } = useFirestoreCollection<BinMaterialMovement>('binMaterialMovements');
 
     const { toast } = useToast();
     const firestore = useFirestore();
@@ -183,6 +186,77 @@ export default function FallCreekPage() {
             })
             .sort((a, b) => safeToMillis(a.timestamp) - safeToMillis(b.timestamp));
     }, [allTemperatures, selectedChamber]);
+
+    const last7DaysData = React.useMemo(() => {
+        const now = new Date();
+        const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        return formattedData
+            .filter(item => {
+                const ts = item.timestamp as any;
+                const date = ts && typeof ts.toDate === 'function' ? ts.toDate() : new Date(ts);
+                return date >= sevenDaysAgo;
+            })
+            .sort((a, b) => safeToMillis(b.timestamp) - safeToMillis(a.timestamp));
+    }, [formattedData]);
+
+    const loadingBinsData = loadingBinMovements || loadingBinMaterials || loadingProducers;
+
+    const leasedBinsCount = React.useMemo(() => {
+        if (loadingBinsData || !allBinMovements || !allBinMaterials || !allProducers) return 0;
+        
+        const fcProducers = allProducers.filter(p => {
+            const shortName = String(p.shortName || '').toUpperCase();
+            const name = String(p.name || '').toUpperCase();
+            return shortName.includes("FALL") || name.includes("FALL");
+        });
+        const fcIds = new Set(fcProducers.map(p => p.producerId?.trim() || p.id?.trim()).filter(Boolean));
+        fcIds.add("rKHAGeIpt5rigsAmHYza");
+        fcIds.add("76361536-7");
+        fcIds.add(" 76361536-7");
+
+        const fnoBinCodes = new Set(
+            (allBinMaterials || [])
+                .filter(m => m.exporterId === 'EXP005' && m.type === 'BINS')
+                .map(m => m.code)
+        );
+
+        let balance = 0;
+        (allBinMovements || []).forEach(mov => {
+            if (mov.exporterId !== 'EXP005') return;
+            if (mov.observation === 'Despacho Directo') return;
+            if (!mov.producerId) return;
+
+            const cleanProdId = mov.producerId.trim();
+            if (fcIds.has(cleanProdId)) {
+                (mov.items || []).forEach(item => {
+                    if (fnoBinCodes.has(item.binMaterialCode)) {
+                        const qty = mov.type === 'salida' ? item.quantity : -item.quantity;
+                        balance += qty;
+                    }
+                });
+            }
+        });
+        return balance;
+    }, [allBinMovements, allBinMaterials, allProducers, loadingBinsData]);
+
+    const storedBinsCount = React.useMemo(() => {
+        if (loadingReceptions || !allReceptions) return 0;
+        
+        let count = 0;
+        (allReceptions || []).forEach(rec => {
+            const isFallCreek = rec.clientName?.toUpperCase() === 'FALL CREEK' || 
+                                (fallCreekClient && rec.clientId === fallCreekClient.id);
+            if (isFallCreek) {
+                const items = rec.items || [];
+                items.forEach(item => {
+                    if (item.status === 'Almacenado' && item.quantity > 0 && item.storageLocation?.coordinate) {
+                        count += item.quantity;
+                    }
+                });
+            }
+        });
+        return count;
+    }, [allReceptions, fallCreekClient, loadingReceptions]);
 
     const { storedItemsByChamber, chamberOccupancy, chambersWithFallCreekStock, reservedCoords, pendingItems, fallCreekStoredItems } = React.useMemo(() => {
         if (!fallCreekClient) return { storedItemsByChamber: {}, chamberOccupancy: {}, chambersWithFallCreekStock: [], reservedCoords: new Set<string>(), pendingItems: [], fallCreekStoredItems: [] };
@@ -784,6 +858,10 @@ export default function FallCreekPage() {
                             <History className="mr-2 h-4 w-4" />
                             Historial
                         </TabsTrigger>
+                        <TabsTrigger value="bins" className="data-[state=active]:bg-[#004b8d] data-[state=active]:text-white">
+                            <Archive className="mr-2 h-4 w-4" />
+                            Bins
+                        </TabsTrigger>
                     </TabsList>
                 </div>
 
@@ -839,7 +917,7 @@ export default function FallCreekPage() {
                         </div>
                     </CardHeader>
                     <CardContent className="space-y-6">
-                        <Accordion type="multiple" onValueChange={setOpenAccordions} defaultValue={chambersWithFallCreekStock}>
+                        <Accordion type="multiple" value={openAccordions} onValueChange={setOpenAccordions}>
                             {Object.keys(chambersConfig)
                                 .filter(id => id !== 'CAMARA-1' && id !== 'CAMARA-6')
                                 .map(chamberId => {
@@ -1083,66 +1161,104 @@ export default function FallCreekPage() {
                         </CardHeader>
                         <CardContent>
                             {formattedData.length > 0 ? (
-                                <div className="h-[350px] w-full mt-4">
-                                    <ResponsiveContainer width="100%" height="100%">
-                                        <AreaChart
-                                            data={formattedData}
-                                            margin={{ top: 10, right: 30, left: 10, bottom: 0 }}
-                                        >
-                                            <defs>
-                                                <linearGradient id="colorTemp" x1="0" y1="0" x2="0" y2="1">
-                                                    <stop offset="5%" stopColor="#004b8d" stopOpacity={0.2}/>
-                                                    <stop offset="95%" stopColor="#004b8d" stopOpacity={0}/>
-                                                </linearGradient>
-                                                <linearGradient id="colorHum" x1="0" y1="0" x2="0" y2="1">
-                                                    <stop offset="5%" stopColor="#00a9e0" stopOpacity={0.2}/>
-                                                    <stop offset="95%" stopColor="#00a9e0" stopOpacity={0}/>
-                                                </linearGradient>
-                                            </defs>
-                                            <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                                            <XAxis 
-                                                dataKey="dateTimeStr" 
-                                                className="text-[10px] fill-muted-foreground"
-                                                tickLine={false}
-                                            />
-                                            <YAxis 
-                                                yAxisId="left"
-                                                className="text-[10px] fill-muted-foreground"
-                                                tickLine={false}
-                                                label={{ value: 'Temp (°C)', angle: -90, position: 'insideLeft', offset: -5, style: { textAnchor: 'middle', fill: '#004b8d', fontWeight: 'bold' } }}
-                                            />
-                                            <YAxis 
-                                                yAxisId="right"
-                                                orientation="right"
-                                                className="text-[10px] fill-muted-foreground"
-                                                tickLine={false}
-                                                label={{ value: 'Humedad (% HR)', angle: 90, position: 'insideRight', offset: 5, style: { textAnchor: 'middle', fill: '#00a9e0', fontWeight: 'bold' } }}
-                                            />
-                                            <Tooltip 
-                                                contentStyle={{ backgroundColor: 'hsl(var(--background))', borderColor: 'hsl(var(--border))', borderRadius: '8px' }}
-                                                labelStyle={{ fontWeight: 'bold', color: 'hsl(var(--foreground))' }}
-                                            />
-                                            <Legend verticalAlign="top" height={36} />
-                                            <Area 
-                                                yAxisId="left"
-                                                type="monotone" 
-                                                dataKey="temperature" 
-                                                name="Temperatura (°C)" 
-                                                stroke="#004b8d" 
-                                                fillOpacity={1} 
-                                                fill="url(#colorTemp)" 
-                                            />
-                                            <Area 
-                                                yAxisId="right"
-                                                type="monotone" 
-                                                dataKey="humidity" 
-                                                name="Humedad (% HR)" 
-                                                stroke="#00a9e0" 
-                                                fillOpacity={1} 
-                                                fill="url(#colorHum)" 
-                                            />
-                                        </AreaChart>
-                                    </ResponsiveContainer>
+                                <div className="space-y-6">
+                                    <div className="h-[350px] w-full mt-4">
+                                        <ResponsiveContainer width="100%" height="100%">
+                                            <AreaChart
+                                                data={formattedData}
+                                                margin={{ top: 10, right: 30, left: 10, bottom: 0 }}
+                                            >
+                                                <defs>
+                                                    <linearGradient id="colorTemp" x1="0" y1="0" x2="0" y2="1">
+                                                        <stop offset="5%" stopColor="#004b8d" stopOpacity={0.2}/>
+                                                        <stop offset="95%" stopColor="#004b8d" stopOpacity={0}/>
+                                                    </linearGradient>
+                                                    <linearGradient id="colorHum" x1="0" y1="0" x2="0" y2="1">
+                                                        <stop offset="5%" stopColor="#00a9e0" stopOpacity={0.2}/>
+                                                        <stop offset="95%" stopColor="#00a9e0" stopOpacity={0}/>
+                                                    </linearGradient>
+                                                </defs>
+                                                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                                                <XAxis 
+                                                    dataKey="dateTimeStr" 
+                                                    className="text-[10px] fill-muted-foreground"
+                                                    tickLine={false}
+                                                />
+                                                <YAxis 
+                                                    yAxisId="left"
+                                                    className="text-[10px] fill-muted-foreground"
+                                                    tickLine={false}
+                                                    label={{ value: 'Temp (°C)', angle: -90, position: 'insideLeft', offset: -5, style: { textAnchor: 'middle', fill: '#004b8d', fontWeight: 'bold' } }}
+                                                />
+                                                <YAxis 
+                                                    yAxisId="right"
+                                                    orientation="right"
+                                                    className="text-[10px] fill-muted-foreground"
+                                                    tickLine={false}
+                                                    label={{ value: 'Humedad (% HR)', angle: 90, position: 'insideRight', offset: 5, style: { textAnchor: 'middle', fill: '#00a9e0', fontWeight: 'bold' } }}
+                                                />
+                                                <Tooltip 
+                                                    contentStyle={{ backgroundColor: 'hsl(var(--background))', borderColor: 'hsl(var(--border))', borderRadius: '8px' }}
+                                                    labelStyle={{ fontWeight: 'bold', color: 'hsl(var(--foreground))' }}
+                                                />
+                                                <Legend verticalAlign="top" height={36} />
+                                                <Area 
+                                                    yAxisId="left"
+                                                    type="monotone" 
+                                                    dataKey="temperature" 
+                                                    name="Temperatura (°C)" 
+                                                    stroke="#004b8d" 
+                                                    fillOpacity={1} 
+                                                    fill="url(#colorTemp)" 
+                                                />
+                                                <Area 
+                                                    yAxisId="right"
+                                                    type="monotone" 
+                                                    dataKey="humidity" 
+                                                    name="Humedad (% HR)" 
+                                                    stroke="#00a9e0" 
+                                                    fillOpacity={1} 
+                                                    fill="url(#colorHum)" 
+                                                />
+                                            </AreaChart>
+                                        </ResponsiveContainer>
+                                    </div>
+
+                                    {/* Tabla de registros históricos de los últimos 7 días */}
+                                    <div className="rounded-md border overflow-hidden mt-6">
+                                        <Table>
+                                            <TableHeader className="bg-muted/40">
+                                                <TableRow>
+                                                    <TableHead className="font-bold text-xs uppercase">Fecha / Hora</TableHead>
+                                                    <TableHead className="font-bold text-xs uppercase">Cámara</TableHead>
+                                                    <TableHead className="font-bold text-xs uppercase">Temperatura</TableHead>
+                                                    <TableHead className="font-bold text-xs uppercase">Humedad</TableHead>
+                                                </TableRow>
+                                            </TableHeader>
+                                            <TableBody>
+                                                {last7DaysData.length > 0 ? (
+                                                    last7DaysData.map((item) => (
+                                                        <TableRow key={item.id} className="hover:bg-muted/30">
+                                                            <TableCell className="text-xs">{item.dateTimeStr}</TableCell>
+                                                            <TableCell className="text-xs font-semibold">{chambersConfig[item.chamberId]?.name || item.chamberId}</TableCell>
+                                                            <TableCell className="font-mono text-xs font-bold text-[#004b8d]">
+                                                                {item.temperature !== undefined ? `${item.temperature.toFixed(1)}°C` : '-'}
+                                                            </TableCell>
+                                                            <TableCell className="font-mono text-xs font-bold text-[#00a9e0]">
+                                                                {item.humidity !== undefined && item.humidity !== null ? `${item.humidity.toFixed(1)}% HR` : '-'}
+                                                            </TableCell>
+                                                        </TableRow>
+                                                    ))
+                                                ) : (
+                                                    <TableRow>
+                                                        <TableCell colSpan={4} className="h-24 text-center text-xs text-muted-foreground">
+                                                            No hay registros de climatización para los últimos 7 días.
+                                                        </TableCell>
+                                                    </TableRow>
+                                                )}
+                                            </TableBody>
+                                        </Table>
+                                    </div>
                                 </div>
                             ) : (
                                 <div className="flex flex-col items-center justify-center h-[200px] border-2 border-dashed rounded-lg bg-muted/20">
@@ -1387,6 +1503,82 @@ export default function FallCreekPage() {
                             </Card>
                         </TabsContent>
                     </Tabs>
+                </TabsContent>
+
+                <TabsContent value="bins" className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {/* Tarjeta 1: Bins en Arriendo */}
+                        <Card className="border-t-4 border-t-[#004b8d] backdrop-blur bg-white/60 dark:bg-zinc-900/60 shadow-lg hover:shadow-xl transition-all duration-300">
+                            <CardHeader className="pb-2">
+                                <div className="flex items-center justify-between">
+                                    <CardTitle className="text-lg text-[#004b8d] font-bold">
+                                        Bins en Arriendo
+                                    </CardTitle>
+                                    <div className="p-2 bg-[#004b8d]/10 rounded-full text-[#004b8d]">
+                                        <Truck className="h-6 w-6" />
+                                    </div>
+                                </div>
+                                <CardDescription>
+                                    Total de Bins de arriendo (FÑO) en posesión física del productor.
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent className="pt-4 flex flex-col justify-center min-h-[140px]">
+                                {loadingBinsData ? (
+                                    <Skeleton className="h-16 w-32 mx-auto" />
+                                ) : (
+                                    <div className="text-center">
+                                        <span className="text-6xl font-black text-zinc-900 dark:text-zinc-50 tracking-tight">
+                                            {leasedBinsCount.toLocaleString()}
+                                        </span>
+                                        <span className="text-sm font-semibold text-muted-foreground block mt-2">
+                                            Bins entregados en arriendo
+                                        </span>
+                                    </div>
+                                )}
+                            </CardContent>
+                        </Card>
+
+                        {/* Tarjeta 2: Bins Almacenados */}
+                        <Card className="border-t-4 border-t-[#7aba28] backdrop-blur bg-white/60 dark:bg-zinc-900/60 shadow-lg hover:shadow-xl transition-all duration-300">
+                            <CardHeader className="pb-2">
+                                <div className="flex items-center justify-between">
+                                    <CardTitle className="text-lg text-[#7aba28] font-bold">
+                                        Bins Almacenados
+                                    </CardTitle>
+                                    <div className="p-2 bg-[#7aba28]/10 rounded-full text-[#7aba28]">
+                                        <Warehouse className="h-6 w-6" />
+                                    </div>
+                                </div>
+                                <CardDescription>
+                                    Total de Bins con plantas de Fall Creek almacenados en las cámaras.
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent className="pt-4 flex flex-col justify-center min-h-[140px]">
+                                {loadingReceptions ? (
+                                    <Skeleton className="h-16 w-32 mx-auto" />
+                                ) : (
+                                    <div className="text-center">
+                                        <span className="text-6xl font-black text-zinc-900 dark:text-zinc-50 tracking-tight">
+                                            {storedBinsCount.toLocaleString()}
+                                        </span>
+                                        <span className="text-sm font-semibold text-muted-foreground block mt-2">
+                                            Bins almacenados en cámaras
+                                        </span>
+                                    </div>
+                                )}
+                            </CardContent>
+                        </Card>
+                    </div>
+
+                    {/* Nota explicativa de control físico */}
+                    <Card className="bg-zinc-50 dark:bg-zinc-900/40 border border-muted-foreground/10">
+                        <CardContent className="p-4 flex gap-3 items-center text-sm text-muted-foreground">
+                            <Info className="h-5 w-5 text-[#004b8d] shrink-0" />
+                            <span>
+                                Este panel de Bins es una herramienta de <strong>control físico</strong>. Muestra la cantidad actual de envases de arriendo en circulación contra la cantidad de envases ingresados y custodiados con plantas de Fall Creek.
+                            </span>
+                        </CardContent>
+                    </Card>
                 </TabsContent>
 
             </Tabs>
