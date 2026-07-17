@@ -1795,16 +1795,10 @@ export default function FallCreekPage() {
                                                             value={item['# of Packages']}
                                                             onChange={(e) => {
                                                                 const newBins = Number(e.target.value) || 0;
-                                                                const currentBins = Number(item['# of Packages']) || 0;
-                                                                const currentPlants = Number(item['Qty of Plants']) || 0;
-                                                                const plantsPerBin = currentBins > 0 ? (currentPlants / currentBins) : 0;
-                                                                const newPlants = Math.round(newBins * plantsPerBin);
-
                                                                 const updated = [...previewItems];
                                                                 updated[index] = {
                                                                     ...item,
-                                                                    '# of Packages': newBins,
-                                                                    'Qty of Plants': newPlants
+                                                                    '# of Packages': newBins
                                                                 };
                                                                 setPreviewItems(updated);
                                                             }}
