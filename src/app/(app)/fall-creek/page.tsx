@@ -845,20 +845,20 @@ export default function FallCreekPage() {
         <div className="min-h-[calc(100vh-10rem)] pb-52">
             <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
                 <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-                    <TabsList className="bg-[#004b8d]/10 p-1">
-                        <TabsTrigger value="storage" className="data-[state=active]:bg-[#004b8d] data-[state=active]:text-white">
+                    <TabsList className="bg-[#004b8d]/10 p-1 flex overflow-x-auto w-full md:w-auto md:inline-flex scrollbar-none whitespace-nowrap h-auto md:h-10">
+                        <TabsTrigger value="storage" className="data-[state=active]:bg-[#004b8d] data-[state=active]:text-white shrink-0">
                             <PackageCheck className="mr-2 h-4 w-4" />
                             Stock en Cámaras
                         </TabsTrigger>
-                        <TabsTrigger value="stock-query" className="data-[state=active]:bg-[#004b8d] data-[state=active]:text-white">
+                        <TabsTrigger value="stock-query" className="data-[state=active]:bg-[#004b8d] data-[state=active]:text-white shrink-0">
                             <Search className="mr-2 h-4 w-4" />
                             Consulta Stock
                         </TabsTrigger>
-                        <TabsTrigger value="history" className="data-[state=active]:bg-[#004b8d] data-[state=active]:text-white">
+                        <TabsTrigger value="history" className="data-[state=active]:bg-[#004b8d] data-[state=active]:text-white shrink-0">
                             <History className="mr-2 h-4 w-4" />
                             Historial
                         </TabsTrigger>
-                        <TabsTrigger value="bins" className="data-[state=active]:bg-[#004b8d] data-[state=active]:text-white">
+                        <TabsTrigger value="bins" className="data-[state=active]:bg-[#004b8d] data-[state=active]:text-white shrink-0">
                             <Archive className="mr-2 h-4 w-4" />
                             Bins
                         </TabsTrigger>
@@ -867,8 +867,8 @@ export default function FallCreekPage() {
 
                 <TabsContent value="storage" className="space-y-6">
                     <Card className="border-t-4 border-t-[#004b8d]">
-                    <CardHeader className="flex flex-col md:flex-row items-center justify-between gap-4">
-                        <div className="flex items-center gap-6">
+                    <CardHeader className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6 w-full lg:w-auto">
                             {fallCreekLogo && (
                                 <div className="relative w-40 h-16 shrink-0 bg-white p-2 rounded-md shadow-sm border">
                                     <Image
@@ -885,7 +885,7 @@ export default function FallCreekPage() {
                                 <CardDescription>Gestión de stock y generación de pre-despachos para plantas.</CardDescription>
                             </div>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full lg:w-auto">
                             {showCargarManifiesto && (
                                 <>
                                     <Input
@@ -898,7 +898,7 @@ export default function FallCreekPage() {
                                     <Button 
                                         onClick={() => fileInputRef.current?.click()}
                                         variant="outline"
-                                        className="border-[#004b8d] text-[#004b8d] hover:bg-[#004b8d]/10"
+                                        className="border-[#004b8d] text-[#004b8d] hover:bg-[#004b8d]/10 w-full sm:w-auto"
                                         disabled={importing}
                                     >
                                         {importing ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <FileUp className="mr-2 h-4 w-4"/>}
@@ -909,7 +909,7 @@ export default function FallCreekPage() {
                             <Button 
                                 onClick={handleToggleSelectionMode} 
                                 variant={selectionMode ? "destructive" : "default"}
-                                className={cn(!selectionMode && "bg-[#7aba28] hover:bg-[#6aa423] text-white")}
+                                className={cn(!selectionMode && "bg-[#7aba28] hover:bg-[#6aa423] text-white", "w-full sm:w-auto")}
                             >
                                 {selectionMode ? <X className="mr-2 h-4 w-4"/> : <CircleDot className="mr-2 h-4 w-4"/>}
                                 {selectionMode ? (isEditing ? 'Cancelar Edición' : 'Cancelar Selección') : 'Iniciar Selección de Despacho'}
@@ -927,11 +927,11 @@ export default function FallCreekPage() {
                                     const activeRows = isRow13Enabled ? config.rows : config.rows.filter(r => r !== 13 && r !== 14);
                                     return (
                                         <AccordionItem value={chamberId} key={chamberId} className="border rounded-lg mb-2 px-4">
-                                            <div className="flex w-full items-center justify-between pr-4">
+                                            <div className="flex flex-col sm:flex-row w-full sm:items-center justify-between gap-2 pr-4 pb-2 sm:pb-0">
                                                 <AccordionTrigger className="hover:no-underline py-4 flex-1">
                                                     <span className="text-lg font-bold text-[#004b8d]">{config.name}</span>
                                                 </AccordionTrigger>
-                                                <div className="flex items-center gap-4 py-2 sm:py-0 z-10">
+                                                <div className="flex flex-wrap items-center gap-2 sm:gap-4 py-2 sm:py-0 z-10 w-full sm:w-auto justify-start sm:justify-end">
                                                     <ChamberTemperatureInput chamberId={chamberId} readOnly={true} />
                                                     <div className="text-right">
                                                         <Badge variant="secondary" className="font-mono text-sm px-3 py-1 bg-muted">
@@ -1225,7 +1225,7 @@ export default function FallCreekPage() {
                                     </div>
 
                                     {/* Tabla de registros históricos de los últimos 7 días */}
-                                    <div className="rounded-md border overflow-hidden mt-6">
+                                    <div className="rounded-md border overflow-x-auto mt-6">
                                         <Table>
                                             <TableHeader className="bg-muted/40">
                                                 <TableRow>
@@ -1313,7 +1313,7 @@ export default function FallCreekPage() {
                                 });
 
                                 return (
-                                    <div className="rounded-md border">
+                                    <div className="rounded-md border overflow-x-auto">
                                         <Table>
                                             <TableHeader>
                                                 <TableRow>
@@ -1387,7 +1387,7 @@ export default function FallCreekPage() {
                                     <CardTitle>Historial de Manifiestos</CardTitle>
                                     <CardDescription>Consulte el estado de los Pallet Logs cargados y recibidos.</CardDescription>
                                 </CardHeader>
-                                <CardContent>
+                                <CardContent className="overflow-x-auto">
                                     <Table>
                                         <TableHeader>
                                             <TableRow>
@@ -1458,7 +1458,7 @@ export default function FallCreekPage() {
                                     <CardTitle>Solicitudes de Pre-Despacho</CardTitle>
                                     <CardDescription>Consulte el estado de todas las solicitudes de picking y despacho sugeridas.</CardDescription>
                                 </CardHeader>
-                                <CardContent>
+                                <CardContent className="overflow-x-auto">
                                     <Table>
                                         <TableHeader>
                                             <TableRow>
@@ -1605,7 +1605,7 @@ export default function FallCreekPage() {
                             </div>
                             <Move className="h-5 w-5 opacity-50" />
                         </CardHeader>
-                        <CardContent className="space-y-4 pt-6">
+                        <CardContent className="space-y-4 pt-6 max-h-[70vh] overflow-y-auto">
                             <div className="grid md:grid-cols-2 gap-4">
                                 <div className="rounded-md border p-4 bg-muted/10">
                                     <h4 className="font-bold text-[#004b8d] mb-2 uppercase text-xs tracking-wider">Productos en Selección</h4>
@@ -1665,7 +1665,7 @@ export default function FallCreekPage() {
                                  Cliente: {movementToView.clientName} - Referencia: {movementToView.document || 'N/A'}
                              </DialogDescription>
                          </DialogHeader>
-                         <div className="max-h-96 overflow-y-auto">
+                         <div className="max-h-96 overflow-y-auto overflow-x-auto">
                              <Table>
                                  <TableHeader>
                                      <TableRow>
@@ -1705,7 +1705,7 @@ export default function FallCreekPage() {
                                  Pallet Log: {receptionToView.document} {receptionToView.documentNumber ? ` - N° Documento: ${receptionToView.documentNumber}` : ''} - Fecha: {receptionToView.createdAt?.toDate()?.toLocaleDateString() ?? 'Sin fecha'}
                              </DialogDescription>
                          </DialogHeader>
-                         <div className="max-h-96 overflow-y-auto">
+                         <div className="max-h-96 overflow-y-auto overflow-x-auto">
                              <Table>
                                  <TableHeader>
                                      <TableRow>
@@ -1770,7 +1770,7 @@ export default function FallCreekPage() {
                                 </div>
                             </div>
 
-                            <div className="rounded-md border max-h-[40vh] overflow-y-auto">
+                            <div className="rounded-md border max-h-[40vh] overflow-y-auto overflow-x-auto">
                                 <Table>
                                     <TableHeader>
                                         <TableRow className="bg-muted/50">
