@@ -75,6 +75,7 @@ export function FallCreekReceptionWorkflow({
     const [scannedBins, setScannedBins] = React.useState<string[]>([]);
     const [isSubmitting, setIsSubmitting] = React.useState(false);
     const [scanning, setScanning] = React.useState(false);
+    const [observation, setObservation] = React.useState('');
 
     const fileInputRef = React.useRef<HTMLInputElement>(null);
     const [importing, setImporting] = React.useState(false);
@@ -318,7 +319,8 @@ export function FallCreekReceptionWorkflow({
                         return {
                             ...item,
                             containerId: binQr,
-                            status: 'Pendiente de almacenar' as const
+                            status: 'Pendiente de almacenar' as const,
+                            observation: observation.trim() || undefined
                         };
                     }
                 }
@@ -369,6 +371,7 @@ export function FallCreekReceptionWorkflow({
 
             setSelectedPalletId(null);
             setScannedBins([]);
+            setObservation('');
         } catch (error) {
             console.error("Error updating manifest:", error);
             toast({ variant: 'destructive', title: 'Error', description: 'No se pudo registrar.' });
@@ -527,6 +530,20 @@ export function FallCreekReceptionWorkflow({
                         </div>
                     </Alert>
                 )}
+
+                {/* Subtle observation input at the bottom right */}
+                <div className="flex justify-end pt-1">
+                    <div className="w-full sm:w-80 space-y-1">
+                        <Label htmlFor="observation-input" className="text-[10px] sm:text-xs font-bold text-muted-foreground uppercase tracking-wider">Observaciones (Opcional)</Label>
+                        <Input
+                            id="observation-input"
+                            placeholder="Ej: Bins deteriorados, plantas con problemas..."
+                            value={observation}
+                            onChange={(e) => setObservation(e.target.value)}
+                            className="h-9 text-xs border-2"
+                        />
+                    </div>
+                </div>
 
                 {/* Step 3: Scanning Bins */}
                 {selectedPalletId && (
