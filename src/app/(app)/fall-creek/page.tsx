@@ -29,7 +29,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
-import { parseFallCreekManifest, decomposePalletsIntoBins, type FallCreekManifestRow, fileToBase64 } from '@/lib/fall-creek-utils';
+import { parseFallCreekManifest, decomposePalletsIntoBins, cleanVarietyName, type FallCreekManifestRow, fileToBase64 } from '@/lib/fall-creek-utils';
 import { parseManifestAIAction } from './actions';
 import { FileUp, ClipboardList, Loader2, Search, Printer, Download, Truck, Warehouse, Info, Archive } from 'lucide-react';
 import { notifyPalletLogStarted } from '@/lib/telegram';
@@ -257,6 +257,35 @@ export default function FallCreekPage() {
         });
         return count;
     }, [allReceptions, fallCreekClient, loadingReceptions]);
+
+    const contingencies = React.useMemo(() => {
+        if (!allReceptions || !fallCreekClient) return [];
+        const list: {
+            id: string;
+            date: any;
+            document: string;
+            documentNumber: string;
+            observation: string;
+            binsCount: number;
+            userName: string;
+        }[] = [];
+
+        allReceptions
+            .filter(r => (r.clientId === fallCreekClient.clientId || r.clientName?.toUpperCase() === 'FALL CREEK') && r.observation && r.observation.trim().length > 0)
+            .forEach(r => {
+                list.push({
+                    id: r.id!,
+                    date: r.createdAt,
+                    document: r.document || 'N/A',
+                    documentNumber: r.documentNumber || '',
+                    observation: r.observation!,
+                    binsCount: r.items?.length || 0,
+                    userName: r.userName || 'N/A'
+                });
+            });
+
+        return list.sort((a, b) => safeToMillis(b.date) - safeToMillis(a.date));
+    }, [allReceptions, fallCreekClient]);
 
     const { storedItemsByChamber, chamberOccupancy, chambersWithFallCreekStock, reservedCoords, pendingItems, fallCreekStoredItems } = React.useMemo(() => {
         if (!fallCreekClient) return { storedItemsByChamber: {}, chamberOccupancy: {}, chambersWithFallCreekStock: [], reservedCoords: new Set<string>(), pendingItems: [], fallCreekStoredItems: [] };
@@ -1376,9 +1405,10 @@ export default function FallCreekPage() {
 
                 <TabsContent value="history" className="space-y-6">
                     <Tabs defaultValue="manifests" className="w-full">
-                        <TabsList className="grid w-full grid-cols-2 mb-4">
+                        <TabsList className="grid w-full grid-cols-3 mb-4">
                             <TabsTrigger value="manifests">Manifiestos (Pallet Logs)</TabsTrigger>
                             <TabsTrigger value="dispatches">Solicitudes de Despacho</TabsTrigger>
+                            <TabsTrigger value="contingencies">Contingencias en Recepción</TabsTrigger>
                         </TabsList>
 
                         <TabsContent value="manifests">
@@ -1495,6 +1525,53 @@ export default function FallCreekPage() {
                                             {fallCreekMovements.length === 0 && (
                                                 <TableRow>
                                                     <TableCell colSpan={6} className="h-24 text-center">No se encontraron solicitudes.</TableCell>
+                                                </TableRow>
+                                            )}
+                                        </TableBody>
+                                    </Table>
+                                </CardContent>
+                            </Card>
+                        </TabsContent>
+
+                        <TabsContent value="contingencies">
+                            <Card className="border-t-4 border-t-amber-500">
+                                <CardHeader>
+                                    <CardTitle className="text-amber-800 dark:text-amber-200">Bitácora / Reporte de Contingencias</CardTitle>
+                                    <CardDescription>Consulte las observaciones registradas durante el proceso de recepción especial.</CardDescription>
+                                </CardHeader>
+                                <CardContent className="overflow-x-auto">
+                                    <Table>
+                                        <TableHeader>
+                                            <TableRow>
+                                                <TableHead>Fecha / Hora</TableHead>
+                                                <TableHead>Pallet Log (Documento)</TableHead>
+                                                <TableHead>N° Documento</TableHead>
+                                                <TableHead className="text-right">Cant. Bins</TableHead>
+                                                <TableHead>Usuario</TableHead>
+                                                <TableHead>Contingencia / Observación</TableHead>
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {contingencies.length > 0 ? (
+                                                contingencies.map((c) => (
+                                                    <TableRow key={c.id} className="hover:bg-amber-50/20">
+                                                        <TableCell className="text-xs whitespace-nowrap">{formatLocaleDateString(c.date)}</TableCell>
+                                                        <TableCell className="font-mono text-xs">{c.document}</TableCell>
+                                                        <TableCell className="font-mono text-xs">{c.documentNumber || '-'}</TableCell>
+                                                        <TableCell className="text-right font-semibold text-xs">{c.binsCount}</TableCell>
+                                                        <TableCell className="text-xs">{c.userName}</TableCell>
+                                                        <TableCell>
+                                                            <Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-800 font-medium py-1 text-xs">
+                                                                ⚠️ {c.observation}
+                                                            </Badge>
+                                                        </TableCell>
+                                                    </TableRow>
+                                                ))
+                                            ) : (
+                                                <TableRow>
+                                                    <TableCell colSpan={6} className="h-24 text-center text-muted-foreground text-xs">
+                                                        No se han registrado contingencias u observaciones en los Pallet Logs de Fall Creek.
+                                                    </TableCell>
                                                 </TableRow>
                                             )}
                                         </TableBody>

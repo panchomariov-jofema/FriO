@@ -92,13 +92,18 @@ export async function notifyPalletLogStored(firestore: Firestore, reception: Oth
     second: '2-digit',
   });
 
-  const message = 
+  let message = 
     `✅ *Pallet Log Almacenado Completamente*\n\n` +
     `*Socio Comercial:* ${reception.clientName || 'N/A'}\n` +
     `*Nombre del Pallet Log:* ${reception.document || 'N/A'}\n` +
     `*Fecha / Hora:* ${formattedDate}\n` +
-    `*Cantidad de Bins:* ${totalBins}\n\n` +
-    `*Estado:* Operación Correcta`;
+    `*Cantidad de Bins:* ${totalBins}\n`;
+
+  if (reception.observation && reception.observation.trim()) {
+    message += `*Observación:* ${reception.observation.trim()}\n`;
+  }
+
+  message += `\n*Estado:* Operación Correcta`;
 
   const success = await sendTelegramMessage(config.botToken, config.chatId, message);
   if (success) {

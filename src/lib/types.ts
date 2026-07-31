@@ -345,6 +345,7 @@ export interface OtherFruitReception {
   userId?: string;
   userName?: string;
   documentNumber?: string;
+  observation?: string;
 }
 
 export interface OtherFruitMovementLocation {

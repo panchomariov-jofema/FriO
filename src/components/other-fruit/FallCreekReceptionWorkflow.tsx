@@ -75,7 +75,8 @@ export function FallCreekReceptionWorkflow({
     const [scannedBins, setScannedBins] = React.useState<string[]>([]);
     const [isSubmitting, setIsSubmitting] = React.useState(false);
     const [scanning, setScanning] = React.useState(false);
-    const [observation, setObservation] = React.useState('');
+    const [manifestObservation, setManifestObservation] = React.useState('');
+    const [isSavingObservation, setIsSavingObservation] = React.useState(false);
 
     const fileInputRef = React.useRef<HTMLInputElement>(null);
     const [importing, setImporting] = React.useState(false);
@@ -251,6 +252,14 @@ export function FallCreekReceptionWorkflow({
         return pendingManifests.find(m => m.id === selectedManifestId);
     }, [pendingManifests, selectedManifestId]);
 
+    React.useEffect(() => {
+        if (activeManifest) {
+            setManifestObservation(activeManifest.observation || '');
+        } else {
+            setManifestObservation('');
+        }
+    }, [activeManifest]);
+
     // Group items by Pallet ID and filter those that still have pending bins
     const availablePallets = React.useMemo(() => {
         if (!activeManifest) return [];
@@ -319,8 +328,7 @@ export function FallCreekReceptionWorkflow({
                         return {
                             ...item,
                             containerId: binQr,
-                            status: 'Pendiente de almacenar' as const,
-                            observation: observation.trim() || undefined
+                            status: 'Pendiente de almacenar' as const
                         };
                     }
                 }
@@ -336,6 +344,7 @@ export function FallCreekReceptionWorkflow({
                 documentNumber: documentNumber || activeManifest.documentNumber || '',
                 userId: user?.uid || null,
                 userName: user?.email || (user?.isAnonymous ? 'Anónimo' : user?.displayName || 'N/A'),
+                observation: manifestObservation.trim() || null
             });
 
             toast({ title: 'Éxito', description: `Pallet ${selectedPalletId} actualizado.` });
@@ -371,7 +380,6 @@ export function FallCreekReceptionWorkflow({
 
             setSelectedPalletId(null);
             setScannedBins([]);
-            setObservation('');
         } catch (error) {
             console.error("Error updating manifest:", error);
             toast({ variant: 'destructive', title: 'Error', description: 'No se pudo registrar.' });
@@ -380,18 +388,41 @@ export function FallCreekReceptionWorkflow({
         }
     };
 
+    const handleSaveManifestObservation = async () => {
+        if (!firestore || !selectedManifestId) return;
+        
+        setIsSavingObservation(true);
+        try {
+            await updateDoc(doc(firestore, 'otherFruitReceptions', selectedManifestId), {
+                observation: manifestObservation.trim() || null
+            });
+            toast({ title: 'Éxito', description: 'Observación del manifiesto guardada correctamente.' });
+        } catch (error) {
+            console.error("Error saving manifest observation:", error);
+            toast({ variant: 'destructive', title: 'Error', description: 'No se pudo guardar la observación.' });
+        } finally {
+            setIsSavingObservation(false);
+        }
+    };
+
     const handleScan = async (qrCode: string) => {
         if (!qrCode) return;
         
         // 1. Check local session (current pallet)
-        if (scannedBins.includes(qrCode)) {
+        const palletInfo = availablePallets.find(p => p.id === selectedPalletId);
+        const isMixedPallet = palletInfo?.isMixed || false;
+        
+        if (!isMixedPallet && scannedBins.includes(qrCode)) {
             toast({ variant: 'destructive', title: 'Error', description: 'Este código ya ha sido escaneado en este pallet.' });
             return;
         }
 
         // 2. Global Uniqueness Check (Across all manifests/years)
         const existingReception = allReceptions?.find(r => 
-            r.items.some(item => item.containerId === qrCode)
+            r.items.some(item => 
+                item.containerId === qrCode && 
+                !(r.id === activeManifest?.id && item.palletId === selectedPalletId)
+            )
         );
 
         if (existingReception) {
@@ -531,19 +562,30 @@ export function FallCreekReceptionWorkflow({
                     </Alert>
                 )}
 
-                {/* Subtle observation input at the bottom right */}
-                <div className="flex justify-end pt-1">
-                    <div className="w-full sm:w-80 space-y-1">
-                        <Label htmlFor="observation-input" className="text-[10px] sm:text-xs font-bold text-muted-foreground uppercase tracking-wider">Observaciones (Opcional)</Label>
-                        <Input
-                            id="observation-input"
-                            placeholder="Ej: Bins deteriorados, plantas con problemas..."
-                            value={observation}
-                            onChange={(e) => setObservation(e.target.value)}
-                            className="h-9 text-xs border-2"
-                        />
+                {selectedManifestId && (
+                    <div className="flex justify-end pt-2 border-t border-dashed">
+                        <div className="w-full sm:w-96 space-y-1">
+                            <Label htmlFor="manifest-observation-input" className="text-[10px] sm:text-xs font-bold text-muted-foreground uppercase tracking-wider">Observaciones del Pallet Log (Opcional)</Label>
+                            <div className="flex gap-2">
+                                <Input
+                                    id="manifest-observation-input"
+                                    placeholder="Ej: Bins deteriorados, plantas con problemas..."
+                                    value={manifestObservation}
+                                    onChange={(e) => setManifestObservation(e.target.value)}
+                                    onBlur={handleSaveManifestObservation}
+                                    className="h-9 text-xs border-2 flex-1"
+                                />
+                                <Button
+                                    onClick={handleSaveManifestObservation}
+                                    disabled={isSavingObservation}
+                                    className="bg-[#004b8d] hover:bg-[#003a6d] text-white font-bold h-9 px-4 shrink-0 text-xs"
+                                >
+                                    {isSavingObservation ? <Loader2 className="h-4 w-4 animate-spin"/> : 'Guardar'}
+                                </Button>
+                            </div>
+                        </div>
                     </div>
-                </div>
+                )}
 
                 {/* Step 3: Scanning Bins */}
                 {selectedPalletId && (
@@ -555,7 +597,7 @@ export function FallCreekReceptionWorkflow({
                                     Bins de Pallet {selectedPalletId}
                                 </h3>
                                 <Badge variant="outline" className="bg-[#7aba28]/10 text-[#7aba28] border-[#7aba28]/20 px-2 py-0.5 text-[10px] sm:text-xs">
-                                    {scannedBins.length + (currentPalletItems.filter(i => i.status !== 'Pendiente de recibir').length)} / 3
+                                    {scannedBins.length + (currentPalletItems.filter(i => i.status !== 'Pendiente de recibir').length)} / {currentPalletItems.length}
                                 </Badge>
                             </div>
 
@@ -662,7 +704,7 @@ export function FallCreekReceptionWorkflow({
                                 <Button 
                                     className="h-14 sm:h-16 text-sm sm:text-lg font-bold bg-[#004b8d] hover:bg-[#003a6d] shadow-md"
                                     onClick={() => setScanning(true)}
-                                    disabled={scannedBins.length >= 3}
+                                    disabled={scannedBins.length >= currentPalletItems.filter(item => item.status === 'Pendiente de recibir').length}
                                 >
                                     <ScanLine className="mr-2 h-5 w-5 sm:h-6 sm:h-6" />
                                     Escanear
@@ -678,10 +720,10 @@ export function FallCreekReceptionWorkflow({
                                 </Button>
                             </div>
                             
-                            {scannedBins.length > 0 && scannedBins.length < 3 && (
+                            {scannedBins.length > 0 && scannedBins.length < currentPalletItems.filter(item => item.status === 'Pendiente de recibir').length && (
                                 <div className="flex items-center gap-2 p-3 bg-orange-50 border border-orange-100 rounded-lg text-orange-800 text-[10px] sm:text-xs">
                                     <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-                                    <span>Escanee los 3 bins para completar el pallet.</span>
+                                    <span>Escanee los {currentPalletItems.filter(item => item.status === 'Pendiente de recibir').length} bins para completar el pallet.</span>
                                 </div>
                             )}
                         </CardContent>
@@ -756,7 +798,8 @@ export function FallCreekReceptionWorkflow({
                                                                     setPreviewItems(updated);
                                                                 }}
                                                                 className="h-8 text-right font-bold w-20 ml-auto border-muted focus:border-primary"
-                                                                min={1}
+                                                                min={0.1}
+                                                                step="any"
                                                             />
                                                         </TableCell>
                                                         <TableCell className="text-right font-semibold text-[#7aba28]">{item['Qty of Plants']}</TableCell>

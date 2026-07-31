@@ -97,28 +97,38 @@ export function decomposePalletsIntoBins(pallets: FallCreekManifestRow[]): Other
                 // Estimate plants per bin for this specific variety
                 const plantsPerPartBin = Math.floor((totalPlants * (binsForThisPart / totalBinCount)) / binsForThisPart) || 0;
 
-                for (let i = 0; i < binsForThisPart; i++) {
+                const decimalPartPart = binsForThisPart % 1;
+                const integerPartPart = Math.floor(binsForThisPart);
+                const numBinsForPart = decimalPartPart > 0 ? integerPartPart + 1 : integerPartPart;
+
+                for (let i = 0; i < numBinsForPart; i++) {
+                    const binQty = (i === numBinsForPart - 1 && decimalPartPart > 0) ? decimalPartPart : 1;
                     binItems.push({
                         palletId,
                         clientLotId: lotId,
                         productName: cleanVarietyName(cleanPart),
                         productCode: itemCode,
-                        quantity: 1,
+                        quantity: binQty,
                         unit: 'Bins',
                         totalPlants: plantsPerPartBin,
                         plantsPerBin: plantsPerPartBin,
                         status: 'Pendiente de recibir',
                         isMixedVariety: true
                     });
-                    remainingBins--;
+                    remainingBins -= binQty;
                 }
             });
             
             // Safety: if after processing parts we still have bins (rare but possible with weird multipliers)
             if (remainingBins > 0 && binItems.length > 0) {
                 const lastItem = binItems[binItems.length - 1];
-                for (let i = 0; i < remainingBins; i++) {
-                    binItems.push({ ...lastItem });
+                const decimalSafety = remainingBins % 1;
+                const integerSafety = Math.floor(remainingBins);
+                const numSafety = decimalSafety > 0 ? integerSafety + 1 : integerSafety;
+                
+                for (let i = 0; i < numSafety; i++) {
+                    const safetyQty = (i === numSafety - 1 && decimalSafety > 0) ? decimalSafety : 1;
+                    binItems.push({ ...lastItem, quantity: safetyQty });
                 }
             }
             
@@ -126,18 +136,24 @@ export function decomposePalletsIntoBins(pallets: FallCreekManifestRow[]): Other
         } else {
             // Standard single-variety case
             const binItems: OtherFruitReceptionItem[] = [];
-            const plantsPerBin = Math.floor(totalPlants / totalBinCount);
             
-            for (let i = 0; i < totalBinCount; i++) {
+            const decimalPart = totalBinCount % 1;
+            const integerPart = Math.floor(totalBinCount);
+            const numBins = decimalPart > 0 ? integerPart + 1 : integerPart;
+            
+            const plantsPerBin = numBins > 0 ? Math.floor(totalPlants / numBins) : 0;
+            
+            for (let i = 0; i < numBins; i++) {
+                const binQty = (i === numBins - 1 && decimalPart > 0) ? decimalPart : 1;
                 binItems.push({
                     palletId,
                     clientLotId: lotId,
                     productName: cleanVarietyName(description),
                     productCode: itemCode,
-                    quantity: 1,
+                    quantity: binQty,
                     unit: 'Bins',
-                    totalPlants: plantsPerBin,
-                    plantsPerBin: plantsPerBin,
+                    totalPlants: i === numBins - 1 ? totalPlants - (plantsPerBin * (numBins - 1)) : plantsPerBin,
+                    plantsPerBin: i === numBins - 1 ? totalPlants - (plantsPerBin * (numBins - 1)) : plantsPerBin,
                     status: 'Pendiente de recibir',
                     isMixedVariety: false
                 });
