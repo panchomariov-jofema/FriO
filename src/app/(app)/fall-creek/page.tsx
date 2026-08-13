@@ -93,6 +93,7 @@ export default function FallCreekPage() {
     const [openAccordions, setOpenAccordions] = React.useState<string[]>([]);
 
     const [activeTab, setActiveTab] = React.useState('storage');
+    const [isDebtorsDialogOpen, setIsDebtorsDialogOpen] = React.useState(false);
     const [searchQuery, setSearchQuery] = React.useState('');
     const [highlightedCoordinate, setHighlightedCoordinate] = React.useState<{ chamberId: string; coordinate: string } | null>(null);
 
@@ -201,9 +202,18 @@ export default function FallCreekPage() {
 
     const loadingBinsData = loadingBinMovements || loadingBinMaterials || loadingProducers;
 
-    const leasedBinsCount = React.useMemo(() => {
-        if (loadingBinsData || !allBinMovements || !allBinMaterials || !allProducers) return 0;
-        
+    const binsMetrics = React.useMemo(() => {
+        if (loadingBinsData || loadingMovements || loadingReceptions || !allBinMovements || !allBinMaterials || !allProducers || !allMovements || !allReceptions) {
+            return {
+                leasedBinsCount: 0,
+                storedBinsCount: 0,
+                dispatchedToProducers: 0,
+                returnedByProducers: 0,
+                debtorsList: [] as { producerId: string; name: string; rut: string; dispatched: number; returned: number; debt: number }[]
+            };
+        }
+
+        // 1. Identify Fall Creek Producers
         const fcProducers = allProducers.filter(p => {
             const shortName = String(p.shortName || '').toUpperCase();
             const name = String(p.name || '').toUpperCase();
@@ -214,15 +224,99 @@ export default function FallCreekPage() {
         fcIds.add("76361536-7");
         fcIds.add(" 76361536-7");
 
+        // 2. Identify FÑO Bin Codes
         const fnoBinCodes = new Set(
             (allBinMaterials || [])
                 .filter(m => m.exporterId === 'EXP005' && m.type === 'BINS')
                 .map(m => m.code)
         );
 
-        let balance = 0;
-        (allBinMovements || []).forEach(mov => {
+        // 3. Stored Bins (Bins Almacenados)
+        let storedBinsCount = 0;
+        allReceptions.forEach(rec => {
+            const isFallCreek = rec.clientName?.toUpperCase() === 'FALL CREEK' || 
+                                (fallCreekClient && rec.clientId === fallCreekClient.id);
+            if (isFallCreek) {
+                const items = rec.items || [];
+                items.forEach(item => {
+                    if (item.status === 'Almacenado' && item.quantity > 0 && item.storageLocation?.coordinate) {
+                        storedBinsCount += item.quantity;
+                    }
+                });
+            }
+        });
+
+        // 4. Calculate Dispatched Bins per Agricultural Customer
+        const producerDispatchMap = new Map<string, { name: string; rut: string; quantity: number }>();
+        allMovements.forEach(mov => {
+            if (mov.type !== 'salida') return;
+            const isFallCreek = mov.clientName?.toUpperCase() === 'FALL CREEK' || 
+                                (fallCreekClient && mov.clientId === fallCreekClient.clientId);
+            if (!isFallCreek) return;
+
+            const destName = mov.destinationClientName || '';
+            const destRut = mov.destinationClientRUT || '';
+            if (!destName && !destRut) return;
+
+            let binsQty = 0;
+            (mov.items || []).forEach(item => {
+                binsQty += item.quantity;
+            });
+
+            if (binsQty <= 0) return;
+
+            const matchingProducer = allProducers.find(p => {
+                if (destRut && p.rut && p.rut.replace(/[^0-9kK]/g, '') === destRut.replace(/[^0-9kK]/g, '')) return true;
+                if (destName && p.name && p.name.toUpperCase() === destName.toUpperCase()) return true;
+                if (destName && p.shortName && p.shortName.toUpperCase() === destName.toUpperCase()) return true;
+                return false;
+            });
+
+            const pId = matchingProducer ? matchingProducer.producerId || matchingProducer.id : destRut || destName || 'Otros';
+            const pName = matchingProducer ? matchingProducer.shortName || matchingProducer.name : destName || 'Otros';
+            const pRut = matchingProducer ? matchingProducer.rut || '' : destRut || '';
+
+            if (!producerDispatchMap.has(pId)) {
+                producerDispatchMap.set(pId, { name: pName, rut: pRut, quantity: 0 });
+            }
+            producerDispatchMap.get(pId)!.quantity += binsQty;
+        });
+
+        // 5. Calculate Returned Bins per Agricultural Customer
+        const producerReturnMap = new Map<string, number>();
+        let fcDirectReturns = 0;
+
+        allBinMovements.forEach(mov => {
             if (mov.exporterId !== 'EXP005') return;
+            if (mov.type !== 'entrada') return;
+            if (!mov.producerId) return;
+
+            const cleanProdId = mov.producerId.trim();
+
+            let returnedQty = 0;
+            (mov.items || []).forEach(item => {
+                if (fnoBinCodes.has(item.binMaterialCode)) {
+                    returnedQty += item.quantity;
+                }
+            });
+
+            if (returnedQty <= 0) return;
+
+            if (fcIds.has(cleanProdId)) {
+                fcDirectReturns += returnedQty;
+            } else {
+                const matchingProducer = allProducers.find(p => p.producerId?.trim() === cleanProdId || p.id?.trim() === cleanProdId);
+                const pId = matchingProducer ? matchingProducer.producerId || matchingProducer.id : cleanProdId;
+                
+                producerReturnMap.set(pId, (producerReturnMap.get(pId) || 0) + returnedQty);
+            }
+        });
+
+        // 6. Calculate total empty bins delivered (leased) to Fall Creek
+        let totalSentToFallCreek = 0;
+        allBinMovements.forEach(mov => {
+            if (mov.exporterId !== 'EXP005') return;
+            if (mov.type !== 'salida') return;
             if (mov.observation === 'Despacho Directo') return;
             if (!mov.producerId) return;
 
@@ -230,33 +324,47 @@ export default function FallCreekPage() {
             if (fcIds.has(cleanProdId)) {
                 (mov.items || []).forEach(item => {
                     if (fnoBinCodes.has(item.binMaterialCode)) {
-                        const qty = mov.type === 'salida' ? item.quantity : -item.quantity;
-                        balance += qty;
+                        totalSentToFallCreek += item.quantity;
                     }
                 });
             }
         });
-        return balance;
-    }, [allBinMovements, allBinMaterials, allProducers, loadingBinsData]);
 
-    const storedBinsCount = React.useMemo(() => {
-        if (loadingReceptions || !allReceptions) return 0;
-        
-        let count = 0;
-        (allReceptions || []).forEach(rec => {
-            const isFallCreek = rec.clientName?.toUpperCase() === 'FALL CREEK' || 
-                                (fallCreekClient && rec.clientId === fallCreekClient.id);
-            if (isFallCreek) {
-                const items = rec.items || [];
-                items.forEach(item => {
-                    if (item.status === 'Almacenado' && item.quantity > 0 && item.storageLocation?.coordinate) {
-                        count += item.quantity;
-                    }
-                });
-            }
+        // 7. Compile debtors
+        const debtorsList: { producerId: string; name: string; rut: string; dispatched: number; returned: number; debt: number }[] = [];
+        let totalDispatchedToProducers = 0;
+        let totalReturnedByProducers = 0;
+
+        // Iterate ONLY through producers that physically received dispatches of Fall Creek plants
+        producerDispatchMap.forEach((dispData, pId) => {
+            const returned = producerReturnMap.get(pId) || 0;
+            const debt = Math.max(0, dispData.quantity - returned);
+
+            totalDispatchedToProducers += debt;
+            totalReturnedByProducers += returned;
+
+            debtorsList.push({
+                producerId: pId,
+                name: dispData.name,
+                rut: dispData.rut,
+                dispatched: dispData.quantity,
+                returned: returned,
+                debt: debt
+            });
         });
-        return count;
-    }, [allReceptions, fallCreekClient, loadingReceptions]);
+
+        const leasedBinsCount = Math.max(0, totalSentToFallCreek - fcDirectReturns - totalReturnedByProducers);
+
+        return {
+            leasedBinsCount,
+            storedBinsCount,
+            dispatchedToProducers: totalDispatchedToProducers,
+            returnedByProducers: totalReturnedByProducers,
+            debtorsList: debtorsList.filter(d => d.dispatched > 0 || d.returned > 0).sort((a, b) => b.debt - a.debt)
+        };
+    }, [allBinMovements, allBinMaterials, allProducers, allMovements, allReceptions, fallCreekClient, loadingBinsData, loadingMovements, loadingReceptions]);
+
+    const { leasedBinsCount, storedBinsCount, dispatchedToProducers, returnedByProducers, debtorsList } = binsMetrics;
 
     const contingencies = React.useMemo(() => {
         if (!allReceptions || !fallCreekClient) return [];
@@ -778,6 +886,12 @@ export default function FallCreekPage() {
 
     const handleDeleteMovement = async (movementToDelete: OtherFruitMovement) => {
         if (!firestore) return;
+        
+        const confirmDelete = window.confirm(
+            `¿Está seguro de que desea eliminar la solicitud de pre-despacho "${movementToDelete.document || 'Sin documento'}"?`
+        );
+        if (!confirmDelete) return;
+
         try {
             await deleteDoc(doc(firestore, 'otherFruitMovements', movementToDelete.id));
             toast({ title: 'Éxito', description: 'La solicitud de pre-despacho ha sido eliminada.' });
@@ -1515,9 +1629,19 @@ export default function FallCreekPage() {
                                                             </Badge>
                                                         </TableCell>
                                                         <TableCell className="text-right">
-                                                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setMovementToView(mov)}>
+                                                            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-primary" onClick={() => setMovementToView(mov)}>
                                                                 <Eye className="h-4 w-4" />
                                                             </Button>
+                                                            {mov.status !== 'Completado' && (
+                                                                <Button 
+                                                                    variant="ghost" 
+                                                                    size="icon" 
+                                                                    className="h-8 w-8 text-destructive hover:bg-destructive/10 hover:text-destructive" 
+                                                                    onClick={() => handleDeleteMovement(mov)}
+                                                                >
+                                                                    <Trash2 className="h-4 w-4" />
+                                                                </Button>
+                                                            )}
                                                         </TableCell>
                                                     </TableRow>
                                                 );
@@ -1583,7 +1707,7 @@ export default function FallCreekPage() {
                 </TabsContent>
 
                 <TabsContent value="bins" className="space-y-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                         {/* Tarjeta 1: Bins en Arriendo */}
                         <Card className="border-t-4 border-t-[#004b8d] backdrop-blur bg-white/60 dark:bg-zinc-900/60 shadow-lg hover:shadow-xl transition-all duration-300">
                             <CardHeader className="pb-2">
@@ -1645,6 +1769,71 @@ export default function FallCreekPage() {
                                 )}
                             </CardContent>
                         </Card>
+
+                        {/* Tarjeta 3: Bins Despachados Productor */}
+                        <Card 
+                            onClick={() => setIsDebtorsDialogOpen(true)}
+                            className="border-t-4 border-t-amber-500 backdrop-blur bg-white/60 dark:bg-zinc-900/60 shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800/50"
+                        >
+                            <CardHeader className="pb-2">
+                                <div className="flex items-center justify-between">
+                                    <CardTitle className="text-lg text-amber-500 font-bold">
+                                        Despachados Productor
+                                    </CardTitle>
+                                    <div className="p-2 bg-amber-500/10 rounded-full text-amber-500">
+                                        <Move className="h-6 w-6" />
+                                    </div>
+                                </div>
+                                <CardDescription>
+                                    Envases en poder de agricultores destinatarios. Clic para ver detalle.
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent className="pt-4 flex flex-col justify-center min-h-[140px]">
+                                {loadingMovements ? (
+                                    <Skeleton className="h-16 w-32 mx-auto" />
+                                ) : (
+                                    <div className="text-center">
+                                        <span className="text-6xl font-black text-zinc-900 dark:text-zinc-50 tracking-tight text-amber-600">
+                                            {dispatchedToProducers.toLocaleString()}
+                                        </span>
+                                        <span className="text-sm font-semibold text-muted-foreground block mt-2">
+                                            Bins en poder de agricultores
+                                        </span>
+                                    </div>
+                                )}
+                            </CardContent>
+                        </Card>
+
+                        {/* Tarjeta 4: Bins Devueltos Productor */}
+                        <Card className="border-t-4 border-t-indigo-500 backdrop-blur bg-white/60 dark:bg-zinc-900/60 shadow-lg hover:shadow-xl transition-all duration-300">
+                            <CardHeader className="pb-2">
+                                <div className="flex items-center justify-between">
+                                    <CardTitle className="text-lg text-indigo-500 font-bold">
+                                        Devueltos por Productor
+                                    </CardTitle>
+                                    <div className="p-2 bg-indigo-500/10 rounded-full text-indigo-500">
+                                        <PackageCheck className="h-6 w-6" />
+                                    </div>
+                                </div>
+                                <CardDescription>
+                                    Total de Bins vacíos devueltos por agricultores que saldaron arriendo.
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent className="pt-4 flex flex-col justify-center min-h-[140px]">
+                                {loadingBinsData ? (
+                                    <Skeleton className="h-16 w-32 mx-auto" />
+                                ) : (
+                                    <div className="text-center">
+                                        <span className="text-6xl font-black text-zinc-900 dark:text-zinc-50 tracking-tight text-indigo-600">
+                                            {returnedByProducers.toLocaleString()}
+                                        </span>
+                                        <span className="text-sm font-semibold text-muted-foreground block mt-2">
+                                            Bins devueltos vacíos
+                                        </span>
+                                    </div>
+                                )}
+                            </CardContent>
+                        </Card>
                     </div>
 
                     {/* Nota explicativa de control físico */}
@@ -1656,6 +1845,65 @@ export default function FallCreekPage() {
                             </span>
                         </CardContent>
                     </Card>
+
+                    {/* Dialogo de detalle de deudores */}
+                    <Dialog open={isDebtorsDialogOpen} onOpenChange={setIsDebtorsDialogOpen}>
+                        <DialogContent className="max-w-2xl">
+                            <DialogHeader>
+                                <DialogTitle className="text-[#004b8d] font-bold flex items-center gap-2 text-xl">
+                                    <ClipboardList className="h-5 w-5" />
+                                    Detalle de Bins en poder de Agricultores
+                                </DialogTitle>
+                                <DialogDescription>
+                                    Listado de productores que adeudan envases Palogix de arriendo despachados con plantas de Fall Creek.
+                                </DialogDescription>
+                            </DialogHeader>
+                            <div className="py-4">
+                                <div className="border rounded-md overflow-hidden bg-card shadow-sm max-h-[300px] overflow-y-auto">
+                                    <Table>
+                                        <TableHeader className="bg-muted/30 sticky top-0 bg-white z-10">
+                                            <TableRow>
+                                                <TableHead>Productor / Agricultor</TableHead>
+                                                <TableHead>RUT</TableHead>
+                                                <TableHead className="text-right">Despachados</TableHead>
+                                                <TableHead className="text-right">Devueltos</TableHead>
+                                                <TableHead className="text-right font-bold text-[#004b8d]">Saldo Adeudado</TableHead>
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {debtorsList.length === 0 ? (
+                                                <TableRow>
+                                                    <TableCell colSpan={5} className="h-24 text-center text-xs text-muted-foreground">
+                                                        No hay registros de envases despachados o adeudados en este momento.
+                                                    </TableCell>
+                                                </TableRow>
+                                            ) : (
+                                                debtorsList.map((debtor) => (
+                                                    <TableRow key={debtor.producerId} className="hover:bg-muted/10">
+                                                        <TableCell className="font-semibold">{debtor.name}</TableCell>
+                                                        <TableCell className="text-xs text-muted-foreground font-mono">{debtor.rut || 'Sin RUT'}</TableCell>
+                                                        <TableCell className="text-right">{debtor.dispatched.toLocaleString()}</TableCell>
+                                                        <TableCell className="text-right">{debtor.returned.toLocaleString()}</TableCell>
+                                                        <TableCell className="text-right font-bold text-amber-600 bg-amber-500/5">
+                                                            {debtor.debt.toLocaleString()} Bins
+                                                        </TableCell>
+                                                    </TableRow>
+                                                ))
+                                            )}
+                                        </TableBody>
+                                    </Table>
+                                </div>
+                            </div>
+                            <DialogFooter className="flex flex-col sm:flex-row justify-between items-center gap-4 bg-muted/10 p-4 rounded-lg">
+                                <div className="text-sm font-semibold">
+                                    Total Adeudado en Terreno: <span className="text-[#004b8d] font-bold text-base">{dispatchedToProducers.toLocaleString()} Bins</span>
+                                </div>
+                                <DialogClose asChild>
+                                    <Button variant="outline">Cerrar</Button>
+                                </DialogClose>
+                            </DialogFooter>
+                        </DialogContent>
+                    </Dialog>
                 </TabsContent>
 
             </Tabs>

@@ -19,13 +19,15 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '..
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Label } from '../ui/label';
 import { Checkbox } from '../ui/checkbox';
-import { cn } from '@/lib/utils';
+import { cn, safeToMillis, formatLocaleDateString } from '@/lib/utils';
+import { cleanVarietyName } from '@/lib/fall-creek-utils';
 
 
 const getLocationKey = (receptionId: string, itemIndex: number) => `${receptionId}_${itemIndex}`;
 
 interface AggregatedLot {
   displayLotId: string;
+  varietyName?: string;
   unit: 'Bins' | 'Pallets';
   totalQuantity: number;
   locations: {
@@ -39,6 +41,15 @@ interface AggregatedLot {
     clientLotId?: string;
   }[];
 }
+
+const getVarietyPriority = (varietyName: string): number => {
+  const name = varietyName.toUpperCase();
+  if (name.includes('CRUNCH')) return 1;
+  if (name.includes('FIESTA')) return 2;
+  if (name.includes('GRANDE')) return 3;
+  if (name.includes('FC13') || name.includes('FC11') || name.startsWith('FC')) return 4;
+  return 5;
+};
 
 const isFallCreekClient = (id: string) => id === 'EXP004' || id === '76361536-7';
 
@@ -139,13 +150,22 @@ export function OtherFruitExitTab({ clientId: fixedClientId }: { clientId?: stri
 
       (reception.items || []).forEach((item, index) => {
         if (item && item.status === 'Almacenado' && item.quantity > 0 && item.storageLocation?.coordinate) {
-          const displayKey = item.clientLotId 
-            ? `${lotId}-${item.clientLotId}` 
-            : lotId;
+          let displayKey = '';
+          let varietyName = '';
+
+          if (isFallCreekClient(selectedClientId)) {
+            varietyName = cleanVarietyName(item.productName);
+            displayKey = `${varietyName} - ${item.clientLotId || 'Sin Lote'}`;
+          } else {
+            displayKey = item.clientLotId 
+              ? `${lotId}-${item.clientLotId}` 
+              : lotId;
+          }
 
           if (!lotMap.has(displayKey)) {
             lotMap.set(displayKey, {
               displayLotId: displayKey,
+              varietyName: varietyName || undefined,
               unit: reception.unit,
               totalQuantity: 0,
               locations: [],
@@ -167,26 +187,214 @@ export function OtherFruitExitTab({ clientId: fixedClientId }: { clientId?: stri
         }
       });
     });
-    return Array.from(lotMap.values()).filter(lot => lot.totalQuantity > 0);
+
+    const result = Array.from(lotMap.values()).filter(lot => lot.totalQuantity > 0);
+
+    // Sort locations in each lot by FIFO (oldest reception first)
+    result.forEach(lot => {
+      lot.locations.sort((a, b) => {
+        const recA = receptions.find(r => r.id === a.receptionId);
+        const recB = receptions.find(r => r.id === b.receptionId);
+        const timeA = recA?.createdAt ? safeToMillis(recA.createdAt) : 0;
+        const timeB = recB?.createdAt ? safeToMillis(recB.createdAt) : 0;
+        return timeA - timeB;
+      });
+    });
+
+    return result;
   }, [selectedClientId, receptions]);
   
   const filteredLots = React.useMemo(() => {
+    let lots = [];
     if (!lotFilter) {
-        return aggregatedStockByLot;
-    }
-    const lowercasedFilter = lotFilter.toLowerCase();
-    return aggregatedStockByLot.filter(lot => {
-        const displayIdMatch = lot.displayLotId.toLowerCase().includes(lowercasedFilter);
-        if (displayIdMatch) {
-            return true;
-        }
+        lots = aggregatedStockByLot;
+    } else {
+        const lowercasedFilter = lotFilter.toLowerCase();
+        lots = aggregatedStockByLot.filter(lot => {
+            const displayIdMatch = lot.displayLotId.toLowerCase().includes(lowercasedFilter);
+            if (displayIdMatch) {
+                return true;
+            }
 
-        const clientLotIdMatch = lot.locations.some(
-            loc => loc.clientLotId && loc.clientLotId.toLowerCase().includes(lowercasedFilter)
-        );
-        return clientLotIdMatch;
+            const clientLotIdMatch = lot.locations.some(
+                loc => loc.clientLotId && loc.clientLotId.toLowerCase().includes(lowercasedFilter)
+            );
+            return clientLotIdMatch;
+        });
+    }
+
+    if (isFallCreekClient(selectedClientId)) {
+        lots = [...lots].sort((a, b) => {
+            const varA = a.varietyName || '';
+            const varB = b.varietyName || '';
+            
+            const prioA = getVarietyPriority(varA);
+            const prioB = getVarietyPriority(varB);
+            
+            if (prioA !== prioB) {
+                return prioA - prioB;
+            }
+            
+            // FIFO: Oldest reception first
+            const getLotFifoTime = (lotItem: typeof a) => {
+                let oldestTime = Infinity;
+                lotItem.locations.forEach(loc => {
+                    const rec = receptions?.find(r => r.id === loc.receptionId);
+                    if (rec && rec.createdAt) {
+                        const time = safeToMillis(rec.createdAt);
+                        if (time < oldestTime) {
+                            oldestTime = time;
+                        }
+                    }
+                });
+                return oldestTime === Infinity ? 0 : oldestTime;
+            };
+
+            return getLotFifoTime(a) - getLotFifoTime(b);
+        });
+    }
+    return lots;
+  }, [aggregatedStockByLot, lotFilter, selectedClientId, receptions]);
+
+  const fallCreekGroups = React.useMemo(() => {
+    if (!selectedClientId || !isFallCreekClient(selectedClientId) || !receptions) return [];
+
+    const varietyMap = new Map<string, {
+      varietyName: string;
+      totalQuantity: number;
+      unit: 'Bins' | 'Pallets';
+      lotsMap: Map<string, {
+        clientLotId: string;
+        totalQuantity: number;
+        fifoTime: number;
+        locations: {
+          receptionId: string;
+          itemIndex: number;
+          coordinate: string;
+          chamberId: string;
+          quantity: number;
+          productName: string;
+          productCode: string;
+          receptionDate: string;
+        }[];
+      }>;
+    }>();
+
+    receptions.forEach(reception => {
+      if (reception.clientId !== selectedClientId) return;
+
+      const lotId = reception.displayLotId || reception.document || reception.id;
+      if (!lotId) return;
+
+      (reception.items || []).forEach((item, index) => {
+        if (item && item.status === 'Almacenado' && item.quantity > 0 && item.storageLocation?.coordinate) {
+          const varietyName = cleanVarietyName(item.productName);
+          const clientLotId = item.clientLotId || 'Sin Lote';
+
+          if (!varietyMap.has(varietyName)) {
+            varietyMap.set(varietyName, {
+              varietyName,
+              totalQuantity: 0,
+              unit: reception.unit,
+              lotsMap: new Map(),
+            });
+          }
+
+          const varietyGroup = varietyMap.get(varietyName)!;
+          varietyGroup.totalQuantity += item.quantity;
+
+          if (!varietyGroup.lotsMap.has(clientLotId)) {
+            varietyGroup.lotsMap.set(clientLotId, {
+              clientLotId,
+              totalQuantity: 0,
+              fifoTime: Infinity,
+              locations: [],
+            });
+          }
+
+          const lotGroup = varietyGroup.lotsMap.get(clientLotId)!;
+          lotGroup.totalQuantity += item.quantity;
+          
+          const recTime = reception.createdAt ? safeToMillis(reception.createdAt) : 0;
+          if (recTime > 0 && recTime < lotGroup.fifoTime) {
+            lotGroup.fifoTime = recTime;
+          }
+
+          lotGroup.locations.push({
+            receptionId: reception.id,
+            itemIndex: index,
+            coordinate: item.storageLocation.coordinate,
+            chamberId: item.storageLocation.chamberId || '',
+            quantity: item.quantity,
+            productName: cleanVarietyName(item.productName),
+            productCode: item.productCode,
+            receptionDate: formatLocaleDateString(reception.createdAt),
+          });
+        }
+      });
     });
-  }, [aggregatedStockByLot, lotFilter]);
+
+    // Convert Map to sorted array
+    const sortedVarieties = Array.from(varietyMap.values()).map(varGroup => {
+      // Sort lots by FIFO (oldest reception first)
+      const sortedLots = Array.from(varGroup.lotsMap.values()).map(lot => {
+        // Sort locations within the lot by FIFO (oldest reception first)
+        lot.locations.sort((a, b) => {
+          const recA = receptions.find(r => r.id === a.receptionId);
+          const recB = receptions.find(r => r.id === b.receptionId);
+          const timeA = recA?.createdAt ? safeToMillis(recA.createdAt) : 0;
+          const timeB = recB?.createdAt ? safeToMillis(recB.createdAt) : 0;
+          return timeA - timeB;
+        });
+        
+        return {
+          ...lot,
+          fifoTime: lot.fifoTime === Infinity ? 0 : lot.fifoTime,
+        };
+      }).sort((a, b) => a.fifoTime - b.fifoTime);
+
+      return {
+        varietyName: varGroup.varietyName,
+        totalQuantity: varGroup.totalQuantity,
+        unit: varGroup.unit,
+        lots: sortedLots,
+      };
+    });
+
+    // Sort varieties by getVarietyPriority
+    sortedVarieties.sort((a, b) => {
+      return getVarietyPriority(a.varietyName) - getVarietyPriority(b.varietyName);
+    });
+
+    return sortedVarieties;
+  }, [selectedClientId, receptions]);
+
+  const filteredFallCreekGroups = React.useMemo(() => {
+    if (!lotFilter) return fallCreekGroups;
+    
+    const lowercasedFilter = lotFilter.toLowerCase();
+    
+    return fallCreekGroups.map(varGroup => {
+      const matchingLots = varGroup.lots.filter(lot => {
+        // Match Lot ID
+        if (lot.clientLotId.toLowerCase().includes(lowercasedFilter)) return true;
+        // Match coordinate or chamber or variety inside lot
+        return lot.locations.some(loc => 
+          loc.coordinate.toLowerCase().includes(lowercasedFilter) ||
+          loc.chamberId.toLowerCase().includes(lowercasedFilter) ||
+          loc.productName.toLowerCase().includes(lowercasedFilter)
+        );
+      });
+      
+      if (matchingLots.length === 0) return null;
+      
+      return {
+        ...varGroup,
+        totalQuantity: matchingLots.reduce((sum, l) => sum + l.totalQuantity, 0),
+        lots: matchingLots,
+      };
+    }).filter(Boolean) as typeof fallCreekGroups;
+  }, [fallCreekGroups, lotFilter]);
 
   const handleClientChange = (val: string) => {
     setSelectedClientId(val);
@@ -362,6 +570,34 @@ export function OtherFruitExitTab({ clientId: fixedClientId }: { clientId?: stri
         if (hasRealWrites) {
             const movementRef = doc(collection(firestore, 'otherFruitMovements'));
             batch.set(movementRef, movementData);
+
+            if (isFallCreekClient(selectedClientId) && selectedSubClientId) {
+                const totalBins = movementItems.reduce((sum, item) => sum + item.quantity, 0);
+                if (totalBins > 0) {
+                    const binMovementRef = doc(collection(firestore, 'binMaterialMovements'));
+                    const binMovementData = {
+                        type: 'salida',
+                        document: document,
+                        driverName: '',
+                        driverRUT: '',
+                        patente_vehiculo: '',
+                        exporterId: 'EXP005',
+                        producerId: selectedSubClientId,
+                        items: [
+                            {
+                                binMaterialId: 'C6hVKlGF375OxDvoe9l7',
+                                binMaterialCode: '10017',
+                                binMaterialName: 'BINS_PALOGIX',
+                                quantity: totalBins
+                            }
+                        ],
+                        observation: `Despacho automático desde Fall Creek`,
+                        createdAt: serverTimestamp()
+                    };
+                    batch.set(binMovementRef, binMovementData);
+                }
+            }
+
             await batch.commit();
         } else {
             console.log("Mock dispatch successful (skipped Firestore writes):", movementData);
@@ -433,80 +669,174 @@ export function OtherFruitExitTab({ clientId: fixedClientId }: { clientId?: stri
             loadingReceptions ? <Skeleton className="h-24 w-full" />
             : (
             <>
-            <Accordion type="multiple" className="w-full">
-                {filteredLots.map(lot => {
-                    const allLocationKeysForLot = lot.locations.map(l => getLocationKey(l.receptionId, l.itemIndex));
-                    const selectedKeysInLot = allLocationKeysForLot.filter(key => key in quantitiesToDispatch);
-                    const isAllSelected = selectedKeysInLot.length === allLocationKeysForLot.length && allLocationKeysForLot.every(key => quantitiesToDispatch[key] === lot.locations.find(l => getLocationKey(l.receptionId, l.itemIndex) === key)?.quantity);
-                    const isSomeSelected = selectedKeysInLot.length > 0;
-
-                    return (
-                        <AccordionItem value={lot.displayLotId} key={lot.displayLotId}>
-                            <AccordionTrigger>
-                                <div className="flex justify-between w-full pr-4">
-                                    <span className="font-mono">{lot.displayLotId}</span>
-                                    <div className="flex items-center gap-4 text-sm">
-                                      <span className="font-semibold">{lot.totalQuantity} {lot.unit}</span>
+            {isFallCreekClient(selectedClientId) ? (
+                <Accordion type="multiple" className="w-full space-y-2">
+                    {filteredFallCreekGroups.map(group => {
+                        const groupValue = `var_${group.varietyName}`;
+                        return (
+                            <AccordionItem value={groupValue} key={groupValue} className="border border-muted rounded-lg bg-card shadow-sm overflow-hidden">
+                                <AccordionTrigger className="px-4 py-3 hover:bg-muted/50 hover:no-underline [&[data-state=open]]:bg-muted/30">
+                                    <div className="flex justify-between items-center w-full pr-4">
+                                        <span className="font-bold text-base text-[#004b8d]">{group.varietyName}</span>
+                                        <span className="font-bold text-sm text-[#7aba28] bg-[#7aba28]/10 px-2.5 py-0.5 rounded-full">{group.totalQuantity} {group.unit}</span>
                                     </div>
-                                </div>
-                            </AccordionTrigger>
-                            <AccordionContent>
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead className="w-12">
-                                            <Checkbox
-                                                checked={isAllSelected ? true : isSomeSelected ? 'indeterminate' : false}
-                                                onCheckedChange={(checked) => handleSelectAllForLot(lot, !!checked)}
-                                                aria-label="Seleccionar todo en este lote"
-                                            />
-                                        </TableHead>
-                                        <TableHead>Coordenada</TableHead>
-                                        <TableHead>Producto</TableHead>
-                                        <TableHead className="hidden md:table-cell">Lote Cliente</TableHead>
-                                        <TableHead className="hidden md:table-cell">Observación</TableHead>
-                                        <TableHead>Disp.</TableHead>
-                                        <TableHead className="w-32">A Despachar</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {lot.locations.map(loc => {
-                                        const key = getLocationKey(loc.receptionId, loc.itemIndex);
-                                        return (
-                                            <TableRow key={key}>
-                                                <TableCell>
-                                                    <Checkbox 
-                                                        checked={!!quantitiesToDispatch[key]}
-                                                        onCheckedChange={(checked) => handleQuantityChange(loc, checked ? loc.quantity.toString() : '0')}
-                                                    />
-                                                </TableCell>
-                                                <TableCell className="font-mono">{loc.coordinate}</TableCell>
-                                                <TableCell>{loc.productName}</TableCell>
-                                                <TableCell className="font-mono hidden md:table-cell">{loc.clientLotId || '-'}</TableCell>
-                                                <TableCell className="hidden md:table-cell">{loc.observation || '-'}</TableCell>
-                                                <TableCell>{loc.quantity}</TableCell>
-                                                <TableCell>
-                                                    <Input
-                                                        type="number"
-                                                        min={0}
-                                                        max={loc.quantity}
-                                                        value={quantitiesToDispatch[key] || ''}
-                                                        onChange={(e) => handleQuantityChange(loc, e.target.value)}
-                                                        placeholder="0"
-                                                        className="h-8"
-                                                    />
-                                                </TableCell>
-                                            </TableRow>
-                                        )
-                                    })}
-                                </TableBody>
-                            </Table>
-                            </AccordionContent>
-                        </AccordionItem>
-                    );
-                })}
-            </Accordion>
-             {filteredLots.length === 0 && (
+                                </AccordionTrigger>
+                                <AccordionContent className="px-4 py-2 bg-muted/10 space-y-2">
+                                    <Accordion type="multiple" className="w-full space-y-1">
+                                        {group.lots.map(lot => {
+                                            const lotValue = `lot_${group.varietyName}_${lot.clientLotId}`;
+                                            
+                                            const allLocationKeysForLot = lot.locations.map(l => getLocationKey(l.receptionId, l.itemIndex));
+                                            const selectedKeysInLot = allLocationKeysForLot.filter(key => key in quantitiesToDispatch);
+                                            const isAllSelected = selectedKeysInLot.length === allLocationKeysForLot.length && 
+                                                allLocationKeysForLot.every(key => quantitiesToDispatch[key] === lot.locations.find(l => getLocationKey(l.receptionId, l.itemIndex) === key)?.quantity);
+                                            const isSomeSelected = selectedKeysInLot.length > 0;
+
+                                            return (
+                                                <AccordionItem value={lotValue} key={lotValue} className="border border-muted/50 rounded bg-white overflow-hidden shadow-sm">
+                                                    <AccordionTrigger className="px-4 py-2 hover:bg-muted/30 hover:no-underline">
+                                                        <div className="flex justify-between items-center w-full pr-4">
+                                                            <span className="font-mono text-sm font-semibold">{lot.clientLotId}</span>
+                                                            <span className="font-semibold text-xs text-muted-foreground">{lot.totalQuantity} {group.unit}</span>
+                                                        </div>
+                                                    </AccordionTrigger>
+                                                    <AccordionContent className="p-0 border-t border-muted/30">
+                                                        <Table>
+                                                            <TableHeader className="bg-muted/20">
+                                                                <TableRow>
+                                                                    <TableHead className="w-12 px-4">
+                                                                        <Checkbox
+                                                                            checked={isAllSelected ? true : isSomeSelected ? 'indeterminate' : false}
+                                                                            onCheckedChange={(checked) => handleSelectAllForLot(lot as any, !!checked)}
+                                                                            aria-label="Seleccionar todo en este lote"
+                                                                        />
+                                                                    </TableHead>
+                                                                    <TableHead className="text-xs font-bold uppercase tracking-wider">Cámara</TableHead>
+                                                                    <TableHead className="text-xs font-bold uppercase tracking-wider">Coordenada</TableHead>
+                                                                    <TableHead className="text-xs font-bold uppercase tracking-wider">Variedad</TableHead>
+                                                                    <TableHead className="text-xs font-bold uppercase tracking-wider">Fecha Recepción</TableHead>
+                                                                    <TableHead className="text-xs font-bold uppercase tracking-wider">Disp.</TableHead>
+                                                                    <TableHead className="text-xs font-bold uppercase tracking-wider w-28 px-4">A Despachar</TableHead>
+                                                                </TableRow>
+                                                            </TableHeader>
+                                                            <TableBody>
+                                                                {lot.locations.map(loc => {
+                                                                    const key = getLocationKey(loc.receptionId, loc.itemIndex);
+                                                                    return (
+                                                                        <TableRow key={key} className="hover:bg-muted/10">
+                                                                            <TableCell className="px-4">
+                                                                                <Checkbox 
+                                                                                    checked={!!quantitiesToDispatch[key]}
+                                                                                    onCheckedChange={(checked) => handleQuantityChange(loc as any, checked ? loc.quantity.toString() : '0')}
+                                                                                />
+                                                                            </TableCell>
+                                                                            <TableCell className="font-semibold text-[#004b8d]">{loc.chamberId}</TableCell>
+                                                                            <TableCell className="font-mono font-medium">{loc.coordinate}</TableCell>
+                                                                            <TableCell className="text-xs">{loc.productName}</TableCell>
+                                                                            <TableCell className="text-xs text-muted-foreground">{loc.receptionDate}</TableCell>
+                                                                            <TableCell className="font-semibold">{loc.quantity}</TableCell>
+                                                                            <TableCell className="px-4">
+                                                                                <Input
+                                                                                    type="number"
+                                                                                    min={0}
+                                                                                    max={loc.quantity}
+                                                                                    value={quantitiesToDispatch[key] || ''}
+                                                                                    onChange={(e) => handleQuantityChange(loc as any, e.target.value)}
+                                                                                    placeholder="0"
+                                                                                    className="h-8 text-right font-semibold"
+                                                                                />
+                                                                            </TableCell>
+                                                                        </TableRow>
+                                                                    );
+                                                                })}
+                                                            </TableBody>
+                                                        </Table>
+                                                    </AccordionContent>
+                                                </AccordionItem>
+                                            );
+                                        })}
+                                    </Accordion>
+                                </AccordionContent>
+                            </AccordionItem>
+                        );
+                    })}
+                </Accordion>
+            ) : (
+                <Accordion type="multiple" className="w-full">
+                    {filteredLots.map(lot => {
+                        const allLocationKeysForLot = lot.locations.map(l => getLocationKey(l.receptionId, l.itemIndex));
+                        const selectedKeysInLot = allLocationKeysForLot.filter(key => key in quantitiesToDispatch);
+                        const isAllSelected = selectedKeysInLot.length === allLocationKeysForLot.length && allLocationKeysForLot.every(key => quantitiesToDispatch[key] === lot.locations.find(l => getLocationKey(l.receptionId, l.itemIndex) === key)?.quantity);
+                        const isSomeSelected = selectedKeysInLot.length > 0;
+
+                        return (
+                            <AccordionItem value={lot.displayLotId} key={lot.displayLotId}>
+                                <AccordionTrigger>
+                                    <div className="flex justify-between w-full pr-4">
+                                        <span className="font-mono">{lot.displayLotId}</span>
+                                        <div className="flex items-center gap-4 text-sm">
+                                          <span className="font-semibold">{lot.totalQuantity} {lot.unit}</span>
+                                        </div>
+                                    </div>
+                                </AccordionTrigger>
+                                <AccordionContent>
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead className="w-12">
+                                                <Checkbox
+                                                    checked={isAllSelected ? true : isSomeSelected ? 'indeterminate' : false}
+                                                    onCheckedChange={(checked) => handleSelectAllForLot(lot, !!checked)}
+                                                    aria-label="Seleccionar todo en este lote"
+                                                />
+                                            </TableHead>
+                                            <TableHead>Coordenada</TableHead>
+                                            <TableHead>Producto</TableHead>
+                                            <TableHead className="hidden md:table-cell">Lote Cliente</TableHead>
+                                            <TableHead className="hidden md:table-cell">Observación</TableHead>
+                                            <TableHead>Disp.</TableHead>
+                                            <TableHead className="w-32">A Despachar</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {lot.locations.map(loc => {
+                                            const key = getLocationKey(loc.receptionId, loc.itemIndex);
+                                            return (
+                                                <TableRow key={key}>
+                                                    <TableCell>
+                                                        <Checkbox 
+                                                            checked={!!quantitiesToDispatch[key]}
+                                                            onCheckedChange={(checked) => handleQuantityChange(loc, checked ? loc.quantity.toString() : '0')}
+                                                        />
+                                                    </TableCell>
+                                                    <TableCell className="font-mono">{loc.coordinate}</TableCell>
+                                                    <TableCell>{loc.productName}</TableCell>
+                                                    <TableCell className="font-mono hidden md:table-cell">{loc.clientLotId || '-'}</TableCell>
+                                                    <TableCell className="hidden md:table-cell">{loc.observation || '-'}</TableCell>
+                                                    <TableCell>{loc.quantity}</TableCell>
+                                                    <TableCell>
+                                                        <Input
+                                                            type="number"
+                                                            min={0}
+                                                            max={loc.quantity}
+                                                            value={quantitiesToDispatch[key] || ''}
+                                                            onChange={(e) => handleQuantityChange(loc, e.target.value)}
+                                                            placeholder="0"
+                                                            className="h-8"
+                                                        />
+                                                    </TableCell>
+                                                </TableRow>
+                                            )
+                                        })}
+                                    </TableBody>
+                                </Table>
+                                </AccordionContent>
+                            </AccordionItem>
+                        );
+                    })}
+                </Accordion>
+            )}
+             {((isFallCreekClient(selectedClientId) ? filteredFallCreekGroups.length : filteredLots.length) === 0) && (
                 <div className="text-center p-8 border-dashed border rounded-md text-sm text-muted-foreground">
                     No hay stock disponible para este cliente y filtro.
                 </div>
