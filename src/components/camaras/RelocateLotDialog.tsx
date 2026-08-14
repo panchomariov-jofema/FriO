@@ -14,7 +14,7 @@ import { chambersConfig } from '@/lib/chambers-config';
 import { Alert, AlertDescription } from '../ui/alert';
 import { useToast } from '@/hooks/use-toast';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
-import { naturalSort } from '@/lib/utils';
+import { naturalSort, getEffectiveChamberConfig } from '@/lib/utils';
 import type { ClientStorageConfig, Exporter } from '@/lib/types';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
@@ -79,23 +79,16 @@ export function RelocateLotDialog({
   const { availableCoordinates, occupancyMap } = React.useMemo(() => {
     if (!targetChamberId) return { availableCoordinates: [], occupancyMap: new Map() };
 
-    const chamberConfig = chambersConfig[targetChamberId];
-    if (!chamberConfig) return { availableCoordinates: [], occupancyMap: new Map() };
+    const rawChamberConfig = chambersConfig[targetChamberId];
+    if (!rawChamberConfig) return { availableCoordinates: [], occupancyMap: new Map() };
+
+    const isChamberRow13Enabled = !!chamberSettings?.find(s => s.id === targetChamberId)?.row13Enabled;
+    const chamberConfig = getEffectiveChamberConfig(rawChamberConfig, isChamberRow13Enabled);
 
     let allPossibleCoords = chamberConfig.columns
         .flatMap(col => chamberConfig.rows.map(row => `${col.name}${row}`))
         .filter(coord => !chamberConfig.blocked?.includes(coord))
         .sort(naturalSort);
-
-    const isChamberRow13Enabled = !!chamberSettings?.find(s => s.id === targetChamberId)?.row13Enabled;
-    if (isChamberRow13Enabled) {
-      const isLargeChamber = ['CAMARA-4', 'CAMARA-5', 'CAMARA-6'].includes(targetChamberId);
-      const allowedComodinColumns = isLargeChamber ? ['A', 'B', 'C', 'M', 'N', 'O'] : ['A', 'B', 'C', 'H', 'I', 'J'];
-      const extraCoords = chamberConfig.columns
-        .filter(col => allowedComodinColumns.includes(col.name))
-        .flatMap(col => [`${col.name}13`, `${col.name}14`]);
-      allPossibleCoords = [...allPossibleCoords, ...extraCoords].sort(naturalSort);
-    }
 
     // 1. Calculate current occupancy and document set for all coordinates in target chamber
     const occupancyMap = new Map<string, { quantity: number; ownerName: string; unit: string; documents: Set<string>; productCodes: Set<string> }>();

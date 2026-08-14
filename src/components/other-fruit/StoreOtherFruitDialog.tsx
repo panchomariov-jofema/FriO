@@ -15,7 +15,7 @@ import { OtherFruitReception, ChamberLot, OtherFruitReceptionItem, Chamber, Clie
 import { chambersConfig } from '@/lib/chambers-config';
 import { useToast } from '@/hooks/use-toast';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
-import { getSortedCoordinates, getPairedCoordinates, safeToMillis } from '@/lib/utils';
+import { getSortedCoordinates, getPairedCoordinates, safeToMillis, getEffectiveChamberConfig } from '@/lib/utils';
 import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
 import { Zap } from 'lucide-react';
 
@@ -89,10 +89,12 @@ export function StoreOtherFruitDialog({
       return { availableCoordinates: [], suggestion: null };
     }
 
-    const chamberConfig = chambersConfig[selectedChamberId];
-    if (!chamberConfig) {
+    const rawChamberConfig = chambersConfig[selectedChamberId];
+    if (!rawChamberConfig) {
       return { availableCoordinates: [], suggestion: null };
     }
+    const isChamberRow13Enabled = !!chamberSettings?.find(s => s.id === selectedChamberId)?.row13Enabled;
+    const chamberConfig = getEffectiveChamberConfig(rawChamberConfig, isChamberRow13Enabled);
 
     const occupancyMap = new Map<string, { lots: {displayLotId: string, binCount: number, clientId: string, productCode?: string }[] }>();
     let lastCoordInChamber: string | null = null;
@@ -249,32 +251,6 @@ export function StoreOtherFruitDialog({
         return currentOccupancy + unitsPerItem <= occupancyThreshold;
     });
 
-    const isChamberRow13Enabled = !!chamberSettings?.find(s => s.id === selectedChamberId)?.row13Enabled;
-    if (isChamberRow13Enabled) {
-        const isLargeChamber = ['CAMARA-4', 'CAMARA-5', 'CAMARA-6'].includes(selectedChamberId);
-        const allowedComodinColumns = isLargeChamber ? ['A', 'B', 'C', 'M', 'N', 'O'] : ['A', 'B', 'C', 'H', 'I', 'J'];
-        const comodinCoords = chamberConfig.columns
-            .filter(col => allowedComodinColumns.includes(col.name))
-            .flatMap(col => [`${col.name}13`, `${col.name}14`]);
-        const availableComodines = comodinCoords.filter(coord => {
-            const entry = occupancyMap.get(coord);
-            if (!entry || entry.lots.length === 0) return true; // Empty
-
-            const hasDifferentClient = entry.lots.some(l => l.clientId !== item.clientId);
-            if (hasDifferentClient) return false;
-
-            const hasDifferentProduct = entry.lots.some(l => {
-                if (!l.productCode) return true;
-                return l.productCode !== item.productCode;
-            });
-            if (hasDifferentProduct) return false;
-
-            const currentOccupancy = entry.lots.reduce((sum, l) => sum + l.binCount, 0);
-            return currentOccupancy + unitsPerItem <= occupancyThreshold;
-        });
-        available = [...available, ...availableComodines];
-    }
-    
     return { availableCoordinates: available, suggestion: currentSuggestion };
 
   }, [selectedChamberId, item, allReceptions, allChamberLots, form.watch('strategy'), capacityPerCoord, lastUsedChamberId, lastUsedCoordinate, chamberSettings]);

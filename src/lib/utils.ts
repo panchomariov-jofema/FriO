@@ -20,6 +20,29 @@ export const naturalSort = (a: string, b: string) => {
   return aNum - bNum;
 };
 
+export const getEffectiveChamberConfig = (chamberConfig: Chamber, row13Enabled?: boolean): Chamber => {
+  if (!row13Enabled) {
+    return chamberConfig;
+  }
+  const isLargeChamber = ['CAMARA-4', 'CAMARA-5', 'CAMARA-6'].includes(chamberConfig.id);
+  const allowedComodinCols = isLargeChamber ? ['A', 'B', 'C', 'M', 'N', 'O'] : ['A', 'B', 'C', 'H', 'I', 'J'];
+  
+  return {
+    ...chamberConfig,
+    blocked: chamberConfig.blocked?.filter(coord => {
+      const match = coord.match(/^([A-Z])(\d+)$/);
+      if (match) {
+        const col = match[1];
+        const row = parseInt(match[2], 10);
+        if (row === 13 || row === 14) {
+          return !allowedComodinCols.includes(col);
+        }
+      }
+      return true;
+    })
+  };
+};
+
 // Generates coordinates for chamber display, handling sequential, snake (FIFO), and aisle-access layouts.
 export const getModeloSofCoordinates = (chamberConfig: Chamber): string[] => {
     const coords: string[] = [];

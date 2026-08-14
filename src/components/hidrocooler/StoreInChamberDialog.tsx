@@ -10,7 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Button } from '@/components/ui/button';
 import type { ChamberLot, OtherFruitReception } from '@/lib/types';
 import { chambersConfig } from '@/lib/chambers-config';
-import { getSortedCoordinates } from '@/lib/utils';
+import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
+import { getSortedCoordinates, getEffectiveChamberConfig } from '@/lib/utils';
 
 interface StoreInChamberDialogProps {
   lot: ChamberLot | null;
@@ -39,16 +40,19 @@ export function StoreInChamberDialog({ lot, open, onOpenChange, onStore, allCham
   });
 
   const selectedChamberId = form.watch('chamberId');
+  const { data: chamberSettings } = useFirestoreCollection<{ id: string; row13Enabled?: boolean }>('chamberSettings');
 
   const { availableCoordinatesForNewLots, suggestion } = React.useMemo(() => {
     if (!selectedChamberId || !lot) {
       return { availableCoordinatesForNewLots: [], suggestion: null };
     }
 
-    const chamberConfig = chambersConfig[selectedChamberId];
-    if (!chamberConfig) {
+    const rawChamberConfig = chambersConfig[selectedChamberId];
+    if (!rawChamberConfig) {
       return { availableCoordinatesForNewLots: [], suggestion: null };
     }
+    const isChamberRow13Enabled = !!chamberSettings?.find(s => s.id === selectedChamberId)?.row13Enabled;
+    const chamberConfig = getEffectiveChamberConfig(rawChamberConfig, isChamberRow13Enabled);
 
     // Get all occupied coordinates
     const occupiedCoords = new Set<string>();
@@ -80,7 +84,7 @@ export function StoreInChamberDialog({ lot, open, onOpenChange, onStore, allCham
         availableCoordinatesForNewLots: allEmptyCoordinatesSequentially,
         suggestion: firstAvailable
     };
-  }, [selectedChamberId, lot, allChamberLots, allOtherFruitReceptions, chamberStrategies]);
+  }, [selectedChamberId, lot, allChamberLots, allOtherFruitReceptions, chamberStrategies, chamberSettings]);
 
 
   // Effect to suggest a coordinate when a chamber is selected

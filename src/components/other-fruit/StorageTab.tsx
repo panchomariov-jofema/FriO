@@ -14,7 +14,7 @@ import { doc, serverTimestamp, updateDoc, runTransaction } from 'firebase/firest
 import { useToast } from '@/hooks/use-toast';
 import { StorePackagingDialog } from '../packaging/StorePackagingDialog';
 import { chambersConfig } from '@/lib/chambers-config';
-import { getPairedCoordinates, getSortedCoordinates } from '@/lib/utils';
+import { getPairedCoordinates, getSortedCoordinates, getEffectiveChamberConfig } from '@/lib/utils';
 import { useUser } from '@/firebase';
 import { ArrowLeft, Users, Zap, Search, CheckCircle2, AlertCircle, Camera, Package } from 'lucide-react';
 import type { ClientStorageConfig, Exporter, OtherClient } from '@/lib/types';
@@ -54,6 +54,7 @@ export function OtherFruitStorageTab({ clientId: fixedClientId }: { clientId?: s
   const { data: clientConfigs } = useFirestoreCollection<ClientStorageConfig>('clientStorageConfigs');
   const { data: exporters } = useFirestoreCollection<Exporter>('exporters');
   const { data: otherClients } = useFirestoreCollection<OtherClient>('otherClients');
+  const { data: chamberSettings } = useFirestoreCollection<{ id: string; row13Enabled?: boolean }>('chamberSettings');
   
   const [selectedItem, setSelectedItem] = React.useState<ConsolidatedPendingItem | null>(null);
   const [quickStoreItem, setQuickStoreItem] = React.useState<{
@@ -269,7 +270,10 @@ export function OtherFruitStorageTab({ clientId: fixedClientId }: { clientId?: s
     if (!preferredChamberId || !chambersConfig[preferredChamberId]) return null;
 
     const chamberId = preferredChamberId;
-    const chamberConfig = chambersConfig[chamberId];
+    const rawChamberConfig = chambersConfig[chamberId];
+    if (!rawChamberConfig) return null;
+    const isChamberRow13Enabled = !!chamberSettings?.find(s => s.id === chamberId)?.row13Enabled;
+    const chamberConfig = getEffectiveChamberConfig(rawChamberConfig, isChamberRow13Enabled);
 
     // Calculate occupancy and find the last used coordinate
     const occupancyMap = new Map<string, number>();
@@ -381,11 +385,13 @@ export function OtherFruitStorageTab({ clientId: fixedClientId }: { clientId?: s
         return;
     }
 
-    const chamberConfig = chambersConfig[chamberId];
-    if (!chamberConfig) {
+    const rawChamberConfig = chambersConfig[chamberId];
+    if (!rawChamberConfig) {
         toast({ title: "Error", description: "Configuración de cámara no encontrada.", variant: "destructive" });
         return;
     }
+    const isChamberRow13Enabled = !!chamberSettings?.find(s => s.id === chamberId)?.row13Enabled;
+    const chamberConfig = getEffectiveChamberConfig(rawChamberConfig, isChamberRow13Enabled);
 
     // --- 1. Get available coordinates ---
     const occupancyMap = new Map<string, number>();

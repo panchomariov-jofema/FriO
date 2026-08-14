@@ -27,7 +27,7 @@ import { notifyPalletLogStored } from '@/lib/telegram';
 import { BarcodeScanner } from '../BarcodeScanner';
 import { FallCreekReceptionWorkflow } from './FallCreekReceptionWorkflow';
 import { chambersConfig } from '@/lib/chambers-config';
-import { getSortedCoordinates, getPairedCoordinates, cn } from '@/lib/utils';
+import { getSortedCoordinates, getPairedCoordinates, cn, getEffectiveChamberConfig } from '@/lib/utils';
 import { Switch } from '@/components/ui/switch';
 import { StoreOtherFruitDialog } from './StoreOtherFruitDialog';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -143,6 +143,7 @@ export function OtherFruitReceptionTab({ clientId: fixedClientId }: { clientId?:
   const { data: clientConfigs } = useFirestoreCollection<any>('clientStorageConfigs');
   const { data: allChamberLots } = useFirestoreCollection<any>('chamberLots');
   const { data: allReceptions } = useFirestoreCollection<OtherFruitReception>('otherFruitReceptions');
+  const { data: chamberSettings } = useFirestoreCollection<any>('chamberSettings');
 
   const [selectedClient, setSelectedClient] = React.useState<OtherClient | null>(null);
   const [scanningIndex, setScanningIndex] = React.useState<number | null>(null);
@@ -279,8 +280,10 @@ export function OtherFruitReceptionTab({ clientId: fixedClientId }: { clientId?:
         return;
     }
 
-    const chamberConfig = chambersConfig[chamberId];
-    if (!chamberConfig) return;
+    const rawChamberConfig = chambersConfig[chamberId];
+    if (!rawChamberConfig) return;
+    const isChamberRow13Enabled = !!chamberSettings?.find((s: any) => s.id === chamberId)?.row13Enabled;
+    const chamberConfig = getEffectiveChamberConfig(rawChamberConfig, isChamberRow13Enabled);
 
     const occupancyMap = new Map<string, number>();
     (allChamberLots || []).forEach(l => {

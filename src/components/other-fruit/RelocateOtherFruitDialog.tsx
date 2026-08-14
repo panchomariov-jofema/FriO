@@ -12,7 +12,7 @@ import type { ChamberLot, OtherFruitReception } from '@/lib/types';
 import { chambersConfig } from '@/lib/chambers-config';
 import { useToast } from '@/hooks/use-toast';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
-import { naturalSort } from '@/lib/utils';
+import { naturalSort, getEffectiveChamberConfig } from '@/lib/utils';
 import type { ClientStorageConfig } from '@/lib/types';
 
 // This will represent a single, located item from an OtherFruitReception
@@ -71,23 +71,16 @@ export function RelocateOtherFruitDialog({
   const { availableCoordinates } = React.useMemo(() => {
     if (!targetChamberId) return { availableCoordinates: [] };
 
-    const chamberConfig = chambersConfig[targetChamberId];
-    if (!chamberConfig) return { availableCoordinates: [] };
+    const rawChamberConfig = chambersConfig[targetChamberId];
+    if (!rawChamberConfig) return { availableCoordinates: [] };
+
+    const isChamberRow13Enabled = !!chamberSettings?.find(s => s.id === targetChamberId)?.row13Enabled;
+    const chamberConfig = getEffectiveChamberConfig(rawChamberConfig, isChamberRow13Enabled);
 
     let allPossibleCoords = chamberConfig.columns
         .flatMap(col => chamberConfig.rows.map(row => `${col.name}${row}`))
         .filter(coord => !chamberConfig.blocked?.includes(coord))
         .sort(naturalSort);
-
-    const isChamberRow13Enabled = !!chamberSettings?.find(s => s.id === targetChamberId)?.row13Enabled;
-    if (isChamberRow13Enabled) {
-      const isLargeChamber = ['CAMARA-4', 'CAMARA-5', 'CAMARA-6'].includes(targetChamberId);
-      const allowedComodinColumns = isLargeChamber ? ['A', 'B', 'C', 'M', 'N', 'O'] : ['A', 'B', 'C', 'H', 'I', 'J'];
-      const extraCoords = chamberConfig.columns
-        .filter(col => allowedComodinColumns.includes(col.name))
-        .flatMap(col => [`${col.name}13`, `${col.name}14`]);
-      allPossibleCoords = [...allPossibleCoords, ...extraCoords].sort(naturalSort);
-    }
 
     // 1. Calculate current occupancy for all coordinates in target chamber
     const occupancyMap = new Map<string, { quantity: number; ownerName: string }>();
