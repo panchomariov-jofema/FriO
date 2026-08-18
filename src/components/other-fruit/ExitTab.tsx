@@ -543,17 +543,11 @@ export function OtherFruitExitTab({ clientId: fixedClientId }: { clientId?: stri
             }
         }
 
-        let hasRealWrites = false;
-        receptionUpdates.forEach((items, receptionId) => {
-            if (!receptionId.startsWith('mock-')) {
-                const receptionRef = doc(firestore, 'otherFruitReceptions', receptionId);
-                batch.update(receptionRef, { items, updatedAt: serverTimestamp() });
-                hasRealWrites = true;
-            }
-        });
+        const hasRealWrites = !client.clientId.startsWith('mock-');
 
         const movementData: Partial<OtherFruitMovement> = {
             type: 'salida',
+            status: 'Pendiente de Picking',
             clientId: client.clientId,
             clientName: client.name,
             unit: client.unit,
@@ -602,7 +596,7 @@ export function OtherFruitExitTab({ clientId: fixedClientId }: { clientId?: stri
         } else {
             console.log("Mock dispatch successful (skipped Firestore writes):", movementData);
         }
-        toast({ title: 'Éxito', description: 'Despacho registrado y stock actualizado.' });
+        toast({ title: 'Éxito', description: 'Despacho registrado. Tarea de picking creada.' });
         setQuantitiesToDispatch({});
         setDocument('');
 

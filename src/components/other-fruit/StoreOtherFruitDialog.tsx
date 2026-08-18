@@ -96,7 +96,7 @@ export function StoreOtherFruitDialog({
     const isChamberRow13Enabled = !!chamberSettings?.find(s => s.id === selectedChamberId)?.row13Enabled;
     const chamberConfig = getEffectiveChamberConfig(rawChamberConfig, isChamberRow13Enabled);
 
-    const occupancyMap = new Map<string, { lots: {displayLotId: string, binCount: number, clientId: string, productCode?: string }[] }>();
+    const occupancyMap = new Map<string, { lots: {displayLotId: string, binCount: number, clientId: string, productCode?: string, unit?: string }[] }>();
     let lastCoordInChamber: string | null = null;
     let latestTimestamp = 0;
     
@@ -137,7 +137,8 @@ export function StoreOtherFruitDialog({
                      displayLotId: lotId, 
                      binCount: equivalentUnits,
                      clientId: reception.clientId,
-                     productCode: storedItem.productCode
+                     productCode: storedItem.productCode,
+                     unit: reception.unit
                    });
                 }
 
@@ -219,6 +220,10 @@ export function StoreOtherFruitDialog({
         const hasDifferentClient = entry.lots.some(l => l.clientId !== item.clientId);
         if (hasDifferentClient) return false;
 
+        // Prevent mixing different unit types (Pallets vs Bins) in the same coordinate
+        const hasDifferentUnit = entry.lots.some(l => l.unit && l.unit !== item.unit);
+        if (hasDifferentUnit) return false;
+
         // Prevent mixing different varieties/products in the same coordinate
         const hasDifferentProduct = entry.lots.some(l => {
             if (!l.productCode) return true;
@@ -239,6 +244,10 @@ export function StoreOtherFruitDialog({
         // Compatibility: only same client allowed for Exportador/Other Fruit
         const hasDifferentClient = entry.lots.some(l => l.clientId !== item.clientId);
         if (hasDifferentClient) return false;
+
+        // Prevent mixing different unit types (Pallets vs Bins) in the same coordinate
+        const hasDifferentUnit = entry.lots.some(l => l.unit && l.unit !== item.unit);
+        if (hasDifferentUnit) return false;
 
         // Prevent mixing different varieties/products in the same coordinate
         const hasDifferentProduct = entry.lots.some(l => {

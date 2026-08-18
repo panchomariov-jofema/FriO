@@ -170,9 +170,11 @@ export function RelocateLotDialog({
             const existingType = existingExporter?.type?.toUpperCase() || 'EXPORTADOR';
             const incomingType = incomingExporter?.type?.toUpperCase() || 'EXPORTADOR';
 
-            // If other fruit relocation, prevent mixing different varieties/products
+            // If other fruit relocation, prevent mixing different varieties/products and unit types (Pallets vs Bins)
             if (firstItemToRelocate?.type === 'otherFruit') {
                 if (existingOwnerName.toUpperCase() !== incomingOwnerName.toUpperCase()) return false;
+                
+                if (occupancyData.unit && occupancyData.unit !== unitType) return false;
                 
                 if (firstItemToRelocate.displayId) { // displayId contains productCode for otherFruit
                     const targetHasDifferentProduct = Array.from(occupancyData.productCodes || []).some(code => code !== firstItemToRelocate.displayId);
@@ -229,6 +231,18 @@ export function RelocateLotDialog({
             message: `La cantidad no puede ser mayor a la disponible en el origen (${totalQuantityInCoord}).`
         });
         return;
+    }
+
+    if (item.type === 'otherFruit') {
+        const selectedItems = lotsInCoordinate.filter(i => (values.selectedItemIds || []).includes(i.id));
+        const selectedTotal = selectedItems.reduce((sum, i) => sum + i.quantity, 0);
+        if (values.quantityToRelocate > selectedTotal) {
+            form.setError('quantityToRelocate', {
+                type: 'manual',
+                message: `La cantidad no puede ser mayor a la suma de los ítems seleccionados (${selectedTotal}).`
+            });
+            return;
+        }
     }
 
     // Validate the target chamber's capacity conditions
@@ -356,7 +370,6 @@ export function RelocateLotDialog({
                       min={1} 
                       max={totalQuantityInCoord} 
                       placeholder="Ingrese cantidad..." 
-                      disabled={item.type === 'otherFruit'}
                       {...field} 
                     />
                   </FormControl>

@@ -14,13 +14,16 @@ import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '../ui/scroll-area';
-import { FileText, Building } from 'lucide-react';
+import { FileText, Building, QrCode, Trash2, Camera, CheckCircle2, ScanLine } from 'lucide-react';
 import { Input } from '../ui/input';
-import { OtherFruitMovement, OtherFruitMovementLocation } from '@/lib/types';
+import { OtherFruitMovement, OtherFruitMovementLocation, OtherFruitReception } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
-
+import { BarcodeScanner } from '../BarcodeScanner';
+import { Switch } from '../ui/switch';
+import { Label } from '../ui/label';
+import { Badge } from '../ui/badge';
 
 interface OtherFruitPickingDialogProps {
   movement: OtherFruitMovement | null;
@@ -28,17 +31,35 @@ interface OtherFruitPickingDialogProps {
   onOpenChange: (open: boolean) => void;
   onConfirmExit: (confirmedMovement: OtherFruitMovement) => void;
   isConfirming: boolean;
+  otherFruitReceptions?: OtherFruitReception[];
 }
 
 interface PickingItem extends OtherFruitMovementLocation {
     compositeKey: string;
 }
 
-export function OtherFruitPickingDialog({ movement, open, onOpenChange, onConfirmExit, isConfirming }: OtherFruitPickingDialogProps) {
+export function OtherFruitPickingDialog({ 
+  movement, 
+  open, 
+  onOpenChange, 
+  onConfirmExit, 
+  isConfirming,
+  otherFruitReceptions = []
+}: OtherFruitPickingDialogProps) {
   const { toast } = useToast();
   const [pickedItems, setPickedItems] = React.useState<Record<string, boolean>>({});
   const [quantities, setQuantities] = React.useState<Record<string, number>>({});
   
+  // QR Scanning State
+  const [scannedQrCodes, setScannedQrCodes] = React.useState<Set<string>>(new Set());
+  const [scannedPallets, setScannedPallets] = React.useState<Set<string>>(new Set());
+  const [isScannerOpen, setIsScannerOpen] = React.useState(false);
+  const [usePhysicalScanner, setUsePhysicalScanner] = React.useState(false);
+
+  const isFallCreek = React.useMemo(() => {
+    return movement?.clientName?.toUpperCase() === 'FALL CREEK';
+  }, [movement]);
+
   const flatItems = React.useMemo((): PickingItem[] => {
     if (!movement?.locations) return [];
     return movement.locations.map(loc => ({
@@ -47,21 +68,37 @@ export function OtherFruitPickingDialog({ movement, open, onOpenChange, onConfir
     }));
   }, [movement]);
 
+  // Retrieve stored bins in the coordinate(s) matching this dispatch
+  const storedBins = React.useMemo(() => {
+      if (!movement || !otherFruitReceptions) return [];
+      const locCoords = new Set((movement.locations || []).map(l => `${l.location.chamberId}_${l.location.coordinate}`));
+      return (otherFruitReceptions || []).flatMap(r => 
+          (r.items || []).map((item, idx) => ({ ...item, receptionId: r.id, itemIndex: idx }))
+      ).filter(item => 
+          item.status === 'Almacenado' && 
+          item.storageLocation && 
+          locCoords.has(`${item.storageLocation.chamberId}_${item.storageLocation.coordinate}`)
+      );
+  }, [movement, otherFruitReceptions]);
+
   React.useEffect(() => {
     if (flatItems) {
         const initialQuantities = flatItems.reduce((acc, item) => {
-            acc[item.compositeKey] = item.quantity;
+            acc[item.compositeKey] = isFallCreek ? 0 : item.quantity;
             return acc;
         }, {} as Record<string, number>);
         setQuantities(initialQuantities);
         setPickedItems({});
+        setScannedQrCodes(new Set());
+        setScannedPallets(new Set());
     }
-  }, [flatItems]);
-
+  }, [flatItems, isFallCreek, open]);
 
   if (!movement) return null;
 
   const handleQuantityChange = (compositeKey: string, originalCount: number, newCountStr: string) => {
+    if (isFallCreek) return; // Quantities are auto-calculated from scans for Fall Creek
+
     let newCount = parseInt(newCountStr, 10);
     if (isNaN(newCount) || newCount < 0) {
         newCount = 0;
@@ -78,6 +115,8 @@ export function OtherFruitPickingDialog({ movement, open, onOpenChange, onConfir
   };
 
   const handleSelectAll = (checked: boolean | 'indeterminate') => {
+    if (isFallCreek) return; // Checkboxes are disabled for Fall Creek
+
     const newPickedItems: Record<string, boolean> = {};
     if (checked === true) {
       flatItems.forEach(item => {
@@ -88,6 +127,8 @@ export function OtherFruitPickingDialog({ movement, open, onOpenChange, onConfir
   };
   
   const handleItemCheck = (compositeKey: string, checked: boolean) => {
+    if (isFallCreek) return; // Checkboxes are disabled for Fall Creek
+
     setPickedItems(prev => {
         const newPicked = {...prev};
         if(checked) {
@@ -96,6 +137,108 @@ export function OtherFruitPickingDialog({ movement, open, onOpenChange, onConfir
             delete newPicked[compositeKey];
         }
         return newPicked;
+    });
+  };
+
+  // QR Scan Handler
+  const handleScan = (scannedCode: string) => {
+    const matchedBin = storedBins.find(b => b.containerId?.trim() === scannedCode.trim());
+    if (!matchedBin) {
+      toast({
+        title: "Código no encontrado",
+        description: "Este código QR no está registrado en las coordenadas de este despacho.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (scannedQrCodes.has(scannedCode)) {
+      toast({
+        title: "Ya escaneado",
+        description: "Este bin ya fue escaneado."
+      });
+      return;
+    }
+
+    const palletId = matchedBin.palletId || 'Loose';
+
+    // Find target picking item matching variety/product code and chamber/coordinate
+    const targetItem = flatItems.find(item => 
+      item.productCode === matchedBin.productCode && 
+      item.location.chamberId === matchedBin.storageLocation?.chamberId &&
+      item.location.coordinate === matchedBin.storageLocation?.coordinate
+    );
+
+    if (!targetItem) {
+      toast({
+        title: "Diferente variedad",
+        description: "Este bin corresponde a una variedad o lote no solicitado en este despacho.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const compositeKey = targetItem.compositeKey;
+    const currentQty = quantities[compositeKey] ?? 0;
+    const targetQty = targetItem.quantity;
+    const remainingQty = targetQty - currentQty;
+
+    if (remainingQty <= 0) {
+      toast({
+        title: "Ubicación completa",
+        description: `Ya se ha escaneado la cantidad requerida para la ubicación ${targetItem.location.chamberId} / ${targetItem.location.coordinate}.`
+      });
+      return;
+    }
+
+    // Apply the smart scanning rule
+    let confirmedCount = 1;
+    let autoConfirmedMsg = "";
+    
+    if (palletId !== 'Loose') {
+      const isPalletAlreadyScanned = scannedPallets.has(palletId);
+      if (!isPalletAlreadyScanned && remainingQty >= 3) {
+        confirmedCount = 3;
+        autoConfirmedMsg = " (Pallet completo - Auto-confirmado 3 bins)";
+      }
+    }
+
+    setQuantities(prev => ({
+      ...prev,
+      [compositeKey]: Math.min(targetQty, (prev[compositeKey] ?? 0) + confirmedCount)
+    }));
+
+    setScannedQrCodes(prev => {
+      const next = new Set(prev);
+      next.add(scannedCode);
+      return next;
+    });
+
+    if (palletId !== 'Loose') {
+      setScannedPallets(prev => {
+        const next = new Set(prev);
+        next.add(palletId);
+        return next;
+      });
+    }
+
+    toast({
+      title: "Bin Escaneado",
+      description: `Se confirmó ${confirmedCount} bin(s) de la variedad ${targetItem.productName}${autoConfirmedMsg}.`,
+    });
+  };
+
+  const handleResetScanning = () => {
+    setScannedQrCodes(new Set());
+    setScannedPallets(new Set());
+    const resetQuantities = flatItems.reduce((acc, item) => {
+        acc[item.compositeKey] = 0;
+        return acc;
+    }, {} as Record<string, number>);
+    setQuantities(resetQuantities);
+    toast({
+      title: "Escaneo reiniciado",
+      description: "Se han borrado los códigos escaneados y cantidades a retirar.",
     });
   };
 
@@ -145,7 +288,6 @@ export function OtherFruitPickingDialog({ movement, open, onOpenChange, onConfir
         return item;
     });
 
-
     if (totalPickedOverall === 0) {
         toast({
             variant: 'destructive',
@@ -161,9 +303,16 @@ export function OtherFruitPickingDialog({ movement, open, onOpenChange, onConfir
   const checkedCount = Object.keys(pickedItems).length;
   const allItemsCount = flatItems.length;
   const selectAllState = checkedCount === allItemsCount && allItemsCount > 0 ? true : checkedCount === 0 ? false : 'indeterminate';
-  const allItemsPicked = allItemsCount > 0 && checkedCount === allItemsCount;
+  
+  const allItemsPicked = allItemsCount > 0 && flatItems.every(item => {
+      if (isFallCreek) {
+          return (quantities[item.compositeKey] ?? 0) === item.quantity;
+      }
+      return !!pickedItems[item.compositeKey];
+  });
   
   const totalPicked = Object.values(quantities).reduce((sum, qty) => sum + qty, 0);
+  const totalExpected = flatItems.reduce((sum, item) => sum + item.quantity, 0);
 
   const handleGeneratePDF = () => {
     if (!movement) return;
@@ -268,87 +417,184 @@ export function OtherFruitPickingDialog({ movement, open, onOpenChange, onConfir
     doc.setTextColor(150);
     doc.text("Este documento es una simulación y no tiene validez tributaria.", 14, doc.internal.pageSize.getHeight() - 10);
 
-
     doc.output('dataurlnewwindow');
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl">
-        <DialogHeader>
-          <DialogTitle>Picking de Despacho de Fruta: {movement.clientName}</DialogTitle>
-          <DialogDescription>
-            Confirme la recolección física de cada artículo y ubicación. Total a retirar: {totalPicked} {movement.unit}.
-          </DialogDescription>
-        </DialogHeader>
-        <div>
-          <ScrollArea className="max-h-96 border rounded-md">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[50px]">
-                    <Checkbox
-                        checked={selectAllState}
-                        onCheckedChange={handleSelectAll}
-                        aria-label="Seleccionar todo"
-                    />
-                  </TableHead>
-                  <TableHead>Producto</TableHead>
-                  <TableHead>Ubicación</TableHead>
-                  <TableHead className="text-right w-36">Cantidad a Retirar</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {flatItems.map((item) => (
-                  <TableRow key={item.compositeKey}>
-                    <TableCell>
-                       <Checkbox
-                          checked={!!pickedItems[item.compositeKey]}
-                          onCheckedChange={(checked) => handleItemCheck(item.compositeKey, !!checked)}
-                        />
-                    </TableCell>
-                    <TableCell>
-                        <div className="font-medium">{item.productName}</div>
-                        <div className="text-sm text-muted-foreground font-mono">{item.clientLotId || 'N/A'}</div>
-                    </TableCell>
-                    <TableCell className="font-mono">{item.location.chamberId} / {item.location.coordinate}</TableCell>
-                    <TableCell className="text-right">
-                       <Input
-                            type="number"
-                            value={quantities[item.compositeKey] ?? ''}
-                            onChange={(e) => handleQuantityChange(item.compositeKey, item.quantity, e.target.value)}
-                            max={item.quantity}
-                            min={0}
-                            className="h-8 w-24 ml-auto text-right"
-                        />
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </ScrollArea>
-        </div>
-        <DialogFooter className="sm:justify-between pt-4">
-           <div className="flex gap-2">
-                <Button variant="outline" onClick={handleGeneratePDF}>
-                    <FileText className="mr-2 h-4 w-4" />
-                    Generar Picking PDF
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-xl font-bold">
+              {isFallCreek ? <QrCode className="h-6 w-6 text-[#7aba28]" /> : null}
+              Picking de Despacho de Fruta: {movement.clientName}
+            </DialogTitle>
+            <DialogDescription>
+              {isFallCreek 
+                ? `Por favor, escanee los códigos QR de los bins. Total recolectado: ${totalPicked} de ${totalExpected} Bins.`
+                : `Confirme la recolección física de cada artículo y ubicación. Total a retirar: ${totalPicked} ${movement.unit}.`
+              }
+            </DialogDescription>
+          </DialogHeader>
+
+          {/* QR Scanning Controls for Fall Creek */}
+          {isFallCreek && (
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 p-4 bg-muted/40 border border-[#7aba28]/25 rounded-lg shadow-sm">
+              <div className="flex items-center gap-2">
+                <Button 
+                  onClick={() => setIsScannerOpen(true)}
+                  className="bg-[#7aba28] hover:bg-[#6ba323] text-white font-bold h-10 px-4 flex items-center gap-2"
+                >
+                  <Camera className="h-4 w-4" />
+                  Escanear con Cámara
                 </Button>
-                <Button variant="outline" onClick={handleGenerateDTE}>
-                    <Building className="mr-2 h-4 w-4" />
-                    Generar DTE (sim)
+                <Button
+                  variant="outline"
+                  onClick={handleResetScanning}
+                  className="h-10 text-muted-foreground border-dashed flex items-center gap-2"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Limpiar Escaneo
                 </Button>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <Switch
+                  id="physical-scanner-toggle-picking"
+                  checked={usePhysicalScanner}
+                  onCheckedChange={setUsePhysicalScanner}
+                />
+                <Label htmlFor="physical-scanner-toggle-picking" className="text-xs font-bold text-muted-foreground uppercase cursor-pointer select-none">
+                  Pistola / PDA Física
+                </Label>
+              </div>
             </div>
-          <div className="flex gap-2">
-            <DialogClose asChild>
-              <Button type="button" variant="outline">Cancelar</Button>
-            </DialogClose>
-            <Button onClick={handleConfirm} disabled={!allItemsPicked || isConfirming}>
-              {isConfirming ? 'Confirmando...' : 'Confirmar Salida'}
-            </Button>
+          )}
+
+          <div>
+            <ScrollArea className="max-h-96 border rounded-md">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[50px]">
+                      {!isFallCreek && (
+                        <Checkbox
+                            checked={selectAllState}
+                            onCheckedChange={handleSelectAll}
+                            aria-label="Seleccionar todo"
+                        />
+                      )}
+                    </TableHead>
+                    <TableHead>Producto</TableHead>
+                    <TableHead>Ubicación</TableHead>
+                    <TableHead className="text-right w-36">Cantidad a Retirar</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {flatItems.map((item) => {
+                    const progress = quantities[item.compositeKey] ?? 0;
+                    const complete = progress === item.quantity;
+                    const hasScanned = progress > 0;
+
+                    return (
+                      <TableRow key={item.compositeKey} className={complete ? "bg-[#7aba28]/5" : ""}>
+                        <TableCell>
+                           {isFallCreek ? (
+                             complete ? (
+                               <CheckCircle2 className="h-5 w-5 text-[#7aba28]" />
+                             ) : hasScanned ? (
+                               <ScanLine className="h-5 w-5 text-amber-500 animate-pulse" />
+                             ) : (
+                               <QrCode className="h-5 w-5 text-muted-foreground/30" />
+                             )
+                           ) : (
+                             <Checkbox
+                                checked={!!pickedItems[item.compositeKey]}
+                                onCheckedChange={(checked) => handleItemCheck(item.compositeKey, !!checked)}
+                              />
+                           )}
+                        </TableCell>
+                        <TableCell>
+                            <div className="font-semibold text-sm">{item.productName}</div>
+                            <div className="text-xs text-muted-foreground font-mono">{item.clientLotId || 'N/A'}</div>
+                        </TableCell>
+                        <TableCell className="font-mono text-sm">{item.location.chamberId} / {item.location.coordinate}</TableCell>
+                        <TableCell className="text-right font-medium">
+                           {isFallCreek ? (
+                             <div className="text-sm font-semibold">
+                               <span className={complete ? "text-[#7aba28] font-bold" : "text-amber-600"}>{progress}</span>
+                               <span className="text-muted-foreground font-normal"> / {item.quantity} Bins</span>
+                             </div>
+                           ) : (
+                             <Input
+                                  type="number"
+                                  value={quantities[item.compositeKey] ?? ''}
+                                  onChange={(e) => handleQuantityChange(item.compositeKey, item.quantity, e.target.value)}
+                                  max={item.quantity}
+                                  min={0}
+                                  className="h-8 w-24 ml-auto text-right"
+                              />
+                           )}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </ScrollArea>
           </div>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+
+          {/* List of scanned QR codes for Fall Creek */}
+          {isFallCreek && scannedQrCodes.size > 0 && (
+            <div className="space-y-1.5 p-3 bg-muted/20 border border-border rounded-md">
+              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">Códigos QR Escaneados en esta Sesión ({scannedQrCodes.size})</span>
+              <div className="flex flex-wrap gap-1.5 max-h-16 overflow-y-auto">
+                {Array.from(scannedQrCodes).map((code, idx) => (
+                  <Badge key={idx} variant="secondary" className="font-mono text-[9px] px-1.5 py-0.5 bg-background border text-zinc-600">
+                    {code}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <DialogFooter className="sm:justify-between pt-4">
+             <div className="flex gap-2">
+                  <Button variant="outline" onClick={handleGeneratePDF}>
+                      <FileText className="mr-2 h-4 w-4" />
+                      Generar Picking PDF
+                  </Button>
+                  <Button variant="outline" onClick={handleGenerateDTE}>
+                      <Building className="mr-2 h-4 w-4" />
+                      Generar DTE (sim)
+                  </Button>
+              </div>
+            <div className="flex gap-2">
+              <DialogClose asChild>
+                <Button type="button" variant="outline">Cancelar</Button>
+              </DialogClose>
+              <Button onClick={handleConfirm} disabled={!allItemsPicked || isConfirming}>
+                {isConfirming ? 'Confirmando...' : 'Confirmar Salida'}
+              </Button>
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* QR scanner dialog for camera/physical code scanning */}
+      {isFallCreek && (
+        <BarcodeScanner
+          open={isScannerOpen}
+          onOpenChange={setIsScannerOpen}
+          onScan={handleScan}
+          closeOnScan={false}
+          title={`Lector de Bins - Picking Despacho`}
+          description="Escanee los códigos QR de los bins ubicados en las coordenadas indicadas."
+          usePhysicalScanner={usePhysicalScanner}
+          currentCount={totalPicked}
+          totalCount={totalExpected}
+        />
+      )}
+    </>
   );
 }

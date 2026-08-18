@@ -395,6 +395,7 @@ export function OtherFruitPickingTab() {
           onOpenChange={(open) => !open && setPickingMovement(null)}
           onConfirmExit={handleConfirmFruitExit}
           isConfirming={isConfirming}
+          otherFruitReceptions={otherFruitReceptions || []}
         />
       )}
        {pickingMovement?.taskType === 'packaging' && (
