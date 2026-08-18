@@ -371,6 +371,7 @@ export interface OtherFruitMovement {
   document?: string;
   destinationClientName?: string;
   destinationClientRUT?: string;
+  destinationClientId?: string;
   items: {
     productCode: string;
     productName: string;

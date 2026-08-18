@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useFirestore } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
-import { doc, writeBatch, serverTimestamp, deleteDoc } from 'firebase/firestore';
+import { doc, collection, writeBatch, serverTimestamp, deleteDoc } from 'firebase/firestore';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { OtherFruitPickingDialog } from './OtherFruitPickingDialog';
@@ -151,6 +151,34 @@ export function OtherFruitPickingTab() {
         receptionUpdates.forEach(update => {
             batch.update(update.ref, { items: update.items, updatedAt: serverTimestamp() });
         });
+
+        const isFallCreek = confirmedMovement.clientName?.toUpperCase() === 'FALL CREEK' || confirmedMovement.clientId === '76361536-7';
+        if (isFallCreek && confirmedMovement.destinationClientId) {
+            const totalBins = confirmedMovement.items.reduce((sum, item) => sum + item.quantity, 0);
+            if (totalBins > 0) {
+                const binMovementRef = doc(collection(firestore, 'binMaterialMovements'));
+                const binMovementData = {
+                    type: 'salida',
+                    document: confirmedMovement.document || '',
+                    driverName: '',
+                    driverRUT: '',
+                    patente_vehiculo: '',
+                    exporterId: 'EXP005',
+                    producerId: confirmedMovement.destinationClientId,
+                    items: [
+                        {
+                            binMaterialId: 'C6hVKlGF375OxDvoe9l7',
+                            binMaterialCode: '10017',
+                            binMaterialName: 'BINS_PALOGIX',
+                            quantity: totalBins
+                        }
+                    ],
+                    observation: `Despacho automático desde Fall Creek (Confirmación de Picking)`,
+                    createdAt: serverTimestamp()
+                };
+                batch.set(binMovementRef, binMovementData);
+            }
+        }
         
         await batch.commit();
         toast({ title: 'Éxito', description: 'Salida de fruta confirmada y stock actualizado.' });

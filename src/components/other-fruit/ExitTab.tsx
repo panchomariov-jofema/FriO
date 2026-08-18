@@ -554,6 +554,7 @@ export function OtherFruitExitTab({ clientId: fixedClientId }: { clientId?: stri
             document: document,
             destinationClientName: (selectedSubClient ? selectedSubClient.name : null) as any,
             destinationClientRUT: (selectedSubClient ? selectedSubClient.rut : null) as any,
+            destinationClientId: (selectedSubClient ? selectedSubClientId : null) as any,
             items: movementItems,
             locations: movementLocations,
             createdAt: serverTimestamp() as any,
@@ -564,33 +565,6 @@ export function OtherFruitExitTab({ clientId: fixedClientId }: { clientId?: stri
         if (hasRealWrites) {
             const movementRef = doc(collection(firestore, 'otherFruitMovements'));
             batch.set(movementRef, movementData);
-
-            if (isFallCreekClient(selectedClientId) && selectedSubClientId) {
-                const totalBins = movementItems.reduce((sum, item) => sum + item.quantity, 0);
-                if (totalBins > 0) {
-                    const binMovementRef = doc(collection(firestore, 'binMaterialMovements'));
-                    const binMovementData = {
-                        type: 'salida',
-                        document: document,
-                        driverName: '',
-                        driverRUT: '',
-                        patente_vehiculo: '',
-                        exporterId: 'EXP005',
-                        producerId: selectedSubClientId,
-                        items: [
-                            {
-                                binMaterialId: 'C6hVKlGF375OxDvoe9l7',
-                                binMaterialCode: '10017',
-                                binMaterialName: 'BINS_PALOGIX',
-                                quantity: totalBins
-                            }
-                        ],
-                        observation: `Despacho automático desde Fall Creek`,
-                        createdAt: serverTimestamp()
-                    };
-                    batch.set(binMovementRef, binMovementData);
-                }
-            }
 
             await batch.commit();
         } else {
