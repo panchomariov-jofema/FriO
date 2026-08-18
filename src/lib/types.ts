@@ -463,6 +463,7 @@ export type StoredItem = {
   document?: string;
   documentNumber?: string;
   palletId?: string;
+  containerId?: string;
   storedAt?: any;
 }
 

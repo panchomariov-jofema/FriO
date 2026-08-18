@@ -425,6 +425,7 @@ export default function FallCreekPage() {
                     document: reception.document,
                     documentNumber: reception.documentNumber,
                     palletId: item.palletId,
+                    containerId: item.containerId,
                     storedAt: item.storedAt || reception.createdAt,
                 }))
             );
@@ -1234,6 +1235,7 @@ export default function FallCreekPage() {
                                                                                                 <p className="text-muted-foreground mt-0.5">{item.varietyOrProduct}</p>
                                                                                                 {item.clientLotId && <p className="text-muted-foreground font-mono text-[9px]">Lote: {item.clientLotId}</p>}
                                                                                                 {item.palletId && <p className="text-muted-foreground font-mono text-[9px]">Pallet ID: {item.palletId}</p>}
+                                                                                                {item.containerId && <p className="text-muted-foreground font-mono text-[9px] text-[#7aba28]">Código QR: {item.containerId}</p>}
                                                                                                 {item.observation && <p className="text-muted-foreground italic text-[10px] mt-0.5">Obs: {item.observation}</p>}
                                                                                             </div>
                                                                                         ))}
@@ -1246,6 +1248,7 @@ export default function FallCreekPage() {
                                                                                             <p><span className="font-semibold">Cliente:</span> {firstItem.ownerName}</p>
                                                                                             <p><span className="font-semibold">Pallet Log:</span> {firstItem.document || '-'}</p>
                                                                                             <p><span className="font-semibold">Pallet ID:</span> <span className="font-mono">{uniquePalletIds.join(', ') || '-'}</span></p>
+                                                                                            {firstItem.containerId && <p><span className="font-semibold">Código QR:</span> <span className="font-mono text-[#7aba28]">{firstItem.containerId}</span></p>}
                                                                                             <p><span className="font-semibold">Variedad:</span> {firstItem.varietyOrProduct}</p>
                                                                                             <p><span className="font-semibold">Documento:</span> {firstItem.documentNumber || '-'}</p>
                                                                                             {firstItem.observation && (
@@ -1463,6 +1466,7 @@ export default function FallCreekPage() {
                                                     <TableHead>Fecha Almacenamiento</TableHead>
                                                     <TableHead>Pallet Log (Documento)</TableHead>
                                                     <TableHead>Pallet ID</TableHead>
+                                                    <TableHead>Código QR (Bin)</TableHead>
                                                     <TableHead>Lote Cliente</TableHead>
                                                     <TableHead>Variedad</TableHead>
                                                     <TableHead>Cámara</TableHead>
@@ -1482,6 +1486,7 @@ export default function FallCreekPage() {
                                                                 <TableCell>{storedDate}</TableCell>
                                                                 <TableCell className="font-mono text-xs">{item.document || '-'}</TableCell>
                                                                 <TableCell className="font-mono text-xs font-bold">{item.palletId || '-'}</TableCell>
+                                                                <TableCell className="font-mono text-xs text-[#7aba28] font-semibold">{item.containerId || '-'}</TableCell>
                                                                 <TableCell className="font-mono text-xs">{item.clientLotId || '-'}</TableCell>
                                                                 <TableCell>{item.varietyOrProduct}</TableCell>
                                                                 <TableCell>{chambersConfig[item.chamberId]?.name || item.chamberId}</TableCell>
@@ -1503,7 +1508,7 @@ export default function FallCreekPage() {
                                                     })
                                                 ) : (
                                                     <TableRow>
-                                                        <TableCell colSpan={9} className="h-24 text-center text-muted-foreground">
+                                                        <TableCell colSpan={10} className="h-24 text-center text-muted-foreground">
                                                             No se encontraron pallets o bins con los criterios ingresados.
                                                         </TableCell>
                                                     </TableRow>

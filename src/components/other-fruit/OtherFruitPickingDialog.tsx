@@ -162,7 +162,7 @@ export function OtherFruitPickingDialog({
 
     const palletId = matchedBin.palletId || 'Loose';
 
-    // Find target picking item matching variety/product code and chamber/coordinate
+    // Find if the variety/coordinate is requested at all
     const targetItem = flatItems.find(item => 
       item.productCode === matchedBin.productCode && 
       item.location.chamberId === matchedBin.storageLocation?.chamberId &&
@@ -178,12 +178,27 @@ export function OtherFruitPickingDialog({
       return;
     }
 
-    const compositeKey = targetItem.compositeKey;
-    const currentQty = quantities[compositeKey] ?? 0;
-    const targetQty = targetItem.quantity;
-    const remainingQty = targetQty - currentQty;
+    // Calculate how many bins of this pallet are currently stored in this chamber coordinate
+    const binsInChamberForPallet = storedBins.filter(b => 
+      b.palletId === palletId && 
+      b.storageLocation?.chamberId === matchedBin.storageLocation?.chamberId &&
+      b.storageLocation?.coordinate === matchedBin.storageLocation?.coordinate
+    );
+    const totalStoredInPallet = binsInChamberForPallet.length;
 
-    if (remainingQty <= 0) {
+    // Find all items of this variety/coordinate in the dispatch
+    const locItems = flatItems.filter(item => 
+      item.productCode === matchedBin.productCode && 
+      item.location.chamberId === matchedBin.storageLocation?.chamberId &&
+      item.location.coordinate === matchedBin.storageLocation?.coordinate
+    );
+
+    // Calculate total remaining bins to be picked for this variety/coordinate
+    const totalRemainingForLoc = locItems.reduce((sum, item) => 
+      sum + (item.quantity - (quantities[item.compositeKey] ?? 0)), 0
+    );
+
+    if (totalRemainingForLoc <= 0) {
       toast({
         title: "Ubicación completa",
         description: `Ya se ha escaneado la cantidad requerida para la ubicación ${targetItem.location.chamberId} / ${targetItem.location.coordinate}.`
@@ -191,22 +206,35 @@ export function OtherFruitPickingDialog({
       return;
     }
 
-    // Apply the smart scanning rule
+    // Decide if we apply the smart pallet scan (auto-confirm 3 bins)
+    const isPalletAlreadyScanned = palletId !== 'Loose' && scannedPallets.has(palletId);
+    const canAutoConfirmPallet = palletId !== 'Loose' && !isPalletAlreadyScanned && totalStoredInPallet === 3 && totalRemainingForLoc >= 3;
+
     let confirmedCount = 1;
     let autoConfirmedMsg = "";
-    
-    if (palletId !== 'Loose') {
-      const isPalletAlreadyScanned = scannedPallets.has(palletId);
-      if (!isPalletAlreadyScanned && remainingQty >= 3) {
-        confirmedCount = 3;
-        autoConfirmedMsg = " (Pallet completo - Auto-confirmado 3 bins)";
+
+    if (canAutoConfirmPallet) {
+      confirmedCount = 3;
+      autoConfirmedMsg = " (Pallet completo - Auto-confirmado 3 bins)";
+    }
+
+    // Distribute the confirmedCount across the items that still need picking
+    let remainingToDistribute = confirmedCount;
+    const updatedQuantities = { ...quantities };
+
+    for (const item of locItems) {
+      if (remainingToDistribute <= 0) break;
+      const currentQty = updatedQuantities[item.compositeKey] ?? 0;
+      const needed = item.quantity - currentQty;
+      if (needed > 0) {
+        const toAdd = Math.min(needed, remainingToDistribute);
+        updatedQuantities[item.compositeKey] = currentQty + toAdd;
+        remainingToDistribute -= toAdd;
       }
     }
 
-    setQuantities(prev => ({
-      ...prev,
-      [compositeKey]: Math.min(targetQty, (prev[compositeKey] ?? 0) + confirmedCount)
-    }));
+    // Update state
+    setQuantities(updatedQuantities);
 
     setScannedQrCodes(prev => {
       const next = new Set(prev);
@@ -224,7 +252,7 @@ export function OtherFruitPickingDialog({
 
     toast({
       title: "Bin Escaneado",
-      description: `Se confirmó ${confirmedCount} bin(s) de la variedad ${targetItem.productName}${autoConfirmedMsg}.`,
+      description: `Se confirmó ${confirmedCount} bin(s) de la variedad ${locItems[0]?.productName || ''}${autoConfirmedMsg}.`,
     });
   };
 
@@ -517,6 +545,26 @@ export function OtherFruitPickingDialog({
                         <TableCell>
                             <div className="font-semibold text-sm">{item.productName}</div>
                             <div className="text-xs text-muted-foreground font-mono">{item.clientLotId || 'N/A'}</div>
+                            {isFallCreek && (() => {
+                              const validBinsInThisLoc = storedBins.filter(b => 
+                                b.productCode === item.productCode && 
+                                b.storageLocation?.chamberId === item.location.chamberId && 
+                                b.storageLocation?.coordinate === item.location.coordinate
+                              );
+                              if (validBinsInThisLoc.length === 0) return null;
+                              return (
+                                <div className="mt-1 text-[10px] text-muted-foreground/80 max-w-xs font-mono">
+                                  <span className="font-bold text-[9px] text-[#7aba28]/95 block mb-0.5">QRs en esta ubicación:</span>
+                                  <div className="flex flex-wrap gap-1">
+                                    {validBinsInThisLoc.map((bin, bIdx) => (
+                                      <span key={bIdx} className="bg-muted px-1.5 py-0.5 rounded text-[9px] border border-muted-foreground/15 text-zinc-700">
+                                        {bin.containerId} ({bin.palletId || 'Suelto'})
+                                      </span>
+                                    ))}
+                                  </div>
+                                </div>
+                              );
+                            })()}
                         </TableCell>
                         <TableCell className="font-mono text-sm">{item.location.chamberId} / {item.location.coordinate}</TableCell>
                         <TableCell className="text-right font-medium">
