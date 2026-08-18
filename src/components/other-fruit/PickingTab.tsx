@@ -110,6 +110,66 @@ export function OtherFruitPickingTab() {
     doc.setFontSize(12);
     doc.text(`Total a Retirar: ${totalPallets} pallets`, 14, finalY + 10);
     
+  };
+
+  const handleGeneratePdfForFruit = (mov: OtherFruitMovement) => {
+    // Find all stored bins matching this dispatch's coordinates
+    const locCoords = new Set((mov.locations || []).map(l => `${l.location.chamberId}_${l.location.coordinate}`));
+    const matchedStoredBins = (otherFruitReceptions || []).flatMap(r => 
+        (r.items || []).map((item, idx) => ({ ...item, receptionId: r.id, itemIndex: idx }))
+    ).filter(item => 
+        item.status === 'Almacenado' && 
+        item.storageLocation && 
+        locCoords.has(`${item.storageLocation.chamberId}_${item.storageLocation.coordinate}`)
+    );
+
+    const doc = new jsPDF();
+    
+    doc.setFontSize(18);
+    doc.text(`Picking de Despacho de Fruta: ${mov.clientName}`, 14, 22);
+
+    doc.setFontSize(11);
+    doc.setTextColor(100);
+    doc.text(`Confirme la recolección física y verifique los códigos QR indicados.`, 14, 30);
+    
+    const tableData = (mov.locations || []).map(loc => {
+      // Find QRs in this coordinate
+      const validBinsInThisLoc = matchedStoredBins.filter(b => 
+        b.productCode === loc.productCode && 
+        b.storageLocation?.chamberId === loc.location.chamberId && 
+        b.storageLocation?.coordinate === loc.location.coordinate
+      );
+      
+      const qrsString = validBinsInThisLoc.map(b => `${b.containerId} (${b.palletId || 'Suelto'})`).join('\n') || 'N/A';
+      
+      return [
+        loc.productName,
+        loc.clientLotId || 'N/A',
+        `${loc.location.chamberId} / ${loc.location.coordinate}`,
+        loc.quantity,
+        qrsString
+      ];
+    });
+    
+    const tableHeaders = [['Producto', 'Lote Cliente', 'Ubicación', 'Cantidad a Retirar', 'Códigos QR / Bins en Ubicación']];
+
+    (doc as any).autoTable({
+      startY: 35,
+      head: tableHeaders,
+      body: tableData,
+      theme: 'grid',
+      headStyles: { fillColor: [22, 163, 74] },
+      columnStyles: {
+        4: { fontStyle: 'bold', textColor: [22, 163, 74] } // style for QR codes column
+      }
+    });
+    
+    const totalBins = (mov.locations || []).reduce((sum, item) => sum + item.quantity, 0);
+    const finalY = (doc as any).lastAutoTable.finalY;
+    
+    doc.setFontSize(12);
+    doc.text(`Total a Retirar: ${totalBins} bins`, 14, finalY + 10);
+    
     doc.output('dataurlnewwindow');
   };
 
@@ -334,6 +394,12 @@ export function OtherFruitPickingTab() {
                                             PDF
                                         </Button>
                                     )}
+                                    {mov.taskType === 'fruit' && (
+                                        <Button variant="outline" size="sm" onClick={() => handleGeneratePdfForFruit(mov as OtherFruitMovement)}>
+                                            <FileText className="mr-2 h-4 w-4" />
+                                            PDF
+                                        </Button>
+                                    )}
                                     <Button size="lg" onClick={() => handleStartPicking(mov)}>Hacer Picking</Button>
                                   </div>
                               </div>
@@ -385,6 +451,12 @@ export function OtherFruitPickingTab() {
                             <div className="flex items-center justify-end gap-2">
                                 {mov.taskType === 'packaging' && (
                                     <Button variant="outline" size="sm" onClick={() => handleGeneratePdfForPackaging(mov as PackagingMovement)}>
+                                        <FileText className="mr-2 h-4 w-4" />
+                                        PDF
+                                    </Button>
+                                )}
+                                {mov.taskType === 'fruit' && (
+                                    <Button variant="outline" size="sm" onClick={() => handleGeneratePdfForFruit(mov as OtherFruitMovement)}>
                                         <FileText className="mr-2 h-4 w-4" />
                                         PDF
                                     </Button>
