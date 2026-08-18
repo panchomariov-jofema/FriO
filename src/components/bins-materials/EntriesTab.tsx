@@ -166,13 +166,14 @@ export function EntriesTab({ exporterId, exporterName, producerId, isDirectDispa
     try {
       await runTransaction(firestore, async (transaction) => {
         const movementRef = doc(collection(firestore, 'binMaterialMovements'));
+        const finalExporterId = exporterId === 'EXP004' ? 'EXP005' : exporterId;
         const movementData: Partial<BinMaterialMovement> & { createdAt: any, type: 'entrada', items: any[] } = {
           type: 'entrada' as const,
           document: values.document,
           driverName: values.driverName || '',
           driverRUT: values.driverRUT || '',
           packingId: values.packingId || null,
-          exporterId,
+          exporterId: finalExporterId,
           producerId,
           items: itemsToProcess,
           createdAt: serverTimestamp() as any,

@@ -20,7 +20,9 @@ export function useBinMaterialsByExporter(exporterId: string | null) {
     setLoading(true);
     
     const materialsRef = collection(firestore, 'binMaterials');
-    const q = query(materialsRef, where('exporterId', '==', exporterId));
+    const q = exporterId === 'EXP004'
+      ? query(materialsRef, where('exporterId', 'in', ['EXP004', 'EXP005']))
+      : query(materialsRef, where('exporterId', '==', exporterId));
     
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
       const items: BinMaterial[] = [];

@@ -78,7 +78,12 @@ export function StockTab({ exporterId }: StockTabProps) {
 
     const addToAggregation = (expId: string, code: string, name: string, qty: number) => {
         // Apply filter by exporterId if present
-        if (exporterId && expId !== exporterId) return;
+        let targetExporterId = exporterId;
+        if (exporterId === 'EXP004' && expId === 'EXP005' && ['10017', '10016', '10018', '10019'].includes(code)) {
+            // For Fall Creek, allow displaying FÑO arriendo materials under its tab
+            targetExporterId = 'EXP005';
+        }
+        if (targetExporterId && expId !== targetExporterId) return;
         if (!activeExporterIds.has(expId)) return;
         
         const key = `${expId}_${code}`;

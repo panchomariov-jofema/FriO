@@ -248,13 +248,14 @@ export function ExitsTab({ exporterId, exporterName, producerId }: ExitsTabProps
       await runTransaction(firestore, async (transaction) => {
         // Create BinMaterialMovement
         const movementRef = doc(collection(firestore, 'binMaterialMovements'));
+        const finalExporterId = exporterId === 'EXP004' ? 'EXP005' : exporterId;
         const movementData = {
           type: 'salida' as const,
           document: values.document,
           driverName: values.driverName || '',
           driverRUT: values.driverRUT || '',
           patente_vehiculo: values.patente_vehiculo || '',
-          exporterId,
+          exporterId: finalExporterId,
           producerId,
           items: itemsToProcess,
           createdAt: serverTimestamp(),
