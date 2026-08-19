@@ -19,7 +19,6 @@ import { Label } from '../ui/label';
 import { Badge } from '../ui/badge';
 import { OtherFruitMovement, OtherFruitMovementLocation, OtherFruitReception } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
-import { BarcodeScanner } from '../BarcodeScanner';
 
 interface OtherFruitPickingDialogProps {
   movement: OtherFruitMovement | null;
@@ -50,9 +49,6 @@ export function OtherFruitPickingDialog({
   const [barcodeInput, setBarcodeInput] = React.useState('');
   const [scannedQrCodes, setScannedQrCodes] = React.useState<Set<string>>(new Set());
   const [scannedPallets, setScannedPallets] = React.useState<Set<string>>(new Set());
-  
-  const [isScannerOpen, setIsScannerOpen] = React.useState(false);
-  
   const inputRef = React.useRef<HTMLInputElement>(null);
 
   const isFallCreek = React.useMemo(() => {
@@ -353,8 +349,7 @@ export function OtherFruitPickingDialog({
   const totalExpected = flatItems.reduce((sum, item) => sum + item.quantity, 0);
 
   return (
-    <>
-      <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md md:max-w-xl max-h-[92vh] overflow-y-auto p-4 sm:p-6" onClick={() => isFallCreek && inputRef.current?.focus()}>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-xl font-bold">
@@ -399,27 +394,18 @@ export function OtherFruitPickingDialog({
                 Reiniciar Escaneo
               </Button>
             </div>
-            <div className="flex gap-2">
-              <Input
-                id="laser-scanner-input"
-                ref={inputRef}
-                placeholder="Escanee un código QR aquí..."
-                value={barcodeInput}
-                onChange={(e) => setBarcodeInput(e.target.value)}
-                onClick={() => setIsScannerOpen(true)}
-                className="h-11 font-mono text-sm uppercase tracking-widest border-[#7aba28]/35 focus-visible:ring-[#7aba28] bg-background flex-1"
-                autoFocus
-                autoComplete="off"
-              />
-              <Button
-                type="button"
-                onClick={() => setIsScannerOpen(true)}
-                className="h-11 px-4 bg-[#7aba28] hover:bg-[#6b9f23] text-white flex items-center gap-2"
-              >
-                <QrCode className="h-5 w-5" />
-                Cámara
-              </Button>
-            </div>
+            <Input
+              id="laser-scanner-input"
+              ref={inputRef}
+              placeholder="Escanee un código QR aquí con el lector láser..."
+              value={barcodeInput}
+              onChange={(e) => setBarcodeInput(e.target.value)}
+              onClick={(e) => e.currentTarget.focus()}
+              inputMode="none"
+              className="h-11 font-mono text-sm uppercase tracking-widest border-[#7aba28]/35 focus-visible:ring-[#7aba28] bg-background w-full"
+              autoFocus
+              autoComplete="off"
+            />
           </form>
         )}
 
@@ -521,14 +507,5 @@ export function OtherFruitPickingDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
-    
-    <BarcodeScanner
-      open={isScannerOpen}
-      onOpenChange={setIsScannerOpen}
-      onScan={handleScan}
-      title="Escanear QR de Bins (Fall Creek)"
-      description="Enfoque el código QR del bin con la cámara de su celular."
-    />
-    </>
   );
 }
