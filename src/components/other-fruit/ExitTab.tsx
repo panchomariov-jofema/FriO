@@ -34,6 +34,7 @@ interface AggregatedLot {
     receptionId: string;
     itemIndex: number;
     coordinate: string;
+    chamberId?: string;
     quantity: number;
     observation?: string;
     productName: string;
@@ -56,6 +57,7 @@ const isFallCreekClient = (id: string) => id === 'EXP004' || id === '76361536-7'
 export function OtherFruitExitTab({ clientId: fixedClientId }: { clientId?: string }) {
   const { data: allClients, loading: loadingClients } = useFirestoreCollection<OtherClient>('otherClients');
   const { data: allReceptions, loading: loadingReceptions } = useFirestoreCollection<OtherFruitReception>('otherFruitReceptions');
+  const { data: allMovements, loading: loadingMovements } = useFirestoreCollection<OtherFruitMovement>('otherFruitMovements');
   const { data: allProducers } = useFirestoreCollection<Producer>('producers');
   const firestore = useFirestore();
   const { toast } = useToast();
@@ -124,7 +126,7 @@ export function OtherFruitExitTab({ clientId: fixedClientId }: { clientId?: stri
 
     return rawClients.filter(c => clientsWithStock.has(c.clientId));
   }, [clients, receptions]);
-  const loading = loadingClients || loadingReceptions;
+  const loading = loadingClients || loadingReceptions || loadingMovements;
   
   React.useEffect(() => {
     if (fixedClientId) {
@@ -140,6 +142,18 @@ export function OtherFruitExitTab({ clientId: fixedClientId }: { clientId?: stri
   const aggregatedStockByLot = React.useMemo(() => {
     if (!selectedClientId || !receptions) return [];
 
+    // Calculate reserved quantities for pending dispatches
+    const pendingExits = (allMovements || []).filter(
+      m => m.type === 'salida' && m.status === 'Pendiente de Picking'
+    );
+    const reservedMap = new Map<string, number>();
+    pendingExits.forEach(mov => {
+      (mov.locations || []).forEach(loc => {
+        const key = `${loc.receptionId}_${loc.itemIndex}`;
+        reservedMap.set(key, (reservedMap.get(key) || 0) + loc.quantity);
+      });
+    });
+
     const lotMap = new Map<string, AggregatedLot>();
 
     receptions.forEach(reception => {
@@ -150,6 +164,10 @@ export function OtherFruitExitTab({ clientId: fixedClientId }: { clientId?: stri
 
       (reception.items || []).forEach((item, index) => {
         if (item && item.status === 'Almacenado' && item.quantity > 0 && item.storageLocation?.coordinate) {
+          const reservedQty = reservedMap.get(`${reception.id}_${index}`) || 0;
+          const availableQty = item.quantity - reservedQty;
+          if (availableQty <= 0) return;
+
           let displayKey = '';
           let varietyName = '';
 
@@ -173,12 +191,13 @@ export function OtherFruitExitTab({ clientId: fixedClientId }: { clientId?: stri
           }
 
           const lot = lotMap.get(displayKey)!;
-          lot.totalQuantity += item.quantity;
+          lot.totalQuantity += availableQty;
           lot.locations.push({
             receptionId: reception.id,
             itemIndex: index,
             coordinate: item.storageLocation.coordinate,
-            quantity: item.quantity,
+            chamberId: item.storageLocation.chamberId || '',
+            quantity: availableQty,
             observation: item.observation,
             productName: item.productName,
             productCode: item.productCode,
@@ -190,9 +209,15 @@ export function OtherFruitExitTab({ clientId: fixedClientId }: { clientId?: stri
 
     const result = Array.from(lotMap.values()).filter(lot => lot.totalQuantity > 0);
 
-    // Sort locations in each lot by FIFO (oldest reception first)
+    // Sort locations in each lot by Chamber, Coordinate, then FIFO
     result.forEach(lot => {
       lot.locations.sort((a, b) => {
+        const chamberCompare = (a.chamberId || '').localeCompare(b.chamberId || '');
+        if (chamberCompare !== 0) return chamberCompare;
+
+        const coordCompare = (a.coordinate || '').localeCompare(b.coordinate || '', undefined, { numeric: true, sensitivity: 'base' });
+        if (coordCompare !== 0) return coordCompare;
+
         const recA = receptions.find(r => r.id === a.receptionId);
         const recB = receptions.find(r => r.id === b.receptionId);
         const timeA = recA?.createdAt ? safeToMillis(recA.createdAt) : 0;
@@ -202,7 +227,7 @@ export function OtherFruitExitTab({ clientId: fixedClientId }: { clientId?: stri
     });
 
     return result;
-  }, [selectedClientId, receptions]);
+  }, [selectedClientId, receptions, allMovements]);
   
   const filteredLots = React.useMemo(() => {
     let lots = [];
@@ -259,6 +284,18 @@ export function OtherFruitExitTab({ clientId: fixedClientId }: { clientId?: stri
   const fallCreekGroups = React.useMemo(() => {
     if (!selectedClientId || !isFallCreekClient(selectedClientId) || !receptions) return [];
 
+    // Calculate reserved quantities for pending dispatches
+    const pendingExits = (allMovements || []).filter(
+      m => m.type === 'salida' && m.status === 'Pendiente de Picking'
+    );
+    const reservedMap = new Map<string, number>();
+    pendingExits.forEach(mov => {
+      (mov.locations || []).forEach(loc => {
+        const key = `${loc.receptionId}_${loc.itemIndex}`;
+        reservedMap.set(key, (reservedMap.get(key) || 0) + loc.quantity);
+      });
+    });
+
     const varietyMap = new Map<string, {
       varietyName: string;
       totalQuantity: number;
@@ -288,6 +325,10 @@ export function OtherFruitExitTab({ clientId: fixedClientId }: { clientId?: stri
 
       (reception.items || []).forEach((item, index) => {
         if (item && item.status === 'Almacenado' && item.quantity > 0 && item.storageLocation?.coordinate) {
+          const reservedQty = reservedMap.get(`${reception.id}_${index}`) || 0;
+          const availableQty = item.quantity - reservedQty;
+          if (availableQty <= 0) return;
+
           const varietyName = cleanVarietyName(item.productName);
           const clientLotId = item.clientLotId || 'Sin Lote';
 
@@ -301,7 +342,7 @@ export function OtherFruitExitTab({ clientId: fixedClientId }: { clientId?: stri
           }
 
           const varietyGroup = varietyMap.get(varietyName)!;
-          varietyGroup.totalQuantity += item.quantity;
+          varietyGroup.totalQuantity += availableQty;
 
           if (!varietyGroup.lotsMap.has(clientLotId)) {
             varietyGroup.lotsMap.set(clientLotId, {
@@ -313,7 +354,7 @@ export function OtherFruitExitTab({ clientId: fixedClientId }: { clientId?: stri
           }
 
           const lotGroup = varietyGroup.lotsMap.get(clientLotId)!;
-          lotGroup.totalQuantity += item.quantity;
+          lotGroup.totalQuantity += availableQty;
           
           const recTime = reception.createdAt ? safeToMillis(reception.createdAt) : 0;
           if (recTime > 0 && recTime < lotGroup.fifoTime) {
@@ -325,7 +366,7 @@ export function OtherFruitExitTab({ clientId: fixedClientId }: { clientId?: stri
             itemIndex: index,
             coordinate: item.storageLocation.coordinate,
             chamberId: item.storageLocation.chamberId || '',
-            quantity: item.quantity,
+            quantity: availableQty,
             productName: cleanVarietyName(item.productName),
             productCode: item.productCode,
             receptionDate: formatLocaleDateString(reception.createdAt),
@@ -338,8 +379,14 @@ export function OtherFruitExitTab({ clientId: fixedClientId }: { clientId?: stri
     const sortedVarieties = Array.from(varietyMap.values()).map(varGroup => {
       // Sort lots by FIFO (oldest reception first)
       const sortedLots = Array.from(varGroup.lotsMap.values()).map(lot => {
-        // Sort locations within the lot by FIFO (oldest reception first)
+        // Sort locations within the lot by Chamber, Coordinate, then FIFO
         lot.locations.sort((a, b) => {
+          const chamberCompare = (a.chamberId || '').localeCompare(b.chamberId || '');
+          if (chamberCompare !== 0) return chamberCompare;
+
+          const coordCompare = (a.coordinate || '').localeCompare(b.coordinate || '', undefined, { numeric: true, sensitivity: 'base' });
+          if (coordCompare !== 0) return coordCompare;
+
           const recA = receptions.find(r => r.id === a.receptionId);
           const recB = receptions.find(r => r.id === b.receptionId);
           const timeA = recA?.createdAt ? safeToMillis(recA.createdAt) : 0;
@@ -367,7 +414,7 @@ export function OtherFruitExitTab({ clientId: fixedClientId }: { clientId?: stri
     });
 
     return sortedVarieties;
-  }, [selectedClientId, receptions]);
+  }, [selectedClientId, receptions, allMovements]);
 
   const filteredFallCreekGroups = React.useMemo(() => {
     if (!lotFilter) return fallCreekGroups;

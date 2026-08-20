@@ -20,7 +20,15 @@ import { z } from 'zod';
 import { DispatchPickingDialog } from '../dispatch/DispatchPickingDialog';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
-import { FileText } from 'lucide-react';
+import { FileText, Trash2 } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog';
 
 type ExitFormValues = z.infer<typeof packagingExitSchema>;
 
@@ -38,7 +46,9 @@ export function OtherFruitPickingTab() {
   const { toast } = useToast();
 
   const [pickingMovement, setPickingMovement] = React.useState<ConsolidatedMovement | null>(null);
+  const [deleteMovement, setDeleteMovement] = React.useState<ConsolidatedMovement | null>(null);
   const [isConfirming, setIsConfirming] = React.useState(false);
+  const [isDeleting, setIsDeleting] = React.useState(false);
 
   const pendingMovements = React.useMemo((): ConsolidatedMovement[] => {
     const fruitTasks: ConsolidatedMovement[] = (otherFruitMovements || [])
@@ -352,6 +362,27 @@ export function OtherFruitPickingTab() {
     }
   };
 
+  const handleConfirmDelete = async () => {
+    if (!deleteMovement || !firestore) return;
+    setIsDeleting(true);
+    try {
+      if (deleteMovement.taskType === 'fruit') {
+        await deleteDoc(doc(firestore, 'otherFruitMovements', deleteMovement.id));
+      } else if (deleteMovement.taskType === 'packaging') {
+        await deleteDoc(doc(firestore, 'packagingMovements', deleteMovement.id));
+      } else if (deleteMovement.taskType === 'producerFruit') {
+        await deleteDoc(doc(firestore, 'dispatches', deleteMovement.id));
+      }
+      toast({ title: 'Éxito', description: 'El picking de despacho ha sido eliminado correctamente.' });
+      setDeleteMovement(null);
+    } catch (e: any) {
+      console.error("Error deleting picking:", e);
+      toast({ variant: 'destructive', title: 'Error', description: 'No se pudo eliminar el picking de despacho.' });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
 
   const loading = loadingFruitMovements || loadingPackagingMovements || loadingPackagingReceptions || loadingOtherFruitReceptions || loadingClients || loadingDispatches || loadingChamberLots;
 
@@ -375,7 +406,7 @@ export function OtherFruitPickingTab() {
                      const typeLabel = mov.taskType === 'fruit' ? 'Fruta (Socio)' : mov.taskType === 'packaging' ? 'Embalaje' : 'Fruta (Productor)';
 
                       return (
-                          <Card key={mov.id} className="p-4">
+                          <Card key={mov.id} className="p-4 flex flex-col gap-3">
                               <div className="flex justify-between items-start gap-4">
                                   <div>
                                       <CardTitle className="text-lg">{clientName}</CardTitle>
@@ -402,6 +433,17 @@ export function OtherFruitPickingTab() {
                                     )}
                                     <Button size="lg" onClick={() => handleStartPicking(mov)}>Hacer Picking</Button>
                                   </div>
+                              </div>
+                              <div className="border-t pt-2 flex justify-between items-center">
+                                  <Button 
+                                    variant="ghost" 
+                                    size="sm" 
+                                    onClick={() => setDeleteMovement(mov)}
+                                    className="text-destructive hover:bg-destructive/10 hover:text-destructive px-2 h-8 text-xs font-semibold flex items-center gap-1.5"
+                                  >
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                      Eliminar Picking
+                                  </Button>
                               </div>
                           </Card>
                       )
@@ -449,6 +491,15 @@ export function OtherFruitPickingTab() {
                           <TableCell><Badge variant="secondary">{mov.status}</Badge></TableCell>
                           <TableCell className="text-right">
                             <div className="flex items-center justify-end gap-2">
+                                <Button 
+                                  variant="outline" 
+                                  size="sm" 
+                                  onClick={() => setDeleteMovement(mov)}
+                                  className="text-destructive border-destructive hover:bg-destructive/10 mr-auto"
+                                  title="Eliminar solicitud de picking"
+                                >
+                                    <Trash2 className="h-4 w-4" />
+                                </Button>
                                 {mov.taskType === 'packaging' && (
                                     <Button variant="outline" size="sm" onClick={() => handleGeneratePdfForPackaging(mov as PackagingMovement)}>
                                         <FileText className="mr-2 h-4 w-4" />
@@ -508,6 +559,39 @@ export function OtherFruitPickingTab() {
           clientName={clientMap[pickingMovement.clientId] || ''}
         />
       )}
+
+      <Dialog open={!!deleteMovement} onOpenChange={(open) => !open && setDeleteMovement(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-red-600 flex items-center gap-2">
+              <Trash2 className="h-5 w-5" />
+              ¿Eliminar Picking de Despacho?
+            </DialogTitle>
+            <DialogDescription className="pt-2 text-zinc-600">
+              Esta acción eliminará de forma permanente esta solicitud de picking. 
+              El stock y las coordenadas reservadas para este despacho volverán a estar disponibles de inmediato en la oficina.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex gap-2 mt-4">
+            <Button 
+              variant="outline" 
+              onClick={() => setDeleteMovement(null)} 
+              disabled={isDeleting}
+              className="flex-1"
+            >
+              Cancelar
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={handleConfirmDelete} 
+              disabled={isDeleting}
+              className="flex-1 bg-red-600 hover:bg-red-700 text-white"
+            >
+              {isDeleting ? 'Eliminando...' : 'Sí, Eliminar'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
