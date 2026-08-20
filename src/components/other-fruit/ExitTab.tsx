@@ -534,10 +534,7 @@ export function OtherFruitExitTab({ clientId: fixedClientId }: { clientId?: stri
       return;
     }
 
-    if (!document.trim()) {
-        toast({ variant: 'destructive', title: 'Error', description: 'El Documento de Despacho es obligatorio.' });
-        return;
-    }
+
     
     if (isFallCreekClient(selectedClientId) && !selectedSubClientId) {
         toast({ variant: 'destructive', title: 'Error', description: 'Debe seleccionar un SubCliente para despachar a Fall Creek.' });
@@ -704,8 +701,8 @@ export function OtherFruitExitTab({ clientId: fixedClientId }: { clientId?: stri
                 <Input placeholder="Escriba para filtrar..." value={lotFilter} onChange={(e) => setLotFilter(e.target.value)} disabled={!selectedClientId} />
             </div>
             <div>
-              <Label>Documento de Despacho</Label>
-              <Input type="text" placeholder="Ej: 12345" value={document} onChange={(e) => setDocument(e.target.value)} disabled={!selectedClientId} required />
+              <Label>Documento de Despacho (Opcional)</Label>
+              <Input type="text" placeholder="Opcional. Ej: 12345" value={document} onChange={(e) => setDocument(e.target.value)} disabled={!selectedClientId} />
             </div>
         </div>
 
@@ -1307,14 +1304,10 @@ export function OtherFruitExitTab({ clientId: fixedClientId }: { clientId?: stri
                     Requisitos de Despacho
                   </span>
                   <div className="text-[11px] space-y-1 bg-zinc-50 p-2 rounded border text-zinc-600">
-                    <div className="flex items-center gap-1.5">
-                      {document ? (
-                        <span className="text-green-600 font-bold">✓</span>
-                      ) : (
-                        <span className="text-red-500 font-bold">✗</span>
-                      )}
-                      <span className={document ? 'text-zinc-700' : 'text-red-500 font-medium'}>
-                        {document ? `Documento: ${document}` : 'Falta Documento de Despacho'}
+                    <div className="flex items-center gap-1.5 text-green-600">
+                      <span className="font-bold">✓</span>
+                      <span className="text-zinc-700">
+                        {document ? `Documento: ${document}` : 'Documento: Opcional'}
                       </span>
                     </div>
                     <div className="flex items-center gap-1.5">
@@ -1347,7 +1340,6 @@ export function OtherFruitExitTab({ clientId: fixedClientId }: { clientId?: stri
                   disabled={
                     isDispatching || 
                     Object.keys(quantitiesToDispatch).length === 0 || 
-                    !document || 
                     !selectedSubClientId || 
                     (targetDispatchTotal ? totalSelectedQuantity !== parseInt(targetDispatchTotal, 10) : false)
                   }
