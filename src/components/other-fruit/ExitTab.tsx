@@ -21,6 +21,9 @@ import { Label } from '../ui/label';
 import { Checkbox } from '../ui/checkbox';
 import { cn, safeToMillis, formatLocaleDateString } from '@/lib/utils';
 import { cleanVarietyName } from '@/lib/fall-creek-utils';
+import { chambersConfig } from '@/lib/chambers-config';
+import { Grid, List, Plus, Minus, Move, Search } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 
 const getLocationKey = (receptionId: string, itemIndex: number) => `${receptionId}_${itemIndex}`;
@@ -69,6 +72,9 @@ export function OtherFruitExitTab({ clientId: fixedClientId }: { clientId?: stri
   const [lotFilter, setLotFilter] = React.useState('');
   const [quantitiesToDispatch, setQuantitiesToDispatch] = React.useState<Record<string, number>>({});
   const [isDispatching, setIsDispatching] = React.useState(false);
+  const [viewMode, setViewMode] = React.useState<'list' | 'map'>('list');
+  const [activeChamber, setActiveChamber] = React.useState('CAMARA-5');
+  const [targetDispatchTotal, setTargetDispatchTotal] = React.useState('');
 
   const clients = React.useMemo(() => {
     const raw = allClients || [];
@@ -680,11 +686,198 @@ export function OtherFruitExitTab({ clientId: fixedClientId }: { clientId?: stri
             </div>
         </div>
 
+        {selectedClientId && isFallCreekClient(selectedClientId) && (
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-muted/20 p-3 rounded-lg border border-[#004b8d]/10">
+            <div className="flex items-center gap-4 w-full sm:w-auto">
+              <div className="w-full sm:w-44">
+                <Label className="text-xs font-bold uppercase tracking-wider text-[#004b8d]">Meta de Despacho (Bins)</Label>
+                <Input
+                  type="number"
+                  placeholder="Ej: 66"
+                  value={targetDispatchTotal}
+                  onChange={(e) => setTargetDispatchTotal(e.target.value)}
+                  className="mt-1 bg-background"
+                />
+              </div>
+              <div className="text-xs text-muted-foreground mt-4 hidden sm:block">
+                Indique la cantidad de Bins solicitados en la orden para controlar el avance en tiempo real.
+              </div>
+            </div>
+            <div className="flex items-center gap-2 self-end sm:self-center">
+              <Button
+                type="button"
+                variant={viewMode === 'list' ? 'default' : 'outline'}
+                onClick={() => setViewMode('list')}
+                className={cn(viewMode === 'list' ? "bg-[#004b8d] hover:bg-[#003c70] text-white" : "border-[#004b8d] text-[#004b8d]")}
+                size="sm"
+              >
+                <List className="h-4 w-4 mr-1.5" />
+                Vista Lista
+              </Button>
+              <Button
+                type="button"
+                variant={viewMode === 'map' ? 'default' : 'outline'}
+                onClick={() => setViewMode('map')}
+                className={cn(viewMode === 'map' ? "bg-[#004b8d] hover:bg-[#003c70] text-white" : "border-[#004b8d] text-[#004b8d]")}
+                size="sm"
+              >
+                <Grid className="h-4 w-4 mr-1.5" />
+                Vista Mapa Visual
+              </Button>
+            </div>
+          </div>
+        )}
+
         {selectedClientId && (
             loadingReceptions ? <Skeleton className="h-24 w-full" />
             : (
             <>
             {isFallCreekClient(selectedClientId) ? (
+              viewMode === 'map' ? (
+                <div className="space-y-4">
+                  {/* Chamber Selector Buttons */}
+                  <div className="flex flex-wrap gap-2 border-b pb-2">
+                    {['CAMARA-4', 'CAMARA-5', 'CAMARA-6'].map(camId => {
+                      const config = chambersConfig[camId];
+                      return (
+                        <Button
+                          key={camId}
+                          type="button"
+                          variant={activeChamber === camId ? 'default' : 'outline'}
+                          onClick={() => setActiveChamber(camId)}
+                          className={cn(
+                            activeChamber === camId 
+                              ? "bg-[#004b8d] hover:bg-[#003c70] text-white font-bold" 
+                              : "border-zinc-200 text-zinc-700 bg-background hover:bg-zinc-50"
+                          )}
+                        >
+                          {config?.name || camId}
+                        </Button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Chamber Map Grid */}
+                  {(() => {
+                    const chamber = chambersConfig[activeChamber];
+                    if (!chamber) return <p className="text-sm text-red-500">Configuración de cámara no encontrada.</p>;
+
+                    return (
+                      <div className="overflow-x-auto border rounded-lg p-4 bg-muted/5 shadow-inner">
+                        <div className="min-w-[800px] flex flex-col gap-1.5 text-zinc-800">
+                          {/* Grid Column Headers (A, B, C...) */}
+                          <div className="flex gap-1.5">
+                            <div className="w-10 text-center font-bold text-xs text-muted-foreground"></div>
+                            {chamber.columns.map(col => (
+                              <div key={col.id} className="flex-1 text-center font-bold text-xs text-muted-foreground py-1 bg-muted/40 rounded">
+                                {col.name}
+                              </div>
+                            ))}
+                          </div>
+
+                          {/* Grid Rows (1 to 14) */}
+                          {chamber.rows.map(row => (
+                            <div key={row} className="flex gap-1.5 items-center">
+                              {/* Row Header */}
+                              <div className="w-10 text-center font-bold text-xs text-muted-foreground bg-muted/40 py-3 rounded">
+                                {row}
+                              </div>
+
+                              {/* Column Cells */}
+                              {chamber.columns.map(col => {
+                                const coordName = `${col.name}${row}`;
+                                const isLargeChamber = ['CAMARA-4', 'CAMARA-5', 'CAMARA-6'].includes(activeChamber);
+                                const allowedComodinCols = isLargeChamber ? ['A', 'B', 'C', 'M', 'N', 'O'] : ['A', 'B', 'C', 'H', 'I', 'J'];
+                                const isPermanentlyBlocked = (row === 13 || row === 14) && !allowedComodinCols.includes(col.name);
+
+                                // Find Fall Creek items in this coordinate
+                                const coordItems: {
+                                  varietyName: string;
+                                  clientLotId: string;
+                                  receptionId: string;
+                                  itemIndex: number;
+                                  quantity: number;
+                                  locationKey: string;
+                                }[] = [];
+                                
+                                filteredFallCreekGroups.forEach(group => {
+                                  group.lots.forEach(lot => {
+                                    lot.locations.forEach(loc => {
+                                      if (loc.coordinate === coordName && loc.chamberId === activeChamber) {
+                                        coordItems.push({
+                                          varietyName: group.varietyName,
+                                          clientLotId: lot.clientLotId,
+                                          receptionId: loc.receptionId,
+                                          itemIndex: loc.itemIndex,
+                                          quantity: loc.quantity,
+                                          locationKey: getLocationKey(loc.receptionId, loc.itemIndex)
+                                        });
+                                      }
+                                    });
+                                  });
+                                });
+
+                                const hasStock = coordItems.length > 0;
+                                const totalCoordQty = coordItems.reduce((sum, item) => sum + item.quantity, 0);
+                                const selectedCoordQty = coordItems.reduce((sum, item) => sum + (quantitiesToDispatch[item.locationKey] || 0), 0);
+                                const isSelected = selectedCoordQty > 0;
+                                const isFullySelected = selectedCoordQty === totalCoordQty;
+                                const isPartiallySelected = isSelected && !isFullySelected;
+
+                                const handleCellClick = () => {
+                                  if (isPermanentlyBlocked || !hasStock) return;
+                                  
+                                  setQuantitiesToDispatch(prev => {
+                                    const next = { ...prev };
+                                    if (isSelected) {
+                                      // Deselect all
+                                      coordItems.forEach(item => {
+                                        delete next[item.locationKey];
+                                      });
+                                    } else {
+                                      // Select all (max available)
+                                      coordItems.forEach(item => {
+                                        next[item.locationKey] = item.quantity;
+                                      });
+                                    }
+                                    return next;
+                                  });
+                                };
+
+                                return (
+                                  <div
+                                    key={coordName}
+                                    onClick={handleCellClick}
+                                    className={cn(
+                                      "flex-1 h-12 rounded border flex flex-col items-center justify-center text-[10px] font-mono relative overflow-hidden transition-all select-none cursor-pointer",
+                                      isPermanentlyBlocked
+                                        ? "bg-muted/10 border-muted-foreground/10 text-muted-foreground/30 pointer-events-none"
+                                        : !hasStock
+                                        ? "bg-background border-dashed border-zinc-200 text-zinc-300 hover:border-zinc-300 hover:bg-zinc-50/50"
+                                        : isFullySelected
+                                        ? "bg-[#7aba28]/10 border-2 border-[#7aba28] text-[#7aba28] ring-2 ring-[#7aba28] ring-offset-1 font-bold scale-95"
+                                        : isPartiallySelected
+                                        ? "bg-[#7aba28]/5 border-2 border-dashed border-[#7aba28] text-[#7aba28] font-bold scale-95"
+                                        : "bg-[#004b8d]/5 border border-[#004b8d]/30 text-[#004b8d] hover:bg-[#004b8d]/10 hover:border-[#004b8d]/50"
+                                    )}
+                                  >
+                                    <span className="font-bold block">{coordName}</span>
+                                    {hasStock && !isPermanentlyBlocked && (
+                                      <span className="text-[9px] scale-90 opacity-90 block mt-0.5">
+                                        {selectedCoordQty > 0 ? `${selectedCoordQty}/${totalCoordQty}` : `${totalCoordQty}`} Bins
+                                      </span>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+              ) : (
                 <Accordion type="multiple" className="w-full space-y-2">
                     {filteredFallCreekGroups.map(group => {
                         const groupValue = `var_${group.varietyName}`;
@@ -708,49 +901,44 @@ export function OtherFruitExitTab({ clientId: fixedClientId }: { clientId?: stri
                                             const isSomeSelected = selectedKeysInLot.length > 0;
 
                                             return (
-                                                <AccordionItem value={lotValue} key={lotValue} className="border border-muted/50 rounded bg-white overflow-hidden shadow-sm">
-                                                    <AccordionTrigger className="px-4 py-2 hover:bg-muted/30 hover:no-underline">
+                                                <AccordionItem value={lotValue} key={lotValue} className="border border-[#7aba28]/15 rounded bg-background overflow-hidden">
+                                                    <AccordionTrigger className="px-3 py-2 hover:bg-muted/30 hover:no-underline text-xs [&[data-state=open]]:bg-muted/20">
                                                         <div className="flex justify-between items-center w-full pr-4">
-                                                            <span className="font-mono text-sm font-semibold">{lot.clientLotId}</span>
-                                                            <span className="font-semibold text-xs text-muted-foreground">{lot.totalQuantity} {group.unit}</span>
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="font-semibold text-zinc-700">Lote: <span className="font-mono text-zinc-900">{lot.clientLotId}</span></span>
+                                                            </div>
+                                                            <span className="font-bold text-zinc-600 bg-zinc-100 px-2 py-0.5 rounded">{lot.totalQuantity} Bins</span>
                                                         </div>
                                                     </AccordionTrigger>
-                                                    <AccordionContent className="p-0 border-t border-muted/30">
+                                                    <AccordionContent className="px-3 py-1">
                                                         <Table>
-                                                            <TableHeader className="bg-muted/20">
+                                                            <TableHeader>
                                                                 <TableRow>
-                                                                    <TableHead className="w-12 px-4">
-                                                                        <Checkbox
+                                                                    <TableHead className="w-10">
+                                                                        <Checkbox 
                                                                             checked={isAllSelected ? true : isSomeSelected ? 'indeterminate' : false}
                                                                             onCheckedChange={(checked) => handleSelectAllForLot(lot as any, !!checked)}
-                                                                            aria-label="Seleccionar todo en este lote"
                                                                         />
                                                                     </TableHead>
-                                                                    <TableHead className="text-xs font-bold uppercase tracking-wider">Cámara</TableHead>
-                                                                    <TableHead className="text-xs font-bold uppercase tracking-wider">Coordenada</TableHead>
-                                                                    <TableHead className="text-xs font-bold uppercase tracking-wider">Variedad</TableHead>
-                                                                    <TableHead className="text-xs font-bold uppercase tracking-wider">Fecha Recepción</TableHead>
-                                                                    <TableHead className="text-xs font-bold uppercase tracking-wider">Disp.</TableHead>
-                                                                    <TableHead className="text-xs font-bold uppercase tracking-wider w-28 px-4">A Despachar</TableHead>
+                                                                    <TableHead className="text-xs">Ubicación</TableHead>
+                                                                    <TableHead className="text-xs">Disponible</TableHead>
+                                                                    <TableHead className="text-xs w-28">A Despachar</TableHead>
                                                                 </TableRow>
                                                             </TableHeader>
                                                             <TableBody>
                                                                 {lot.locations.map(loc => {
                                                                     const key = getLocationKey(loc.receptionId, loc.itemIndex);
                                                                     return (
-                                                                        <TableRow key={key} className="hover:bg-muted/10">
-                                                                            <TableCell className="px-4">
+                                                                        <TableRow key={key} className="h-8 py-0">
+                                                                            <TableCell className="py-1">
                                                                                 <Checkbox 
                                                                                     checked={!!quantitiesToDispatch[key]}
                                                                                     onCheckedChange={(checked) => handleQuantityChange(loc as any, checked ? loc.quantity.toString() : '0')}
                                                                                 />
                                                                             </TableCell>
-                                                                            <TableCell className="font-semibold text-[#004b8d]">{loc.chamberId}</TableCell>
-                                                                            <TableCell className="font-mono font-medium">{loc.coordinate}</TableCell>
-                                                                            <TableCell className="text-xs">{loc.productName}</TableCell>
-                                                                            <TableCell className="text-xs text-muted-foreground">{loc.receptionDate}</TableCell>
-                                                                            <TableCell className="font-semibold">{loc.quantity}</TableCell>
-                                                                            <TableCell className="px-4">
+                                                                            <TableCell className="font-mono text-xs py-1">{loc.chamberId} / {loc.coordinate}</TableCell>
+                                                                            <TableCell className="text-xs py-1">{loc.quantity}</TableCell>
+                                                                            <TableCell className="py-1">
                                                                                 <Input
                                                                                     type="number"
                                                                                     min={0}
@@ -758,7 +946,7 @@ export function OtherFruitExitTab({ clientId: fixedClientId }: { clientId?: stri
                                                                                     value={quantitiesToDispatch[key] || ''}
                                                                                     onChange={(e) => handleQuantityChange(loc as any, e.target.value)}
                                                                                     placeholder="0"
-                                                                                    className="h-8 text-right font-semibold"
+                                                                                    className="h-7 text-xs w-20 px-2"
                                                                                 />
                                                                             </TableCell>
                                                                         </TableRow>
@@ -776,6 +964,7 @@ export function OtherFruitExitTab({ clientId: fixedClientId }: { clientId?: stri
                         );
                     })}
                 </Accordion>
+              )
             ) : (
                 <Accordion type="multiple" className="w-full">
                     {filteredLots.map(lot => {
@@ -857,7 +1046,7 @@ export function OtherFruitExitTab({ clientId: fixedClientId }: { clientId?: stri
                 </div>
             )}
 
-            {Object.keys(quantitiesToDispatch).length > 0 && (
+            {Object.keys(quantitiesToDispatch).length > 0 && (!isFallCreekClient(selectedClientId) || viewMode !== 'map') && (
                  <div className="flex justify-between items-center pt-4">
                     <div className="text-sm font-medium">
                         Total a despachar: {totalSelectedQuantity} {aggregatedStockByLot.find(l => l.locations.some(loc => quantitiesToDispatch[getLocationKey(loc.receptionId, loc.itemIndex)]))?.unit}
@@ -871,6 +1060,197 @@ export function OtherFruitExitTab({ clientId: fixedClientId }: { clientId?: stri
             )
         )}
       </CardContent>
+
+      {/* Floating Pre-Dispatch Summary Bar for Fall Creek */}
+      {selectedClientId && isFallCreekClient(selectedClientId) && (
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-30 w-[95%] max-w-4xl bg-card border-2 border-[#004b8d] rounded-lg shadow-2xl overflow-hidden animate-in slide-in-from-bottom-5 duration-300">
+          {/* Floating Header */}
+          <div className="bg-[#004b8d] text-white px-4 py-2.5 flex justify-between items-center select-none">
+            <div className="flex flex-col">
+              <span className="text-xs font-bold uppercase tracking-wider text-left">Resumen de Pre-Despacho</span>
+              <span className="text-[10px] opacity-80 text-left">Indique cantidades parciales de retiro aquí</span>
+            </div>
+            <div className="flex items-center gap-4">
+              <div className="text-right">
+                <span className="text-[10px] block opacity-75 font-semibold">TOTAL SELECCIONADO</span>
+                <span className="text-base font-black">
+                  {totalSelectedQuantity} {targetDispatchTotal ? `/ ${targetDispatchTotal}` : ''} Bins
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Floating Content */}
+          <div className="p-3 bg-background flex flex-col md:flex-row gap-3 max-h-[25vh] overflow-y-auto border-t">
+            {/* Selected Items List */}
+            <div className="flex-1 space-y-1.5">
+              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block text-left">
+                Ubicaciones Seleccionadas
+              </span>
+              {Object.keys(quantitiesToDispatch).length > 0 ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                  {(() => {
+                    const selectedItems: {
+                      key: string;
+                      varietyName: string;
+                      clientLotId: string;
+                      coordinate: string;
+                      chamberId: string;
+                      maxQty: number;
+                      selectedQty: number;
+                    }[] = [];
+
+                    receptions.forEach(reception => {
+                      if (reception.clientId !== selectedClientId) return;
+                      (reception.items || []).forEach((item, index) => {
+                        const key = getLocationKey(reception.id, index);
+                        if (key in quantitiesToDispatch) {
+                          selectedItems.push({
+                            key,
+                            varietyName: cleanVarietyName(item.productName),
+                            clientLotId: item.clientLotId || 'Sin Lote',
+                            coordinate: item.storageLocation?.coordinate || '',
+                            chamberId: item.storageLocation?.chamberId || '',
+                            maxQty: item.quantity,
+                            selectedQty: quantitiesToDispatch[key]
+                          });
+                        }
+                      });
+                    });
+
+                    return selectedItems.map(item => {
+                      // Calculate availableQty (max) by subtracting reserved dispatches
+                      const pendingExits = (allMovements || []).filter(
+                        m => m.type === 'salida' && m.status === 'Pendiente de Picking'
+                      );
+                      let reservedQty = 0;
+                      pendingExits.forEach(mov => {
+                        (mov.locations || []).forEach(loc => {
+                          if (getLocationKey(loc.receptionId, loc.itemIndex) === item.key) {
+                            reservedQty += loc.quantity;
+                          }
+                        });
+                      });
+                      const maxAvailable = item.maxQty - reservedQty;
+
+                      const handleIncrement = () => {
+                        setQuantitiesToDispatch(prev => {
+                          const next = { ...prev };
+                          const current = next[item.key] || 0;
+                          if (current < maxAvailable) {
+                            next[item.key] = current + 1;
+                          }
+                          return next;
+                        });
+                      };
+
+                      const handleDecrement = () => {
+                        setQuantitiesToDispatch(prev => {
+                          const next = { ...prev };
+                          const current = next[item.key] || 0;
+                          if (current > 1) {
+                            next[item.key] = current - 1;
+                          } else {
+                            delete next[item.key];
+                          }
+                          return next;
+                        });
+                      };
+
+                      const handleInputChange = (val: string) => {
+                        let num = parseInt(val, 10);
+                        if (isNaN(num) || num <= 0) {
+                          setQuantitiesToDispatch(prev => {
+                            const next = { ...prev };
+                            delete next[item.key];
+                            return next;
+                          });
+                        } else {
+                          if (num > maxAvailable) num = maxAvailable;
+                          setQuantitiesToDispatch(prev => ({
+                            ...prev,
+                            [item.key]: num
+                          }));
+                        }
+                      };
+
+                      return (
+                        <div key={item.key} className="flex justify-between items-center border border-[#004b8d]/10 bg-muted/10 p-2 rounded-md">
+                          <div className="flex flex-col min-w-0 text-left">
+                            <span className="text-[10px] font-bold text-[#004b8d] truncate">
+                              {chambersConfig[item.chamberId]?.name || item.chamberId} - {item.coordinate}
+                            </span>
+                            <span className="text-[9px] text-zinc-600 truncate leading-none mt-0.5">
+                              {item.varietyName}
+                            </span>
+                          </div>
+                          {/* Controls */}
+                          <div className="flex items-center gap-1">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={handleDecrement}
+                              className="h-6 w-6 p-0 border-[#004b8d]/25 text-[#004b8d] bg-background"
+                            >
+                              <Minus className="h-3 w-3" />
+                            </Button>
+                            <Input
+                              type="number"
+                              value={item.selectedQty}
+                              onChange={(e) => handleInputChange(e.target.value)}
+                              className="h-6 w-10 text-center font-bold text-xs p-0 border-[#004b8d]/25 bg-background"
+                            />
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={handleIncrement}
+                              disabled={item.selectedQty >= maxAvailable}
+                              className="h-6 w-6 p-0 border-[#004b8d]/25 text-[#004b8d] bg-background"
+                            >
+                              <Plus className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        </div>
+                      );
+                    });
+                  })()}
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground italic py-4 text-left">No hay ubicaciones seleccionadas en el mapa.</p>
+              )}
+            </div>
+
+            {/* Dispatch Action */}
+            <div className="w-full md:w-64 border-t md:border-t-0 md:border-l pt-2 md:pt-0 md:pl-3 flex flex-col justify-between gap-3 text-zinc-800 text-left">
+              <div className="space-y-1">
+                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">
+                  Datos de Despacho
+                </span>
+                <div className="text-[11px] text-zinc-600 leading-tight">
+                  <div><span className="font-semibold text-zinc-800">Destinatario:</span> {producers.find(p => p.id === selectedSubClientId)?.name || 'No seleccionado'}</div>
+                  <div><span className="font-semibold text-zinc-800">Documento:</span> {document || 'No especificado'}</div>
+                </div>
+              </div>
+              
+              <Button
+                onClick={handleDispatch}
+                disabled={
+                  isDispatching || 
+                  Object.keys(quantitiesToDispatch).length === 0 || 
+                  !document || 
+                  !selectedSubClientId || 
+                  (targetDispatchTotal ? totalSelectedQuantity !== parseInt(targetDispatchTotal, 10) : false)
+                }
+                className="w-full bg-[#7aba28] hover:bg-[#6aa423] text-white py-4 text-xs font-bold uppercase tracking-wider"
+              >
+                {isDispatching ? 'Creando Despacho...' : 'Enviar Solicitud de Picking'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </Card>
   );
 }
