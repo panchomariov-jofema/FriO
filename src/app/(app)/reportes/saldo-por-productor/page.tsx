@@ -198,15 +198,15 @@ export default function ProducerBalanceReportPage() {
                                 {groupedBalance.map((group, idx) => (
                                     <AccordionItem key={idx} value={`item-${idx}`} className="border-b last:border-b-0">
                                         <AccordionTrigger className="hover:no-underline py-4 px-4">
-                                            <div className="flex justify-between w-full pr-4 text-left">
-                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-12 gap-y-1">
-                                                    <div>
+                                            <div className="flex justify-between items-center w-full pr-4 text-left">
+                                                <div className="flex flex-col sm:flex-row sm:items-center gap-y-1 gap-x-16 flex-1 min-w-0">
+                                                    <div className="sm:w-36 shrink-0 truncate">
                                                         <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">Exportador</p>
-                                                        <p className="text-sm font-medium">{group.exporterName}</p>
+                                                        <p className="text-sm font-medium truncate">{group.exporterName}</p>
                                                     </div>
-                                                    <div>
+                                                    <div className="min-w-0 flex-1 truncate">
                                                         <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">Productor</p>
-                                                        <p className="text-sm font-bold text-primary">{group.producerName}</p>
+                                                        <p className="text-sm font-bold text-primary truncate">{group.producerName}</p>
                                                     </div>
                                                 </div>
                                                 <div className="hidden sm:flex items-center gap-2">
