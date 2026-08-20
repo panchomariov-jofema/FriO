@@ -87,7 +87,23 @@ export function OtherFruitPickingDialog({
   }, [open, isFallCreek]);
 
   React.useEffect(() => {
-    if (flatItems) {
+    if (flatItems && open && movement) {
+        const key = `picking_progress_${movement.id}`;
+        const saved = typeof window !== 'undefined' ? localStorage.getItem(key) : null;
+        if (saved && isFallCreek) {
+          try {
+            const data = JSON.parse(saved);
+            if (data.quantities) setQuantities(data.quantities);
+            if (data.scannedQrCodes) setScannedQrCodes(new Set(data.scannedQrCodes));
+            if (data.scannedPallets) setScannedPallets(new Set(data.scannedPallets));
+            setPickedItems({});
+            setBarcodeInput('');
+            return;
+          } catch (e) {
+            console.error('Error loading picking progress:', e);
+          }
+        }
+
         const initialQuantities = flatItems.reduce((acc, item) => {
             acc[item.compositeKey] = isFallCreek ? 0 : item.quantity;
             return acc;
@@ -98,7 +114,21 @@ export function OtherFruitPickingDialog({
         setScannedPallets(new Set());
         setBarcodeInput('');
     }
-  }, [flatItems, isFallCreek, open]);
+  }, [flatItems, isFallCreek, open, movement]);
+
+  React.useEffect(() => {
+    if (movement && isFallCreek && open && Object.keys(quantities).length > 0) {
+      const key = `picking_progress_${movement.id}`;
+      const data = {
+        quantities,
+        scannedQrCodes: Array.from(scannedQrCodes),
+        scannedPallets: Array.from(scannedPallets)
+      };
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(key, JSON.stringify(data));
+      }
+    }
+  }, [quantities, scannedQrCodes, scannedPallets, movement, isFallCreek, open]);
 
   React.useEffect(() => {
     if (open) {
@@ -277,6 +307,9 @@ export function OtherFruitPickingDialog({
     }, {} as Record<string, number>);
     setQuantities(resetQuantities);
     setBarcodeInput('');
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem(`picking_progress_${movement.id}`);
+    }
     toast({
       title: "Escaneo reiniciado",
       description: "Se han borrado los códigos escaneados y cantidades a retirar.",
@@ -338,6 +371,9 @@ export function OtherFruitPickingDialog({
         return;
     }
 
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem(`picking_progress_${movement.id}`);
+    }
     onConfirmExit(newMovement);
   };
   
