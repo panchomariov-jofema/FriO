@@ -32,7 +32,7 @@ import { PlaceHolderImages } from '@/lib/placeholder-images';
 import { parseFallCreekManifest, decomposePalletsIntoBins, cleanVarietyName, type FallCreekManifestRow, fileToBase64 } from '@/lib/fall-creek-utils';
 import { parseManifestAIAction } from './actions';
 import { FileUp, ClipboardList, Loader2, Search, Printer, Download, Truck, Warehouse, Info, Archive } from 'lucide-react';
-import { notifyPalletLogStarted } from '@/lib/telegram';
+import { notifyPalletLogStarted, notifyFallCreekDispatchCreated } from '@/lib/telegram';
 import type { PendingItem } from '@/lib/types';
 import { StoreOtherFruitDialog } from '@/components/other-fruit/StoreOtherFruitDialog';
 import { ChamberTemperatureInput } from '@/components/camaras/ChamberTemperatureInput';
@@ -744,8 +744,14 @@ export default function FallCreekPage() {
                 await updateDoc(movementRef, {...movementData, updatedAt: serverTimestamp()});
                 toast({ title: 'Éxito', description: 'Solicitud de Pre-Despacho actualizada.' });
             } else {
-                 await addDoc(collection(firestore, 'otherFruitMovements'), {...movementData, createdAt: serverTimestamp()});
-                 toast({ title: 'Éxito', description: 'Solicitud de Pre-Despacho creada y enviada a la bodega para picking.' });
+                  const docRef = await addDoc(collection(firestore, 'otherFruitMovements'), {...movementData, createdAt: serverTimestamp()});
+                  notifyFallCreekDispatchCreated(firestore, {
+                      ...movementData,
+                      id: docRef.id
+                  } as any).catch(err => {
+                      console.error("Error al enviar la notificación de Telegram para pre-despacho creado:", err);
+                  });
+                  toast({ title: 'Éxito', description: 'Solicitud de Pre-Despacho creada y enviada a la bodega para picking.' });
             }
 
             setSelectionMode(false);

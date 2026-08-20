@@ -21,6 +21,7 @@ import { DispatchPickingDialog } from '../dispatch/DispatchPickingDialog';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import { FileText, Trash2 } from 'lucide-react';
+import { notifyFallCreekPickingCompleted } from '@/lib/telegram';
 import {
   Dialog,
   DialogContent,
@@ -251,6 +252,13 @@ export function OtherFruitPickingTab() {
         }
         
         await batch.commit();
+
+        if (isFallCreek) {
+            notifyFallCreekPickingCompleted(firestore, confirmedMovement).catch(err => {
+                console.error("Error al enviar la notificación de Telegram de picking completado:", err);
+            });
+        }
+
         toast({ title: 'Éxito', description: 'Salida de fruta confirmada y stock actualizado.' });
         setPickingMovement(null);
 

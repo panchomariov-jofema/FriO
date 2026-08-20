@@ -1,5 +1,5 @@
 import { doc, getDoc, Firestore } from 'firebase/firestore';
-import type { OtherFruitReception } from './types';
+import type { OtherFruitReception, OtherFruitMovement } from './types';
 
 export interface TelegramConfig {
   botToken: string;
@@ -157,4 +157,62 @@ export async function notifyPalletLogStarted(firestore: Firestore, reception: Ot
     console.warn(`No se pudo enviar la notificación de inicio de Telegram para: ${reception.document}`);
   }
 }
+
+/**
+ * Envía una notificación a Telegram cuando se crea un despacho de Fall Creek.
+ */
+export async function notifyFallCreekDispatchCreated(firestore: Firestore, movement: OtherFruitMovement): Promise<void> {
+  const config = await getTelegramConfig(firestore);
+  if (!config.botToken || !config.chatId) {
+    console.log('Telegram no está configurado. Se omite la notificación.');
+    return;
+  }
+
+  // Calcular la cantidad total de Bins de forma robusta
+  const totalBins = (movement.items || []).reduce((sum, item) => sum + (item.quantity || 0), 0);
+  const varieties = Array.from(new Set((movement.items || []).map(item => item.productName))).join(', ');
+
+  const message = 
+    `📤 *Solicitud de Despacho Creada (Fall Creek)*\n\n` +
+    `*Cliente / Productor:* ${movement.destinationClientName || 'N/A'}\n` +
+    `*Cantidad de Bins:* ${totalBins}\n` +
+    `*Variedad:* ${varieties || 'N/A'}`;
+
+  const success = await sendTelegramMessage(config.botToken, config.chatId, message);
+  if (success) {
+    console.log(`Notificación de despacho creado de Telegram enviada.`);
+  } else {
+    console.warn(`No se pudo enviar la notificación de despacho creado de Telegram.`);
+  }
+}
+
+/**
+ * Envía una notificación a Telegram cuando el picking de Fall Creek ha sido completado.
+ */
+export async function notifyFallCreekPickingCompleted(firestore: Firestore, movement: OtherFruitMovement): Promise<void> {
+  const config = await getTelegramConfig(firestore);
+  if (!config.botToken || !config.chatId) {
+    console.log('Telegram no está configurado. Se omite la notificación.');
+    return;
+  }
+
+  // Calcular la cantidad total de Bins de forma robusta
+  const totalBins = (movement.items || []).reduce((sum, item) => sum + (item.quantity || 0), 0);
+  const varieties = Array.from(new Set((movement.items || []).map(item => item.productName))).join(', ');
+
+  const message = 
+    `✅ *Picking de Despacho Completado (Fall Creek)*\n\n` +
+    `*Cliente / Productor:* ${movement.destinationClientName || 'N/A'}\n` +
+    `*Cantidad de Bins:* ${totalBins}\n` +
+    `*Variedad:* ${varieties || 'N/A'}\n\n` +
+    `*Estado:* Completado - Listo para Despacho`;
+
+  const success = await sendTelegramMessage(config.botToken, config.chatId, message);
+  if (success) {
+    console.log(`Notificación de picking completado de Telegram enviada.`);
+  } else {
+    console.warn(`No se pudo enviar la notificación de picking completado de Telegram.`);
+  }
+}
+
 

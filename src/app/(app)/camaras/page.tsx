@@ -23,7 +23,8 @@ import { cn, getSortedCoordinates, safeToDate, safeToMillis, safeStringCompare, 
 import { Progress } from '@/components/ui/progress';
 import { RelocateLotDialog } from '@/components/camaras/RelocateLotDialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Trash2, Upload, Loader2 } from 'lucide-react';
+import { Trash2, Upload, Loader2, Pencil } from 'lucide-react';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ExternalReceptionUploader } from '@/components/hidrocooler/ExternalReceptionUploader';
 import { ChamberTemperatureInput } from '@/components/camaras/ChamberTemperatureInput';
 import { Label } from '@/components/ui/label';
@@ -121,6 +122,10 @@ export default function CamarasPage() {
   const [showChamberStatus, setShowChamberStatus] = React.useState(true);
   const [importingTemps, setImportingTemps] = React.useState(false);
   const tempFileInputRef = React.useRef<HTMLInputElement>(null);
+
+  const [editingItem, setEditingItem] = React.useState<StoredItem | null>(null);
+  const [obsText, setObsText] = React.useState('');
+  const [isSavingObs, setIsSavingObs] = React.useState(false);
 
   const currentUserMaster = React.useMemo(() => {
     if (!user?.email || !usersMaster) return null;
@@ -714,6 +719,44 @@ export default function CamarasPage() {
     }
   };
 
+  const handleEditObservationClick = (item: StoredItem) => {
+    setEditingItem(item);
+    setObsText(item.observation || '');
+  };
+
+  const handleSaveObservation = async () => {
+    if (!editingItem || !firestore) return;
+    setIsSavingObs(true);
+    try {
+      if (editingItem.type === 'otherFruit' && editingItem.receptionId) {
+        const receptionRef = doc(firestore, 'otherFruitReceptions', editingItem.receptionId);
+        const receptionSnap = await getDoc(receptionRef);
+        if (receptionSnap.exists()) {
+          const data = receptionSnap.data();
+          const items = data.items || [];
+          if (items[editingItem.itemIndex]) {
+            items[editingItem.itemIndex].observation = obsText.trim() || null;
+            await updateDoc(receptionRef, { items });
+            toast({
+              title: 'Éxito',
+              description: 'Observación actualizada correctamente.',
+            });
+          }
+        }
+      }
+      setEditingItem(null);
+    } catch (error: any) {
+      console.error('Error updating observation:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: error.message || 'No se pudo guardar la observación.',
+      });
+    } finally {
+      setIsSavingObs(false);
+    }
+  };
+
 
   const handleTempExcelUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -1143,19 +1186,36 @@ export default function CamarasPage() {
                                                                   <span>⚠ Contiene {uniqueLotIds.length} lotes</span>
                                                               </p>
                                                               <div className="space-y-2 max-h-36 overflow-y-auto">
-                                                                  {itemsInCoord.map((item, idx) => (
-                                                                      <div key={idx} className="text-xs border-b border-dashed pb-1.5 last:border-0 last:pb-0">
-                                                                          <div className="flex justify-between items-center">
-                                                                              <span className="font-bold">{item.type === 'producerLot' ? `Lote: ${item.displayId}` : `Doc: ${item.document || '-'}`}</span>
-                                                                              <Badge variant="outline" className="h-4 text-[9px] px-1 bg-primary/5 text-primary border-primary/20">
-                                                                                  {item.quantity} {item.unit}
-                                                                              </Badge>
-                                                                          </div>
-                                                                          <p className="text-muted-foreground mt-0.5">{item.ownerName} - {item.varietyOrProduct}</p>
-                                                                          {item.clientLotId && <p className="text-muted-foreground font-mono text-[9px]">Lote Cliente: {item.clientLotId}</p>}
-                                                                          {item.observation && <p className="text-muted-foreground italic text-[10px] mt-0.5">Obs: {item.observation}</p>}
-                                                                      </div>
-                                                                  ))}
+                                                                  {itemsInCoord.map((item, idx) => {
+                                                                       const canEditObs = item.type === 'otherFruit' && item.ownerName?.toUpperCase() !== 'FALL CREEK';
+                                                                       return (
+                                                                           <div key={idx} className="text-xs border-b border-dashed pb-1.5 last:border-0 last:pb-0">
+                                                                               <div className="flex justify-between items-center">
+                                                                                   <span className="font-bold">{item.type === 'producerLot' ? `Lote: ${item.displayId}` : `Doc: ${item.document || '-'}`}</span>
+                                                                                   <Badge variant="outline" className="h-4 text-[9px] px-1 bg-primary/5 text-primary border-primary/20">
+                                                                                       {item.quantity} {item.unit}
+                                                                                   </Badge>
+                                                                               </div>
+                                                                               <p className="text-muted-foreground mt-0.5">{item.ownerName} - {item.varietyOrProduct}</p>
+                                                                               {item.clientLotId && <p className="text-muted-foreground font-mono text-[9px]">Lote Cliente: {item.clientLotId}</p>}
+                                                                               {(item.observation || canEditObs) && (
+                                                                                   <div className="flex items-center gap-1.5 mt-0.5">
+                                                                                       <p className="text-muted-foreground italic text-[10px]">Obs: {item.observation || '-'}</p>
+                                                                                       {canEditObs && (
+                                                                                           <Button 
+                                                                                               variant="ghost" 
+                                                                                               size="icon" 
+                                                                                               className="h-4 w-4 shrink-0 text-muted-foreground hover:text-primary p-0" 
+                                                                                               onClick={() => handleEditObservationClick(item)}
+                                                                                           >
+                                                                                               <Pencil className="h-2.5 w-2.5" />
+                                                                                           </Button>
+                                                                                       )}
+                                                                                   </div>
+                                                                               )}
+                                                                           </div>
+                                                                       );
+                                                                   })}
                                                               </div>
                                                           </div>
                                                       ) : (
@@ -1184,9 +1244,27 @@ export default function CamarasPage() {
                                                                               <p>Producto: {firstItem.varietyOrProduct}</p>
                                                                           </>
                                                                       )}
-                                                                      {firstItem.observation && (
-                                                                        <p className="text-muted-foreground italic text-xs mt-0.5">Obs: {firstItem.observation}</p>
-                                                                      )}
+                                                                      {(() => {
+                                                                            const canEditObs = firstItem.type === 'otherFruit' && firstItem.ownerName?.toUpperCase() !== 'FALL CREEK';
+                                                                            if (firstItem.observation || canEditObs) {
+                                                                                return (
+                                                                                    <div className="flex items-center gap-1.5 mt-0.5">
+                                                                                        <p className="text-muted-foreground italic text-xs">Obs: {firstItem.observation || '-'}</p>
+                                                                                        {canEditObs && (
+                                                                                            <Button 
+                                                                                                variant="ghost" 
+                                                                                                size="icon" 
+                                                                                                className="h-4 w-4 shrink-0 text-muted-foreground hover:text-primary p-0" 
+                                                                                                onClick={() => handleEditObservationClick(firstItem)}
+                                                                                            >
+                                                                                                <Pencil className="h-3 w-3" />
+                                                                                            </Button>
+                                                                                        )}
+                                                                                    </div>
+                                                                                );
+                                                                            }
+                                                                            return null;
+                                                                        })()}
                                                                   </div>
                                                               )}
                                                           </>
@@ -1241,6 +1319,35 @@ export default function CamarasPage() {
             clientConfigs={clientConfigs || []}
             exporters={exporters || []}
         />
+      )}
+
+      {editingItem && (
+        <Dialog open={!!editingItem} onOpenChange={(open) => !open && setEditingItem(null)}>
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle>Editar Observación</DialogTitle>
+              <DialogDescription>
+                Ingrese una observación para el producto de <span className="font-semibold">{editingItem.ownerName}</span> en la ubicación <span className="font-mono font-semibold">{editingItem.coordinate}</span>.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="py-4">
+              <Input
+                value={obsText}
+                onChange={(e) => setObsText(e.target.value)}
+                placeholder="Escriba la observación..."
+                maxLength={100}
+              />
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setEditingItem(null)} disabled={isSavingObs}>
+                Cancelar
+              </Button>
+              <Button onClick={handleSaveObservation} disabled={isSavingObs}>
+                {isSavingObs ? 'Guardando...' : 'Guardar'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       )}
     </div>
   );
