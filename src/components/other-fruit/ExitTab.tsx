@@ -75,6 +75,7 @@ export function OtherFruitExitTab({ clientId: fixedClientId }: { clientId?: stri
   const [viewMode, setViewMode] = React.useState<'list' | 'map'>('list');
   const [activeChamber, setActiveChamber] = React.useState('CAMARA-5');
   const [targetDispatchTotal, setTargetDispatchTotal] = React.useState('');
+  const [isSummaryExpanded, setIsSummaryExpanded] = React.useState(true);
 
   const clients = React.useMemo(() => {
     const raw = allClients || [];
@@ -1065,10 +1066,15 @@ export function OtherFruitExitTab({ clientId: fixedClientId }: { clientId?: stri
       {selectedClientId && isFallCreekClient(selectedClientId) && (
         <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-30 w-[95%] max-w-4xl bg-card border-2 border-[#004b8d] rounded-lg shadow-2xl overflow-hidden animate-in slide-in-from-bottom-5 duration-300">
           {/* Floating Header */}
-          <div className="bg-[#004b8d] text-white px-4 py-2.5 flex justify-between items-center select-none">
+          <div 
+            onClick={() => setIsSummaryExpanded(!isSummaryExpanded)}
+            className="bg-[#004b8d] text-white px-4 py-2.5 flex justify-between items-center select-none cursor-pointer hover:bg-[#003c70]"
+          >
             <div className="flex flex-col">
               <span className="text-xs font-bold uppercase tracking-wider text-left">Resumen de Pre-Despacho</span>
-              <span className="text-[10px] opacity-80 text-left">Indique cantidades parciales de retiro aquí</span>
+              <span className="text-[10px] opacity-80 text-left">
+                {isSummaryExpanded ? 'Haga clic para colapsar y ver el mapa' : 'Haga clic para expandir y editar cantidades'}
+              </span>
             </div>
             <div className="flex items-center gap-4">
               <div className="text-right">
@@ -1077,178 +1083,183 @@ export function OtherFruitExitTab({ clientId: fixedClientId }: { clientId?: stri
                   {totalSelectedQuantity} {targetDispatchTotal ? `/ ${targetDispatchTotal}` : ''} Bins
                 </span>
               </div>
+              <div className="border-l pl-3 text-xs font-bold bg-[#7aba28]/90 px-2.5 py-1 rounded text-white shadow-sm shrink-0">
+                {isSummaryExpanded ? 'Minimizar ▲' : 'Maximizar ▼'}
+              </div>
             </div>
           </div>
 
           {/* Floating Content */}
-          <div className="p-3 bg-background flex flex-col md:flex-row gap-3 max-h-[25vh] overflow-y-auto border-t">
-            {/* Selected Items List */}
-            <div className="flex-1 space-y-1.5">
-              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block text-left">
-                Ubicaciones Seleccionadas
-              </span>
-              {Object.keys(quantitiesToDispatch).length > 0 ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
-                  {(() => {
-                    const selectedItems: {
-                      key: string;
-                      varietyName: string;
-                      clientLotId: string;
-                      coordinate: string;
-                      chamberId: string;
-                      maxQty: number;
-                      selectedQty: number;
-                    }[] = [];
+          {isSummaryExpanded && (
+            <div className="p-3 bg-background flex flex-col md:flex-row gap-3 border-t">
+              {/* Selected Items List (Scrollable Left Side) */}
+              <div className="flex-1 max-h-[20vh] overflow-y-auto pr-2 space-y-1.5 border-b md:border-b-0 pb-2 md:pb-0">
+                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block text-left">
+                  Ubicaciones Seleccionadas
+                </span>
+                {Object.keys(quantitiesToDispatch).length > 0 ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                    {(() => {
+                      const selectedItems: {
+                        key: string;
+                        varietyName: string;
+                        clientLotId: string;
+                        coordinate: string;
+                        chamberId: string;
+                        maxQty: number;
+                        selectedQty: number;
+                      }[] = [];
 
-                    receptions.forEach(reception => {
-                      if (reception.clientId !== selectedClientId) return;
-                      (reception.items || []).forEach((item, index) => {
-                        const key = getLocationKey(reception.id, index);
-                        if (key in quantitiesToDispatch) {
-                          selectedItems.push({
-                            key,
-                            varietyName: cleanVarietyName(item.productName),
-                            clientLotId: item.clientLotId || 'Sin Lote',
-                            coordinate: item.storageLocation?.coordinate || '',
-                            chamberId: item.storageLocation?.chamberId || '',
-                            maxQty: item.quantity,
-                            selectedQty: quantitiesToDispatch[key]
+                      receptions.forEach(reception => {
+                        if (reception.clientId !== selectedClientId) return;
+                        (reception.items || []).forEach((item, index) => {
+                          const key = getLocationKey(reception.id, index);
+                          if (key in quantitiesToDispatch) {
+                            selectedItems.push({
+                              key,
+                              varietyName: cleanVarietyName(item.productName),
+                              clientLotId: item.clientLotId || 'Sin Lote',
+                              coordinate: item.storageLocation?.coordinate || '',
+                              chamberId: item.storageLocation?.chamberId || '',
+                              maxQty: item.quantity,
+                              selectedQty: quantitiesToDispatch[key]
+                            });
+                          }
+                        });
+                      });
+
+                      return selectedItems.map(item => {
+                        // Calculate availableQty (max) by subtracting reserved dispatches
+                        const pendingExits = (allMovements || []).filter(
+                          m => m.type === 'salida' && m.status === 'Pendiente de Picking'
+                        );
+                        let reservedQty = 0;
+                        pendingExits.forEach(mov => {
+                          (mov.locations || []).forEach(loc => {
+                            if (getLocationKey(loc.receptionId, loc.itemIndex) === item.key) {
+                              reservedQty += loc.quantity;
+                            }
                           });
-                        }
-                      });
-                    });
-
-                    return selectedItems.map(item => {
-                      // Calculate availableQty (max) by subtracting reserved dispatches
-                      const pendingExits = (allMovements || []).filter(
-                        m => m.type === 'salida' && m.status === 'Pendiente de Picking'
-                      );
-                      let reservedQty = 0;
-                      pendingExits.forEach(mov => {
-                        (mov.locations || []).forEach(loc => {
-                          if (getLocationKey(loc.receptionId, loc.itemIndex) === item.key) {
-                            reservedQty += loc.quantity;
-                          }
                         });
-                      });
-                      const maxAvailable = item.maxQty - reservedQty;
+                        const maxAvailable = item.maxQty - reservedQty;
 
-                      const handleIncrement = () => {
-                        setQuantitiesToDispatch(prev => {
-                          const next = { ...prev };
-                          const current = next[item.key] || 0;
-                          if (current < maxAvailable) {
-                            next[item.key] = current + 1;
-                          }
-                          return next;
-                        });
-                      };
-
-                      const handleDecrement = () => {
-                        setQuantitiesToDispatch(prev => {
-                          const next = { ...prev };
-                          const current = next[item.key] || 0;
-                          if (current > 1) {
-                            next[item.key] = current - 1;
-                          } else {
-                            delete next[item.key];
-                          }
-                          return next;
-                        });
-                      };
-
-                      const handleInputChange = (val: string) => {
-                        let num = parseInt(val, 10);
-                        if (isNaN(num) || num <= 0) {
+                        const handleIncrement = () => {
                           setQuantitiesToDispatch(prev => {
                             const next = { ...prev };
-                            delete next[item.key];
+                            const current = next[item.key] || 0;
+                            if (current < maxAvailable) {
+                              next[item.key] = current + 1;
+                            }
                             return next;
                           });
-                        } else {
-                          if (num > maxAvailable) num = maxAvailable;
-                          setQuantitiesToDispatch(prev => ({
-                            ...prev,
-                            [item.key]: num
-                          }));
-                        }
-                      };
+                        };
 
-                      return (
-                        <div key={item.key} className="flex justify-between items-center border border-[#004b8d]/10 bg-muted/10 p-2 rounded-md">
-                          <div className="flex flex-col min-w-0 text-left">
-                            <span className="text-[10px] font-bold text-[#004b8d] truncate">
-                              {chambersConfig[item.chamberId]?.name || item.chamberId} - {item.coordinate}
-                            </span>
-                            <span className="text-[9px] text-zinc-600 truncate leading-none mt-0.5">
-                              {item.varietyName}
-                            </span>
-                          </div>
-                          {/* Controls */}
-                          <div className="flex items-center gap-1">
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={handleDecrement}
-                              className="h-6 w-6 p-0 border-[#004b8d]/25 text-[#004b8d] bg-background"
-                            >
-                              <Minus className="h-3 w-3" />
-                            </Button>
-                            <Input
-                              type="number"
-                              value={item.selectedQty}
-                              onChange={(e) => handleInputChange(e.target.value)}
-                              className="h-6 w-10 text-center font-bold text-xs p-0 border-[#004b8d]/25 bg-background"
-                            />
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={handleIncrement}
-                              disabled={item.selectedQty >= maxAvailable}
-                              className="h-6 w-6 p-0 border-[#004b8d]/25 text-[#004b8d] bg-background"
-                            >
-                              <Plus className="h-3 w-3" />
-                            </Button>
-                          </div>
-                        </div>
-                      );
-                    });
-                  })()}
-                </div>
-              ) : (
-                <p className="text-xs text-muted-foreground italic py-4 text-left">No hay ubicaciones seleccionadas en el mapa.</p>
-              )}
-            </div>
+                        const handleDecrement = () => {
+                          setQuantitiesToDispatch(prev => {
+                            const next = { ...prev };
+                            const current = next[item.key] || 0;
+                            if (current > 1) {
+                              next[item.key] = current - 1;
+                            } else {
+                              delete next[item.key];
+                            }
+                            return next;
+                          });
+                        };
 
-            {/* Dispatch Action */}
-            <div className="w-full md:w-64 border-t md:border-t-0 md:border-l pt-2 md:pt-0 md:pl-3 flex flex-col justify-between gap-3 text-zinc-800 text-left">
-              <div className="space-y-1">
-                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">
-                  Datos de Despacho
-                </span>
-                <div className="text-[11px] text-zinc-600 leading-tight">
-                  <div><span className="font-semibold text-zinc-800">Destinatario:</span> {producers.find(p => p.id === selectedSubClientId)?.name || 'No seleccionado'}</div>
-                  <div><span className="font-semibold text-zinc-800">Documento:</span> {document || 'No especificado'}</div>
-                </div>
+                        const handleInputChange = (val: string) => {
+                          let num = parseInt(val, 10);
+                          if (isNaN(num) || num <= 0) {
+                            setQuantitiesToDispatch(prev => {
+                              const next = { ...prev };
+                              delete next[item.key];
+                              return next;
+                            });
+                          } else {
+                            if (num > maxAvailable) num = maxAvailable;
+                            setQuantitiesToDispatch(prev => ({
+                              ...prev,
+                              [item.key]: num
+                            }));
+                          }
+                        };
+
+                        return (
+                          <div key={item.key} className="flex justify-between items-center border border-[#004b8d]/10 bg-muted/10 p-2 rounded-md">
+                            <div className="flex flex-col min-w-0 text-left">
+                              <span className="text-[10px] font-bold text-[#004b8d] truncate">
+                                {chambersConfig[item.chamberId]?.name || item.chamberId} - {item.coordinate}
+                              </span>
+                              <span className="text-[9px] text-zinc-600 truncate leading-none mt-0.5">
+                                {item.varietyName}
+                              </span>
+                            </div>
+                            {/* Controls */}
+                            <div className="flex items-center gap-1 shrink-0">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={handleDecrement}
+                                className="h-6 w-6 p-0 border-[#004b8d]/25 text-[#004b8d] bg-background"
+                              >
+                                <Minus className="h-3 w-3" />
+                              </Button>
+                              <Input
+                                type="number"
+                                value={item.selectedQty}
+                                onChange={(e) => handleInputChange(e.target.value)}
+                                className="h-6 w-10 text-center font-bold text-xs p-0 border-[#004b8d]/25 bg-background"
+                              />
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={handleIncrement}
+                                disabled={item.selectedQty >= maxAvailable}
+                                className="h-6 w-6 p-0 border-[#004b8d]/25 text-[#004b8d] bg-background"
+                              >
+                                <Plus className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          </div>
+                        );
+                      });
+                    })()}
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground italic py-4 text-left">No hay ubicaciones seleccionadas en el mapa.</p>
+                )}
               </div>
-              
-              <Button
-                onClick={handleDispatch}
-                disabled={
-                  isDispatching || 
-                  Object.keys(quantitiesToDispatch).length === 0 || 
-                  !document || 
-                  !selectedSubClientId || 
-                  (targetDispatchTotal ? totalSelectedQuantity !== parseInt(targetDispatchTotal, 10) : false)
-                }
-                className="w-full bg-[#7aba28] hover:bg-[#6aa423] text-white py-4 text-xs font-bold uppercase tracking-wider"
-              >
-                {isDispatching ? 'Creando Despacho...' : 'Enviar Solicitud de Picking'}
-              </Button>
+
+              {/* Dispatch Action (Static/Fixed Right Panel) */}
+              <div className="w-full md:w-64 md:border-l md:pl-3 flex flex-col justify-between gap-3 text-zinc-800 text-left shrink-0">
+                <div className="space-y-1">
+                  <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">
+                    Datos de Despacho
+                  </span>
+                  <div className="text-[11px] text-zinc-600 leading-tight">
+                    <div><span className="font-semibold text-zinc-800">Destinatario:</span> {producers.find(p => p.id === selectedSubClientId)?.name || 'No seleccionado'}</div>
+                    <div><span className="font-semibold text-zinc-800">Documento:</span> {document || 'No especificado'}</div>
+                  </div>
+                </div>
+                
+                <Button
+                  onClick={handleDispatch}
+                  disabled={
+                    isDispatching || 
+                    Object.keys(quantitiesToDispatch).length === 0 || 
+                    !document || 
+                    !selectedSubClientId || 
+                    (targetDispatchTotal ? totalSelectedQuantity !== parseInt(targetDispatchTotal, 10) : false)
+                  }
+                  className="w-full bg-[#7aba28] hover:bg-[#6aa423] text-white py-4 text-xs font-bold uppercase tracking-wider shadow"
+                >
+                  {isDispatching ? 'Creando Despacho...' : 'Enviar Solicitud de Picking'}
+                </Button>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       )}
     </Card>
