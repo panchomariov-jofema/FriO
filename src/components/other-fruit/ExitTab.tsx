@@ -450,6 +450,28 @@ export function OtherFruitExitTab({ clientId: fixedClientId }: { clientId?: stri
     }).filter(Boolean) as typeof fallCreekGroups;
   }, [fallCreekGroups, lotFilter]);
 
+  const availableChambers = React.useMemo(() => {
+    const chambersSet = new Set<string>();
+    filteredFallCreekGroups.forEach(group => {
+      group.lots.forEach(lot => {
+        lot.locations.forEach(loc => {
+          if (loc.quantity > 0) {
+            chambersSet.add(loc.chamberId);
+          }
+        });
+      });
+    });
+    return Array.from(chambersSet).sort();
+  }, [filteredFallCreekGroups]);
+
+  React.useEffect(() => {
+    if (selectedClientId && isFallCreekClient(selectedClientId) && availableChambers.length > 0) {
+      if (!availableChambers.includes(activeChamber)) {
+        setActiveChamber(availableChambers[0]);
+      }
+    }
+  }, [availableChambers, activeChamber, selectedClientId]);
+
   const handleClientChange = (val: string) => {
     setSelectedClientId(val);
     setSelectedSubClientId('');
@@ -738,7 +760,7 @@ export function OtherFruitExitTab({ clientId: fixedClientId }: { clientId?: stri
                 <div className="space-y-4">
                   {/* Chamber Selector Buttons */}
                   <div className="flex flex-wrap gap-2 border-b pb-2">
-                    {['CAMARA-4', 'CAMARA-5', 'CAMARA-6'].map(camId => {
+                    {availableChambers.map(camId => {
                       const config = chambersConfig[camId];
                       return (
                         <Button
@@ -828,6 +850,21 @@ export function OtherFruitExitTab({ clientId: fixedClientId }: { clientId?: stri
                                 const handleCellClick = () => {
                                   if (isPermanentlyBlocked || !hasStock) return;
                                   
+                                  if (!isSelected) {
+                                    const meta = parseInt(targetDispatchTotal, 10);
+                                    if (!isNaN(meta) && meta > 0) {
+                                      const maxAllowed = meta % 3 === 0 ? meta : meta + (3 - (meta % 3));
+                                      if (totalSelectedQuantity >= maxAllowed) {
+                                        toast({
+                                          variant: 'destructive',
+                                          title: 'Límite de Meta Alcanzado',
+                                          description: `No puede seleccionar más ubicaciones. El límite según la meta es de ${maxAllowed} Bins (${meta} Bins más tolerancia del pallet).`
+                                        });
+                                        return;
+                                      }
+                                    }
+                                  }
+
                                   setQuantitiesToDispatch(prev => {
                                     const next = { ...prev };
                                     if (isSelected) {
@@ -1144,45 +1181,76 @@ export function OtherFruitExitTab({ clientId: fixedClientId }: { clientId?: stri
                         const maxAvailable = item.maxQty - reservedQty;
 
                         const handleIncrement = () => {
-                          setQuantitiesToDispatch(prev => {
-                            const next = { ...prev };
-                            const current = next[item.key] || 0;
-                            if (current < maxAvailable) {
-                              next[item.key] = current + 1;
-                            }
-                            return next;
-                          });
-                        };
+                           const meta = parseInt(targetDispatchTotal, 10);
+                           if (!isNaN(meta) && meta > 0) {
+                             const maxAllowed = meta % 3 === 0 ? meta : meta + (3 - (meta % 3));
+                             if (totalSelectedQuantity >= maxAllowed) {
+                               toast({
+                                 variant: 'destructive',
+                                 title: 'Límite de Meta Alcanzado',
+                                 description: `No puede incrementar más allá de la meta máxima permitida de ${maxAllowed} Bins.`
+                               });
+                               return;
+                             }
+                           }
 
-                        const handleDecrement = () => {
-                          setQuantitiesToDispatch(prev => {
-                            const next = { ...prev };
-                            const current = next[item.key] || 0;
-                            if (current > 1) {
-                              next[item.key] = current - 1;
-                            } else {
-                              delete next[item.key];
-                            }
-                            return next;
-                          });
-                        };
+                           setQuantitiesToDispatch(prev => {
+                             const next = { ...prev };
+                             const current = next[item.key] || 0;
+                             if (current < maxAvailable) {
+                               next[item.key] = current + 1;
+                             }
+                             return next;
+                           });
+                         };
 
-                        const handleInputChange = (val: string) => {
-                          let num = parseInt(val, 10);
-                          if (isNaN(num) || num <= 0) {
-                            setQuantitiesToDispatch(prev => {
-                              const next = { ...prev };
-                              delete next[item.key];
-                              return next;
-                            });
-                          } else {
-                            if (num > maxAvailable) num = maxAvailable;
-                            setQuantitiesToDispatch(prev => ({
-                              ...prev,
-                              [item.key]: num
-                            }));
-                          }
-                        };
+                         const handleDecrement = () => {
+                           setQuantitiesToDispatch(prev => {
+                             const next = { ...prev };
+                             const current = next[item.key] || 0;
+                             if (current > 1) {
+                               next[item.key] = current - 1;
+                             } else {
+                               delete next[item.key];
+                             }
+                             return next;
+                           });
+                         };
+
+                         const handleInputChange = (val: string) => {
+                           let num = parseInt(val, 10);
+                           if (isNaN(num) || num <= 0) {
+                             setQuantitiesToDispatch(prev => {
+                               const next = { ...prev };
+                               delete next[item.key];
+                               return next;
+                             });
+                           } else {
+                             const meta = parseInt(targetDispatchTotal, 10);
+                             if (!isNaN(meta) && meta > 0) {
+                               const maxAllowed = meta % 3 === 0 ? meta : meta + (3 - (meta % 3));
+                               const currentSelectedForItem = quantitiesToDispatch[item.key] || 0;
+                               const projectedTotal = totalSelectedQuantity - currentSelectedForItem + num;
+                               if (projectedTotal > maxAllowed) {
+                                 num = maxAllowed - (totalSelectedQuantity - currentSelectedForItem);
+                                 if (num <= 0) {
+                                   toast({
+                                     variant: 'destructive',
+                                     title: 'Límite Excedido',
+                                     description: `La meta limita la selección a un máximo de ${maxAllowed} Bins.`
+                                   });
+                                   return;
+                                 }
+                               }
+                             }
+
+                             if (num > maxAvailable) num = maxAvailable;
+                             setQuantitiesToDispatch(prev => ({
+                               ...prev,
+                               [item.key]: num
+                             }));
+                           }
+                         };
 
                         return (
                           <div key={item.key} className="flex justify-between items-center border border-[#004b8d]/10 bg-muted/10 p-2 rounded-md">
@@ -1234,13 +1302,43 @@ export function OtherFruitExitTab({ clientId: fixedClientId }: { clientId?: stri
 
               {/* Dispatch Action (Static/Fixed Right Panel) */}
               <div className="w-full md:w-64 md:border-l md:pl-3 flex flex-col justify-between gap-3 text-zinc-800 text-left shrink-0">
-                <div className="space-y-1">
+                <div className="space-y-2">
                   <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">
-                    Datos de Despacho
+                    Requisitos de Despacho
                   </span>
-                  <div className="text-[11px] text-zinc-600 leading-tight">
-                    <div><span className="font-semibold text-zinc-800">Destinatario:</span> {producers.find(p => p.id === selectedSubClientId)?.name || 'No seleccionado'}</div>
-                    <div><span className="font-semibold text-zinc-800">Documento:</span> {document || 'No especificado'}</div>
+                  <div className="text-[11px] space-y-1 bg-zinc-50 p-2 rounded border text-zinc-600">
+                    <div className="flex items-center gap-1.5">
+                      {document ? (
+                        <span className="text-green-600 font-bold">✓</span>
+                      ) : (
+                        <span className="text-red-500 font-bold">✗</span>
+                      )}
+                      <span className={document ? 'text-zinc-700' : 'text-red-500 font-medium'}>
+                        {document ? `Documento: ${document}` : 'Falta Documento de Despacho'}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      {selectedSubClientId ? (
+                        <span className="text-green-600 font-bold">✓</span>
+                      ) : (
+                        <span className="text-red-500 font-bold">✗</span>
+                      )}
+                      <span className={selectedSubClientId ? 'text-zinc-700' : 'text-red-500 font-medium'}>
+                        {selectedSubClientId ? `Destinatario: ${producers.find(p => p.id === selectedSubClientId)?.shortName || producers.find(p => p.id === selectedSubClientId)?.name}` : 'Falta seleccionar Destinatario'}
+                      </span>
+                    </div>
+                    {targetDispatchTotal && (
+                      <div className="flex items-center gap-1.5 font-semibold">
+                        {totalSelectedQuantity === parseInt(targetDispatchTotal, 10) ? (
+                          <span className="text-green-600 font-bold">✓</span>
+                        ) : (
+                          <span className="text-red-500 font-bold">✗</span>
+                        )}
+                        <span className={totalSelectedQuantity === parseInt(targetDispatchTotal, 10) ? 'text-green-700' : 'text-red-600'}>
+                          Meta: {totalSelectedQuantity} de {targetDispatchTotal} Bins
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </div>
                 
