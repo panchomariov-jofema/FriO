@@ -44,6 +44,7 @@ export function OtherFruitPickingDialog({
   const { toast } = useToast();
   const [pickedItems, setPickedItems] = React.useState<Record<string, boolean>>({});
   const [quantities, setQuantities] = React.useState<Record<string, number>>({});
+  const [isDetailsExpanded, setIsDetailsExpanded] = React.useState(true);
   
   // Laser Scan State
   const [barcodeInput, setBarcodeInput] = React.useState('');
@@ -98,6 +99,12 @@ export function OtherFruitPickingDialog({
         setBarcodeInput('');
     }
   }, [flatItems, isFallCreek, open]);
+
+  React.useEffect(() => {
+    if (open) {
+      setIsDetailsExpanded(!isFallCreek);
+    }
+  }, [open, isFallCreek]);
 
   if (!movement) return null;
 
@@ -409,77 +416,113 @@ export function OtherFruitPickingDialog({
           </form>
         )}
 
-        <div className="overflow-x-auto border rounded-md">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-[50px] px-2 text-center">
-                  {!isFallCreek && (
-                    <Checkbox
-                        checked={selectAllState}
-                        onCheckedChange={handleSelectAll}
-                        aria-label="Seleccionar todo"
-                    />
-                  )}
-                </TableHead>
-                <TableHead className="px-2">Producto</TableHead>
-                <TableHead className="px-2">Ubicación</TableHead>
-                <TableHead className="text-right w-28 px-2">Cantidad</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {flatItems.map((item) => {
-                const progress = quantities[item.compositeKey] ?? 0;
-                const complete = progress === item.quantity;
-                const hasScanned = progress > 0;
+        {isFallCreek && (
+          <div className="flex flex-col items-center justify-center p-5 bg-[#004b8d]/5 border border-[#004b8d]/10 rounded-xl text-center space-y-3">
+            <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
+              Progreso de Recolección (Picking)
+            </div>
+            <div className="text-3xl font-black text-[#004b8d] flex items-baseline gap-1 select-none">
+              <span>{totalPicked}</span>
+              <span className="text-sm text-zinc-500 font-normal">/ {totalExpected} Bins</span>
+            </div>
+            <div className="w-full bg-zinc-200/80 h-3 rounded-full overflow-hidden relative shadow-inner">
+              <div 
+                className="bg-[#7aba28] h-full transition-all duration-500 rounded-full" 
+                style={{ width: `${totalExpected > 0 ? (totalPicked / totalExpected) * 100 : 0}%` }}
+              />
+            </div>
+            <div className="text-[10px] text-zinc-500 italic mt-0.5 leading-snug">
+              {allItemsPicked 
+                ? '✓ ¡Meta completada! Todos los bins han sido recolectados.'
+                : 'PDA lista: Escanee códigos QR para registrar la recolección física.'}
+            </div>
+          </div>
+        )}
 
-                return (
-                  <TableRow key={item.compositeKey} className={complete ? "bg-[#7aba28]/5" : ""}>
-                    <TableCell className="px-2 text-center">
-                       {isFallCreek ? (
-                         complete ? (
-                           <CheckCircle2 className="h-5 w-5 text-[#7aba28] mx-auto" />
-                         ) : hasScanned ? (
-                           <ScanLine className="h-5 w-5 text-amber-500 animate-pulse mx-auto" />
-                         ) : (
-                           <QrCode className="h-5 w-5 text-muted-foreground/30 mx-auto" />
-                         )
-                       ) : (
-                         <Checkbox
-                            checked={!!pickedItems[item.compositeKey]}
-                            onCheckedChange={(checked) => handleItemCheck(item.compositeKey, !!checked)}
-                            className="mx-auto"
-                          />
-                       )}
-                    </TableCell>
-                    <TableCell className="px-2 py-3">
-                        <div className="font-semibold text-sm leading-tight">{item.productName}</div>
-                        <div className="text-xs text-muted-foreground font-mono mt-0.5">{item.clientLotId || 'N/A'}</div>
-                    </TableCell>
-                    <TableCell className="font-mono text-sm px-2">{item.location.chamberId}<br/>{item.location.coordinate}</TableCell>
-                    <TableCell className="text-right font-medium px-2">
-                       {isFallCreek ? (
-                         <div className="text-sm font-semibold whitespace-nowrap">
-                           <span className={complete ? "text-[#7aba28] font-bold" : "text-amber-600"}>{progress}</span>
-                           <span className="text-muted-foreground font-normal text-xs"> / {item.quantity}</span>
-                         </div>
-                       ) : (
-                         <Input
-                              type="number"
-                              value={quantities[item.compositeKey] ?? ''}
-                              onChange={(e) => handleQuantityChange(item.compositeKey, item.quantity, e.target.value)}
-                              max={item.quantity}
-                              min={0}
-                              className="h-8 w-16 ml-auto text-right px-1.5"
-                          />
-                       )}
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
+        <div className="flex justify-center py-0.5">
+          <Button 
+            type="button" 
+            variant="ghost" 
+            onClick={() => setIsDetailsExpanded(!isDetailsExpanded)}
+            className="text-xs text-[#004b8d] font-bold hover:bg-[#004b8d]/5 flex items-center gap-1 h-8"
+          >
+            {isDetailsExpanded ? 'Ocultar Detalle de Ubicaciones ▲' : 'Ver Detalle de Ubicaciones ▼'}
+          </Button>
         </div>
+
+        {isDetailsExpanded && (
+          <div className="overflow-x-auto border rounded-md max-h-[35vh]">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[50px] px-2 text-center">
+                    {!isFallCreek && (
+                      <Checkbox
+                          checked={selectAllState}
+                          onCheckedChange={handleSelectAll}
+                          aria-label="Seleccionar todo"
+                      />
+                    )}
+                  </TableHead>
+                  <TableHead className="px-2">Producto</TableHead>
+                  <TableHead className="px-2">Ubicación</TableHead>
+                  <TableHead className="text-right w-28 px-2">Cantidad</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {flatItems.map((item) => {
+                  const progress = quantities[item.compositeKey] ?? 0;
+                  const complete = progress === item.quantity;
+                  const hasScanned = progress > 0;
+
+                  return (
+                    <TableRow key={item.compositeKey} className={complete ? "bg-[#7aba28]/5" : ""}>
+                      <TableCell className="px-2 text-center">
+                         {isFallCreek ? (
+                           complete ? (
+                             <CheckCircle2 className="h-5 w-5 text-[#7aba28] mx-auto" />
+                           ) : hasScanned ? (
+                             <ScanLine className="h-5 w-5 text-amber-500 animate-pulse mx-auto" />
+                           ) : (
+                             <QrCode className="h-5 w-5 text-muted-foreground/30 mx-auto" />
+                           )
+                         ) : (
+                           <Checkbox
+                              checked={!!pickedItems[item.compositeKey]}
+                              onCheckedChange={(checked) => handleItemCheck(item.compositeKey, !!checked)}
+                              className="mx-auto"
+                           />
+                         )}
+                      </TableCell>
+                      <TableCell className="px-2 py-3">
+                          <div className="font-semibold text-sm leading-tight">{item.productName}</div>
+                          <div className="text-xs text-muted-foreground font-mono mt-0.5">{item.clientLotId || 'N/A'}</div>
+                      </TableCell>
+                      <TableCell className="font-mono text-sm px-2">{item.location.chamberId}<br/>{item.location.coordinate}</TableCell>
+                      <TableCell className="text-right font-medium px-2">
+                         {isFallCreek ? (
+                           <div className="text-sm font-semibold whitespace-nowrap">
+                             <span className={complete ? "text-[#7aba28] font-bold" : "text-amber-600"}>{progress}</span>
+                             <span className="text-muted-foreground font-normal text-xs"> / {item.quantity}</span>
+                           </div>
+                         ) : (
+                           <Input
+                                type="number"
+                                value={quantities[item.compositeKey] ?? ''}
+                                onChange={(e) => handleQuantityChange(item.compositeKey, item.quantity, e.target.value)}
+                                max={item.quantity}
+                                min={0}
+                                className="h-8 w-16 ml-auto text-right px-1.5"
+                            />
+                         )}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
+        )}
 
         {/* List of scanned QR codes for Fall Creek */}
         {isFallCreek && scannedQrCodes.size > 0 && (
