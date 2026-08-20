@@ -96,6 +96,15 @@ const reportList = [
         image: PlaceHolderImages.find(img => img.id === 'report-truck')
     },
     { 
+        id: 'despachos-fallcreek',
+        title: 'Reporte de Despachos Fall Creek', 
+        description: 'Detalle de despachos confirmados de Fall Creek con edición de documento de despacho.',
+        href: '/reportes/despachos-fallcreek',
+        icon: Truck,
+        color: 'text-[#7aba28]',
+        image: PlaceHolderImages.find(img => img.id === 'report-truck')
+    },
+    { 
         id: 'registro-temperaturas',
         title: 'Registro de Temperaturas', 
         description: 'Bitácora histórica de las mediciones de frío realizadas en cada una de las cámaras.',
