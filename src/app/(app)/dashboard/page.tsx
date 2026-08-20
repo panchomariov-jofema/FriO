@@ -736,7 +736,7 @@ export default function DashboardPage() {
     }, [binMaterials, binMaterialMovements, loadingBinMaterialMovements, loadingBinMaterials]);
 
     const leasedBinsData = React.useMemo(() => {
-        if (loadingBinMaterialMovements || loadingBinMaterials || loadingProducers) return [];
+        if (loadingBinMaterialMovements || loadingBinMaterials || loadingExporters) return [];
 
         const fnoBinMaterialCodes = new Set(
             (binMaterials || [])
@@ -744,9 +744,9 @@ export default function DashboardPage() {
                 .map(m => m.code)
         );
 
-        const producerMap = (producers || []).reduce((acc, p) => {
-            if (p.producerId) {
-                acc[p.producerId.trim()] = p.shortName || p.name;
+        const exporterMap = (exporters || []).reduce((acc, e) => {
+            if (e.exporterId) {
+                acc[e.exporterId.trim()] = e.name || e.exporterId;
             }
             return acc;
         }, {} as Record<string, string>);
@@ -756,25 +756,24 @@ export default function DashboardPage() {
         (binMaterialMovements || []).forEach(mov => {
             if (mov.exporterId !== 'EXP005') return;
             if (mov.observation === 'Despacho Directo') return;
-            if (!mov.producerId || mov.producerId.trim() === 'SISTEMA') return;
 
-            const cleanProducerId = mov.producerId.trim();
+            const cleanExporterId = mov.exporterId.trim();
 
             mov.items.forEach(item => {
                 if (fnoBinMaterialCodes.has(item.binMaterialCode)) {
                     const qty = mov.type === 'salida' ? item.quantity : -item.quantity;
                     
-                    if (!leasedBalances[cleanProducerId]) {
-                        const producerObj = (producers || []).find(p => p.producerId && p.producerId.trim() === cleanProducerId);
-                        leasedBalances[cleanProducerId] = {
-                            id: cleanProducerId,
-                            producerId: cleanProducerId,
-                            producerName: producerMap[cleanProducerId] || cleanProducerId,
-                            rut: producerObj?.rut ? producerObj.rut.trim() : cleanProducerId,
+                    if (!leasedBalances[cleanExporterId]) {
+                        const exporterObj = (exporters || []).find(e => e.exporterId && e.exporterId.trim() === cleanExporterId) as any;
+                        leasedBalances[cleanExporterId] = {
+                            id: cleanExporterId,
+                            producerId: cleanExporterId,
+                            producerName: exporterMap[cleanExporterId] || cleanExporterId,
+                            rut: exporterObj?.rut ? exporterObj.rut.trim() : '76.361.536-7',
                             quantity: 0
                         };
                     }
-                    leasedBalances[cleanProducerId].quantity += qty;
+                    leasedBalances[cleanExporterId].quantity += qty;
                 }
             });
         });
@@ -782,7 +781,7 @@ export default function DashboardPage() {
         return Object.values(leasedBalances)
             .filter(item => item.quantity > 0)
             .sort((a, b) => b.quantity - a.quantity);
-    }, [binMaterials, binMaterialMovements, producers, loadingBinMaterialMovements, loadingBinMaterials, loadingProducers]);
+    }, [binMaterials, binMaterialMovements, exporters, loadingBinMaterialMovements, loadingBinMaterials, loadingExporters]);
 
     const totalLeasedBins = React.useMemo(() => {
         return leasedBinsData.reduce((sum, item) => sum + item.quantity, 0);
