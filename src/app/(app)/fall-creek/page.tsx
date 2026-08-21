@@ -269,10 +269,12 @@ export default function FallCreekPage() {
                 if (destRut && p.rut && p.rut.replace(/[^0-9kK]/g, '') === destRut.replace(/[^0-9kK]/g, '')) return true;
                 if (destName && p.name && p.name.toUpperCase() === destName.toUpperCase()) return true;
                 if (destName && p.shortName && p.shortName.toUpperCase() === destName.toUpperCase()) return true;
+                if (destName && (p.id === destName || p.producerId?.trim() === destName)) return true;
+                if (mov.destinationClientId && (p.id === mov.destinationClientId || p.producerId?.trim() === mov.destinationClientId)) return true;
                 return false;
             });
 
-            const pId = matchingProducer ? matchingProducer.producerId || matchingProducer.id : destRut || destName || 'Otros';
+            const pId = matchingProducer ? matchingProducer.id : mov.destinationClientId || destRut || destName || 'Otros';
             const pName = matchingProducer ? matchingProducer.shortName || matchingProducer.name : destName || 'Otros';
             const pRut = matchingProducer ? matchingProducer.rut || '' : destRut || '';
 
@@ -305,8 +307,8 @@ export default function FallCreekPage() {
             if (fcIds.has(cleanProdId)) {
                 fcDirectReturns += returnedQty;
             } else {
-                const matchingProducer = allProducers.find(p => p.producerId?.trim() === cleanProdId || p.id?.trim() === cleanProdId);
-                const pId = matchingProducer ? matchingProducer.producerId || matchingProducer.id : cleanProdId;
+                const matchingProducer = allProducers.find(p => p.id === cleanProdId || p.producerId?.trim() === cleanProdId);
+                const pId = matchingProducer ? matchingProducer.id : cleanProdId;
                 
                 producerReturnMap.set(pId, (producerReturnMap.get(pId) || 0) + returnedQty);
             }

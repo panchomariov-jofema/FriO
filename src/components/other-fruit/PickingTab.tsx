@@ -223,36 +223,9 @@ export function OtherFruitPickingTab() {
             batch.update(update.ref, { items: update.items, updatedAt: serverTimestamp() });
         });
 
-        const isFallCreek = confirmedMovement.clientName?.toUpperCase() === 'FALL CREEK' || confirmedMovement.clientId === '76361536-7';
-        if (isFallCreek && confirmedMovement.destinationClientId) {
-            const totalBins = confirmedMovement.items.reduce((sum, item) => sum + item.quantity, 0);
-            if (totalBins > 0) {
-                const binMovementRef = doc(collection(firestore, 'binMaterialMovements'));
-                const binMovementData = {
-                    type: 'salida',
-                    document: confirmedMovement.document || '',
-                    driverName: '',
-                    driverRUT: '',
-                    patente_vehiculo: '',
-                    exporterId: 'EXP005',
-                    producerId: confirmedMovement.destinationClientId,
-                    items: [
-                        {
-                            binMaterialId: 'C6hVKlGF375OxDvoe9l7',
-                            binMaterialCode: '10017',
-                            binMaterialName: 'BINS_PALOGIX',
-                            quantity: totalBins
-                        }
-                    ],
-                    observation: `Despacho automático desde Fall Creek (Confirmación de Picking)`,
-                    createdAt: serverTimestamp()
-                };
-                batch.set(binMovementRef, binMovementData);
-            }
-        }
-        
         await batch.commit();
 
+        const isFallCreek = confirmedMovement.clientName?.toUpperCase() === 'FALL CREEK' || confirmedMovement.clientId === '76361536-7';
         if (isFallCreek) {
             notifyFallCreekPickingCompleted(firestore, confirmedMovement).catch(err => {
                 console.error("Error al enviar la notificación de Telegram de picking completado:", err);
