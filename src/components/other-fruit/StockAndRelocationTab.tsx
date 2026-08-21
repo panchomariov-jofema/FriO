@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { BarcodeScanner } from '@/components/BarcodeScanner';
 import { useToast } from '@/hooks/use-toast';
+import { safeFormatDate } from '@/lib/utils';
 
 interface StoredOtherFruitItem {
     id: string; // receptionId + itemIndex
@@ -190,9 +191,7 @@ export function StockAndRelocationTab({ clientId: fixedClientId }: { clientId?: 
                   ))
                 ) : filteredItems.length > 0 ? (
                   filteredItems.map((item) => {
-                    const storedDate = item.storedAt?.toDate 
-                        ? item.storedAt.toDate().toLocaleDateString() 
-                        : (item.storedAt ? new Date(item.storedAt).toLocaleDateString() : 'Sin fecha');
+                    const storedDate = safeFormatDate(item.storedAt, 'dd-MM-yyyy', 'Sin fecha');
                     
                     return (
                       <TableRow key={item.id} className="hover:bg-muted/30">

@@ -1510,9 +1510,7 @@ export default function FallCreekPage() {
                                             <TableBody>
                                                 {filtered.length > 0 ? (
                                                     filtered.map((item) => {
-                                                        const storedDate = item.storedAt?.toDate 
-                                                            ? item.storedAt.toDate().toLocaleDateString() 
-                                                            : (item.storedAt ? new Date(item.storedAt).toLocaleDateString() : 'Sin fecha');
+                                                        const storedDate = safeFormatDate(item.storedAt, 'dd-MM-yyyy', 'Sin fecha');
                                                         return (
                                                             <TableRow key={item.id}>
                                                                 <TableCell>{storedDate}</TableCell>
@@ -1656,7 +1654,7 @@ export default function FallCreekPage() {
                                                 const status = mov.status === 'Completado' ? 'Completado' : 'En Proceso';
                                                 return (
                                                     <TableRow key={mov.id}>
-                                                        <TableCell className="text-xs">{mov.createdAt?.toDate()?.toLocaleString('es-CL') ?? 'Sin fecha'}</TableCell>
+                                                        <TableCell className="text-xs">{safeFormatDate(mov.createdAt, 'dd-MM-yyyy HH:mm', 'Sin fecha')}</TableCell>
                                                         <TableCell className="font-mono font-bold">{mov.document || '-'}</TableCell>
                                                         <TableCell className="font-mono text-[10px] max-w-[250px] truncate">{mov.lotes}</TableCell>
                                                         <TableCell className="font-semibold">{mov.totalQuantity} {mov.unit}</TableCell>
@@ -2064,7 +2062,7 @@ export default function FallCreekPage() {
                          <DialogHeader>
                              <DialogTitle className="text-[#004b8d]">Detalle de Manifiesto (Pallet Log)</DialogTitle>
                              <DialogDescription>
-                                 Pallet Log: {receptionToView.document} {receptionToView.documentNumber ? ` - N° Documento: ${receptionToView.documentNumber}` : ''} - Fecha: {receptionToView.createdAt?.toDate()?.toLocaleDateString() ?? 'Sin fecha'}
+                                 Pallet Log: {receptionToView.document} {receptionToView.documentNumber ? ` - N° Documento: ${receptionToView.documentNumber}` : ''} - Fecha: {safeFormatDate(receptionToView.createdAt, 'dd-MM-yyyy', 'Sin fecha')}
                              </DialogDescription>
                          </DialogHeader>
                          <div className="max-h-96 overflow-y-auto overflow-x-auto">
