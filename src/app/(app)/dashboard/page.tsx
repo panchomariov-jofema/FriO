@@ -724,6 +724,7 @@ export default function DashboardPage() {
         (binMaterialMovements || []).forEach(mov => {
             if (mov.exporterId !== 'EXP005') return;
             if (mov.observation === 'Despacho Directo') return;
+            if (mov.noAffectStock || (mov as any).isFruitDispatch) return;
             
             mov.items.forEach(item => {
                 if (fnoBinMaterialCodes.has(item.binMaterialCode)) {
@@ -756,6 +757,7 @@ export default function DashboardPage() {
         (binMaterialMovements || []).forEach(mov => {
             if (mov.exporterId !== 'EXP005') return;
             if (mov.observation === 'Despacho Directo') return;
+            if (mov.noAffectStock || (mov as any).isFruitDispatch) return;
             if (!mov.producerId || mov.producerId.trim() === 'SISTEMA') return;
 
             const cleanExporterId = mov.exporterId.trim();

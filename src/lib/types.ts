@@ -56,6 +56,8 @@ export interface BinMaterialMovement {
   observation?: string;
   userId?: string;
   userName?: string;
+  noAffectStock?: boolean;
+  isFruitDispatch?: boolean;
 }
 
 export interface BinMaterialStock {

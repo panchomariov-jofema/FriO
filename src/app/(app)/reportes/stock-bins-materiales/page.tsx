@@ -73,6 +73,7 @@ export default function BinMaterialStockReportPage() {
         (movements || []).forEach(mov => {
             const isDirectDispatch = mov.observation === 'Despacho Directo';
             if (isDirectDispatch) return;
+            if (mov.noAffectStock || (mov as any).isFruitDispatch) return;
 
             mov.items.forEach(item => {
                 const qty = mov.type === 'entrada' ? item.quantity : -item.quantity;

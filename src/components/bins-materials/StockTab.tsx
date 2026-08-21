@@ -102,6 +102,7 @@ export function StockTab({ exporterId }: StockTabProps) {
     // 1. Manual Movements from Kardex
     (movements || []).forEach(mov => {
         if (mov.observation === 'Despacho Directo') return;
+        if (mov.noAffectStock || (mov as any).isFruitDispatch) return;
         mov.items.forEach(item => {
             const qty = mov.type === 'entrada' ? item.quantity : -item.quantity;
             const currentName = materialMap.get(item.binMaterialCode) || item.binMaterialName;

@@ -113,6 +113,7 @@ export function ExitsTab({ exporterId, exporterName, producerId }: ExitsTabProps
     // 1. Manual Movements from Kardex
     (movements || []).forEach(mov => {
         if (mov.exporterId !== exporterId || mov.observation === 'Despacho Directo') return;
+        if (mov.noAffectStock || (mov as any).isFruitDispatch) return;
         mov.items.forEach(item => {
             const current = stockMap.get(item.binMaterialCode) || 0;
             const qty = mov.type === 'entrada' ? item.quantity : -item.quantity;
