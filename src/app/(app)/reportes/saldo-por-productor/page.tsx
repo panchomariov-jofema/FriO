@@ -236,12 +236,12 @@ export default function ProducerBalanceReportPage() {
                                     <AccordionItem key={idx} value={`item-${idx}`} className="border-b last:border-b-0">
                                         <AccordionTrigger className="hover:no-underline py-4 px-4">
                                             <div className="flex justify-between items-center w-full pr-4 text-left">
-                                                <div className="flex flex-col sm:flex-row sm:items-center gap-y-1 gap-x-16 flex-1 min-w-0">
-                                                    <div className="sm:w-36 shrink-0 truncate">
+                                                <div className="grid grid-cols-[100px_1fr] items-center gap-x-8 flex-1 min-w-0">
+                                                    <div className="min-w-0 truncate">
                                                         <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">Exportador</p>
                                                         <p className="text-sm font-medium truncate">{group.exporterName}</p>
                                                     </div>
-                                                    <div className="min-w-0 flex-1 truncate">
+                                                    <div className="min-w-0 truncate">
                                                         <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">Productor</p>
                                                         <p className="text-sm font-bold text-primary truncate">{group.producerName}</p>
                                                     </div>
