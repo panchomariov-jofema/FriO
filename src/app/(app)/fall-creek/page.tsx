@@ -246,6 +246,38 @@ export default function FallCreekPage() {
             }
         });
 
+        const findProducer = (prodCodeOrRut: string, prodName?: string) => {
+            const cleanCode = prodCodeOrRut ? prodCodeOrRut.trim().replace(/[^0-9kK]/g, '') : '';
+            const cleanName = prodName ? prodName.trim().toUpperCase() : '';
+
+            let matched = allProducers.find(p => p.id === prodCodeOrRut);
+            if (matched) return matched;
+
+            const matches = allProducers.filter(p => {
+                if (cleanCode) {
+                    if (p.rut && p.rut.replace(/[^0-9kK]/g, '') === cleanCode) return true;
+                    if (p.producerId && p.producerId.replace(/[^0-9kK]/g, '') === cleanCode) return true;
+                }
+                if (cleanName) {
+                    if (p.name && p.name.toUpperCase() === cleanName) return true;
+                    if (p.shortName && p.shortName.toUpperCase() === cleanName) return true;
+                }
+                return false;
+            });
+
+            if (matches.length > 0) {
+                const fcMatch = matches.find(p => {
+                    if (Array.isArray(p.exporterId)) {
+                        return p.exporterId.includes('EXP004') || p.exporterId.includes('EXP005') || p.exporterId.includes('76361536-7');
+                    }
+                    return p.exporterId === 'EXP004' || p.exporterId === 'EXP005' || p.exporterId === '76361536-7';
+                });
+                return fcMatch || matches[0];
+            }
+
+            return null;
+        };
+
         // 4. Calculate Dispatched Bins per Agricultural Customer
         const producerDispatchMap = new Map<string, { name: string; rut: string; quantity: number }>();
         allMovements.forEach(mov => {
@@ -265,15 +297,7 @@ export default function FallCreekPage() {
 
             if (binsQty <= 0) return;
 
-            const matchingProducer = allProducers.find(p => {
-                if (destRut && p.rut && p.rut.replace(/[^0-9kK]/g, '') === destRut.replace(/[^0-9kK]/g, '')) return true;
-                if (destName && p.name && p.name.toUpperCase() === destName.toUpperCase()) return true;
-                if (destName && p.shortName && p.shortName.toUpperCase() === destName.toUpperCase()) return true;
-                if (destName && (p.id === destName || p.producerId?.trim() === destName)) return true;
-                if (mov.destinationClientId && (p.id === mov.destinationClientId || p.producerId?.trim() === mov.destinationClientId)) return true;
-                return false;
-            });
-
+            const matchingProducer = findProducer(destRut || destName, destName);
             const pId = matchingProducer ? matchingProducer.id : mov.destinationClientId || destRut || destName || 'Otros';
             const pName = matchingProducer ? matchingProducer.shortName || matchingProducer.name : destName || 'Otros';
             const pRut = matchingProducer ? matchingProducer.rut || '' : destRut || '';
@@ -307,7 +331,7 @@ export default function FallCreekPage() {
             if (fcIds.has(cleanProdId)) {
                 fcDirectReturns += returnedQty;
             } else {
-                const matchingProducer = allProducers.find(p => p.id === cleanProdId || p.producerId?.trim() === cleanProdId);
+                const matchingProducer = findProducer(cleanProdId);
                 const pId = matchingProducer ? matchingProducer.id : cleanProdId;
                 
                 producerReturnMap.set(pId, (producerReturnMap.get(pId) || 0) + returnedQty);

@@ -63,6 +63,38 @@ export default function ProducerBalanceReportPage() {
             if (p.id) producerMap.set(p.id, p.shortName || p.name);
             if (p.producerId) producerMap.set(p.producerId, p.shortName || p.name);
         });
+
+        const findProducer = (prodCodeOrRut: string, prodName?: string) => {
+            const cleanCode = prodCodeOrRut ? prodCodeOrRut.trim().replace(/[^0-9kK]/g, '') : '';
+            const cleanName = prodName ? prodName.trim().toUpperCase() : '';
+
+            let matched = activeProducers.find(p => p.id === prodCodeOrRut);
+            if (matched) return matched;
+
+            const matches = activeProducers.filter(p => {
+                if (cleanCode) {
+                    if (p.rut && p.rut.replace(/[^0-9kK]/g, '') === cleanCode) return true;
+                    if (p.producerId && p.producerId.replace(/[^0-9kK]/g, '') === cleanCode) return true;
+                }
+                if (cleanName) {
+                    if (p.name && p.name.toUpperCase() === cleanName) return true;
+                    if (p.shortName && p.shortName.toUpperCase() === cleanName) return true;
+                }
+                return false;
+            });
+
+            if (matches.length > 0) {
+                const fcMatch = matches.find(p => {
+                    if (Array.isArray(p.exporterId)) {
+                        return p.exporterId.includes('EXP004') || p.exporterId.includes('EXP005') || p.exporterId.includes('76361536-7');
+                    }
+                    return p.exporterId === 'EXP004' || p.exporterId === 'EXP005' || p.exporterId === '76361536-7';
+                });
+                return fcMatch || matches[0];
+            }
+
+            return null;
+        };
         
         // Fresher material maps by ID and Code
         const materialIdMap = new Map(allMaterials.map(m => [m.id, m]));
@@ -82,7 +114,7 @@ export default function ProducerBalanceReportPage() {
             if (!activeExporterIds.has(mov.exporterId)) return;
 
             mov.items.forEach(item => {
-                const matchingProd = activeProducers.find(p => p.id === mov.producerId || p.producerId === mov.producerId);
+                const matchingProd = findProducer(mov.producerId);
                 let effectiveProducerId = matchingProd ? matchingProd.producerId : mov.producerId;
                 let effectiveProducerName = matchingProd ? matchingProd.shortName || matchingProd.name : mov.producerId;
                 let isException = false;
