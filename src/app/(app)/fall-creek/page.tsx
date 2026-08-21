@@ -1509,7 +1509,9 @@ export default function FallCreekPage() {
                                             </TableHeader>
                                             <TableBody>
                                                 {filtered.length > 0 ? (
-                                                    filtered.map((item) => {
+                                                    [...filtered]
+                                                        .sort((a, b) => safeToMillis(a.storedAt) - safeToMillis(b.storedAt))
+                                                        .map((item) => {
                                                         const storedDate = safeFormatDate(item.storedAt, 'dd-MM-yyyy', 'Sin fecha');
                                                         return (
                                                             <TableRow key={item.id}>

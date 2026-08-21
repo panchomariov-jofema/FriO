@@ -12,7 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { BarcodeScanner } from '@/components/BarcodeScanner';
 import { useToast } from '@/hooks/use-toast';
-import { safeFormatDate } from '@/lib/utils';
+import { safeFormatDate, safeToMillis } from '@/lib/utils';
 
 interface StoredOtherFruitItem {
     id: string; // receptionId + itemIndex
@@ -190,7 +190,9 @@ export function StockAndRelocationTab({ clientId: fixedClientId }: { clientId?: 
                     </TableRow>
                   ))
                 ) : filteredItems.length > 0 ? (
-                  filteredItems.map((item) => {
+                  [...filteredItems]
+                    .sort((a, b) => safeToMillis(a.storedAt) - safeToMillis(b.storedAt))
+                    .map((item) => {
                     const storedDate = safeFormatDate(item.storedAt, 'dd-MM-yyyy', 'Sin fecha');
                     
                     return (
