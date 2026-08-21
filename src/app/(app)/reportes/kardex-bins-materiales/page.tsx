@@ -178,7 +178,11 @@ export default function BinMaterialKardexReportPage() {
         (otherClients || []).forEach(c => {
             expMap.set(c.clientId, c.name);
         });
-        const prodMap = new Map((producers || []).map(p => [p.producerId, p.shortName]));
+        const prodMap = new Map();
+        (producers || []).forEach(p => {
+            if (p.id) prodMap.set(p.id, p.shortName || p.name);
+            if (p.producerId) prodMap.set(p.producerId, p.shortName || p.name);
+        });
         const recLotMap = new Map((receptionLots || []).map(l => [l.displayLotId, l]));
         const matMasterMap = new Map((allMaterials || []).map(m => [m.code, m.name]));
         return { exporterMap: expMap, producerMap: prodMap, receptionLotMap: recLotMap, materialMasterMap: matMasterMap };

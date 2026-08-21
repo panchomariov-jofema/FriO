@@ -55,10 +55,14 @@ export default function ProducerBalanceReportPage() {
         const activeExporters = allExporters.filter(e => e.status !== 'inactivo');
         const activeExporterIds = new Set(activeExporters.map(e => e.exporterId));
         const activeProducers = allProducers.filter(p => p.status !== 'inactivo');
-        const activeProducerIds = new Set(activeProducers.map(p => p.producerId));
+        const activeProducerIds = new Set(activeProducers.flatMap(p => [p.producerId, p.id]));
 
         const exporterMap = new Map(activeExporters.map(e => [e.exporterId, e.name]));
-        const producerMap = new Map(activeProducers.map(p => [p.producerId, p.shortName]));
+        const producerMap = new Map();
+        activeProducers.forEach(p => {
+            if (p.id) producerMap.set(p.id, p.shortName || p.name);
+            if (p.producerId) producerMap.set(p.producerId, p.shortName || p.name);
+        });
         
         // Fresher material maps by ID and Code
         const materialIdMap = new Map(allMaterials.map(m => [m.id, m]));
@@ -78,8 +82,9 @@ export default function ProducerBalanceReportPage() {
             if (!activeExporterIds.has(mov.exporterId)) return;
 
             mov.items.forEach(item => {
-                let effectiveProducerId = mov.producerId;
-                let effectiveProducerName = producerMap.get(mov.producerId) || mov.producerId;
+                const matchingProd = activeProducers.find(p => p.id === mov.producerId || p.producerId === mov.producerId);
+                let effectiveProducerId = matchingProd ? matchingProd.producerId : mov.producerId;
+                let effectiveProducerName = matchingProd ? matchingProd.shortName || matchingProd.name : mov.producerId;
                 let isException = false;
 
                 // Lógica de excepción para PALOGIX - Se identifica por el documento y código de producto
