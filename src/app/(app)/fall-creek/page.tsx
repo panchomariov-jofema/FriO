@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { useFirestore, useUser } from '@/firebase';
-import { collection, writeBatch, doc, setDoc, serverTimestamp, addDoc, deleteDoc, updateDoc } from 'firebase/firestore';
+import { collection, writeBatch, doc, setDoc, serverTimestamp, addDoc, deleteDoc, updateDoc, query, where, getDocs } from 'firebase/firestore';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -108,6 +108,210 @@ export default function FallCreekPage() {
         setActiveTab('storage');
         setOpenAccordions(prev => Array.from(new Set([...prev, chamberId])));
         setHighlightedCoordinate({ chamberId, coordinate });
+    };
+
+    const handleStartTest = async () => {
+        if (!firestore || !fallCreekClient) {
+            toast({
+                title: "Error",
+                description: "Firebase o cliente Fall Creek no inicializado",
+                variant: "destructive"
+            });
+            return;
+        }
+
+        try {
+            const testReceptionRef = doc(firestore, 'otherFruitReceptions', 'test-sekoya-reception');
+            const testReceptionData = {
+                id: 'test-sekoya-reception',
+                clientId: fallCreekClient.id || 'rKHAGeIpt5rigsAmHYza',
+                clientName: 'FALL CREEK',
+                document: 'TEST-SEKOYA-001',
+                documentNumber: '9999',
+                createdAt: new Date(),
+                status: 'Almacenado',
+                exporterId: 'EXP005',
+                items: [
+                    {
+                        palletId: 'PALLET-TEST-S1',
+                        containerId: 'BIN-TEST-S1',
+                        productCode: '10017',
+                        productName: 'Sekoya Prueba',
+                        quantity: 3,
+                        status: 'Almacenado',
+                        storageLocation: {
+                            chamberId: 'CAMARA-6',
+                            coordinate: 'C6-A1'
+                        }
+                    },
+                    {
+                        palletId: 'PALLET-TEST-S2',
+                        containerId: 'BIN-TEST-S2',
+                        productCode: '10017',
+                        productName: 'Sekoya Prueba',
+                        quantity: 3,
+                        status: 'Almacenado',
+                        storageLocation: {
+                            chamberId: 'CAMARA-6',
+                            coordinate: 'C6-A2'
+                        }
+                    },
+                    {
+                        palletId: 'PALLET-TEST-S3',
+                        containerId: 'BIN-TEST-S3',
+                        productCode: '10017',
+                        productName: 'Sekoya Prueba',
+                        quantity: 3,
+                        status: 'Almacenado',
+                        storageLocation: {
+                            chamberId: 'CAMARA-6',
+                            coordinate: 'C6-A3'
+                        }
+                    }
+                ]
+            };
+
+            await setDoc(testReceptionRef, testReceptionData);
+
+            toast({
+                title: "Prueba Iniciada",
+                description: "Se cargaron 3 pallets de 'Sekoya Prueba' en la Cámara 6 (Ubicaciones C6-A1, C6-A2, C6-A3). Ahora puedes simular el despacho.",
+            });
+        } catch (error: any) {
+            console.error("Error starting test:", error);
+            toast({
+                title: "Error al iniciar prueba",
+                description: error.message,
+                variant: "destructive"
+            });
+        }
+    };
+
+    const handleResetTestCycle = async () => {
+        if (!firestore) return;
+
+        try {
+            const testReceptionRef = doc(firestore, 'otherFruitReceptions', 'test-sekoya-reception');
+            await updateDoc(testReceptionRef, {
+                status: 'Almacenado',
+                items: [
+                    {
+                        palletId: 'PALLET-TEST-S1',
+                        containerId: 'BIN-TEST-S1',
+                        productCode: '10017',
+                        productName: 'Sekoya Prueba',
+                        quantity: 3,
+                        status: 'Almacenado',
+                        storageLocation: {
+                            chamberId: 'CAMARA-6',
+                            coordinate: 'C6-A1'
+                        }
+                    },
+                    {
+                        palletId: 'PALLET-TEST-S2',
+                        containerId: 'BIN-TEST-S2',
+                        productCode: '10017',
+                        productName: 'Sekoya Prueba',
+                        quantity: 3,
+                        status: 'Almacenado',
+                        storageLocation: {
+                            chamberId: 'CAMARA-6',
+                            coordinate: 'C6-A2'
+                        }
+                    },
+                    {
+                        palletId: 'PALLET-TEST-S3',
+                        containerId: 'BIN-TEST-S3',
+                        productCode: '10017',
+                        productName: 'Sekoya Prueba',
+                        quantity: 3,
+                        status: 'Almacenado',
+                        storageLocation: {
+                            chamberId: 'CAMARA-6',
+                            coordinate: 'C6-A3'
+                        }
+                    }
+                ]
+            });
+
+            const fcMovementsQuery = query(
+                collection(firestore, 'otherFruitMovements'),
+                where('clientName', '==', 'FALL CREEK')
+            );
+            const fcMovementsSnap = await getDocs(fcMovementsQuery);
+            for (const docSnap of fcMovementsSnap.docs) {
+                const data = docSnap.data();
+                const hasSekoyaPrueba = (data.items || []).some((it: any) => it.variety === 'Sekoya Prueba' || it.varietyOrProduct === 'Sekoya Prueba');
+                if (hasSekoyaPrueba) {
+                    await deleteDoc(docSnap.ref);
+                }
+            }
+
+            const binMovementsSnap = await getDocs(collection(firestore, 'binMaterialMovements'));
+            for (const docSnap of binMovementsSnap.docs) {
+                const data = docSnap.data();
+                const hasSekoyaPrueba = (data.items || []).some((it: any) => it.binMaterialName === 'Sekoya Prueba' || it.variety === 'Sekoya Prueba');
+                const isTestObservation = String(data.observation || '').includes('test-sekoya-reception') || String(data.observation || '').includes('Sekoya Prueba');
+                if (hasSekoyaPrueba || isTestObservation) {
+                    await deleteDoc(docSnap.ref);
+                }
+            }
+
+            toast({
+                title: "Ciclo Reiniciado",
+                description: "Se eliminaron los movimientos de salida de la prueba. Los 3 pallets de 'Sekoya Prueba' están nuevamente Almacenados en la Cámara 6.",
+            });
+        } catch (error: any) {
+            console.error("Error resetting test:", error);
+            toast({
+                title: "Error al reiniciar ciclo",
+                description: error.message,
+                variant: "destructive"
+            });
+        }
+    };
+
+    const handleDeleteTestData = async () => {
+        if (!firestore) return;
+
+        try {
+            await deleteDoc(doc(firestore, 'otherFruitReceptions', 'test-sekoya-reception'));
+
+            const fcMovementsQuery = query(
+                collection(firestore, 'otherFruitMovements'),
+                where('clientName', '==', 'FALL CREEK')
+            );
+            const fcMovementsSnap = await getDocs(fcMovementsQuery);
+            for (const docSnap of fcMovementsSnap.docs) {
+                const data = docSnap.data();
+                const hasSekoyaPrueba = (data.items || []).some((it: any) => it.variety === 'Sekoya Prueba' || it.varietyOrProduct === 'Sekoya Prueba');
+                if (hasSekoyaPrueba) {
+                    await deleteDoc(docSnap.ref);
+                }
+            }
+
+            const binMovementsSnap = await getDocs(collection(firestore, 'binMaterialMovements'));
+            for (const docSnap of binMovementsSnap.docs) {
+                const data = docSnap.data();
+                const hasSekoyaPrueba = (data.items || []).some((it: any) => it.binMaterialName === 'Sekoya Prueba' || it.variety === 'Sekoya Prueba');
+                const isTestObservation = String(data.observation || '').includes('test-sekoya-reception') || String(data.observation || '').includes('Sekoya Prueba');
+                if (hasSekoyaPrueba || isTestObservation) {
+                    await deleteDoc(docSnap.ref);
+                }
+            }
+
+            toast({
+                title: "Datos de Prueba Eliminados",
+                description: "Se limpiaron todos los registros de prueba de la base de datos.",
+            });
+        } catch (error: any) {
+            console.error("Error deleting test data:", error);
+            toast({
+                title: "Error al eliminar datos",
+                description: error.message,
+                variant: "destructive"
+            });
+        }
     };
 
     const [movementToView, setMovementToView] = React.useState<OtherFruitMovement | null>(null);
@@ -2213,6 +2417,28 @@ export default function FallCreekPage() {
             )}
 
             {/* Store dialog removed */}
+            {process.env.NODE_ENV === 'development' && (
+                <div className="fixed bottom-4 right-4 z-50 bg-white dark:bg-zinc-950 p-4 rounded-lg shadow-xl border border-[#7aba28]/40 max-w-sm space-y-3">
+                    <h4 className="font-bold text-xs text-[#7aba28] uppercase tracking-wider flex items-center gap-1.5">
+                        <span className="w-2.5 h-2.5 rounded-full bg-[#7aba28] animate-ping" />
+                        Simulador de Pruebas Offline
+                    </h4>
+                    <p className="text-[11px] text-muted-foreground">
+                        Simula un ciclo completo de recepción, picking y despacho offline sin tocar el servidor de producción.
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                        <Button size="sm" variant="outline" className="text-xs h-8 text-[#004b8d] border-[#004b8d]/20 hover:bg-[#004b8d]/5" onClick={handleStartTest}>
+                            1. Cargar "Sekoya Prueba" (Cámara 6)
+                        </Button>
+                        <Button size="sm" variant="outline" className="text-xs h-8 border-orange-500/30 text-orange-600 hover:bg-orange-50" onClick={handleResetTestCycle}>
+                            2. Reiniciar Ciclo
+                        </Button>
+                        <Button size="sm" variant="destructive" className="text-xs h-8" onClick={handleDeleteTestData}>
+                            3. Eliminar Todo
+                        </Button>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
