@@ -96,6 +96,16 @@ export default function FallCreekPage() {
     const [isDebtorsDialogOpen, setIsDebtorsDialogOpen] = React.useState(false);
     const [searchQuery, setSearchQuery] = React.useState('');
     const [highlightedCoordinate, setHighlightedCoordinate] = React.useState<{ chamberId: string; coordinate: string } | null>(null);
+    const [isDev, setIsDev] = React.useState(false);
+
+    React.useEffect(() => {
+        if (typeof window !== 'undefined') {
+            const host = window.location.hostname;
+            if (host === 'localhost' || host === '127.0.0.1' || host.startsWith('192.168.') || host.startsWith('10.')) {
+                setIsDev(true);
+            }
+        }
+    }, []);
 
     React.useEffect(() => {
         if (highlightedCoordinate) {
@@ -2417,7 +2427,7 @@ export default function FallCreekPage() {
             )}
 
             {/* Store dialog removed */}
-            {process.env.NODE_ENV === 'development' && (
+            {isDev && (
                 <div className="fixed bottom-4 right-4 z-50 bg-white dark:bg-zinc-950 p-4 rounded-lg shadow-xl border border-[#7aba28]/40 max-w-sm space-y-3">
                     <h4 className="font-bold text-xs text-[#7aba28] uppercase tracking-wider flex items-center gap-1.5">
                         <span className="w-2.5 h-2.5 rounded-full bg-[#7aba28] animate-ping" />
