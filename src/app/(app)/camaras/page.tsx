@@ -1216,101 +1216,105 @@ export default function CamarasPage() {
                                               </PopoverTrigger>
                                               {isOccupied && (
                                                   <PopoverContent className="p-4 w-60 sm:w-64" side="bottom" align="center">
-                                                  <div className="space-y-2">
-                                                      <div className="border-b pb-1">
-                                                          <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Ubicación {coord}</p>
-                                                          <p className="text-sm font-semibold">{uniqueLotIds.length > 1 ? 'Lotes Mezclados' : firstItem?.type === 'producerLot' ? `Lote: ${firstItem?.displayId}` : `Documento: ${firstItem?.document || '-'}`}</p>
-                                                      </div>
+                                                   <div className="space-y-2">
+                                                       <div className="border-b pb-1 flex justify-between items-start">
+                                                           <div>
+                                                               <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Ubicación {coord}</p>
+                                                               <p className="text-sm font-semibold">{uniqueLotIds.length > 1 ? 'Lotes Mezclados' : firstItem?.type === 'producerLot' ? `Lote: ${firstItem?.displayId}` : `Documento: ${firstItem?.document || '-'}`}</p>
+                                                           </div>
+                                                           {uniqueLotIds.length === 1 && (() => {
+                                                               const canEdit = firstItem?.type === 'otherFruit' && firstItem?.ownerName?.toUpperCase() !== 'FALL CREEK';
+                                                               if (canEdit) {
+                                                                   return (
+                                                                       <Button 
+                                                                           variant="ghost" 
+                                                                           size="icon" 
+                                                                           className="h-7 w-7 text-muted-foreground hover:text-primary shrink-0" 
+                                                                           onClick={() => handleEditObservationClick(firstItem)}
+                                                                       >
+                                                                           <Pencil className="h-3.5 w-3.5" />
+                                                                       </Button>
+                                                                   );
+                                                               }
+                                                               return null;
+                                                           })()}
+                                                       </div>
 
-                                                      {uniqueLotIds.length > 1 ? (
-                                                          <div className="space-y-3">
-                                                              <p className="text-xs font-bold text-amber-500 flex items-center gap-1">
-                                                                  <span>⚠ Contiene {uniqueLotIds.length} lotes</span>
-                                                              </p>
-                                                              <div className="space-y-2 max-h-36 overflow-y-auto">
-                                                                  {itemsInCoord.map((item, idx) => {
-                                                                       const canEditObs = item.type === 'otherFruit' && item.ownerName?.toUpperCase() !== 'FALL CREEK';
-                                                                       return (
-                                                                           <div key={idx} className="text-xs border-b border-dashed pb-1.5 last:border-0 last:pb-0">
-                                                                               <div className="flex justify-between items-center">
-                                                                                   <span className="font-bold">{item.type === 'producerLot' ? `Lote: ${item.displayId}` : `Doc: ${item.document || '-'}`}</span>
-                                                                                   <Badge variant="outline" className="h-4 text-[9px] px-1 bg-primary/5 text-primary border-primary/20">
-                                                                                       {item.quantity} {item.unit}
-                                                                                   </Badge>
-                                                                               </div>
-                                                                               <p className="text-muted-foreground mt-0.5">{item.ownerName} - {item.varietyOrProduct}</p>
-                                                                               {item.clientLotId && <p className="text-muted-foreground font-mono text-[9px]">Lote Cliente: {item.clientLotId}</p>}
-                                                                               {(item.observation || canEditObs) && (
-                                                                                   <div className="flex items-center gap-1.5 mt-0.5">
-                                                                                       <p className="text-muted-foreground italic text-[10px]">Obs: {item.observation || '-'}</p>
-                                                                                       {canEditObs && (
-                                                                                           <Button 
-                                                                                               variant="ghost" 
-                                                                                               size="icon" 
-                                                                                               className="h-4 w-4 shrink-0 text-muted-foreground hover:text-primary p-0" 
-                                                                                               onClick={() => handleEditObservationClick(item)}
-                                                                                           >
-                                                                                               <Pencil className="h-2.5 w-2.5" />
-                                                                                           </Button>
-                                                                                       )}
-                                                                                   </div>
-                                                                               )}
-                                                                           </div>
-                                                                       );
-                                                                   })}
-                                                              </div>
-                                                          </div>
-                                                      ) : (
-                                                          <>
-                                                              {firstItem && (
-                                                                  <div className="text-xs space-y-1">
-                                                                      {isFC ? (
-                                                                          <>
-                                                                              <p>Cliente: {firstItem.ownerName}</p>
-                                                                              <p>Pallet Log: {firstItem.document || '-'}</p>
-                                                                              <p>Pallet ID: <span className="font-mono">{uniquePalletIds.join(', ') || '-'}</span></p>
-                                                                              <p>Variedad: {firstItem.varietyOrProduct}</p>
-                                                                              <p>Documento: {firstItem.documentNumber || '-'}</p>
-                                                                          </>
-                                                                      ) : (
-                                                                          <>
-                                                                              <p>
-                                                                              {firstItem.type === 'producerLot' ? `Productor: ${firstItem.ownerName}` : `Cliente: ${firstItem.ownerName}`}
-                                                                              </p>
-                                                                              {firstItem.type === 'otherFruit' && (
-                                                                                  <p>Documento: {firstItem.document || '-'}</p>
-                                                                              )}
-                                                                              {clientLotIds.length > 0 && (
-                                                                              <p>Lote Cliente: <span className="font-mono">{clientLotIds.join(', ')}</span></p>
-                                                                              )}
-                                                                              <p>Producto: {firstItem.varietyOrProduct}</p>
-                                                                          </>
-                                                                      )}
-                                                                      {(() => {
-                                                                            const canEditObs = firstItem.type === 'otherFruit' && firstItem.ownerName?.toUpperCase() !== 'FALL CREEK';
-                                                                            if (firstItem.observation || canEditObs) {
-                                                                                return (
-                                                                                    <div className="flex items-center gap-1.5 mt-0.5">
-                                                                                        <p className="text-muted-foreground italic text-xs">Obs: {firstItem.observation || '-'}</p>
+                                                       {uniqueLotIds.length > 1 ? (
+                                                           <div className="space-y-3">
+                                                               <p className="text-xs font-bold text-amber-500 flex items-center gap-1">
+                                                                   <span>⚠ Contiene {uniqueLotIds.length} lotes</span>
+                                                               </p>
+                                                               <div className="space-y-2 max-h-36 overflow-y-auto">
+                                                                   {itemsInCoord.map((item, idx) => {
+                                                                        const canEditObs = item.type === 'otherFruit' && item.ownerName?.toUpperCase() !== 'FALL CREEK';
+                                                                        return (
+                                                                            <div key={idx} className="text-xs border-b border-dashed pb-1.5 last:border-0 last:pb-0">
+                                                                                <div className="flex justify-between items-center">
+                                                                                    <span className="font-bold">{item.type === 'producerLot' ? `Lote: ${item.displayId}` : `Doc: ${item.document || '-'}`}</span>
+                                                                                    <div className="flex items-center gap-1.5">
+                                                                                        <Badge variant="outline" className="h-4 text-[9px] px-1 bg-primary/5 text-primary border-primary/20">
+                                                                                            {item.quantity} {item.unit}
+                                                                                        </Badge>
                                                                                         {canEditObs && (
                                                                                             <Button 
                                                                                                 variant="ghost" 
                                                                                                 size="icon" 
-                                                                                                className="h-4 w-4 shrink-0 text-muted-foreground hover:text-primary p-0" 
-                                                                                                onClick={() => handleEditObservationClick(firstItem)}
+                                                                                                className="h-5 w-5 text-muted-foreground hover:text-primary p-0 shrink-0" 
+                                                                                                onClick={() => handleEditObservationClick(item)}
                                                                                             >
                                                                                                 <Pencil className="h-3 w-3" />
                                                                                             </Button>
                                                                                         )}
                                                                                     </div>
-                                                                                );
-                                                                            }
-                                                                            return null;
-                                                                        })()}
-                                                                  </div>
-                                                              )}
-                                                          </>
-                                                      )}
+                                                                                </div>
+                                                                                <p className="text-muted-foreground mt-0.5">{item.ownerName} - {item.varietyOrProduct}</p>
+                                                                                {item.clientLotId && <p className="text-muted-foreground font-mono text-[9px]">Lote Cliente: {item.clientLotId}</p>}
+                                                                                {item.observation && (
+                                                                                    <div className="flex items-center gap-1.5 mt-0.5">
+                                                                                        <p className="text-muted-foreground italic text-[10px]">Obs: {item.observation}</p>
+                                                                                    </div>
+                                                                                )}
+                                                                            </div>
+                                                                        );
+                                                                    })}
+                                                               </div>
+                                                           </div>
+                                                       ) : (
+                                                           <>
+                                                               {firstItem && (
+                                                                   <div className="text-xs space-y-1">
+                                                                       {isFC ? (
+                                                                           <>
+                                                                               <p>Cliente: {firstItem.ownerName}</p>
+                                                                               <p>Pallet Log: {firstItem.document || '-'}</p>
+                                                                               <p>Pallet ID: <span className="font-mono">{uniquePalletIds.join(', ') || '-'}</span></p>
+                                                                               <p>Variedad: {firstItem.varietyOrProduct}</p>
+                                                                               <p>Documento: {firstItem.documentNumber || '-'}</p>
+                                                                           </>
+                                                                       ) : (
+                                                                           <>
+                                                                               <p>
+                                                                               {firstItem.type === 'producerLot' ? `Productor: ${firstItem.ownerName}` : `Cliente: ${firstItem.ownerName}`}
+                                                                               </p>
+                                                                               {firstItem.type === 'otherFruit' && (
+                                                                                   <p>Documento: {firstItem.document || '-'}</p>
+                                                                               )}
+                                                                               {clientLotIds.length > 0 && (
+                                                                               <p>Lote Cliente: <span className="font-mono">{clientLotIds.join(', ')}</span></p>
+                                                                               )}
+                                                                               <p>Producto: {firstItem.varietyOrProduct}</p>
+                                                                           </>
+                                                                       )}
+                                                                       {firstItem.observation && (
+                                                                           <div className="flex items-center gap-1.5 mt-0.5">
+                                                                               <p className="text-muted-foreground italic text-xs">Obs: {firstItem.observation}</p>
+                                                                           </div>
+                                                                       )}
+                                                                   </div>
+                                                               )}
+                                                           </>
+                                                       )}
 
                                                       <div className="grid grid-cols-2 gap-x-4 pt-1 text-xs font-semibold border-t">
                                                           <p>Bins: {totalBins}</p>
