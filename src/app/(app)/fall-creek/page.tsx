@@ -504,6 +504,11 @@ export default function FallCreekPage() {
             const destRut = mov.destinationClientRUT || '';
             if (!destName && !destRut) return;
 
+            // Skip test producer "Prueba" from dispatches
+            if (destRut.trim() === '1111111-1' || destName.toUpperCase().includes('PRUEBA')) {
+                return;
+            }
+
             let binsQty = 0;
             (mov.items || []).forEach(item => {
                 binsQty += item.quantity;
@@ -525,6 +530,7 @@ export default function FallCreekPage() {
         // 5. Calculate Returned Bins per Agricultural Customer
         const producerReturnMap = new Map<string, number>();
         let fcDirectReturns = 0;
+        let testReturnedQty = 0; // Track test returns separately for physical inventory calculation
 
         allBinMovements.forEach(mov => {
             if (mov.exporterId !== 'EXP005') return;
@@ -547,8 +553,15 @@ export default function FallCreekPage() {
             } else {
                 const matchingProducer = findProducer(cleanProdId);
                 const pId = matchingProducer ? matchingProducer.id : cleanProdId;
-                
-                producerReturnMap.set(pId, (producerReturnMap.get(pId) || 0) + returnedQty);
+                const pRut = matchingProducer ? matchingProducer.rut || '' : '';
+                const pName = matchingProducer ? matchingProducer.name || '' : '';
+
+                // Skip test producer "Prueba" from return map but track quantity
+                if (pRut.trim() === '1111111-1' || cleanProdId === '1111111-1' || pName.toUpperCase().includes('PRUEBA')) {
+                    testReturnedQty += returnedQty;
+                } else {
+                    producerReturnMap.set(pId, (producerReturnMap.get(pId) || 0) + returnedQty);
+                }
             }
         });
 
@@ -577,6 +590,10 @@ export default function FallCreekPage() {
 
         // Iterate ONLY through producers that physically received dispatches of Fall Creek plants
         producerDispatchMap.forEach((dispData, pId) => {
+            if (dispData.rut.trim() === '1111111-1' || dispData.name.toUpperCase().includes('PRUEBA')) {
+                return;
+            }
+
             const returned = producerReturnMap.get(pId) || 0;
             const debt = Math.max(0, dispData.quantity - returned);
 
@@ -593,7 +610,7 @@ export default function FallCreekPage() {
             });
         });
 
-        const leasedBinsCount = Math.max(0, totalSentToFallCreek - fcDirectReturns - totalReturnedByProducers);
+        const leasedBinsCount = Math.max(0, totalSentToFallCreek - fcDirectReturns - (totalReturnedByProducers + testReturnedQty));
 
         return {
             leasedBinsCount,
