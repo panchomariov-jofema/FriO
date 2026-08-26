@@ -126,6 +126,10 @@ export default function CamarasPage() {
   const [editingItem, setEditingItem] = React.useState<StoredItem | null>(null);
   const [obsText, setObsText] = React.useState('');
   const [isSavingObs, setIsSavingObs] = React.useState(false);
+  const [clientProducts, setClientProducts] = React.useState<any[]>([]);
+  const [loadingProducts, setLoadingProducts] = React.useState(false);
+  const [docText, setDocText] = React.useState('');
+  const [selectedProductCode, setSelectedProductCode] = React.useState('');
 
   const currentUserMaster = React.useMemo(() => {
     if (!user?.email || !usersMaster) return null;
@@ -160,6 +164,31 @@ export default function CamarasPage() {
 
     return () => unsubscribers.forEach(unsub => unsub());
   }, [firestore]);
+
+  React.useEffect(() => {
+    if (!editingItem || !firestore || !editingItem.exporterId) {
+      setClientProducts([]);
+      return;
+    }
+    setLoadingProducts(true);
+    const q = query(
+      collection(firestore, 'packagingMaster'),
+      where('clientId', 'in', [editingItem.exporterId, '99999'])
+    );
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const items: any[] = [];
+      snapshot.forEach((doc) => {
+        items.push({ id: doc.id, ...doc.data() });
+      });
+      setClientProducts(items);
+      setLoadingProducts(false);
+    }, (error) => {
+      console.error("Error fetching client products:", error);
+      setClientProducts([]);
+      setLoadingProducts(false);
+    });
+    return () => unsubscribe();
+  }, [editingItem, firestore]);
 
 
   const { sortedPendingLots, storedItemsByChamber, chamberOccupancy, totalNetWeightInStock, exporterMap, allLotsInChambers } = React.useMemo(() => {
@@ -722,6 +751,8 @@ export default function CamarasPage() {
   const handleEditObservationClick = (item: StoredItem) => {
     setEditingItem(item);
     setObsText(item.observation || '');
+    setDocText(item.document || '');
+    setSelectedProductCode(item.displayId || '');
   };
 
   const handleSaveObservation = async () => {
@@ -735,22 +766,33 @@ export default function CamarasPage() {
           const data = receptionSnap.data();
           const items = data.items || [];
           if (items[editingItem.itemIndex]) {
+            const selectedProd = clientProducts.find(p => p.code === selectedProductCode);
+            if (selectedProd) {
+              items[editingItem.itemIndex].productCode = selectedProd.code;
+              items[editingItem.itemIndex].productName = selectedProd.name;
+            }
             items[editingItem.itemIndex].observation = obsText.trim() || null;
-            await updateDoc(receptionRef, { items });
+
+            const updateData: any = { items };
+            if (docText.trim()) {
+              updateData.document = docText.trim();
+            }
+
+            await updateDoc(receptionRef, updateData);
             toast({
               title: 'Éxito',
-              description: 'Observación actualizada correctamente.',
+              description: 'Información del lote actualizada correctamente.',
             });
           }
         }
       }
       setEditingItem(null);
     } catch (error: any) {
-      console.error('Error updating observation:', error);
+      console.error('Error updating lot details:', error);
       toast({
         variant: 'destructive',
         title: 'Error',
-        description: error.message || 'No se pudo guardar la observación.',
+        description: error.message || 'No se pudo guardar la información.',
       });
     } finally {
       setIsSavingObs(false);
@@ -1325,18 +1367,57 @@ export default function CamarasPage() {
         <Dialog open={!!editingItem} onOpenChange={(open) => !open && setEditingItem(null)}>
           <DialogContent className="sm:max-w-[425px]">
             <DialogHeader>
-              <DialogTitle>Editar Observación</DialogTitle>
+              <DialogTitle>Editar Información del Lote</DialogTitle>
               <DialogDescription>
-                Ingrese una observación para el producto de <span className="font-semibold">{editingItem.ownerName}</span> en la ubicación <span className="font-mono font-semibold">{editingItem.coordinate}</span>.
+                Modifique la información del lote de <span className="font-semibold">{editingItem.ownerName}</span> en la ubicación <span className="font-mono font-semibold">{editingItem.coordinate}</span>.
               </DialogDescription>
             </DialogHeader>
-            <div className="py-4">
-              <Input
-                value={obsText}
-                onChange={(e) => setObsText(e.target.value)}
-                placeholder="Escriba la observación..."
-                maxLength={100}
-              />
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-document">Documento</Label>
+                <Input
+                  id="edit-document"
+                  value={docText}
+                  onChange={(e) => setDocText(e.target.value)}
+                  placeholder="Ingrese el número de documento..."
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-product">Producto</Label>
+                {loadingProducts ? (
+                  <div className="text-xs text-muted-foreground">Cargando productos del cliente...</div>
+                ) : (
+                  <Select value={selectedProductCode} onValueChange={setSelectedProductCode}>
+                    <SelectTrigger id="edit-product">
+                      <SelectValue placeholder="Seleccione un producto..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {clientProducts.map((prod) => (
+                        <SelectItem key={prod.id || prod.code} value={prod.code}>
+                          {prod.name}
+                        </SelectItem>
+                      ))}
+                      {!clientProducts.some(p => p.code === selectedProductCode) && editingItem.varietyOrProduct && (
+                        <SelectItem value={selectedProductCode}>
+                          {editingItem.varietyOrProduct}
+                        </SelectItem>
+                      )}
+                    </SelectContent>
+                  </Select>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-observation">Observación</Label>
+                <Input
+                  id="edit-observation"
+                  value={obsText}
+                  onChange={(e) => setObsText(e.target.value)}
+                  placeholder="Escriba la observación..."
+                  maxLength={100}
+                />
+              </div>
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setEditingItem(null)} disabled={isSavingObs}>
