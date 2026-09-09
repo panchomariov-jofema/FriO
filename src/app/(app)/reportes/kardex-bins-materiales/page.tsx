@@ -112,6 +112,8 @@ interface KardexItem {
     sourceType: 'manual' | 'automatic';
     movementId?: string;
     itemIndex?: number;
+    noAffectStock?: boolean;
+    afectaStock?: string;
 }
 
 
@@ -134,6 +136,7 @@ export default function BinMaterialKardexReportPage() {
     const [movFilter, setMovFilter] = React.useState('');
     const [typeFilter, setTypeFilter] = React.useState<'all' | 'Entrada' | 'Salida'>('all');
     const [driverFilter, setDriverFilter] = React.useState('');
+    const [stockAffectFilter, setStockAffectFilter] = React.useState<'all' | 'yes' | 'no'>('all');
 
     // Actions State
     const [itemToEdit, setItemToEdit] = React.useState<KardexItem | null>(null);
@@ -188,8 +191,13 @@ export default function BinMaterialKardexReportPage() {
         return { exporterMap: expMap, producerMap: prodMap, receptionLotMap: recLotMap, materialMasterMap: matMasterMap };
     }, [exporters, producers, receptionLots, allMaterials, otherClients]);
 
-    const formatUserName = (name?: string) => {
-        if (!name) return 'N/A';
+    const formatUserName = (name?: string, movObservation?: string) => {
+        if (!name) {
+            if (movObservation && movObservation.toLowerCase().includes('automático')) {
+                return 'Sistema (Despacho)';
+            }
+            return 'Sistema';
+        }
         if (name === 'francisco.villarreal@outlook.es') return 'ADMINISTRADOR';
         return name;
     };
@@ -237,7 +245,7 @@ export default function BinMaterialKardexReportPage() {
                     cantidad: item.quantity,
                     movimiento: mov.observation || (isDirectDispatch ? 'Despacho Directo' : 'Bins y Materiales'),
                     tipo: typeLabel as 'Entrada' | 'Salida',
-                    userName: formatUserName(mov.userName),
+                    userName: formatUserName(mov.userName, mov.observation),
                     documento: mov.document,
                     driverName: mov.driverName || '',
                     driverRUT: mov.driverRUT || '',
@@ -245,6 +253,8 @@ export default function BinMaterialKardexReportPage() {
                     sourceType: 'manual',
                     movementId: mov.id,
                     itemIndex: index,
+                    noAffectStock: mov.noAffectStock,
+                    afectaStock: mov.noAffectStock ? 'No' : 'Sí',
                 });
             });
         });
@@ -264,6 +274,8 @@ export default function BinMaterialKardexReportPage() {
                     userName: formatUserName(lot.userName),
                     documento: lot.displayLotId,
                     sourceType: 'automatic',
+                    noAffectStock: true,
+                    afectaStock: 'No',
                 });
             }
         });
@@ -285,6 +297,8 @@ export default function BinMaterialKardexReportPage() {
                         userName: formatUserName(dispatch.userName),
                         documento: bin.displayLotId,
                         sourceType: 'automatic',
+                        noAffectStock: true,
+                        afectaStock: 'No',
                     });
                 });
             }
@@ -310,10 +324,15 @@ export default function BinMaterialKardexReportPage() {
             if (movFilter && !item.movimiento.toLowerCase().includes(movFilter.toLowerCase())) return false;
             if (driverFilter && !item.driverName?.toLowerCase().includes(driverFilter.toLowerCase())) return false;
             if (typeFilter !== 'all' && item.tipo !== typeFilter) return false;
+            if (stockAffectFilter !== 'all') {
+                const affects = item.sourceType === 'manual' && !item.noAffectStock;
+                if (stockAffectFilter === 'yes' && !affects) return false;
+                if (stockAffectFilter === 'no' && affects) return false;
+            }
 
             return true;
         });
-    }, [rawKardexData, dateRange, docFilter, expFilter, prodFilter, nameFilter, userFilter, movFilter, driverFilter, typeFilter]);
+    }, [rawKardexData, dateRange, docFilter, expFilter, prodFilter, nameFilter, userFilter, movFilter, driverFilter, typeFilter, stockAffectFilter]);
     
 
     const handleExport = () => {
@@ -331,6 +350,7 @@ export default function BinMaterialKardexReportPage() {
             { key: 'movimiento', label: 'Movimiento' },
             { key: 'tipo', label: 'Entrada/Salida' },
             { key: 'userName', label: 'Usuario' },
+            { key: 'afectaStock', label: 'Afecta Stock' },
         ];
         const csv = convertToCSV(filteredKardexData, headers);
         downloadCSV(csv, 'kardex_bins_y_materiales_detallado.csv');
@@ -692,12 +712,27 @@ export default function BinMaterialKardexReportPage() {
                                             </Select>
                                         </div>
                                     </TableHead>
+                                    <TableHead>
+                                        <div className="space-y-1">
+                                            <span>Afecta Stock</span>
+                                            <Select value={stockAffectFilter} onValueChange={(val: any) => setStockAffectFilter(val)}>
+                                                <SelectTrigger className="h-7 text-xs w-[100px]">
+                                                    <SelectValue />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="all">Todos</SelectItem>
+                                                    <SelectItem value="yes">Sí</SelectItem>
+                                                    <SelectItem value="no">No</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                    </TableHead>
                                     {isAuthorized && <TableHead className="text-right">Acciones</TableHead>}
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
                                 {loading ? (
-                                    Array.from({ length: 10 }).map((_, i) => <TableRow key={i}><TableCell colSpan={10}><Skeleton className="h-4 w-full" /></TableCell></TableRow>)
+                                    Array.from({ length: 10 }).map((_, i) => <TableRow key={i}><TableCell colSpan={11}><Skeleton className="h-4 w-full" /></TableCell></TableRow>)
                                 ) : filteredKardexData.length > 0 ? (
                                     filteredKardexData.map(item => (
                                         <TableRow key={item.key}>
@@ -715,6 +750,17 @@ export default function BinMaterialKardexReportPage() {
                                                 <Badge variant={getBadgeVariant(item.tipo)} className="text-[10px] px-1.5 h-4">
                                                     {item.tipo}
                                                 </Badge>
+                                            </TableCell>
+                                            <TableCell>
+                                                {item.sourceType === 'manual' && !item.noAffectStock ? (
+                                                    <Badge variant="outline" className="text-[10px] px-1.5 h-4 bg-green-50 text-green-700 border-green-200">
+                                                        Sí
+                                                    </Badge>
+                                                ) : (
+                                                    <Badge variant="secondary" className="text-[10px] px-1.5 h-4 bg-zinc-100 text-zinc-500 border-zinc-200">
+                                                        No
+                                                    </Badge>
+                                                )}
                                             </TableCell>
                                             {isAuthorized && (
                                                 <TableCell className="text-right">

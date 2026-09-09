@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useFirestore } from '@/firebase';
+import { useFirestore, useUser } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { doc, collection, writeBatch, serverTimestamp, deleteDoc } from 'firebase/firestore';
 import { errorEmitter } from '@/firebase/error-emitter';
@@ -45,6 +45,7 @@ export function OtherFruitPickingTab() {
   const { data: allClients, loading: loadingClients } = useFirestoreCollection<OtherClient>('otherClients');
   const firestore = useFirestore();
   const { toast } = useToast();
+  const { user } = useUser();
 
   const [pickingMovement, setPickingMovement] = React.useState<ConsolidatedMovement | null>(null);
   const [deleteMovement, setDeleteMovement] = React.useState<ConsolidatedMovement | null>(null);
@@ -246,6 +247,7 @@ export function OtherFruitPickingTab() {
                     ],
                     observation: `Despacho automático desde Fall Creek (Confirmación de Picking)`,
                     createdAt: serverTimestamp(),
+                    userName: user?.email || 'Sistema (Picking)',
                     noAffectStock: true,
                     isFruitDispatch: true
                 };

@@ -91,19 +91,23 @@ export function RelocateLotDialog({
         .sort(naturalSort);
 
     // 1. Calculate current occupancy and document set for all coordinates in target chamber
-    const occupancyMap = new Map<string, { quantity: number; ownerName: string; unit: string; documents: Set<string>; productCodes: Set<string> }>();
+    const occupancyMap = new Map<string, { quantity: number; ownerName: string; unit: string; documents: Set<string>; productCodes: Set<string>; varieties: Set<string> }>();
     
     allChamberLots.forEach(lot => {
       if (lot.status === 'Almacenado' && lot.chamberId === targetChamberId && lot.coordinate) {
-        const current = occupancyMap.get(lot.coordinate) || { quantity: 0, ownerName: lot.producerShortName, unit: 'Bins', documents: new Set<string>(), productCodes: new Set<string>() };
+        const current = occupancyMap.get(lot.coordinate) || { quantity: 0, ownerName: lot.producerShortName, unit: 'Bins', documents: new Set<string>(), productCodes: new Set<string>(), varieties: new Set<string>() };
         const lotDoc = lot.displayLotId.split('-').slice(1).join('-');
         current.documents.add(lotDoc);
+        if (lot.variety) {
+            current.varieties.add(lot.variety.trim().toUpperCase());
+        }
         occupancyMap.set(lot.coordinate, { 
             quantity: current.quantity + lot.binCount, 
             ownerName: lot.producerShortName, 
             unit: 'Bins',
             documents: current.documents,
-            productCodes: current.productCodes
+            productCodes: current.productCodes,
+            varieties: current.varieties,
         });
       }
     });
@@ -111,10 +115,13 @@ export function RelocateLotDialog({
     allOtherFruitReceptions.forEach(reception => {
         (reception.items || []).forEach(item => {
             if(item.status === 'Almacenado' && item.storageLocation?.chamberId === targetChamberId && item.storageLocation.coordinate) {
-                const current = occupancyMap.get(item.storageLocation.coordinate) || { quantity: 0, ownerName: reception.clientName, unit: reception.unit, documents: new Set<string>(), productCodes: new Set<string>() };
+                const current = occupancyMap.get(item.storageLocation.coordinate) || { quantity: 0, ownerName: reception.clientName, unit: reception.unit, documents: new Set<string>(), productCodes: new Set<string>(), varieties: new Set<string>() };
                 current.documents.add(reception.document);
                 if (item.productCode) {
                     current.productCodes.add(item.productCode);
+                }
+                if (item.productName) {
+                    current.varieties.add(item.productName.trim().toUpperCase());
                 }
                 
                 // Determine units: if it's Fall Creek, 1 pallet = 3 bins.
@@ -126,7 +133,8 @@ export function RelocateLotDialog({
                     ownerName: reception.clientName, 
                     unit: reception.unit,
                     documents: current.documents,
-                    productCodes: current.productCodes
+                    productCodes: current.productCodes,
+                    varieties: current.varieties,
                 });
             }
         });
@@ -176,7 +184,15 @@ export function RelocateLotDialog({
                 
                 if (occupancyData.unit && occupancyData.unit !== unitType) return false;
                 
-                if (firstItemToRelocate.displayId) { // displayId contains productCode for otherFruit
+                const isFallCreek = incomingOwnerName.toUpperCase() === 'FALL CREEK';
+                if (isFallCreek) {
+                    // Para Fall Creek: la variedad (productName) es la que manda
+                    const incomingVariety = (firstItemToRelocate.varietyOrProduct || '').trim().toUpperCase();
+                    if (incomingVariety && occupancyData.varieties && occupancyData.varieties.size > 0) {
+                        const targetHasDifferentVariety = Array.from(occupancyData.varieties).some(v => v !== incomingVariety);
+                        if (targetHasDifferentVariety) return false;
+                    }
+                } else if (firstItemToRelocate.displayId) { // displayId contains productCode for otherFruit
                     const targetHasDifferentProduct = Array.from(occupancyData.productCodes || []).some(code => code !== firstItemToRelocate.displayId);
                     if (targetHasDifferentProduct) return false;
                 }

@@ -96,7 +96,7 @@ export function StoreOtherFruitDialog({
     const isChamberRow13Enabled = !!chamberSettings?.find(s => s.id === selectedChamberId)?.row13Enabled;
     const chamberConfig = getEffectiveChamberConfig(rawChamberConfig, isChamberRow13Enabled);
 
-    const occupancyMap = new Map<string, { lots: {displayLotId: string, binCount: number, clientId: string, productCode?: string, unit?: string }[] }>();
+    const occupancyMap = new Map<string, { lots: {displayLotId: string, binCount: number, clientId: string, clientName?: string, productCode?: string, productName?: string, unit?: string }[] }>();
     let lastCoordInChamber: string | null = null;
     let latestTimestamp = 0;
     
@@ -109,7 +109,9 @@ export function StoreOtherFruitDialog({
           occupancyMap.get(lot.coordinate)!.lots.push({ 
             displayLotId: lot.displayLotId, 
             binCount: lot.binCount,
-            clientId: lot.exporterId 
+            clientId: lot.exporterId,
+            productName: lot.variety,
+            unit: 'Bins'
           });
 
           const time = safeToMillis(lot.storedAt);
@@ -137,7 +139,9 @@ export function StoreOtherFruitDialog({
                      displayLotId: lotId, 
                      binCount: equivalentUnits,
                      clientId: reception.clientId,
+                     clientName: reception.clientName,
                      productCode: storedItem.productCode,
+                     productName: storedItem.productName,
                      unit: reception.unit
                    });
                 }
@@ -211,6 +215,8 @@ export function StoreOtherFruitDialog({
         ...allPossibleCoords.slice(0, startIndex)
     ];
 
+    const isFallCreek = (item.clientName?.toUpperCase() === 'FALL CREEK' || item.clientId === '76361536-7');
+
     const currentSuggestion = prioritizedCoords.find(coord => {
         if (chamberConfig.blocked?.includes(coord)) return false;
         const entry = occupancyMap.get(coord);
@@ -226,6 +232,11 @@ export function StoreOtherFruitDialog({
 
         // Prevent mixing different varieties/products in the same coordinate
         const hasDifferentProduct = entry.lots.some(l => {
+            if (isFallCreek) {
+                const targetVariety = (l.productName || '').trim().toUpperCase();
+                const incomingVariety = (item.productName || '').trim().toUpperCase();
+                return targetVariety && incomingVariety ? targetVariety !== incomingVariety : false;
+            }
             if (!l.productCode) return true;
             return l.productCode !== item.productCode;
         });
@@ -251,6 +262,11 @@ export function StoreOtherFruitDialog({
 
         // Prevent mixing different varieties/products in the same coordinate
         const hasDifferentProduct = entry.lots.some(l => {
+            if (isFallCreek) {
+                const targetVariety = (l.productName || '').trim().toUpperCase();
+                const incomingVariety = (item.productName || '').trim().toUpperCase();
+                return targetVariety && incomingVariety ? targetVariety !== incomingVariety : false;
+            }
             if (!l.productCode) return true;
             return l.productCode !== item.productCode;
         });
