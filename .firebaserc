@@ -1,5 +1,7 @@
 {
-  "projects": {},
+  "projects": {
+    "default": "frigomanagerm1-96752421-f2f17"
+  },
   "targets": {},
   "etags": {}
 }
