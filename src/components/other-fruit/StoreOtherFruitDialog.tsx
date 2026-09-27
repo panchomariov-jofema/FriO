@@ -15,7 +15,7 @@ import { OtherFruitReception, ChamberLot, OtherFruitReceptionItem, Chamber, Clie
 import { chambersConfig } from '@/lib/chambers-config';
 import { useToast } from '@/hooks/use-toast';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
-import { getSortedCoordinates, getPairedCoordinates, safeToMillis, getEffectiveChamberConfig } from '@/lib/utils';
+import { getSortedCoordinates, getPairedCoordinates, safeToMillis, getEffectiveChamberConfig, cn } from '@/lib/utils';
 import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
 import { Zap } from 'lucide-react';
 
@@ -75,17 +75,66 @@ export function StoreOtherFruitDialog({
   const selectedCoordinate = form.watch('coordinate');
   const isSubmitDisabled = !selectedChamberId || !selectedCoordinate || selectedCoordinate === '';
   
+  const isItemPackaging = Boolean(
+    item?.clientName?.toUpperCase().includes('VITAFOOD') ||
+    item?.clientName?.toUpperCase().includes('EMBALAJE')
+  );
+
+  const chamberSanitaryMap = useMemo(() => {
+    const map = new Map<string, { hasFruit: boolean; hasPackaging: boolean }>();
+    Object.keys(chambersConfig).forEach(chId => {
+      map.set(chId, { hasFruit: false, hasPackaging: false });
+    });
+
+    // 1. Cherry lots are always Fruit
+    (allChamberLots || []).forEach(lot => {
+      if (lot.status === 'Almacenado' && lot.chamberId && lot.binCount > 0) {
+        const entry = map.get(lot.chamberId);
+        if (entry) entry.hasFruit = true;
+      }
+    });
+
+    // 2. Receptions (Fruit vs Packaging)
+    (allReceptions || []).forEach(reception => {
+      const isPkg = reception.clientName?.toUpperCase().includes('VITAFOOD') || reception.clientName?.toUpperCase().includes('EMBALAJE');
+      (reception.items || []).forEach(it => {
+        if (it.status === 'Almacenado' && it.storageLocation?.chamberId && it.quantity > 0) {
+          const entry = map.get(it.storageLocation.chamberId);
+          if (entry) {
+            if (isPkg) {
+              entry.hasPackaging = true;
+            } else {
+              entry.hasFruit = true;
+            }
+          }
+        }
+      });
+    });
+
+    return map;
+  }, [allChamberLots, allReceptions]);
+
   const capacityPerCoord = useMemo(() => {
     if (!item) return DEFAULT_PALLETS_PER_COORDINATE;
     const isFC = item.clientName === 'FALL CREEK' || item.clientName?.toUpperCase() === 'FALL CREEK';
+    const isVita = item.clientName?.toUpperCase().includes('VITAFOOD');
     if (item.unit === 'Bins') {
       return clientConfig?.binsPerCoordinate ?? (isFC ? 9 : DEFAULT_BINS_PER_COORDINATE);
     }
-    return clientConfig?.palletsPerCoordinate ?? (isFC ? 3 : DEFAULT_PALLETS_PER_COORDINATE);
+    return clientConfig?.palletsPerCoordinate ?? (isFC ? 3 : (isVita ? 2 : DEFAULT_PALLETS_PER_COORDINATE));
   }, [item, clientConfig]);
 
   const { availableCoordinates, suggestion } = useMemo(() => {
     if (!selectedChamberId || !item) {
+      return { availableCoordinates: [], suggestion: null };
+    }
+
+    // Incompatibility check for the selected chamber
+    const sanitary = chamberSanitaryMap.get(selectedChamberId);
+    if (isItemPackaging && sanitary?.hasFruit) {
+      return { availableCoordinates: [], suggestion: null };
+    }
+    if (!isItemPackaging && sanitary?.hasPackaging) {
       return { availableCoordinates: [], suggestion: null };
     }
 
@@ -529,12 +578,29 @@ export function StoreOtherFruitDialog({
                     <Select onValueChange={(value) => { field.onChange(value); form.resetField('coordinate'); }} value={field.value}>
                         <FormControl><SelectTrigger><SelectValue placeholder="Seleccione..." /></SelectTrigger></FormControl>
                         <SelectContent>
-                        {Object.values(chambersConfig).map(chamber => (
-                            <SelectItem key={chamber.id} value={chamber.id}>
-                              {chamber.name} 
-                              {clientConfig?.chamberOverrides?.[chamber.id] && ` (Cap. Reservada: ${clientConfig.chamberOverrides[chamber.id]})`}
-                            </SelectItem>
-                        ))}
+                        {Object.values(chambersConfig).map(chamber => {
+                            const sanitary = chamberSanitaryMap.get(chamber.id);
+                            const isIncompatible = isItemPackaging ? sanitary?.hasFruit : sanitary?.hasPackaging;
+                            const reason = isItemPackaging ? 'Incompatible (Tiene Fruta)' : 'Incompatible (Tiene Embalaje)';
+
+                            return (
+                                <SelectItem key={chamber.id} value={chamber.id} disabled={isIncompatible}>
+                                  <span className={cn(isIncompatible && "text-muted-foreground line-through opacity-60")}>
+                                    {chamber.name}
+                                  </span>
+                                  {isIncompatible && (
+                                    <span className="text-[10px] text-destructive ml-1.5 font-bold">
+                                      ⚠️ [{reason}]
+                                    </span>
+                                  )}
+                                  {!isIncompatible && clientConfig?.chamberOverrides?.[chamber.id] && (
+                                    <span className="text-xs text-muted-foreground ml-1">
+                                      (Cap. Reservada: {clientConfig.chamberOverrides[chamber.id]})
+                                    </span>
+                                  )}
+                                </SelectItem>
+                            );
+                        })}
                         </SelectContent>
                     </Select>
                     <FormMessage />

@@ -10,16 +10,22 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
-import type { OtherClient, PackagingMaster, PackagingReceptionItem } from '@/lib/types';
+import type { OtherClient, PackagingMaster, PackagingReceptionItem, OtherFruitReception, ChamberLot, ClientStorageConfig } from '@/lib/types';
 import { packagingReceptionSchema } from '@/lib/schemas';
 import { PlusCircle, Trash2, ScanLine } from 'lucide-react';
 import { useFirestore } from '@/firebase';
-import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
+import { addDoc, collection, serverTimestamp, doc, getDoc, updateDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { BarcodeScanner } from '../BarcodeScanner';
 import { CreatePackagingProduct } from './CreatePackagingProduct';
+import { VitafoodReceptionWorkflow } from '../other-fruit/VitafoodReceptionWorkflow';
+import { StoreOtherFruitDialog } from '../other-fruit/StoreOtherFruitDialog';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
+import { chambersConfig } from '@/lib/chambers-config';
+import { getSortedCoordinates, getPairedCoordinates, getEffectiveChamberConfig } from '@/lib/utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 
 type ReceptionFormValues = z.infer<typeof packagingReceptionSchema>;
@@ -34,10 +40,33 @@ const defaultItem = {
 export function ReceptionTab() {
   const { data: allClients, loading: loadingClients } = useFirestoreCollection<OtherClient>('otherClients');
   const { data: allPackagingMasters, loading: loadingMasters } = useFirestoreCollection<PackagingMaster>('packagingMaster');
+  const { data: allReceptions } = useFirestoreCollection<OtherFruitReception>('otherFruitReceptions');
+  const { data: allChamberLots } = useFirestoreCollection<ChamberLot>('chamberLots');
+  const { data: clientConfigs } = useFirestoreCollection<ClientStorageConfig>('clientStorageConfigs');
+  const { data: chamberSettings } = useFirestoreCollection<{ id: string; row13Enabled?: boolean }>('chamberSettings');
+
   const firestore = useFirestore();
   const { toast } = useToast();
   const [scanningIndex, setScanningIndex] = React.useState<number | null>(null);
   const [isCreateProductOpen, setIsCreateProductOpen] = React.useState(false);
+
+  // Vitafood & Storage State
+  const [directStorageMode, setDirectStorageMode] = React.useState(true);
+  const [usePhysicalScanner, setUsePhysicalScanner] = React.useState(false);
+  const [itemToStore, setItemToStore] = React.useState<any | null>(null);
+  const [isStoreDialogOpen, setIsStoreDialogOpen] = React.useState(false);
+  const [selectedManifestId, setSelectedManifestId] = React.useState<string | null>(null);
+  const [lastUsedChamberId, setLastUsedChamberId] = React.useState<string | null>(null);
+  const [lastUsedCoordinate, setLastUsedCoordinate] = React.useState<string | null>(null);
+
+  const packagingClients = React.useMemo(() => {
+    return (allClients || []).filter(c => 
+      c.status !== 'inactivo' && (
+        c.type?.toLowerCase() === 'embalaje' || 
+        c.name?.toUpperCase().includes('VITAFOOD')
+      )
+    );
+  }, [allClients]);
 
   const form = useForm<ReceptionFormValues>({
     resolver: zodResolver(packagingReceptionSchema),
@@ -56,15 +85,107 @@ export function ReceptionTab() {
 
   const selectedClientId = form.watch('clientId');
 
-  const packagingClients = React.useMemo(() => {
-    return (allClients || []).filter(c => c.type.toLowerCase() === 'embalaje' && c.status !== 'inactivo');
-  }, [allClients]);
+  const selectedClient = React.useMemo(() => {
+    return packagingClients.find(c => c.clientId === selectedClientId) || null;
+  }, [packagingClients, selectedClientId]);
+
+  // Default to Vitafood if available and not selected
+  React.useEffect(() => {
+    if (packagingClients.length > 0 && !selectedClientId) {
+      const vita = packagingClients.find(c => c.name.toUpperCase().includes('VITAFOOD'));
+      if (vita) {
+        form.setValue('clientId', vita.clientId);
+      } else {
+        form.setValue('clientId', packagingClients[0].clientId);
+      }
+    }
+  }, [packagingClients, selectedClientId, form]);
+
+  const resolvedClientConfig = React.useMemo(() => {
+    if (!itemToStore) return undefined;
+    const explicit = clientConfigs?.find(c => c.id === itemToStore.clientId);
+    return {
+      id: itemToStore.clientId,
+      clientName: itemToStore.clientName,
+      strategy: (explicit?.strategy || 'secuencial') as any,
+      binsPerCoordinate: explicit?.binsPerCoordinate ?? 6,
+      palletsPerCoordinate: explicit?.palletsPerCoordinate ?? 2,
+      preferredChamberId: explicit?.preferredChamberId,
+      chamberOverrides: explicit?.chamberOverrides
+    };
+  }, [itemToStore, clientConfigs]);
+
+  const onStoreConfirm = async (data: { chamberId: string; coordinate: string; totalQuantity: number; quantityPerLocation: number; strategy: any }) => {
+    if (!itemToStore || !firestore) return;
+
+    const { chamberId, coordinate: startCoordinate, totalQuantity, quantityPerLocation, strategy } = data;
+    const receptionRef = doc(firestore, 'otherFruitReceptions', itemToStore.receptionId);
+    
+    try {
+      const receptionSnap = await getDoc(receptionRef);
+      if (!receptionSnap.exists()) {
+        toast({ title: 'Error', description: 'No se encontró la recepción.', variant: 'destructive' });
+        return;
+      }
+      const originalReception = { id: receptionSnap.id, ...receptionSnap.data() } as OtherFruitReception;
+      const rawChamberConfig = chambersConfig[chamberId];
+      if (!rawChamberConfig) return;
+
+      const isChamberRow13Enabled = !!chamberSettings?.find(s => s.id === chamberId)?.row13Enabled;
+      const chamberConfig = getEffectiveChamberConfig(rawChamberConfig, isChamberRow13Enabled);
+      let allPossibleCoords = (strategy === 'pareado') ? getPairedCoordinates(chamberConfig) : getSortedCoordinates(chamberConfig, strategy || 'secuencial');
+
+      const itemsToProcess = itemToStore.itemIndices.map((idx: number) => originalReception.items[idx]);
+      const newStoredItems: any[] = [];
+      let remainingToStore = totalQuantity;
+      const startIndex = allPossibleCoords.indexOf(startCoordinate);
+      if (startIndex === -1) {
+        toast({ variant: 'destructive', title: 'Error de ubicación', description: 'Coordenada no válida.' });
+        return;
+      }
+
+      for (const itemToProcess of itemsToProcess) {
+        if (remainingToStore <= 0) break;
+        newStoredItems.push({
+          ...itemToProcess,
+          quantity: itemToProcess.quantity,
+          status: 'Almacenado',
+          storageLocation: {
+            chamberId,
+            coordinate: startCoordinate
+          },
+          storedAt: new Date(),
+        });
+        remainingToStore -= itemToProcess.quantity;
+      }
+
+      const finalItemsArray = originalReception.items.filter((_, index) => !itemToStore.itemIndices.includes(index));
+      finalItemsArray.push(...newStoredItems);
+
+      const stillHasPending = finalItemsArray.some(item => (item.status === 'Pendiente de recibir' || item.status === 'Pendiente de almacenar') && item.quantity > 0);
+      const newStatus = stillHasPending ? 'Parcialmente Almacenado' : 'Almacenado';
+
+      await updateDoc(receptionRef, {
+        items: finalItemsArray,
+        status: newStatus
+      });
+
+      setLastUsedChamberId(chamberId);
+      setLastUsedCoordinate(startCoordinate);
+      setIsStoreDialogOpen(false);
+      setItemToStore(null);
+      toast({ title: 'Éxito', description: `Pallet almacenado en ${chamberConfig.name} - ${startCoordinate}.` });
+    } catch (err: any) {
+      console.error('Error storing packaging in chamber:', err);
+      toast({ variant: 'destructive', title: 'Error', description: 'No se pudo guardar la ubicación.' });
+    }
+  };
 
   const onSubmit = async (values: ReceptionFormValues) => {
     if (!firestore) return;
 
-    const selectedClient = packagingClients.find(c => c.clientId === values.clientId);
-    if (!selectedClient) {
+    const currentClient = packagingClients.find(c => c.clientId === values.clientId);
+    if (!currentClient) {
         toast({ variant: 'destructive', title: 'Error', description: 'Cliente no válido.' });
         return;
     }
@@ -85,7 +206,7 @@ export function ReceptionTab() {
         clientId: values.clientId,
         document: values.document,
         items: itemsWithStatus,
-        clientName: selectedClient.name,
+        clientName: currentClient.name,
         status: 'Pendiente de almacenar' as const,
         createdAt: serverTimestamp(),
     };
@@ -145,42 +266,111 @@ export function ReceptionTab() {
         lote: '',
         items: [defaultItem]
     });
+  };
+
+  // IF VITAFOOD IS SELECTED -> RENDER VITAFOOD SPECIALIZED WORKFLOW
+  if (selectedClient?.name?.toUpperCase().includes('VITAFOOD') || selectedClient?.name?.toUpperCase() === 'VITAFOODS') {
+    return (
+      <div className="space-y-4 sm:space-y-6">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-3 border-b gap-3">
+          <div className="flex items-center gap-3">
+            <span className="text-sm font-semibold text-muted-foreground">Cliente de Embalaje:</span>
+            <Select value={selectedClient.clientId} onValueChange={(val) => form.setValue('clientId', val)}>
+              <SelectTrigger className="w-[260px] font-bold bg-background">
+                <SelectValue placeholder="Seleccione cliente..." />
+              </SelectTrigger>
+              <SelectContent>
+                {packagingClients.map(c => (
+                  <SelectItem key={c.clientId} value={c.clientId} className="font-medium">
+                    {c.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex items-center gap-2 bg-muted/40 px-3 py-1.5 rounded-lg border">
+            <Switch
+              id="direct-storage-vita"
+              checked={directStorageMode}
+              onCheckedChange={setDirectStorageMode}
+            />
+            <Label htmlFor="direct-storage-vita" className="text-xs cursor-pointer font-bold uppercase">
+              Almacenamiento Directo
+            </Label>
+          </div>
+        </div>
+
+        <VitafoodReceptionWorkflow
+          directStorageMode={directStorageMode}
+          usePhysicalScanner={usePhysicalScanner}
+          onTriggerStorage={(item) => {
+            setItemToStore(item);
+            setIsStoreDialogOpen(true);
+          }}
+          selectedManifestId={selectedManifestId}
+          onSelectedManifestIdChange={setSelectedManifestId}
+          selectedClient={selectedClient}
+        />
+
+        <StoreOtherFruitDialog
+          open={isStoreDialogOpen}
+          onOpenChange={setIsStoreDialogOpen}
+          item={itemToStore}
+          onConfirm={onStoreConfirm}
+          allReceptions={allReceptions || []}
+          allChamberLots={allChamberLots || []}
+          clientConfig={resolvedClientConfig}
+          lastUsedChamberId={lastUsedChamberId}
+          lastUsedCoordinate={lastUsedCoordinate}
+        />
+      </div>
+    );
   }
 
-
+  // STANDARD PACKAGING FORM
   return (
     <>
       <Card>
         <CardHeader>
-            <div className="flex flex-row items-start justify-between">
-                <div>
-                    <CardTitle>Recepción de Pallets de Embalaje</CardTitle>
-                    <CardDescription>Registre la entrada de materiales de embalaje de un cliente.</CardDescription>
-                </div>
-                <Button variant="secondary" size="sm" onClick={() => setIsCreateProductOpen(true)} disabled={!selectedClientId}>
-                    + Producto Nuevo
-                </Button>
-            </div>
+          <div className="flex justify-between items-center">
+              <div>
+                  <CardTitle>Recepción de Embalajes</CardTitle>
+                  <CardDescription>
+                      Registre la entrada de nuevos materiales de embalaje en pallets.
+                  </CardDescription>
+              </div>
+              <Button 
+                variant="outline"
+                size="sm"
+                onClick={() => setIsCreateProductOpen(true)}
+                disabled={!selectedClientId}
+              >
+                <PlusCircle className="mr-2 h-4 w-4" />
+                Nuevo Producto
+              </Button>
+          </div>
         </CardHeader>
         <CardContent>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-              <div className="grid md:grid-cols-3 gap-4 items-end">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <FormField
                   control={form.control}
                   name="clientId"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Cliente de Embalaje</FormLabel>
+                      <FormLabel>Cliente</FormLabel>
                       <Select onValueChange={handleClientChange} value={field.value} disabled={loadingClients}>
                         <FormControl>
                           <SelectTrigger>
-                            <SelectValue placeholder="Seleccione un cliente..." />
+                            <SelectValue placeholder="Seleccione un cliente" />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {packagingClients.map(c => (
-                            <SelectItem key={c.id} value={c.clientId}>{c.name}</SelectItem>
+                          {packagingClients.map((client) => (
+                            <SelectItem key={client.clientId} value={client.clientId}>
+                              {client.name}
+                            </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
@@ -193,10 +383,11 @@ export function ReceptionTab() {
                   name="document"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Documento de Entrada (Guía)</FormLabel>
+                      <FormLabel>N° Guía / Factura</FormLabel>
                       <FormControl>
-                        <Input
-                          {...field}
+                        <Input 
+                          placeholder="Ej: 12345" 
+                          {...field} 
                           autoComplete="off"
                           inputMode="numeric"
                           pattern="[0-9]*"

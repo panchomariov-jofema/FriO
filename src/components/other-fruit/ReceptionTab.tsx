@@ -26,6 +26,7 @@ import { Checkbox } from '../ui/checkbox';
 import { notifyPalletLogStored } from '@/lib/telegram';
 import { BarcodeScanner } from '../BarcodeScanner';
 import { FallCreekReceptionWorkflow } from './FallCreekReceptionWorkflow';
+import { VitafoodReceptionWorkflow } from './VitafoodReceptionWorkflow';
 import { chambersConfig } from '@/lib/chambers-config';
 import { getSortedCoordinates, getPairedCoordinates, cn, getEffectiveChamberConfig } from '@/lib/utils';
 import { Switch } from '@/components/ui/switch';
@@ -745,6 +746,36 @@ export function OtherFruitReceptionTab({ clientId: fixedClientId }: { clientId?:
   }
 
   const gridColsClass = showClientLot ? 'sm:grid-cols-4' : 'sm:grid-cols-3';
+
+  if (selectedClient?.name?.toUpperCase().includes('VITAFOOD') || selectedClient?.name?.toUpperCase() === 'VITAFOODS') {
+    return (
+      <div className="space-y-4 sm:space-y-6">
+        <VitafoodReceptionWorkflow
+          directStorageMode={directStorageMode}
+          usePhysicalScanner={usePhysicalScanner}
+          onTriggerStorage={(item) => {
+            setItemToStore(item);
+            setIsStoreDialogOpen(true);
+          }}
+          selectedManifestId={selectedManifestId}
+          onSelectedManifestIdChange={setSelectedManifestId}
+          selectedClient={selectedClient}
+        />
+
+        <StoreOtherFruitDialog
+          open={isStoreDialogOpen}
+          onOpenChange={setIsStoreDialogOpen}
+          item={itemToStore}
+          onConfirm={onStoreConfirm}
+          allReceptions={allReceptions || []}
+          allChamberLots={allChamberLots || []}
+          clientConfig={resolvedClientConfig}
+          lastUsedChamberId={lastUsedChamberId}
+          lastUsedCoordinate={lastUsedCoordinate}
+        />
+      </div>
+    );
+  }
 
   if (selectedClient?.name?.toUpperCase() === 'FALL CREEK') {
     return (

@@ -68,8 +68,46 @@ export function RelocateOtherFruitDialog({
   
   const targetChamberId = form.watch('targetChamberId');
 
+  const isItemPackaging = Boolean(
+    item?.clientName?.toUpperCase().includes('VITAFOOD') ||
+    item?.clientName?.toUpperCase().includes('EMBALAJE')
+  );
+
+  const chamberSanitaryMap = React.useMemo(() => {
+    const map = new Map<string, { hasFruit: boolean; hasPackaging: boolean }>();
+    Object.keys(chambersConfig).forEach(chId => {
+      map.set(chId, { hasFruit: false, hasPackaging: false });
+    });
+
+    (allChamberLots || []).forEach(lot => {
+      if (lot.status === 'Almacenado' && lot.chamberId && lot.binCount > 0) {
+        const entry = map.get(lot.chamberId);
+        if (entry) entry.hasFruit = true;
+      }
+    });
+
+    (allOtherFruitReceptions || []).forEach(reception => {
+      const isPkg = reception.clientName?.toUpperCase().includes('VITAFOOD') || reception.clientName?.toUpperCase().includes('EMBALAJE');
+      (reception.items || []).forEach(it => {
+        if (it.status === 'Almacenado' && it.storageLocation?.chamberId && it.quantity > 0) {
+          const entry = map.get(it.storageLocation.chamberId);
+          if (entry) {
+            if (isPkg) entry.hasPackaging = true;
+            else entry.hasFruit = true;
+          }
+        }
+      });
+    });
+
+    return map;
+  }, [allChamberLots, allOtherFruitReceptions]);
+
   const { availableCoordinates } = React.useMemo(() => {
     if (!targetChamberId) return { availableCoordinates: [] };
+
+    const sanitary = chamberSanitaryMap.get(targetChamberId);
+    if (isItemPackaging && sanitary?.hasFruit) return { availableCoordinates: [] };
+    if (!isItemPackaging && sanitary?.hasPackaging) return { availableCoordinates: [] };
 
     const rawChamberConfig = chambersConfig[targetChamberId];
     if (!rawChamberConfig) return { availableCoordinates: [] };
