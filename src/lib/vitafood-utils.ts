@@ -247,3 +247,19 @@ export function parseVitafoodManifest(file: File): Promise<VitafoodParsedManifes
         reader.readAsArrayBuffer(file);
     });
 }
+
+export function cleanFirestoreObject<T>(obj: T): T {
+    if (obj === null || obj === undefined) return null as any;
+    if (typeof obj !== 'object') return obj;
+    if (Array.isArray(obj)) {
+        return obj.map(item => cleanFirestoreObject(item)).filter(item => item !== undefined) as any;
+    }
+    const clean: any = {};
+    for (const [key, value] of Object.entries(obj)) {
+        if (value !== undefined) {
+            clean[key] = cleanFirestoreObject(value);
+        }
+    }
+    return clean;
+}
+

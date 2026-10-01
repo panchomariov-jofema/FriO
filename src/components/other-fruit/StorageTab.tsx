@@ -25,6 +25,7 @@ import { cn, safeToDate, safeToMillis, safeFormatQuantity, safeStringCompare } f
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { notifyPalletLogStored } from '@/lib/telegram';
 import { ChevronDown } from 'lucide-react';
+import { cleanFirestoreObject } from '@/lib/vitafood-utils';
 
 type PendingFruitItem = OtherFruitReceptionItem & {
     type: 'fruit';
@@ -373,11 +374,20 @@ export function OtherFruitStorageTab({ clientId: fixedClientId }: { clientId?: s
     };
   };
 
-  const handleFruitStoreConfirm = async (data: { chamberId: string; coordinate: string; totalQuantity: number; quantityPerLocation: number; strategy: 'secuencial' | 'pareado' | 'aisle-access' | 'inverted-secuencial' | 'horizontal-secuencial' | 'fifo' | 'serpentina-vertical' | 'modelo-sof' | 'fifo-vertical' }, overrideItem?: PendingFruitItem) => {
+  const handleFruitStoreConfirm = async (data: { 
+    chamberId: string; 
+    coordinate: string; 
+    warehouse?: string;
+    aisle?: string;
+    destinationType?: 'chamber' | 'warehouse';
+    totalQuantity: number; 
+    quantityPerLocation: number; 
+    strategy: 'secuencial' | 'pareado' | 'aisle-access' | 'inverted-secuencial' | 'horizontal-secuencial' | 'fifo' | 'serpentina-vertical' | 'modelo-sof' | 'fifo-vertical' 
+  }, overrideItem?: PendingFruitItem) => {
     const itemToProcessScope = overrideItem || (selectedItem?.type === 'fruit' ? selectedItem : null);
     if (!itemToProcessScope || !firestore) return;
 
-    const { chamberId, coordinate: startCoordinate, totalQuantity, quantityPerLocation, strategy } = data;
+    const { chamberId, coordinate: startCoordinate, warehouse, aisle, destinationType, totalQuantity, quantityPerLocation, strategy } = data;
 
     const originalReception = otherFruitReceptions.find(r => r.id === itemToProcessScope.receptionId);
     if (!originalReception) {
@@ -385,6 +395,60 @@ export function OtherFruitStorageTab({ clientId: fixedClientId }: { clientId?: s
         return;
     }
 
+    const itemsToProcess = itemToProcessScope.itemIndices.map(idx => originalReception.items[idx]);
+    const receptionRef = doc(firestore, 'otherFruitReceptions', itemToProcessScope.receptionId);
+
+    // --- WAREHOUSE & AISLE STORAGE ---
+    if (destinationType === 'warehouse' || (warehouse && aisle)) {
+      const newStoredItems: OtherFruitReceptionItem[] = [];
+      let remainingToStore = totalQuantity;
+
+      for (const itemToStore of itemsToProcess) {
+        if (remainingToStore <= 0) break;
+        const amountToStore = Math.min(itemToStore.quantity, remainingToStore);
+        newStoredItems.push({
+          ...itemToStore,
+          quantity: amountToStore,
+          status: 'Almacenado',
+          storageLocation: {
+            warehouse: warehouse || '',
+            aisle: aisle || '',
+            chamberId: warehouse || '',
+            coordinate: aisle || '',
+          },
+          storedAt: new Date(),
+          storedByUserName: user?.email || (user?.isAnonymous ? 'Anónimo' : user?.displayName || 'N/A'),
+          storedByUserId: user?.uid || undefined,
+        });
+        remainingToStore -= amountToStore;
+      }
+
+      const finalItemsArray = originalReception.items.filter((_, index) => !itemToProcessScope.itemIndices.includes(index));
+      finalItemsArray.push(...newStoredItems);
+      
+      const stillHasPending = finalItemsArray.some(item => 
+          (item.status === 'Pendiente de recibir' || item.status === 'Pendiente de almacenar') && 
+          item.quantity > 0
+      );
+      const newStatus = stillHasPending ? 'Parcialmente Almacenado' : 'Almacenado';
+
+      try {
+        await updateDoc(receptionRef, cleanFirestoreObject({
+          items: finalItemsArray,
+          status: newStatus,
+          updatedAt: serverTimestamp(),
+        }));
+        toast({ title: '✅ Éxito', description: `Almacenado en ${warehouse} - ${aisle}.` });
+        setSelectedItem(null);
+        setQuickStoreItem(null);
+      } catch (error) {
+        console.error("Error storing packaging in warehouse:", error);
+        toast({ variant: 'destructive', title: 'Error', description: 'No se pudo actualizar la ubicación.' });
+      }
+      return;
+    }
+
+    // --- CHAMBER STORAGE ---
     const rawChamberConfig = chambersConfig[chamberId];
     if (!rawChamberConfig) {
         toast({ title: "Error", description: "Configuración de cámara no encontrada.", variant: "destructive" });
@@ -435,8 +499,6 @@ export function OtherFruitStorageTab({ clientId: fixedClientId }: { clientId?: s
     }
     
     // --- 2. Prepare updates ---
-    const itemsToProcess = itemToProcessScope.itemIndices.map(idx => originalReception.items[idx]);
-    
     const isFC = originalReception.clientName?.toUpperCase() === 'FALL CREEK';
     if (isFC) {
         const missingQrItems = itemsToProcess.filter(item => !item.containerId || item.containerId.trim() === '' || item.containerId === '-');
@@ -533,14 +595,12 @@ export function OtherFruitStorageTab({ clientId: fixedClientId }: { clientId?: s
     );
     const newStatus = stillHasPending ? 'Parcialmente Almacenado' : 'Almacenado';
 
-    const receptionRef = doc(firestore, 'otherFruitReceptions', itemToProcessScope.receptionId);
-
     try {
-        await updateDoc(receptionRef, {
+        await updateDoc(receptionRef, cleanFirestoreObject({
             items: finalItemsArray,
             status: newStatus,
             updatedAt: serverTimestamp(),
-        });
+        }));
         toast({ title: 'Éxito', description: `Almacenado en ${chamberConfig.name}, Coord: ${startCoordinate}.` });
 
         if (newStatus === 'Almacenado') {

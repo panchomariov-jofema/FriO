@@ -316,6 +316,8 @@ export interface OtherFruitReceptionItem {
     storageLocation?: {
       chamberId: string;
       coordinate: string;
+      warehouse?: string;
+      aisle?: string;
     };
     storedAt?: Timestamp | Date;
     storedByUserName?: string;

@@ -11,13 +11,14 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { OtherFruitReception, ChamberLot, OtherFruitReceptionItem, Chamber, ClientStorageConfig } from '@/lib/types';
+import { OtherFruitReception, ChamberLot, OtherFruitReceptionItem, Chamber, ClientStorageConfig, Warehouse, Aisle } from '@/lib/types';
 import { chambersConfig } from '@/lib/chambers-config';
 import { useToast } from '@/hooks/use-toast';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
-import { getSortedCoordinates, getPairedCoordinates, safeToMillis, getEffectiveChamberConfig, cn } from '@/lib/utils';
+import { getSortedCoordinates, getPairedCoordinates, safeToMillis, getEffectiveChamberConfig, cn, naturalSort } from '@/lib/utils';
 import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
-import { Zap } from 'lucide-react';
+import { Zap, Warehouse as WarehouseIcon, Snowflake } from 'lucide-react';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 interface PendingItem extends OtherFruitReceptionItem {
     receptionId: string;
@@ -32,7 +33,16 @@ interface StoreOtherFruitDialogProps {
   item: PendingItem | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onConfirm: (data: { chamberId: string; coordinate: string; totalQuantity: number; quantityPerLocation: number; strategy: 'secuencial' | 'pareado' | 'aisle-access' | 'inverted-secuencial' | 'horizontal-secuencial' | 'fifo' | 'serpentina-vertical' | 'modelo-sof' | 'fifo-vertical' }) => void;
+  onConfirm: (data: { 
+    chamberId: string; 
+    coordinate: string; 
+    warehouse?: string;
+    aisle?: string;
+    destinationType?: 'chamber' | 'warehouse';
+    totalQuantity: number; 
+    quantityPerLocation: number; 
+    strategy: 'secuencial' | 'pareado' | 'aisle-access' | 'inverted-secuencial' | 'horizontal-secuencial' | 'fifo' | 'serpentina-vertical' | 'modelo-sof' | 'fifo-vertical' 
+  }) => void;
   allReceptions: OtherFruitReception[];
   allChamberLots: ChamberLot[];
   clientConfig?: ClientStorageConfig;
@@ -44,11 +54,30 @@ const DEFAULT_BINS_PER_COORDINATE = 6;
 const DEFAULT_PALLETS_PER_COORDINATE = 3; 
 
 const storeSchema = z.object({
-  chamberId: z.string({ required_error: 'Debe seleccionar una cámara.' }).min(1, 'Debe seleccionar una cámara.'),
-  coordinate: z.string({ required_error: 'Debe seleccionar una coordenada de inicio.' }).min(1, 'Debe seleccionar una coordenada de inicio.'),
+  destinationType: z.enum(['chamber', 'warehouse']).default('chamber'),
+  chamberId: z.string().optional(),
+  coordinate: z.string().optional(),
+  warehouse: z.string().optional(),
+  aisle: z.string().optional(),
   totalQuantity: z.coerce.number().positive('La cantidad total debe ser mayor a 0.'),
   quantityPerLocation: z.coerce.number().positive('La cantidad por ubicación debe ser mayor a 0.'),
   strategy: z.enum(['secuencial', 'pareado', 'aisle-access', 'inverted-secuencial', 'horizontal-secuencial', 'fifo', 'serpentina-vertical', 'modelo-sof', 'fifo-vertical']).default('secuencial'),
+}).superRefine((data, ctx) => {
+  if (data.destinationType === 'chamber') {
+    if (!data.chamberId || data.chamberId.trim() === '') {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Debe seleccionar una cámara.', path: ['chamberId'] });
+    }
+    if (!data.coordinate || data.coordinate.trim() === '') {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Debe seleccionar una coordenada.', path: ['coordinate'] });
+    }
+  } else {
+    if (!data.warehouse || data.warehouse.trim() === '') {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Debe seleccionar un almacén.', path: ['warehouse'] });
+    }
+    if (!data.aisle || data.aisle.trim() === '') {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Debe seleccionar un pasillo.', path: ['aisle'] });
+    }
+  }
 });
 
 type StoreFormValues = z.infer<typeof storeSchema>;
@@ -67,18 +96,49 @@ export function StoreOtherFruitDialog({
 }: StoreOtherFruitDialogProps) {
   const form = useForm<StoreFormValues>({
     resolver: zodResolver(storeSchema),
+    defaultValues: {
+      destinationType: 'chamber',
+      chamberId: '',
+      coordinate: '',
+      warehouse: '',
+      aisle: '',
+      strategy: 'secuencial'
+    }
   });
   const { toast } = useToast();
 
   const { data: chamberSettings } = useFirestoreCollection<{ id: string; row13Enabled?: boolean }>('chamberSettings');
+  const { data: warehouses } = useFirestoreCollection<Warehouse>('warehouses');
+  const { data: allAisles } = useFirestoreCollection<Aisle>('aisles');
+
+  const destinationType = form.watch('destinationType') || 'chamber';
   const selectedChamberId = form.watch('chamberId');
   const selectedCoordinate = form.watch('coordinate');
-  const isSubmitDisabled = !selectedChamberId || !selectedCoordinate || selectedCoordinate === '';
+  const selectedWarehouse = form.watch('warehouse');
+  const selectedAisle = form.watch('aisle');
+
+  const isSubmitDisabled = destinationType === 'chamber' 
+    ? (!selectedChamberId || !selectedCoordinate || selectedCoordinate === '')
+    : (!selectedWarehouse || !selectedAisle || selectedAisle === '');
   
   const isItemPackaging = Boolean(
     item?.clientName?.toUpperCase().includes('VITAFOOD') ||
     item?.clientName?.toUpperCase().includes('EMBALAJE')
   );
+
+  const sortedWarehouses = useMemo(() => {
+    if (!warehouses) return [];
+    return [...warehouses].sort((a, b) => naturalSort(a.name, b.name));
+  }, [warehouses]);
+
+  const filteredAisles = useMemo(() => {
+    if (!selectedWarehouse || !allAisles || !warehouses) return [];
+    const whObj = warehouses.find(w => w.name === selectedWarehouse || w.id === selectedWarehouse);
+    if (!whObj) return [];
+    return allAisles
+      .filter(a => a.warehouseIds && a.warehouseIds.includes(whObj.id))
+      .sort((a, b) => naturalSort(a.name, b.name));
+  }, [selectedWarehouse, allAisles, warehouses]);
 
   const chamberSanitaryMap = useMemo(() => {
     const map = new Map<string, { hasFruit: boolean; hasPackaging: boolean }>();
@@ -423,21 +483,32 @@ export function StoreOtherFruitDialog({
     };
   }, [open, suggestion, selectedChamberId, selectedCoordinate, form, item]);
 
-  const onSubmit = (values: StoreFormValues) => {
+    const onSubmit = (values: StoreFormValues) => {
     if (!item) return;
-    if (values.quantityPerLocation > capacityPerCoord) {
-        toast({ variant: 'destructive', title: 'Límite Excedido', description: `La cantidad por ubicación no puede ser mayor a ${capacityPerCoord} para este cliente.`});
-        return;
+    if (values.destinationType === 'chamber') {
+      if (values.quantityPerLocation > capacityPerCoord) {
+          toast({ variant: 'destructive', title: 'Límite Excedido', description: `La cantidad por ubicación no puede ser mayor a ${capacityPerCoord} para este cliente.`});
+          return;
+      }
+      if (values.chamberId) {
+          localStorage.setItem('frio_last_chamber_id', values.chamberId);
+      }
     }
     if (values.totalQuantity > item.quantity) {
         toast({ variant: 'destructive', title: 'Cantidad Inválida', description: `No puede almacenar más de lo pendiente (${item.quantity}).`});
         return;
     }
     
-    // Persist last used chamber
-    localStorage.setItem('frio_last_chamber_id', values.chamberId);
-    
-    onConfirm(values);
+    onConfirm({
+      chamberId: values.destinationType === 'warehouse' ? (values.warehouse || '') : (values.chamberId || ''),
+      coordinate: values.destinationType === 'warehouse' ? (values.aisle || '') : (values.coordinate || ''),
+      warehouse: values.warehouse,
+      aisle: values.aisle,
+      destinationType: values.destinationType,
+      totalQuantity: values.totalQuantity,
+      quantityPerLocation: values.quantityPerLocation,
+      strategy: values.strategy || 'secuencial'
+    });
   };
   
   if (!item) {
@@ -450,7 +521,7 @@ export function StoreOtherFruitDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             Almacenar Producto
-            {suggestion && (
+            {destinationType === 'chamber' && suggestion && (
                 <div className="ml-auto flex items-center gap-2 bg-primary/10 text-primary px-3 py-1 rounded-full text-xs animate-pulse">
                      <div className="w-2 h-2 bg-primary rounded-full" />
                      Ubicación Sugerida Lista
@@ -471,7 +542,35 @@ export function StoreOtherFruitDialog({
           </div>
         </DialogHeader>
 
-        {suggestion && selectedChamberId && (
+        {isItemPackaging && (
+          <Tabs 
+            value={destinationType} 
+            onValueChange={(val: any) => {
+              form.setValue('destinationType', val);
+              if (val === 'warehouse') {
+                form.setValue('chamberId', '');
+                form.setValue('coordinate', '');
+              } else {
+                form.setValue('warehouse', '');
+                form.setValue('aisle', '');
+              }
+            }} 
+            className="w-full mt-2"
+          >
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="chamber" className="flex items-center justify-center gap-2 font-bold text-xs sm:text-sm">
+                <Snowflake className="w-4 h-4 text-blue-500" />
+                Cámara Frigorífica / Galpón
+              </TabsTrigger>
+              <TabsTrigger value="warehouse" className="flex items-center justify-center gap-2 font-bold text-xs sm:text-sm">
+                <WarehouseIcon className="w-4 h-4 text-amber-600" />
+                Almacén / Pasillo (emb)
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+        )}
+
+        {destinationType === 'chamber' && suggestion && selectedChamberId && (
             <div 
                 className="bg-gradient-to-r from-primary/10 via-primary/5 to-transparent border-l-4 border-primary rounded-xl p-5 flex items-center justify-between group hover:from-primary/20 hover:via-primary/10 transition-all cursor-pointer shadow-sm relative overflow-hidden" 
                 onClick={handleQuickConfirm}
@@ -501,77 +600,11 @@ export function StoreOtherFruitDialog({
                 </div>
             </div>
         )}
+
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 py-4">
-            <div className="hidden">
-             <FormField
-                control={form.control}
-                name="strategy"
-                render={({ field }) => (
-                    <FormItem className="space-y-3">
-                        <FormLabel>Estrategia de Almacenamiento</FormLabel>
-                        <FormControl>
-                            <RadioGroup
-                                onValueChange={field.onChange}
-                                value={field.value}
-                                className="grid grid-cols-2 gap-4"
-                            >
-                                <FormItem className="flex items-center space-x-2 space-y-0">
-                                    <FormControl>
-                                        <RadioGroupItem value="secuencial" />
-                                    </FormControl>
-                                    <FormLabel className="font-normal cursor-pointer text-xs">Secuencial (A1 &rarr; L12)</FormLabel>
-                                </FormItem>
-                                <FormItem className="flex items-center space-x-2 space-y-0">
-                                    <FormControl>
-                                        <RadioGroupItem value="inverted-secuencial" />
-                                    </FormControl>
-                                    <FormLabel className="font-normal cursor-pointer text-xs">Invertido (A12 &rarr; A1)</FormLabel>
-                                </FormItem>
-                                <FormItem className="flex items-center space-x-2 space-y-0">
-                                    <FormControl>
-                                        <RadioGroupItem value="horizontal-secuencial" />
-                                    </FormControl>
-                                    <FormLabel className="font-normal cursor-pointer text-xs">Horizontal (A1 &rarr; O1)</FormLabel>
-                                </FormItem>
-                                <FormItem className="flex items-center space-x-2 space-y-0">
-                                    <FormControl>
-                                        <RadioGroupItem value="aisle-access" />
-                                    </FormControl>
-                                    <FormLabel className="font-normal cursor-pointer text-xs">Pasillo (Fall Creek)</FormLabel>
-                                </FormItem>
-                                <FormItem className="flex items-center space-x-2 space-y-0">
-                                    <FormControl>
-                                        <RadioGroupItem value="fifo" />
-                                    </FormControl>
-                                    <FormLabel className="font-normal cursor-pointer text-xs">FIFO (Serpiente)</FormLabel>
-                                </FormItem>
-                                <FormItem className="flex items-center space-x-2 space-y-0">
-                                    <FormControl>
-                                        <RadioGroupItem value="serpentina-vertical" />
-                                    </FormControl>
-                                    <FormLabel className="font-normal cursor-pointer text-xs">Serpentina Vertical</FormLabel>
-                                </FormItem>
-                                <FormItem className="flex items-center space-x-2 space-y-0">
-                                    <FormControl>
-                                        <RadioGroupItem value="modelo-sof" />
-                                    </FormControl>
-                                    <FormLabel className="font-normal cursor-pointer text-xs">Modelo SOF (Serpentina Continua)</FormLabel>
-                                </FormItem>
-                                <FormItem className="flex items-center space-x-2 space-y-0">
-                                    <FormControl>
-                                        <RadioGroupItem value="fifo-vertical" />
-                                    </FormControl>
-                                    <FormLabel className="font-normal cursor-pointer text-xs">FIFO Vertical</FormLabel>
-                                </FormItem>
-                            </RadioGroup>
-                        </FormControl>
-                        <FormMessage />
-                    </FormItem>
-                )}
-            />
-            </div>
-             <div className="grid grid-cols-2 gap-4">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 py-2">
+            {destinationType === 'chamber' ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <FormField control={form.control} name="chamberId" render={({ field }) => (
                     <FormItem>
                     <FormLabel>Cámara</FormLabel>
@@ -624,9 +657,75 @@ export function StoreOtherFruitDialog({
                     <FormMessage />
                     </FormItem>
                 )} />
-            </div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <FormField control={form.control} name="warehouse" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Almacén / Bodega (emb)</FormLabel>
+                      <Select 
+                        onValueChange={(val) => { 
+                          field.onChange(val); 
+                          form.resetField('aisle'); 
+                        }} 
+                        value={field.value}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Seleccione Almacén..." />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {sortedWarehouses.length > 0 ? (
+                            sortedWarehouses.map(wh => (
+                              <SelectItem key={wh.id} value={wh.name}>
+                                {wh.name}
+                              </SelectItem>
+                            ))
+                          ) : (
+                            <div className="p-2 text-xs text-center text-muted-foreground">
+                              No hay almacenes configurados en Datos Maestros.
+                            </div>
+                          )}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                )} />
+                <FormField control={form.control} name="aisle" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Pasillo (emb)</FormLabel>
+                      <Select 
+                        onValueChange={field.onChange} 
+                        value={field.value} 
+                        disabled={!selectedWarehouse}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder={!selectedWarehouse ? "Seleccione almacén primero" : "Seleccione pasillo..."} />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {filteredAisles.length > 0 ? (
+                            filteredAisles.map(aisle => (
+                              <SelectItem key={aisle.id} value={aisle.name}>
+                                {aisle.name}
+                              </SelectItem>
+                            ))
+                          ) : (
+                            <div className="p-2 text-xs text-center text-muted-foreground">
+                              No hay pasillos para este almacén.
+                            </div>
+                          )}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                )} />
+              </div>
+            )}
             
-            {/* Hidden quantity fields to simplify UI as requested */}
+            {/* Hidden quantity fields */}
             <input type="hidden" {...form.register('totalQuantity')} />
             <input type="hidden" {...form.register('quantityPerLocation')} />
             

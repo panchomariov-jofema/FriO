@@ -27,6 +27,7 @@ import { Label } from '@/components/ui/label';
 import { chambersConfig } from '@/lib/chambers-config';
 import { getSortedCoordinates, getPairedCoordinates, getEffectiveChamberConfig } from '@/lib/utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { cleanFirestoreObject } from '@/lib/vitafood-utils';
 
 type ReceptionFormValues = z.infer<typeof packagingReceptionSchema>;
 
@@ -115,10 +116,19 @@ export function ReceptionTab() {
     };
   }, [itemToStore, clientConfigs]);
 
-  const onStoreConfirm = async (data: { chamberId: string; coordinate: string; totalQuantity: number; quantityPerLocation: number; strategy: any }) => {
+  const onStoreConfirm = async (data: { 
+    chamberId: string; 
+    coordinate: string; 
+    warehouse?: string;
+    aisle?: string;
+    destinationType?: 'chamber' | 'warehouse';
+    totalQuantity: number; 
+    quantityPerLocation: number; 
+    strategy: any 
+  }) => {
     if (!itemToStore || !firestore) return;
 
-    const { chamberId, coordinate: startCoordinate, totalQuantity, quantityPerLocation, strategy } = data;
+    const { chamberId, coordinate: startCoordinate, warehouse, aisle, destinationType, totalQuantity, quantityPerLocation, strategy } = data;
     const receptionRef = doc(firestore, 'otherFruitReceptions', itemToStore.receptionId);
     
     try {
@@ -128,55 +138,96 @@ export function ReceptionTab() {
         return;
       }
       const originalReception = { id: receptionSnap.id, ...receptionSnap.data() } as OtherFruitReception;
-      const rawChamberConfig = chambersConfig[chamberId];
-      if (!rawChamberConfig) return;
-
-      const isChamberRow13Enabled = !!chamberSettings?.find(s => s.id === chamberId)?.row13Enabled;
-      const chamberConfig = getEffectiveChamberConfig(rawChamberConfig, isChamberRow13Enabled);
-      let allPossibleCoords = (strategy === 'pareado') ? getPairedCoordinates(chamberConfig) : getSortedCoordinates(chamberConfig, strategy || 'secuencial');
 
       const itemsToProcess = itemToStore.itemIndices.map((idx: number) => originalReception.items[idx]);
       const newStoredItems: any[] = [];
       let remainingToStore = totalQuantity;
-      const startIndex = allPossibleCoords.indexOf(startCoordinate);
-      if (startIndex === -1) {
-        toast({ variant: 'destructive', title: 'Error de ubicación', description: 'Coordenada no válida.' });
-        return;
+
+      if (destinationType === 'warehouse' || (warehouse && aisle)) {
+        // Warehouse and Aisle storage (e.g., Almacén 7 / Pasillo 1)
+        for (const itemToProcess of itemsToProcess) {
+          if (remainingToStore <= 0) break;
+          newStoredItems.push({
+            ...itemToProcess,
+            quantity: itemToProcess.quantity,
+            status: 'Almacenado',
+            storageLocation: {
+              warehouse: warehouse,
+              aisle: aisle,
+              chamberId: warehouse,
+              coordinate: aisle
+            },
+            storedAt: new Date(),
+          });
+          remainingToStore -= itemToProcess.quantity;
+        }
+
+        const finalItemsArray = originalReception.items.filter((_, index) => !itemToStore.itemIndices.includes(index));
+        finalItemsArray.push(...newStoredItems);
+
+        const stillHasPending = finalItemsArray.some(item => (item.status === 'Pendiente de recibir' || item.status === 'Pendiente de almacenar') && item.quantity > 0);
+        const newStatus = stillHasPending ? 'Parcialmente Almacenado' : 'Almacenado';
+
+        await updateDoc(receptionRef, cleanFirestoreObject({
+          items: finalItemsArray,
+          status: newStatus
+        }));
+
+        setIsStoreDialogOpen(false);
+        setItemToStore(null);
+        toast({ title: '✅ Éxito', description: `Pallet almacenado en ${warehouse} - ${aisle}.` });
+      } else {
+        // Cold Chamber storage with Coordinates
+        const rawChamberConfig = chambersConfig[chamberId];
+        if (!rawChamberConfig) {
+          toast({ variant: 'destructive', title: 'Error', description: 'Cámara no válida.' });
+          return;
+        }
+
+        const isChamberRow13Enabled = !!chamberSettings?.find(s => s.id === chamberId)?.row13Enabled;
+        const chamberConfig = getEffectiveChamberConfig(rawChamberConfig, isChamberRow13Enabled);
+        let allPossibleCoords = (strategy === 'pareado') ? getPairedCoordinates(chamberConfig) : getSortedCoordinates(chamberConfig, strategy || 'secuencial');
+
+        const startIndex = allPossibleCoords.indexOf(startCoordinate);
+        if (startIndex === -1) {
+          toast({ variant: 'destructive', title: 'Error de ubicación', description: 'Coordenada no válida.' });
+          return;
+        }
+
+        for (const itemToProcess of itemsToProcess) {
+          if (remainingToStore <= 0) break;
+          newStoredItems.push({
+            ...itemToProcess,
+            quantity: itemToProcess.quantity,
+            status: 'Almacenado',
+            storageLocation: {
+              chamberId,
+              coordinate: startCoordinate
+            },
+            storedAt: new Date(),
+          });
+          remainingToStore -= itemToProcess.quantity;
+        }
+
+        const finalItemsArray = originalReception.items.filter((_, index) => !itemToStore.itemIndices.includes(index));
+        finalItemsArray.push(...newStoredItems);
+
+        const stillHasPending = finalItemsArray.some(item => (item.status === 'Pendiente de recibir' || item.status === 'Pendiente de almacenar') && item.quantity > 0);
+        const newStatus = stillHasPending ? 'Parcialmente Almacenado' : 'Almacenado';
+
+        await updateDoc(receptionRef, cleanFirestoreObject({
+          items: finalItemsArray,
+          status: newStatus
+        }));
+
+        setLastUsedChamberId(chamberId);
+        setLastUsedCoordinate(startCoordinate);
+        setIsStoreDialogOpen(false);
+        setItemToStore(null);
+        toast({ title: '✅ Éxito', description: `Pallet almacenado en ${chamberConfig.name} - ${startCoordinate}.` });
       }
-
-      for (const itemToProcess of itemsToProcess) {
-        if (remainingToStore <= 0) break;
-        newStoredItems.push({
-          ...itemToProcess,
-          quantity: itemToProcess.quantity,
-          status: 'Almacenado',
-          storageLocation: {
-            chamberId,
-            coordinate: startCoordinate
-          },
-          storedAt: new Date(),
-        });
-        remainingToStore -= itemToProcess.quantity;
-      }
-
-      const finalItemsArray = originalReception.items.filter((_, index) => !itemToStore.itemIndices.includes(index));
-      finalItemsArray.push(...newStoredItems);
-
-      const stillHasPending = finalItemsArray.some(item => (item.status === 'Pendiente de recibir' || item.status === 'Pendiente de almacenar') && item.quantity > 0);
-      const newStatus = stillHasPending ? 'Parcialmente Almacenado' : 'Almacenado';
-
-      await updateDoc(receptionRef, {
-        items: finalItemsArray,
-        status: newStatus
-      });
-
-      setLastUsedChamberId(chamberId);
-      setLastUsedCoordinate(startCoordinate);
-      setIsStoreDialogOpen(false);
-      setItemToStore(null);
-      toast({ title: 'Éxito', description: `Pallet almacenado en ${chamberConfig.name} - ${startCoordinate}.` });
     } catch (err: any) {
-      console.error('Error storing packaging in chamber:', err);
+      console.error('Error storing packaging in chamber/warehouse:', err);
       toast({ variant: 'destructive', title: 'Error', description: 'No se pudo guardar la ubicación.' });
     }
   };

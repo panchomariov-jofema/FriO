@@ -23,7 +23,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { parseVitafoodManifest, fileToBase64, type VitafoodManifestRow, type VitafoodParsedManifest } from '@/lib/vitafood-utils';
+import { parseVitafoodManifest, fileToBase64, cleanFirestoreObject, type VitafoodManifestRow, type VitafoodParsedManifest } from '@/lib/vitafood-utils';
 import { parseVitafoodManifestAIAction } from '@/app/(app)/otros-hortofruticolas/actions';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
@@ -247,7 +247,14 @@ export function VitafoodReceptionWorkflow({
 
     // Confirm Pre-Reception Import into Firestore
     const handleConfirmImport = async () => {
-        if (!previewData || !firestore || !selectedClient) return;
+        if (!previewData || !firestore || !selectedClient) {
+            toast({
+                variant: 'destructive',
+                title: 'Error de Inicialización',
+                description: 'No se ha seleccionado el cliente o no se ha inicializado Firestore.'
+            });
+            return;
+        }
 
         const guiaFinal = customGuiaNumber.trim();
         if (!guiaFinal) {
@@ -263,23 +270,32 @@ export function VitafoodReceptionWorkflow({
         try {
             const displayLotId = `VITA-${guiaFinal}`;
 
-            const items: OtherFruitReceptionItem[] = previewData.rows.map((row) => ({
-                productCode: row.material,
-                productName: row.description,
-                palletId: row.ump,
-                clientLotId: row.lote,
-                quantity: row.quantity,
-                unit: 'Pallets',
-                status: 'Pendiente de recibir',
-                observation: [
+            const items: OtherFruitReceptionItem[] = previewData.rows.map((row) => {
+                const obsParts = [
                     row.mfgDate ? `Elab: ${row.mfgDate}` : '',
                     row.expDate ? `Venc: ${row.expDate}` : '',
                     previewData.header.origin ? `Origen: ${previewData.header.origin}` : '',
                     previewData.header.driver ? `Chofer: ${previewData.header.driver}` : '',
-                ].filter(Boolean).join(' | ') || undefined
-            }));
+                ].filter(Boolean);
 
-            const receptionDoc: any = {
+                const item: any = {
+                    productCode: String(row.material || '').trim(),
+                    productName: String(row.description || `MATERIAL ${row.material}`).trim(),
+                    palletId: String(row.ump || '').trim(),
+                    clientLotId: String(row.lote || '').trim() || 'S/L',
+                    quantity: Number(row.quantity) || 1,
+                    unit: 'Pallets',
+                    status: 'Pendiente de recibir'
+                };
+
+                if (obsParts.length > 0) {
+                    item.observation = obsParts.join(' | ');
+                }
+
+                return item;
+            });
+
+            const rawReceptionDoc: any = {
                 clientId: selectedClient.clientId || 'VITAFOODS',
                 clientName: selectedClient.name || 'VITAFOODS',
                 unit: 'Pallets',
@@ -294,7 +310,8 @@ export function VitafoodReceptionWorkflow({
                 observation: `Orden de Compra / PL: ${previewData.header.orderNumber || 'N/A'} - Guía: ${guiaFinal} - Total: ${items.length} Pallets`
             };
 
-            const docRef = await addDoc(collection(firestore, 'otherFruitReceptions'), receptionDoc);
+            const cleanedDoc = cleanFirestoreObject(rawReceptionDoc);
+            const docRef = await addDoc(collection(firestore, 'otherFruitReceptions'), cleanedDoc);
             setSelectedManifestId(docRef.id);
             setShowPreview(false);
             setPreviewData(null);
@@ -308,7 +325,7 @@ export function VitafoodReceptionWorkflow({
             toast({
                 variant: 'destructive',
                 title: 'Error al Guardar',
-                description: 'No se pudo registrar la orden de entrada en la base de datos.'
+                description: error.message || 'No se pudo registrar la orden de entrada en la base de datos.'
             });
         } finally {
             setIsConfirmingImport(false);
@@ -513,12 +530,12 @@ export function VitafoodReceptionWorkflow({
         try {
             const displayLotId = `VITA-${guiaFinal}`;
 
-            const newItem: OtherFruitReceptionItem = {
-                productCode: manualProductCode,
-                productName: manualProductName || `PRODUCTO ${manualProductCode}`,
-                palletId: manualUmp.trim(),
-                clientLotId: manualLote.trim() || undefined,
-                quantity: Number(manualQuantity),
+            const newItem: any = {
+                productCode: String(manualProductCode).trim(),
+                productName: String(manualProductName || `PRODUCTO ${manualProductCode}`).trim(),
+                palletId: String(manualUmp).trim(),
+                clientLotId: String(manualLote).trim() || 'S/L',
+                quantity: Number(manualQuantity) || 1,
                 unit: 'Pallets',
                 status: 'Pendiente de almacenar'
             };
