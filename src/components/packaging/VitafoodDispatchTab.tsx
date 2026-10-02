@@ -16,7 +16,7 @@ import { parseVitafoodDispatchFile, cleanFirestoreObject, VitafoodParsedDispatch
 import { chambersConfig } from '@/lib/chambers-config';
 import { useFirestore, useUser } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
-import { doc, writeBatch, serverTimestamp, collection } from 'firebase/firestore';
+import { doc, writeBatch, serverTimestamp, collection, setDoc } from 'firebase/firestore';
 import { 
   FileSpreadsheet, 
   UploadCloud, 
@@ -79,6 +79,55 @@ export function VitafoodDispatchTab() {
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [isScannerOpen, setIsScannerOpen] = React.useState(false);
   const [activeInputMode, setActiveInputMode] = React.useState<'file' | 'manual'>('file');
+  const [isDraftRestored, setIsDraftRestored] = React.useState(false);
+
+  // Load saved draft on mount
+  React.useEffect(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('frio_vitafood_active_dispatch');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (parsed.requestedUmps && Array.isArray(parsed.requestedUmps) && parsed.requestedUmps.length > 0) {
+            setRequestedUmps(parsed.requestedUmps);
+            setFileName(parsed.fileName || 'Borrador en Progreso');
+            setDispatchDocument(parsed.dispatchDocument || '');
+            setDestination(parsed.destination || '');
+            setCarrier(parsed.carrier || '');
+            setLicensePlate(parsed.licensePlate || '');
+            setPickedState(parsed.pickedState || {});
+            setIsDraftRestored(true);
+          }
+        }
+      } catch (e) {
+        console.error("Error loading dispatch draft from storage:", e);
+      }
+    }
+  }, []);
+
+  // Save draft whenever state changes
+  React.useEffect(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        if (requestedUmps.length > 0) {
+          localStorage.setItem('frio_vitafood_active_dispatch', JSON.stringify({
+            requestedUmps,
+            fileName,
+            dispatchDocument,
+            destination,
+            carrier,
+            licensePlate,
+            pickedState,
+            savedAt: new Date().toISOString()
+          }));
+        } else {
+          localStorage.removeItem('frio_vitafood_active_dispatch');
+        }
+      } catch (e) {
+        console.error("Error saving dispatch draft to storage:", e);
+      }
+    }
+  }, [requestedUmps, fileName, dispatchDocument, destination, carrier, licensePlate, pickedState]);
 
   // Handle File Upload
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -87,6 +136,7 @@ export function VitafoodDispatchTab() {
 
     try {
       setFileName(file.name);
+      setIsDraftRestored(false);
       const parsed: VitafoodParsedDispatch = await parseVitafoodDispatchFile(file);
       
       if (parsed.header.documentNumber && !dispatchDocument) {
@@ -139,6 +189,7 @@ export function VitafoodDispatchTab() {
     });
     setPickedState(initialPicked);
     setFileName("Ingreso Manual");
+    setIsDraftRestored(false);
 
     toast({
       title: "Lista Procesada",
@@ -339,10 +390,335 @@ export function VitafoodDispatchTab() {
     setCarrier('');
     setLicensePlate('');
     setManualText('');
+    setIsDraftRestored(false);
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('frio_vitafood_active_dispatch');
+    }
+  };
+
+  const handleSaveAsPickingRequest = async () => {
+    if (!firestore) return;
+    if (matchedItems.length === 0) {
+      toast({
+        variant: "destructive",
+        title: "Sin UMPs coincidentes",
+        description: "No hay UMPs encontrados en stock para crear la solicitud de picking.",
+      });
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const movementRef = doc(collection(firestore, 'packagingMovements'));
+      await setDoc(movementRef, cleanFirestoreObject({
+        type: 'salida',
+        clientId: matchedItems[0]?.clientId || 'VITAFOODS',
+        clientName: matchedItems[0]?.clientName || 'Vitafoods',
+        document: dispatchDocument || 'Sin Documento',
+        destination: destination || '',
+        carrier: carrier || '',
+        licensePlate: licensePlate || '',
+        totalPallets: matchedItems.length,
+        fileName: fileName || 'Carga Excel',
+        items: matchedItems.map(it => ({
+          ump: it.ump,
+          productCode: it.productCode,
+          productName: it.productName,
+          lote: it.clientLotId,
+          quantity: it.quantity,
+          unit: it.unit,
+          location: it.locationDisplay,
+          receptionId: it.receptionId,
+          itemIndex: it.itemIndex,
+          collectionType: it.collectionType,
+        })),
+        status: 'Pendiente de Picking',
+        createdAt: serverTimestamp(),
+        userId: user?.uid || '',
+        userName: user?.displayName || user?.email || '',
+      }));
+
+      toast({
+        title: "📋 Solicitud de Picking Guardada",
+        description: `Se guardó la orden con ${matchedItems.length} pallets en "En Picking / Historial" para continuar desde cualquier dispositivo.`,
+      });
+    } catch (err: any) {
+      console.error("Error saving picking order:", err);
+      toast({
+        variant: "destructive",
+        title: "Error al guardar solicitud",
+        description: err.message || "No se pudo guardar la orden en Firestore.",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handlePrint = () => {
-    window.print();
+    const printWindow = window.open('', '_blank', 'width=900,height=700');
+    if (!printWindow) {
+      toast({
+        variant: "destructive",
+        title: "Bloqueador de ventanas emergentes",
+        description: "Permita las ventanas emergentes en su navegador para imprimir el documento.",
+      });
+      return;
+    }
+
+    const now = new Date();
+    const dateStr = now.toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    const timeStr = now.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' });
+    const totalUnits = matchedItems.reduce((sum, item) => sum + (item.quantity || 0), 0);
+
+    const rowsHtml = matchedItems.map((item, idx) => `
+      <tr>
+        <td style="text-align: center; font-weight: bold; width: 30px;">${idx + 1}</td>
+        <td style="font-weight: bold; background-color: #f1f5f9; text-transform: uppercase; font-size: 11px; white-space: nowrap;">
+          ${item.locationDisplay}
+        </td>
+        <td style="font-family: monospace; font-size: 13px; font-weight: bold; letter-spacing: 0.5px;">
+          ${item.ump}
+        </td>
+        <td style="font-family: monospace; font-size: 11px; text-align: center;">
+          ${item.clientLotId || '-'}
+        </td>
+        <td>
+          <div style="font-weight: 600; font-size: 11px;">${item.productName}</div>
+          ${item.productCode ? `<div style="font-size: 9px; color: #64748b; font-family: monospace;">CÓD: ${item.productCode}</div>` : ''}
+        </td>
+        <td style="text-align: right; font-weight: bold; font-size: 12px; white-space: nowrap;">
+          ${item.quantity.toLocaleString('es-CL')} <span style="font-size: 9px; font-weight: normal; color: #64748b;">${item.unit}</span>
+        </td>
+        <td style="text-align: center; width: 50px;">
+          <div style="display: inline-block; width: 18px; height: 18px; border: 2px solid #0f172a; border-radius: 3px; vertical-align: middle;"></div>
+        </td>
+      </tr>
+    `).join('');
+
+    const html = `
+      <!DOCTYPE html>
+      <html lang="es">
+      <head>
+        <meta charset="utf-8">
+        <title>Picking List - Guía ${dispatchDocument || 'Borrador'}</title>
+        <style>
+          @page {
+            size: letter portrait;
+            margin: 10mm 12mm;
+          }
+          * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            color: #0f172a;
+          }
+          body {
+            padding: 15px;
+            font-size: 11px;
+            line-height: 1.3;
+          }
+          .header-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 12px;
+            border-bottom: 2px solid #0f172a;
+            padding-bottom: 8px;
+          }
+          .title {
+            font-size: 16px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+          }
+          .subtitle {
+            font-size: 10px;
+            color: #475569;
+            font-weight: 600;
+          }
+          .meta-grid {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 14px;
+            background-color: #f8fafc;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+          }
+          .meta-grid td {
+            padding: 6px 10px;
+            font-size: 11px;
+            border: 1px solid #e2e8f0;
+          }
+          .meta-label {
+            font-size: 9px;
+            text-transform: uppercase;
+            font-weight: 700;
+            color: #64748b;
+            display: block;
+            margin-bottom: 2px;
+          }
+          .meta-val {
+            font-weight: 700;
+            font-size: 12px;
+          }
+          .picking-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 16px;
+          }
+          .picking-table th {
+            background-color: #0f172a;
+            color: #ffffff;
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            padding: 7px 8px;
+            text-align: left;
+            border: 1px solid #0f172a;
+          }
+          .picking-table td {
+            padding: 6px 8px;
+            border: 1px solid #cbd5e1;
+            font-size: 11px;
+            vertical-align: middle;
+          }
+          .picking-table tr:nth-child(even) {
+            background-color: #f8fafc;
+          }
+          .summary-bar {
+            display: flex;
+            justify-content: space-between;
+            background-color: #f1f5f9;
+            border: 1px solid #cbd5e1;
+            padding: 8px 12px;
+            font-weight: bold;
+            margin-bottom: 24px;
+            border-radius: 4px;
+          }
+          .signatures-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+            margin-top: 35px;
+            page-break-inside: avoid;
+          }
+          .signature-box {
+            border-top: 1px solid #0f172a;
+            padding-top: 6px;
+            text-align: center;
+            font-size: 10px;
+          }
+          .signature-title {
+            font-weight: bold;
+            text-transform: uppercase;
+            margin-bottom: 25px;
+          }
+          .footer-note {
+            margin-top: 25px;
+            font-size: 9px;
+            color: #64748b;
+            text-align: center;
+            border-top: 1px dashed #cbd5e1;
+            padding-top: 6px;
+            page-break-inside: avoid;
+          }
+          @media print {
+            body { padding: 0; }
+            .no-print { display: none; }
+          }
+        </style>
+      </head>
+      <body>
+        <table class="header-table">
+          <tr>
+            <td>
+              <div class="title">ORDEN DE PICKING / PREPARACIÓN DE DESPACHO</div>
+              <div class="subtitle">FRIGOMANAGER &bull; FRÍO MAIPO &bull; LOGÍSTICA DE EMBALAJES</div>
+            </td>
+            <td style="text-align: right;">
+              <div style="font-size: 13px; font-weight: 800;">GUÍA N°: ${dispatchDocument || 'PENDIENTE'}</div>
+              <div style="font-size: 10px; color: #64748b;">Emisión: ${dateStr} ${timeStr}</div>
+            </td>
+          </tr>
+        </table>
+
+        <table class="meta-grid">
+          <tr>
+            <td width="25%">
+              <span class="meta-label">Cliente</span>
+              <span class="meta-val">${matchedItems[0]?.clientName || 'VITAFOODS'}</span>
+            </td>
+            <td width="25%">
+              <span class="meta-label">Destino / Planta</span>
+              <span class="meta-val">${destination || 'PLANTA PRINCIPAL'}</span>
+            </td>
+            <td width="25%">
+              <span class="meta-label">Transportista</span>
+              <span class="meta-val">${carrier || '-'}</span>
+            </td>
+            <td width="25%">
+              <span class="meta-label">Patente Camión</span>
+              <span class="meta-val" style="font-family: monospace;">${licensePlate || '-'}</span>
+            </td>
+          </tr>
+        </table>
+
+        <table class="picking-table">
+          <thead>
+            <tr>
+              <th style="text-align: center; width: 30px;">#</th>
+              <th style="width: 160px;">Ubicación Física</th>
+              <th style="width: 120px;">UMP (Pallet ID)</th>
+              <th style="width: 85px; text-align: center;">Lote</th>
+              <th>Producto / Material</th>
+              <th style="text-align: right; width: 85px;">Cant.</th>
+              <th style="text-align: center; width: 50px;">Check</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rowsHtml}
+          </tbody>
+        </table>
+
+        <div class="summary-bar">
+          <span>TOTAL PALLETS: <strong>${matchedItems.length}</strong></span>
+          <span>TOTAL BULTOS / UNIDADES: <strong>${totalUnits.toLocaleString('es-CL')}</strong></span>
+          <span>EMITIDO POR: <strong>${user?.displayName || user?.email || 'BODEGA'}</strong></span>
+        </div>
+
+        <div class="signatures-grid">
+          <div class="signature-box">
+            <div class="signature-title">Preparado por (Bodega)</div>
+            <div>Firma / Nombre</div>
+          </div>
+          <div class="signature-box">
+            <div class="signature-title">Control / Despachador</div>
+            <div>Firma / Nombre</div>
+          </div>
+          <div class="signature-box">
+            <div class="signature-title">Chofer / Transportista</div>
+            <div>Firma / RUT</div>
+          </div>
+        </div>
+
+        <div class="footer-note">
+          Documento de control interno de preparación y carga. Verifique la coincidencia física de cada UMP antes de cargar al camión.
+        </div>
+
+        <script>
+          window.onload = function() {
+            setTimeout(function() {
+              window.print();
+            }, 250);
+          };
+        </script>
+      </body>
+      </html>
+    `;
+
+    printWindow.document.open();
+    printWindow.document.write(html);
+    printWindow.document.close();
   };
 
   const handleConfirmDispatch = async () => {
@@ -502,6 +878,14 @@ export function VitafoodDispatchTab() {
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
+          {isDraftRestored && (
+            <div className="bg-primary/10 border border-primary/20 p-2.5 rounded-lg text-xs flex items-center justify-between text-primary font-medium">
+              <span>💾 Se ha restaurado automáticamente la orden de despacho en progreso.</span>
+              <Button size="sm" variant="ghost" onClick={handleReset} className="h-6 text-xs text-destructive hover:bg-destructive/10">
+                Descartar
+              </Button>
+            </div>
+          )}
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
             <div className="space-y-1.5">
               <Label className="text-xs font-bold text-foreground flex items-center gap-1">
@@ -806,7 +1190,7 @@ export function VitafoodDispatchTab() {
                   <span className="font-bold text-foreground">{pickedCount}</span> pallets listos para despachar con Guía <span className="font-mono font-bold text-foreground">{dispatchDocument || '(Pendiente)'}</span>.
                 </div>
 
-                <div className="flex items-center gap-2 w-full sm:w-auto">
+                <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
                   <Button 
                     variant="outline" 
                     onClick={handleReset} 
@@ -814,6 +1198,14 @@ export function VitafoodDispatchTab() {
                     className="flex-1 sm:flex-initial"
                   >
                     Cancelar
+                  </Button>
+                  <Button 
+                    variant="secondary"
+                    onClick={handleSaveAsPickingRequest} 
+                    disabled={isSubmitting || matchedItems.length === 0}
+                    className="flex-1 sm:flex-initial font-bold"
+                  >
+                    Guardar Solicitud de Picking
                   </Button>
                   <Button 
                     onClick={handleConfirmDispatch} 

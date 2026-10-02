@@ -7,7 +7,7 @@ import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
 import type { PackagingReception, PackagingMaster, OtherClient, OtherFruitReception } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { RelocatePackagingDialog } from './RelocatePackagingDialog';
+import { RelocatePackagingDialog, RelocatePackagingData } from './RelocatePackagingDialog';
 import { useFirestore } from '@/firebase';
 import { doc, updateDoc, serverTimestamp, writeBatch, collection } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
@@ -53,10 +53,11 @@ const SPANISH_IMPORT_HEADERS = Object.keys(IMPORT_HEADER_MAP);
 
 const EXPORT_HEADER_MAP: { [key: string]: string } = {
   'Cliente': 'clientName',
+  'UMP': 'palletId',
   'Código': 'code',
   'Artículo': 'name',
   'Lote': 'lote',
-  'Ubicación': 'location',
+  'Ubicación': 'locationDisplay',
   'Cant. Pallets': 'palletCount',
 };
 const SPANISH_EXPORT_HEADERS = Object.keys(EXPORT_HEADER_MAP);
@@ -132,6 +133,7 @@ export function StockAndRelocationTab() {
                         name: item.packagingMasterName,
                         lote: item.lote,
                         palletCount: item.palletCount,
+                        palletId: item.lote || item.packagingMasterCode || '-',
                         locationDisplay: locDisplay,
                         location: item.storageLocation || { warehouse: '', aisle: '' },
                     };
@@ -223,8 +225,26 @@ export function StockAndRelocationTab() {
     setAdjustDialogOpen(true);
   };
 
-  const handleRelocateConfirm = async (newLocation: { warehouse: string; aisle: string; }) => {
+  const handleRelocateConfirm = async (newLocation: RelocatePackagingData) => {
     if (!itemToRelocate || !firestore) return;
+
+    let targetLocationObj: any = {};
+    let targetDisplay = '';
+
+    if (newLocation.destinationType === 'chamber') {
+      targetLocationObj = {
+        chamberId: newLocation.chamberId,
+        coordinate: newLocation.coordinate,
+      };
+      const chName = chambersConfig[newLocation.chamberId!]?.name || newLocation.chamberId;
+      targetDisplay = `❄️ ${chName} / ${newLocation.coordinate}`;
+    } else {
+      targetLocationObj = {
+        warehouse: newLocation.warehouse,
+        aisle: newLocation.aisle,
+      };
+      targetDisplay = `🏢 ${newLocation.warehouse} / ${newLocation.aisle}`;
+    }
 
     if (itemToRelocate.collectionType === 'otherFruitReceptions') {
       const receptionDocRef = doc(firestore, 'otherFruitReceptions', itemToRelocate.receptionId);
@@ -234,12 +254,7 @@ export function StockAndRelocationTab() {
       const updatedItems = JSON.parse(JSON.stringify(originalReception.items));
       updatedItems[itemToRelocate.itemIndex] = {
           ...updatedItems[itemToRelocate.itemIndex],
-          storageLocation: {
-            warehouse: newLocation.warehouse,
-            aisle: newLocation.aisle,
-            chamberId: newLocation.warehouse,
-            coordinate: newLocation.aisle,
-          },
+          storageLocation: targetLocationObj,
           storedAt: new Date(), 
       };
 
@@ -248,7 +263,7 @@ export function StockAndRelocationTab() {
               items: updatedItems,
               updatedAt: serverTimestamp(),
           }));
-          toast({ title: '✅ Éxito', description: `Pallet reubicado a ${newLocation.warehouse} - ${newLocation.aisle}.` });
+          toast({ title: '✅ Éxito', description: `Pallet reubicado a ${targetDisplay}.` });
           setDialogOpen(false);
       } catch (error) {
           console.error("Error relocating otherFruit packaging item:", error);
@@ -264,26 +279,23 @@ export function StockAndRelocationTab() {
     const updatedItems = JSON.parse(JSON.stringify(originalReception.items));
     updatedItems[itemToRelocate.itemIndex] = {
         ...updatedItems[itemToRelocate.itemIndex],
-        storageLocation: newLocation,
+        storageLocation: targetLocationObj,
         storedAt: new Date(), 
     };
 
-    const updateData = {
-        items: updatedItems,
-        updatedAt: serverTimestamp(),
-    };
-
     try {
-        await updateDoc(receptionDocRef, updateData);
-        toast({ title: 'Éxito', description: `Pallet reubicado a ${newLocation.warehouse} - ${newLocation.aisle}.` });
+        await updateDoc(receptionDocRef, cleanFirestoreObject({
+            items: updatedItems,
+            updatedAt: serverTimestamp(),
+        }));
+        toast({ title: '✅ Éxito', description: `Pallet reubicado a ${targetDisplay}.` });
         setDialogOpen(false);
     } catch (error) {
         console.error("Error relocating packaging item:", error);
         toast({ variant: 'destructive', title: 'Error', description: 'No se pudo reubicar el pallet.' });
         errorEmitter.emit('permission-error', new FirestorePermissionError({
-            path: receptionDocRef.path,
+            path: 'packagingReceptions',
             operation: 'update',
-            requestResourceData: updateData,
         }));
     }
   };
@@ -539,10 +551,10 @@ export function StockAndRelocationTab() {
           </div>
           <div className="pt-4">
               <Input
-                placeholder="Filtrar por código de artículo..."
+                placeholder="Filtrar por UMP, código, artículo, lote o ubicación..."
                 value={codeFilter}
                 onChange={(e) => setCodeFilter(e.target.value)}
-                className="max-w-sm"
+                className="max-w-md"
               />
           </div>
         </CardHeader>
@@ -552,6 +564,7 @@ export function StockAndRelocationTab() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Cliente</TableHead>
+                  <TableHead className="font-bold">UMP</TableHead>
                   <TableHead className="hidden sm:table-cell">Código</TableHead>
                   <TableHead>Artículo</TableHead>
                   <TableHead>Lote</TableHead>
@@ -563,17 +576,18 @@ export function StockAndRelocationTab() {
               <TableBody>
                 {isLoading ? (
                   Array.from({ length: 5 }).map((_, i) => (
-                    <TableRow key={i}><TableCell colSpan={7}><Skeleton className="h-4 w-full" /></TableCell></TableRow>
+                    <TableRow key={i}><TableCell colSpan={8}><Skeleton className="h-4 w-full" /></TableCell></TableRow>
                   ))
                 ) : filteredItems.length > 0 ? (
                   filteredItems.map((item) => (
                     <TableRow key={item.id}>
-                        <TableCell>{item.clientName}</TableCell>
-                        <TableCell className="font-mono hidden sm:table-cell">{item.code}</TableCell>
-                        <TableCell className="font-medium">{item.name}</TableCell>
-                        <TableCell>{item.lote || '-'}</TableCell>
-                        <TableCell className="font-medium">{item.locationDisplay}</TableCell>
-                        <TableCell className="font-semibold">{item.palletCount}</TableCell>
+                        <TableCell className="font-medium text-xs">{item.clientName}</TableCell>
+                        <TableCell className="font-mono font-bold text-xs">{item.palletId || '-'}</TableCell>
+                        <TableCell className="font-mono hidden sm:table-cell text-xs">{item.code}</TableCell>
+                        <TableCell className="font-medium text-xs">{item.name}</TableCell>
+                        <TableCell className="font-mono text-xs">{item.lote || '-'}</TableCell>
+                        <TableCell className="font-medium text-xs">{item.locationDisplay}</TableCell>
+                        <TableCell className="font-semibold text-xs">{item.palletCount}</TableCell>
                         <TableCell className="text-right">
                            <div className="flex gap-2 justify-end">
                                 <Button variant="outline" size="sm" onClick={() => handleAdjustClick(item)}>Ajustar</Button>
@@ -584,8 +598,8 @@ export function StockAndRelocationTab() {
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={7} className="h-24 text-center">
-                        {codeFilter ? 'No se encontraron artículos con ese código.' : 'No hay stock almacenado.'}
+                    <TableCell colSpan={8} className="h-24 text-center">
+                        {codeFilter ? 'No se encontraron artículos con ese criterio.' : 'No hay stock almacenado.'}
                     </TableCell>
                   </TableRow>
                 )}
