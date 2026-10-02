@@ -398,24 +398,27 @@ export function StoreOtherFruitDialog({
          ? (clientConfig?.binsPerCoordinate ?? (isFallCreek ? 9 : DEFAULT_BINS_PER_COORDINATE))
          : (clientConfig?.palletsPerCoordinate ?? (isFallCreek ? 3 : DEFAULT_PALLETS_PER_COORDINATE));
 
-        // Prioritize session continuity (lastUsedChamberId from props or localStorage) over client preferred chamber
-        const savedChamber = lastUsedChamberId || (typeof window !== 'undefined' ? localStorage.getItem('frio_last_chamber_id') : null);
-        let chamberId = (savedChamber && chambersConfig[savedChamber]) ? savedChamber : clientConfig?.preferredChamberId;
+        // Session continuity: Only preselect chamber if there is an active session choice from lastUsedChamberId
+        let chamberId = (lastUsedChamberId && chambersConfig[lastUsedChamberId]) ? lastUsedChamberId : '';
         
-        // Validation: Ensure the preferred chamber actually exists in config
-        if (chamberId && !chambersConfig[chamberId]) {
-            chamberId = undefined;
+        // Sanitary validation: Ensure packaging doesn't preselect a chamber with fruit
+        if (chamberId && isItemPackaging) {
+          const sanitary = chamberSanitaryMap.get(chamberId);
+          if (sanitary?.hasFruit) {
+            chamberId = '';
+          }
         }
 
        form.reset({
          totalQuantity,
          quantityPerLocation: qtyPerLocation,
-         chamberId: chamberId,
+         chamberId: chamberId || undefined,
          coordinate: undefined,
          strategy: strategy as any,
+         destinationType: 'chamber'
         });
     }
-  }, [item, open, form, clientConfig, lastUsedChamberId]);
+  }, [item, open, form, clientConfig, lastUsedChamberId, isItemPackaging, chamberSanitaryMap]);
 
   useEffect(() => {
     if (suggestion) {

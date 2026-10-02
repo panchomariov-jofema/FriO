@@ -4,7 +4,7 @@ import * as React from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
-import type { PackagingReception, PackagingMaster, OtherClient } from '@/lib/types';
+import type { PackagingReception, PackagingMaster, OtherClient, OtherFruitReception } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { RelocatePackagingDialog } from './RelocatePackagingDialog';
@@ -16,21 +16,28 @@ import { FirestorePermissionError } from '@/firebase/errors';
 import { Download, Upload } from 'lucide-react';
 import { AdjustPackagingDialog } from './AdjustPackagingDialog';
 import { Input } from '@/components/ui/input';
+import { chambersConfig } from '@/lib/chambers-config';
+import { cleanFirestoreObject } from '@/lib/vitafood-utils';
 
 interface StoredPackagingItem {
     id: string; // receptionId + itemIndex
     receptionId: string;
     itemIndex: number;
+    collectionType: 'packagingReceptions' | 'otherFruitReceptions';
     clientName: string;
     document: string;
     code: string;
     name: string;
     lote?: string;
     palletCount: number;
+    palletId?: string;
+    locationDisplay: string;
     location: {
-        warehouse: string;
-        aisle: string;
-    }
+        warehouse?: string;
+        aisle?: string;
+        chamberId?: string;
+        coordinate?: string;
+    };
 }
 
 const IMPORT_HEADER_MAP: { [key: string]: string } = {
@@ -72,7 +79,8 @@ function downloadCSV(csvString: string, filename: string) {
 
 
 export function StockAndRelocationTab() {
-  const { data: allReceptions, loading } = useFirestoreCollection<PackagingReception>('packagingReceptions');
+  const { data: packagingReceptions, loading: loadingPackaging } = useFirestoreCollection<PackagingReception>('packagingReceptions');
+  const { data: otherFruitReceptions, loading: loadingOtherFruit } = useFirestoreCollection<OtherFruitReception>('otherFruitReceptions');
   const { data: allPackagingMasters, loading: loadingMasters } = useFirestoreCollection<PackagingMaster>('packagingMaster');
   const { data: allClients, loading: loadingClients } = useFirestoreCollection<OtherClient>('otherClients');
 
@@ -85,36 +93,122 @@ export function StockAndRelocationTab() {
   const { toast } = useToast();
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
-  const isLoading = loading || loadingMasters || loadingClients;
+  const isLoading = loadingPackaging || loadingOtherFruit || loadingMasters || loadingClients;
 
   const storedItems = React.useMemo(() => {
-    return (allReceptions || [])
+    // Determine which clients are packaging clients
+    const packagingClientIds = new Set<string>();
+    (allClients || []).forEach(c => {
+      if (c.type?.toLowerCase() === 'embalaje' || c.name?.toUpperCase().includes('VITAFOOD') || c.clientId?.toUpperCase().includes('VITAFOOD')) {
+        packagingClientIds.add(c.clientId.toUpperCase());
+        packagingClientIds.add(c.name.toUpperCase());
+      }
+    });
+    packagingClientIds.add('VITAFOODS');
+    packagingClientIds.add('VITAFOOD');
+
+    // 1. Traditional packaging receptions
+    const pkgItems: StoredPackagingItem[] = (packagingReceptions || [])
         .flatMap((reception) => 
-            reception.items
+            (reception.items || [])
                 .map((item, index) => ({ item, index, reception }))
                 .filter(({ item }) => item.status === 'Almacenado' && item.palletCount > 0 && item.storageLocation)
-                .map(({ item, index, reception }) => ({
-                    id: `${reception.id}-${index}`,
-                    receptionId: reception.id,
-                    itemIndex: index,
-                    clientName: reception.clientName,
-                    document: reception.document,
-                    code: item.packagingMasterCode,
-                    name: item.packagingMasterName,
-                    lote: item.lote,
-                    palletCount: item.palletCount,
-                    location: item.storageLocation!,
-                }))
-        )
-        .sort((a,b) => a.code.localeCompare(b.code) || a.clientName.localeCompare(b.clientName));
-  }, [allReceptions]);
+                .map(({ item, index, reception }) => {
+                    const loc = item.storageLocation as any;
+                    const locDisplay = (loc && loc.warehouse && loc.aisle)
+                      ? `${loc.warehouse} / ${loc.aisle}`
+                      : ((loc && loc.chamberId && loc.coordinate)
+                          ? `${chambersConfig[loc.chamberId]?.name || loc.chamberId} / ${loc.coordinate}`
+                          : (loc?.coordinate || 'Almacenado'));
+
+                    return {
+                        id: `${reception.id}-${index}`,
+                        receptionId: reception.id,
+                        itemIndex: index,
+                        collectionType: 'packagingReceptions' as const,
+                        clientName: reception.clientName,
+                        document: reception.document,
+                        code: item.packagingMasterCode,
+                        name: item.packagingMasterName,
+                        lote: item.lote,
+                        palletCount: item.palletCount,
+                        locationDisplay: locDisplay,
+                        location: item.storageLocation || { warehouse: '', aisle: '' },
+                    };
+                })
+        );
+
+    // 2. ONLY Vitafoods and packaging clients stored in otherFruitReceptions (Filter out Fruit/Plants like Fall Creek)
+    const vitafoodItems: StoredPackagingItem[] = (otherFruitReceptions || [])
+        .filter(reception => {
+          const clientIdUpper = String(reception.clientId || '').toUpperCase();
+          const clientNameUpper = String(reception.clientName || '').toUpperCase();
+          return (
+            packagingClientIds.has(clientIdUpper) ||
+            packagingClientIds.has(clientNameUpper) ||
+            clientNameUpper.includes('VITAFOOD') ||
+            clientIdUpper.includes('VITAFOOD') ||
+            clientNameUpper.includes('EMBALAJE')
+          );
+        })
+        .flatMap((reception) => 
+            (reception.items || [])
+                .map((item, index) => ({ item, index, reception }))
+                .filter(({ item }) => item.status === 'Almacenado' && item.quantity > 0 && item.storageLocation)
+                .map(({ item, index, reception }) => {
+                    const loc = item.storageLocation as any;
+                    let locDisplay = 'Almacenado';
+                    if (loc) {
+                      if (loc.warehouse && loc.aisle) {
+                        locDisplay = `${loc.warehouse} / ${loc.aisle}`;
+                      } else if (loc.chamberId && loc.coordinate) {
+                        locDisplay = `${chambersConfig[loc.chamberId]?.name || loc.chamberId} / ${loc.coordinate}`;
+                      } else if (loc.coordinate) {
+                        locDisplay = loc.coordinate;
+                      }
+                    }
+
+                    return {
+                        id: `${reception.id}-${index}`,
+                        receptionId: reception.id,
+                        itemIndex: index,
+                        collectionType: 'otherFruitReceptions' as const,
+                        clientName: reception.clientName,
+                        document: reception.document || (reception as any).documentNumber || '',
+                        code: item.productCode || item.palletId || '',
+                        name: item.productName,
+                        lote: item.clientLotId,
+                        palletCount: 1, // 1 Pallet item per row
+                        palletId: item.palletId || item.containerId || '',
+                        locationDisplay: locDisplay,
+                        location: {
+                          warehouse: loc?.warehouse,
+                          aisle: loc?.aisle,
+                          chamberId: loc?.chamberId,
+                          coordinate: loc?.coordinate
+                        },
+                    };
+                })
+        );
+
+    return [...pkgItems, ...vitafoodItems].sort((a, b) => 
+      a.clientName.localeCompare(b.clientName) || a.code.localeCompare(b.code)
+    );
+  }, [packagingReceptions, otherFruitReceptions, allClients]);
   
   const filteredItems = React.useMemo(() => {
     if (!codeFilter) {
         return storedItems;
     }
+    const q = codeFilter.toLowerCase().trim();
     return storedItems.filter(item => 
-        item.code.toLowerCase().includes(codeFilter.toLowerCase())
+        item.code.toLowerCase().includes(q) ||
+        item.name.toLowerCase().includes(q) ||
+        item.clientName.toLowerCase().includes(q) ||
+        (item.lote && item.lote.toLowerCase().includes(q)) ||
+        (item.palletId && item.palletId.toLowerCase().includes(q)) ||
+        (item.document && item.document.toLowerCase().includes(q)) ||
+        item.locationDisplay.toLowerCase().includes(q)
     );
   }, [storedItems, codeFilter]);
 
@@ -132,9 +226,39 @@ export function StockAndRelocationTab() {
   const handleRelocateConfirm = async (newLocation: { warehouse: string; aisle: string; }) => {
     if (!itemToRelocate || !firestore) return;
 
+    if (itemToRelocate.collectionType === 'otherFruitReceptions') {
+      const receptionDocRef = doc(firestore, 'otherFruitReceptions', itemToRelocate.receptionId);
+      const originalReception = otherFruitReceptions?.find(r => r.id === itemToRelocate.receptionId);
+      if (!originalReception) return;
+
+      const updatedItems = JSON.parse(JSON.stringify(originalReception.items));
+      updatedItems[itemToRelocate.itemIndex] = {
+          ...updatedItems[itemToRelocate.itemIndex],
+          storageLocation: {
+            warehouse: newLocation.warehouse,
+            aisle: newLocation.aisle,
+            chamberId: newLocation.warehouse,
+            coordinate: newLocation.aisle,
+          },
+          storedAt: new Date(), 
+      };
+
+      try {
+          await updateDoc(receptionDocRef, cleanFirestoreObject({
+              items: updatedItems,
+              updatedAt: serverTimestamp(),
+          }));
+          toast({ title: '✅ Éxito', description: `Pallet reubicado a ${newLocation.warehouse} - ${newLocation.aisle}.` });
+          setDialogOpen(false);
+      } catch (error) {
+          console.error("Error relocating otherFruit packaging item:", error);
+          toast({ variant: 'destructive', title: 'Error', description: 'No se pudo reubicar el pallet.' });
+      }
+      return;
+    }
+
     const receptionDocRef = doc(firestore, 'packagingReceptions', itemToRelocate.receptionId);
-    
-    const originalReception = allReceptions.find(r => r.id === itemToRelocate.receptionId);
+    const originalReception = packagingReceptions?.find(r => r.id === itemToRelocate.receptionId);
     if (!originalReception) return;
 
     const updatedItems = JSON.parse(JSON.stringify(originalReception.items));
@@ -172,9 +296,33 @@ export function StockAndRelocationTab() {
         return;
     }
 
+    if (itemToAdjust.collectionType === 'otherFruitReceptions') {
+      const receptionDocRef = doc(firestore, 'otherFruitReceptions', itemToAdjust.receptionId);
+      const originalReception = otherFruitReceptions?.find(r => r.id === itemToAdjust.receptionId);
+      if (!originalReception) return;
+
+      const updatedItems = JSON.parse(JSON.stringify(originalReception.items));
+      const itemToUpdate = updatedItems[itemToAdjust.itemIndex];
+      if (itemToUpdate) {
+          itemToUpdate.quantity = newQuantity;
+      }
+
+      try {
+          await updateDoc(receptionDocRef, cleanFirestoreObject({
+              items: updatedItems,
+              updatedAt: serverTimestamp(),
+          }));
+          toast({ title: '✅ Éxito', description: `La cantidad ha sido ajustada a ${newQuantity}.` });
+          setAdjustDialogOpen(false);
+      } catch (error) {
+          console.error("Error adjusting item:", error);
+          toast({ variant: 'destructive', title: 'Error', description: 'No se pudo ajustar la cantidad.' });
+      }
+      return;
+    }
+
     const receptionDocRef = doc(firestore, 'packagingReceptions', itemToAdjust.receptionId);
-    
-    const originalReception = allReceptions.find(r => r.id === itemToAdjust.receptionId);
+    const originalReception = packagingReceptions?.find(r => r.id === itemToAdjust.receptionId);
     if (!originalReception) return;
 
     const updatedItems = JSON.parse(JSON.stringify(originalReception.items));
@@ -217,7 +365,7 @@ export function StockAndRelocationTab() {
         code: item.code,
         name: item.name,
         lote: item.lote || '',
-        location: `${item.location.warehouse} / ${item.location.aisle}`,
+        location: item.locationDisplay,
         palletCount: item.palletCount,
     }));
     
@@ -424,7 +572,7 @@ export function StockAndRelocationTab() {
                         <TableCell className="font-mono hidden sm:table-cell">{item.code}</TableCell>
                         <TableCell className="font-medium">{item.name}</TableCell>
                         <TableCell>{item.lote || '-'}</TableCell>
-                        <TableCell>{item.location.warehouse} / {item.location.aisle}</TableCell>
+                        <TableCell className="font-medium">{item.locationDisplay}</TableCell>
                         <TableCell className="font-semibold">{item.palletCount}</TableCell>
                         <TableCell className="text-right">
                            <div className="flex gap-2 justify-end">

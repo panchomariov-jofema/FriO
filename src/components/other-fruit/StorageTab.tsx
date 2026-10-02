@@ -48,7 +48,7 @@ type PendingPackagingItem = PackagingReceptionItem & {
 type ConsolidatedPendingItem = PendingFruitItem | PendingPackagingItem;
 
 
-export function OtherFruitStorageTab({ clientId: fixedClientId }: { clientId?: string }) {
+export function OtherFruitStorageTab({ clientId: fixedClientId, onlyPackaging }: { clientId?: string; onlyPackaging?: boolean }) {
   const { data: otherFruitReceptions, loading: loadingFruit } = useFirestoreCollection<OtherFruitReception>('otherFruitReceptions');
   const { data: packagingReceptions, loading: loadingPackaging } = useFirestoreCollection<PackagingReception>('packagingReceptions');
   const { data: allChamberLots, loading: loadingChamberLots } = useFirestoreCollection<ChamberLot>('chamberLots');
@@ -98,55 +98,21 @@ export function OtherFruitStorageTab({ clientId: fixedClientId }: { clientId?: s
   }, [isScannerOpen, selectedClientId]);
 
   const loading = loadingFruit || loadingPackaging || loadingChamberLots;
-  
-  const resolvedClientConfig = React.useMemo(() => {
-    if (!selectedItem) return undefined;
-    
-    const reception = [...(otherFruitReceptions || []), ...(packagingReceptions || [])].find(r => r.id === selectedItem.receptionId);
-    if (!reception) return undefined;
-    
-    const clientId = reception.clientId;
-    
-    // 1. Get explicit override if exists
-    const explicitOverride = clientConfigs?.find(c => c.id === clientId);
-    
-    // 2. Get master data defaults
-    const otherClient = otherClients?.find(c => c.clientId === clientId);
-    const exporter = exporters?.find(e => e.exporterId === clientId);
-    const masterData = otherClient || exporter;
-    
-    if (!masterData && !explicitOverride) return undefined;
-    
-    let strategy = explicitOverride?.strategy || masterData?.storageStrategy || 'secuencial';
-    let binsPerCoordinate = explicitOverride?.binsPerCoordinate ?? masterData?.binsPerCoordinate ?? 9;
-    let palletsPerCoordinate = explicitOverride?.palletsPerCoordinate ?? masterData?.palletsPerCoordinate ?? 3;
-    let preferredChamberId = explicitOverride?.preferredChamberId ?? (masterData as any)?.preferredChamberId;
 
-    // Hardcoded defaults for Fall Creek
-    if (masterData?.name?.toUpperCase() === 'FALL CREEK' || masterData?.id === 'fallcreek') {
-        if (!explicitOverride?.strategy && !masterData?.storageStrategy) strategy = 'aisle-access';
-        if (explicitOverride?.binsPerCoordinate === undefined && masterData?.binsPerCoordinate === undefined) binsPerCoordinate = 9;
-        if (explicitOverride?.palletsPerCoordinate === undefined && masterData?.palletsPerCoordinate === undefined) palletsPerCoordinate = 3;
-    }
+  const isPackagingClient = React.useCallback((r: OtherFruitReception | { clientId?: string; clientName?: string }) => {
+    const name = String(r.clientName || '').toUpperCase();
+    const id = String(r.clientId || '').toUpperCase();
+    const foundOtherClient = otherClients?.find(c => c.clientId === r.clientId);
+    return name.includes('VITAFOOD') || id.includes('VITAFOOD') || name.includes('EMBALAJE') || foundOtherClient?.type?.toLowerCase() === 'embalaje';
+  }, [otherClients]);
 
-    return {
-      id: clientId,
-      clientName: masterData?.name || explicitOverride?.clientName || 'Cliente',
-      strategy: strategy as any,
-      binsPerCoordinate,
-      palletsPerCoordinate,
-      preferredChamberId,
-      chamberOverrides: explicitOverride?.chamberOverrides
-    } as ClientStorageConfig;
-  }, [selectedItem, otherFruitReceptions, packagingReceptions, clientConfigs, otherClients, exporters]);
-
-
-    const allConsolidatedItems = React.useMemo(() => {
-        // Fruit items
+  const allConsolidatedItems = React.useMemo(() => {
+        // Fruit/Packaging items from otherFruitReceptions
         const fruitItemsRaw: PendingFruitItem[] = (otherFruitReceptions || [])
-            .filter(lot => 
-                ['Pendiente de almacenar', 'Parcialmente Almacenado', 'Recibido', 'Parcialmente Recibido'].includes(lot.status)
-            )
+            .filter(lot => {
+                if (onlyPackaging && !isPackagingClient(lot)) return false;
+                return ['Pendiente de almacenar', 'Parcialmente Almacenado', 'Recibido', 'Parcialmente Recibido'].includes(lot.status);
+            })
             .flatMap((lot) => 
                 lot.items
                     .map((item, itemIndex) => ({ ...item, type: 'fruit' as const, receptionId: lot.id, clientName: lot.clientName, document: lot.document, itemIndices: [itemIndex], unit: lot.unit }))
@@ -190,7 +156,7 @@ export function OtherFruitStorageTab({ clientId: fixedClientId }: { clientId?: s
             );
 
         return [...fruitItems, ...packagingItems];
-    }, [otherFruitReceptions, packagingReceptions]);
+    }, [otherFruitReceptions, packagingReceptions, onlyPackaging, isPackagingClient]);
 
     const pendingItems = React.useMemo(() => {
         return allConsolidatedItems.filter(item => {
@@ -210,12 +176,14 @@ export function OtherFruitStorageTab({ clientId: fixedClientId }: { clientId?: s
             const timeB = lotB ? safeToMillis(lotB.createdAt) : 0;
             return timeA - timeB;
         });
-  }, [otherFruitReceptions, packagingReceptions, fixedClientId, selectedClientId]);
+  }, [allConsolidatedItems, otherFruitReceptions, packagingReceptions, selectedClientId]);
 
   const clientsWithPending = React.useMemo(() => {
     const clientsMap = new Map<string, { id: string; name: string; count: number }>();
     
-    (otherFruitReceptions || []).forEach(reception => {
+    (otherFruitReceptions || [])
+      .filter(r => !onlyPackaging || isPackagingClient(r))
+      .forEach(reception => {
         const pendingCount = reception.items.filter(i => i.status === 'Pendiente de almacenar').length;
         if (pendingCount > 0) {
             const existing = clientsMap.get(reception.clientId);
@@ -240,7 +208,43 @@ export function OtherFruitStorageTab({ clientId: fixedClientId }: { clientId?: s
     });
 
     return Array.from(clientsMap.values()).sort((a, b) => b.count - a.count);
-  }, [otherFruitReceptions, packagingReceptions]);
+  }, [otherFruitReceptions, packagingReceptions, onlyPackaging, isPackagingClient]);
+
+  const chamberSanitaryMap = React.useMemo(() => {
+    const map = new Map<string, { hasFruit: boolean; hasPackaging: boolean }>();
+    Object.keys(chambersConfig).forEach(chId => {
+      map.set(chId, { hasFruit: false, hasPackaging: false });
+    });
+
+    // 1. Cherry lots are always Fruit
+    (allChamberLots || []).forEach(lot => {
+      if (lot.status === 'Almacenado' && lot.chamberId && lot.binCount > 0) {
+        const entry = map.get(lot.chamberId);
+        if (entry) entry.hasFruit = true;
+      }
+    });
+
+    // 2. OtherFruit Receptions (Fruit vs Packaging)
+    (otherFruitReceptions || []).forEach(reception => {
+      const isPkg = reception.clientName?.toUpperCase().includes('VITAFOOD') || 
+                    reception.clientId?.toUpperCase().includes('VITAFOOD') ||
+                    reception.clientName?.toUpperCase().includes('EMBALAJE');
+      (reception.items || []).forEach(it => {
+        if (it.status === 'Almacenado' && it.storageLocation?.chamberId && it.quantity > 0) {
+          const entry = map.get(it.storageLocation.chamberId);
+          if (entry) {
+            if (isPkg) {
+              entry.hasPackaging = true;
+            } else {
+              entry.hasFruit = true;
+            }
+          }
+        }
+      });
+    });
+
+    return map;
+  }, [allChamberLots, otherFruitReceptions]);
 
   const activeClientName = React.useMemo(() => {
     if (!selectedClientId) return null;
@@ -248,9 +252,36 @@ export function OtherFruitStorageTab({ clientId: fixedClientId }: { clientId?: s
     return client?.name || selectedClientId;
   }, [selectedClientId, clientsWithPending]);
 
+  const resolvedClientConfig = React.useMemo(() => {
+    if (!selectedItem || selectedItem.type !== 'fruit') return undefined;
+    const clientId = (otherFruitReceptions || []).find(r => r.id === (selectedItem as any).receptionId)?.clientId;
+    if (!clientId) return undefined;
+    return clientConfigs?.find(c => c.id === clientId);
+  }, [selectedItem, otherFruitReceptions, clientConfigs]);
+
   const calculateFruitSuggestion = (item: PendingFruitItem) => {
+    // REGLA: La sugerencia automática está VACÍA hasta que el usuario seleccione manualmente
+    // la ubicación de inicio para esta sesión/partida.
+    if (!lastUsedChamberId || !lastUsedCoordinate) {
+      return null;
+    }
+
     const clientId = item.type === 'fruit' ? (otherFruitReceptions?.find(r => r.id === item.receptionId)?.clientId) : null;
     if (!clientId) return null;
+
+    const isItemPackaging = Boolean(
+      item.clientName?.toUpperCase().includes('VITAFOOD') ||
+      item.clientName?.toUpperCase().includes('EMBALAJE')
+    );
+
+    // REGLA SANITARIA: Si es embalaje, la cámara NO puede tener fruta activa.
+    const sanitary = chamberSanitaryMap.get(lastUsedChamberId);
+    if (isItemPackaging && sanitary?.hasFruit) {
+      return null;
+    }
+    if (!isItemPackaging && sanitary?.hasPackaging) {
+      return null;
+    }
 
     const explicitOverride = clientConfigs?.find(c => c.id === clientId);
     const otherClient = otherClients?.find(c => c.clientId === clientId);
@@ -258,119 +289,83 @@ export function OtherFruitStorageTab({ clientId: fixedClientId }: { clientId?: s
     const masterData = otherClient || exporter;
 
     let strategy = explicitOverride?.strategy || masterData?.storageStrategy || 'secuencial';
-    let binsPerCoordinate = explicitOverride?.binsPerCoordinate ?? masterData?.binsPerCoordinate ?? 9;
-    let palletsPerCoordinate = explicitOverride?.palletsPerCoordinate ?? masterData?.palletsPerCoordinate ?? 3;
-    let preferredChamberId = lastUsedChamberId || (typeof window !== 'undefined' ? localStorage.getItem('frio_last_chamber_id') : null) || explicitOverride?.preferredChamberId || (masterData as any)?.preferredChamberId;
+    let binsPerCoordinate = explicitOverride?.binsPerCoordinate ?? masterData?.binsPerCoordinate ?? 6;
+    let palletsPerCoordinate = isItemPackaging ? 2 : (explicitOverride?.palletsPerCoordinate ?? masterData?.palletsPerCoordinate ?? 2);
 
     if (item.clientName?.toUpperCase() === 'FALL CREEK') {
-        if (!explicitOverride?.strategy && !masterData?.storageStrategy) strategy = 'aisle-access';
-        if (explicitOverride?.binsPerCoordinate === undefined && masterData?.binsPerCoordinate === undefined) binsPerCoordinate = 9;
-        if (explicitOverride?.palletsPerCoordinate === undefined && masterData?.palletsPerCoordinate === undefined) palletsPerCoordinate = 3;
+      if (!explicitOverride?.strategy && !masterData?.storageStrategy) strategy = 'aisle-access';
+      if (explicitOverride?.binsPerCoordinate === undefined && masterData?.binsPerCoordinate === undefined) binsPerCoordinate = 9;
+      if (explicitOverride?.palletsPerCoordinate === undefined && masterData?.palletsPerCoordinate === undefined) palletsPerCoordinate = 3;
     }
 
-    if (!preferredChamberId || !chambersConfig[preferredChamberId]) return null;
-
-    const chamberId = preferredChamberId;
+    const chamberId = lastUsedChamberId;
     const rawChamberConfig = chambersConfig[chamberId];
     if (!rawChamberConfig) return null;
     const isChamberRow13Enabled = !!chamberSettings?.find(s => s.id === chamberId)?.row13Enabled;
     const chamberConfig = getEffectiveChamberConfig(rawChamberConfig, isChamberRow13Enabled);
 
-    // Calculate occupancy and find the last used coordinate
+    // Calculate real occupancy in this chamber
     const occupancyMap = new Map<string, number>();
-    let lastCoordInChamber: string | null = null;
-    
-    // We also cross-reference with stored items to find the truly most recent storage
-    let latestTimestamp = 0;
 
     (allChamberLots || []).forEach(l => {
-        if (l.status === 'Almacenado' && l.chamberId === chamberId && l.coordinate) {
-            occupancyMap.set(l.coordinate, (occupancyMap.get(l.coordinate) || 0) + l.binCount);
-            const time = safeToMillis(l.storedAt);
-            if (time > latestTimestamp) {
-                latestTimestamp = time;
-                lastCoordInChamber = l.coordinate;
-            }
-        }
+      if (l.status === 'Almacenado' && l.chamberId === chamberId && l.coordinate) {
+        occupancyMap.set(l.coordinate, (occupancyMap.get(l.coordinate) || 0) + l.binCount);
+      }
     });
 
     (otherFruitReceptions || []).forEach(r => {
-        (r.items || []).forEach((it) => {
-            if (it.status === 'Almacenado' && it.storageLocation && it.storageLocation.chamberId === chamberId && it.storageLocation.coordinate) {
-                const multiplier = (r.clientName?.toUpperCase() === 'FALL CREEK' && r.unit === 'Pallets') ? 3 : (r.unit === 'Bins' ? 1 : 2);
-                const equivalentUnits = it.quantity * multiplier;
-                
-                const coord = it.storageLocation.coordinate;
-                occupancyMap.set(coord, (occupancyMap.get(coord) || 0) + equivalentUnits);
-                
-                const time = safeToMillis(it.storedAt);
-                if (time > latestTimestamp) {
-                    latestTimestamp = time;
-                    lastCoordInChamber = coord;
-                }
-            }
-        });
+      (r.items || []).forEach((it) => {
+        if (it.status === 'Almacenado' && it.storageLocation && it.storageLocation.chamberId === chamberId && it.storageLocation.coordinate) {
+          const isFC = r.clientName?.toUpperCase() === 'FALL CREEK';
+          const multiplier = (isFC && r.unit === 'Pallets') ? 3 : (r.unit === 'Bins' ? 1 : 1);
+          const equivalentUnits = (it.unit === 'Pallets' ? 1 : it.quantity) * multiplier;
+          occupancyMap.set(it.storageLocation.coordinate, (occupancyMap.get(it.storageLocation.coordinate) || 0) + equivalentUnits);
+        }
+      });
     });
 
     let allPossibleCoords;
     const finalStrategy = strategy || 'secuencial';
     if (finalStrategy === 'pareado') {
-        allPossibleCoords = getPairedCoordinates(chamberConfig);
+      allPossibleCoords = getPairedCoordinates(chamberConfig);
     } else {
-        allPossibleCoords = getSortedCoordinates(chamberConfig, finalStrategy as any);
+      allPossibleCoords = getSortedCoordinates(chamberConfig, finalStrategy as any);
     }
 
     const isFC = item.clientName?.toUpperCase() === 'FALL CREEK';
-    const occupancyThreshold = (isFC || item.unit === 'Bins') ? binsPerCoordinate : palletsPerCoordinate * 2;
-    const unitsPerItem = (isFC && item.unit === 'Pallets') ? 3 : (item.unit === 'Bins' ? 1 : 2);
+    const occupancyThreshold = (item.unit === 'Bins') ? binsPerCoordinate : palletsPerCoordinate;
+    const unitsPerItem = (isFC && item.unit === 'Pallets') ? 3 : 1; // 1 pallet ocupa 1 posición de pallet
 
-    // Determine the starting point for suggestion search
     let startIndex = 0;
-    const effectiveLastChamber = lastUsedChamberId || (typeof window !== 'undefined' ? localStorage.getItem('frio_last_chamber_id') : null);
-    const effectiveSessionCoord = lastUsedCoordinate || (typeof window !== 'undefined' ? localStorage.getItem('frio_last_coordinate') : null);
-    const isContinuingChamber = effectiveLastChamber === chamberId;
-    
-    // We prioritize real DB state (lastCoordInChamber) over localStorage if there's any occupancy.
-    // If the chamber is completely empty in the DB, we ignore all session/localStorage history and start from A1.
-    const hasAnyOccupancy = occupancyMap.size > 0;
-    const effectiveLastCoord = hasAnyOccupancy
-      ? (lastUsedCoordinate 
-          ? lastUsedCoordinate 
-          : (lastCoordInChamber || (isContinuingChamber && effectiveSessionCoord ? effectiveSessionCoord : null)))
-      : null;
-    
-    if (effectiveLastCoord && finalStrategy !== 'modelo-sof' && finalStrategy !== 'serpentina-vertical' && finalStrategy !== 'fifo-vertical') {
-        const foundIdx = allPossibleCoords.indexOf(effectiveLastCoord);
-        if (foundIdx !== -1) {
-            const currentOccupancy = occupancyMap.get(effectiveLastCoord) || 0;
-            if (currentOccupancy + unitsPerItem > occupancyThreshold) {
-                startIndex = foundIdx + 1;
-            } else {
-                startIndex = foundIdx;
-            }
-        }
+    const foundIdx = allPossibleCoords.indexOf(lastUsedCoordinate);
+    if (foundIdx !== -1) {
+      const currentOccupancy = occupancyMap.get(lastUsedCoordinate) || 0;
+      if (currentOccupancy + unitsPerItem > occupancyThreshold) {
+        startIndex = foundIdx + 1;
+      } else {
+        startIndex = foundIdx;
+      }
     }
 
-    // Create a prioritized search list: From last used position forward, then wrap around
     const prioritizedCoords = [
-        ...allPossibleCoords.slice(startIndex),
-        ...allPossibleCoords.slice(0, startIndex)
+      ...allPossibleCoords.slice(startIndex),
+      ...allPossibleCoords.slice(0, startIndex)
     ];
 
     const suggestedCoord = prioritizedCoords.find(coord => {
-        if (chamberConfig.blocked?.includes(coord)) return false;
-        const currentOccupancy = occupancyMap.get(coord) || 0;
-        return currentOccupancy + unitsPerItem <= occupancyThreshold;
+      if (chamberConfig.blocked?.includes(coord)) return false;
+      const currentOccupancy = occupancyMap.get(coord) || 0;
+      return currentOccupancy + unitsPerItem <= occupancyThreshold;
     });
-    
+
     if (!suggestedCoord) return null;
 
     return {
-        chamberId,
-        coordinate: suggestedCoord,
-        totalQuantity: item.quantity,
-        quantityPerLocation: occupancyThreshold,
-        strategy: strategy as any
+      chamberId,
+      coordinate: suggestedCoord,
+      totalQuantity: item.quantity,
+      quantityPerLocation: occupancyThreshold,
+      strategy: strategy as any
     };
   };
 

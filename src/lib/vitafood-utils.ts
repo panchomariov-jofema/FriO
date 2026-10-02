@@ -248,6 +248,160 @@ export function parseVitafoodManifest(file: File): Promise<VitafoodParsedManifes
     });
 }
 
+export interface VitafoodDispatchItem {
+    ump: string;
+    material?: string;
+    description?: string;
+    lote?: string;
+    quantity?: number;
+    orderNumber?: string;
+    documentNumber?: string;
+}
+
+export interface VitafoodParsedDispatch {
+    header: {
+        orderNumber?: string;
+        documentNumber?: string;
+        destination?: string;
+        date?: string;
+        carrier?: string;
+    };
+    items: VitafoodDispatchItem[];
+    rawUmps: string[];
+}
+
+export function parseVitafoodDispatchFile(file: File): Promise<VitafoodParsedDispatch> {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            try {
+                const data = new Uint8Array(e.target?.result as ArrayBuffer);
+                const workbook = XLSX.read(data, { type: 'array' });
+                const sheetName = workbook.SheetNames[0];
+                const sheet = workbook.Sheets[sheetName];
+                
+                const rawSheetData = XLSX.utils.sheet_to_json<any[]>(sheet, { header: 1 });
+                const header: VitafoodParsedDispatch['header'] = {};
+                let tableHeaderRowIndex = -1;
+
+                // 1. Scan for metadata
+                for (let i = 0; i < rawSheetData.length; i++) {
+                    const row = rawSheetData[i];
+                    if (!row || !Array.isArray(row)) continue;
+                    const rowText = row.map(cell => String(cell || '').trim()).join(' ');
+
+                    if (rowText.includes('Paking List') || rowText.includes('Packing List') || rowText.includes('ORDEN')) {
+                        const match = rowText.match(/(\d{6,10})/);
+                        if (match) header.orderNumber = match[1];
+                    }
+                    if (rowText.includes('ENTREGA') || rowText.includes('GUIA') || rowText.includes('DESPACHO')) {
+                        const match = rowText.match(/(\d{5,12})/);
+                        if (match) header.documentNumber = match[1];
+                    }
+                    if (rowText.includes('DESTINO') || rowText.includes('CLIENTE')) {
+                        const idx = row.findIndex(c => String(c).toUpperCase().includes('DESTINO'));
+                        if (idx !== -1 && row[idx + 1]) header.destination = String(row[idx + 1]).trim();
+                    }
+
+                    const lowerRow = row.map(c => String(c || '').toLowerCase().trim());
+                    const hasUmp = lowerRow.some(c => c.includes('manip') || c.includes('ump') || c.includes('pallet') || c.includes('sscc') || c.includes('codigo'));
+                    if (hasUmp && tableHeaderRowIndex === -1) {
+                        tableHeaderRowIndex = i;
+                    }
+                }
+
+                const rangeIndex = tableHeaderRowIndex !== -1 ? tableHeaderRowIndex : 0;
+                const rawRows = XLSX.utils.sheet_to_json<Record<string, any>>(sheet, { range: rangeIndex });
+                const items: VitafoodDispatchItem[] = [];
+                const rawUmps: string[] = [];
+                const seenUmps = new Set<string>();
+
+                for (const r of rawRows) {
+                    let ump = '';
+                    let material = '';
+                    let description = '';
+                    let lote = '';
+                    let quantity = 1;
+
+                    for (const [key, rawVal] of Object.entries(r)) {
+                        if (rawVal === undefined || rawVal === null) continue;
+                        let valStr = String(rawVal).trim();
+                        if (valStr.includes('e+')) {
+                            const num = Number(valStr);
+                            if (!isNaN(num)) valStr = num.toFixed(0);
+                        }
+
+                        if (/manip|ump|pallet|sscc|hu\b/i.test(key)) {
+                            ump = valStr.replace(/\.0$/, '');
+                        } else if (/material|art[ií]culo|item/i.test(key)) {
+                            material = valStr.replace(/\.0$/, '');
+                        } else if (/descrip|denominac/i.test(key)) {
+                            description = valStr;
+                        } else if (/lote|lot/i.test(key)) {
+                            lote = valStr.replace(/\.0$/, '');
+                        } else if (/cant|qty|unidades/i.test(key)) {
+                            const num = Number(rawVal);
+                            if (!isNaN(num) && num > 0) quantity = num;
+                        }
+                    }
+
+                    // Fallback: if no key matched but row has a value with 8-20 digits, treat as UMP
+                    if (!ump) {
+                        for (const val of Object.values(r)) {
+                            const str = String(val || '').trim();
+                            if (/^\d{6,22}$/.test(str)) {
+                                ump = str;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (ump) {
+                        rawUmps.push(ump);
+                        if (!seenUmps.has(ump)) {
+                            seenUmps.add(ump);
+                            items.push({
+                                ump,
+                                material: material || undefined,
+                                description: description || undefined,
+                                lote: lote || undefined,
+                                quantity,
+                                orderNumber: header.orderNumber,
+                                documentNumber: header.documentNumber
+                            });
+                        }
+                    }
+                }
+
+                // If still empty, scan raw array cells for any numeric codes
+                if (items.length === 0) {
+                    for (const row of rawSheetData) {
+                        if (!Array.isArray(row)) continue;
+                        for (const cell of row) {
+                            const str = String(cell || '').trim();
+                            if (/^\d{7,20}$/.test(str) && !seenUmps.has(str)) {
+                                seenUmps.add(str);
+                                rawUmps.push(str);
+                                items.push({ ump: str, quantity: 1 });
+                            }
+                        }
+                    }
+                }
+
+                resolve({
+                    header,
+                    items,
+                    rawUmps
+                });
+            } catch (error) {
+                reject(error);
+            }
+        };
+        reader.onerror = (error) => reject(error);
+        reader.readAsArrayBuffer(file);
+    });
+}
+
 export function cleanFirestoreObject<T>(obj: T): T {
     if (obj === null || obj === undefined) return null as any;
     if (typeof obj !== 'object') return obj;
@@ -262,4 +416,5 @@ export function cleanFirestoreObject<T>(obj: T): T {
     }
     return clean;
 }
+
 

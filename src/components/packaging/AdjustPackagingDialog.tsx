@@ -14,10 +14,13 @@ interface StoredPackagingItem {
     id: string;
     name: string;
     palletCount: number;
-    location: {
-        warehouse: string;
-        aisle: string;
-    }
+    location?: {
+        warehouse?: string;
+        aisle?: string;
+        chamberId?: string;
+        coordinate?: string;
+    };
+    [key: string]: any;
 }
 
 interface AdjustPackagingDialogProps {
@@ -64,7 +67,11 @@ export function AdjustPackagingDialog({ item, open, onOpenChange, onConfirm }: A
         <Alert>
             <AlertTitle>Ubicación Actual</AlertTitle>
             <AlertDescription>
-               {item.location.warehouse} / {item.location.aisle}
+               {item.location?.warehouse && item.location?.aisle
+                 ? `${item.location.warehouse} / ${item.location.aisle}`
+                 : (item.location?.chamberId && item.location?.coordinate
+                     ? `${item.location.chamberId} / ${item.location.coordinate}`
+                     : (item.location?.coordinate || 'No especificada'))}
             </AlertDescription>
         </Alert>
 

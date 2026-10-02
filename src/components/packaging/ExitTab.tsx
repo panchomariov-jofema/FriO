@@ -21,6 +21,9 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { PlusCircle, Trash2 } from 'lucide-react';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { VitafoodDispatchTab } from './VitafoodDispatchTab';
+import { PendingPickingTab } from './PendingPickingTab';
+import { FileSpreadsheet, PackageCheck, ListOrdered } from 'lucide-react';
 
 // --- Schemas ---
 const autoDispatchItemSchema = z.object({
@@ -378,65 +381,93 @@ export function ExitTab() {
     }
   };
   
+  const [mainMode, setMainMode] = React.useState<'vitafoods' | 'clasico' | 'pendientes'>('vitafoods');
+  
   const isLoading = loadingClients || loadingMasters || loadingReceptions;
   const totalSelectedPallets = Object.values(dispatchQuantities).reduce((sum, qty) => sum + (qty || 0), 0);
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Crear Solicitud de Despacho</CardTitle>
-        <CardDescription>Seleccione un cliente y elija el método de despacho.</CardDescription>
-      </CardHeader>
-      <CardContent>
-          <div className="grid md:grid-cols-2 gap-4 mb-6">
-            <div className="space-y-2">
-              <Label>Cliente de Embalaje</Label>
-              <Select onValueChange={handleClientChange} value={selectedClientId} disabled={isLoading}>
-                <SelectTrigger><SelectValue placeholder="Seleccione un cliente..." /></SelectTrigger>
-                <SelectContent>{packagingClients.map(c => <SelectItem key={c.id} value={c.clientId}>{c.name}</SelectItem>)}</SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Documento de Salida (Opcional)</Label>
-              <Input value={document} onChange={(e) => setDocument(e.target.value)} autoComplete="off" />
-            </div>
-          </div>
+    <div className="space-y-4">
+      <Tabs value={mainMode} onValueChange={(v) => setMainMode(v as any)}>
+        <TabsList className="grid w-full grid-cols-3 max-w-2xl mb-4">
+          <TabsTrigger value="vitafoods" className="flex items-center gap-1.5 font-bold">
+            <FileSpreadsheet className="h-4 w-4" /> Excel / Picking (Vitafoods)
+          </TabsTrigger>
+          <TabsTrigger value="clasico" className="flex items-center gap-1.5 font-bold">
+            <PackageCheck className="h-4 w-4" /> Despacho Clásico
+          </TabsTrigger>
+          <TabsTrigger value="pendientes" className="flex items-center gap-1.5 font-bold">
+            <ListOrdered className="h-4 w-4" /> En Picking / Historial
+          </TabsTrigger>
+        </TabsList>
 
-          <Tabs value={activeTab} onValueChange={setActiveTab}>
-              <TabsList className="grid w-full grid-cols-2">
-                  <TabsTrigger value="automatico">Despacho Automático (FIFO)</TabsTrigger>
-                  <TabsTrigger value="manual">Despacho Manual</TabsTrigger>
-              </TabsList>
-              <TabsContent value="automatico" className="mt-4">
-                  <Card>
-                    <CardHeader><CardTitle className="text-base">Añadir productos a despachar</CardTitle></CardHeader>
-                    <CardContent>
-                       <AutomaticDispatchTab
-                            selectedClientId={selectedClientId}
-                            document={document}
-                            clientMasters={clientMasters}
-                            clientStock={clientStock}
-                            onSubmit={onSubmit}
-                        />
-                    </CardContent>
-                  </Card>
-              </TabsContent>
-              <TabsContent value="manual" className="mt-4">
-                  <ManualDispatchTab clientStock={clientStock} dispatchQuantities={dispatchQuantities} handleQuantityChange={handleQuantityChange} />
-              </TabsContent>
-          </Tabs>
-          <div className="flex justify-between items-center mt-4">
-            <div className="font-semibold text-sm">
-                Total a Despachar: {activeTab === 'manual' ? totalSelectedPallets : autoDispatchForm.getValues('items').reduce((sum, i) => sum + (i.quantity || 0), 0)} pallets
-            </div>
-            <Button 
-              onClick={activeTab === 'automatico' ? autoDispatchForm.handleSubmit((values) => onSubmit(values, 'automatico')) : () => onSubmit(null, 'manual')} 
-              disabled={isSubmitting || !selectedClientId}
-            >
-                {isSubmitting ? 'Creando Solicitud...' : 'Crear Solicitud de Despacho'}
-            </Button>
-          </div>
-      </CardContent>
-    </Card>
+        <TabsContent value="vitafoods">
+          <VitafoodDispatchTab />
+        </TabsContent>
+
+        <TabsContent value="clasico">
+          <Card>
+            <CardHeader>
+              <CardTitle>Despacho Clásico de Embalajes</CardTitle>
+              <CardDescription>Seleccione un cliente y elija el método de despacho tradicional (FIFO o manual).</CardDescription>
+            </CardHeader>
+            <CardContent>
+                <div className="grid md:grid-cols-2 gap-4 mb-6">
+                  <div className="space-y-2">
+                    <Label>Cliente de Embalaje</Label>
+                    <Select onValueChange={handleClientChange} value={selectedClientId} disabled={isLoading}>
+                      <SelectTrigger><SelectValue placeholder="Seleccione un cliente..." /></SelectTrigger>
+                      <SelectContent>{packagingClients.map(c => <SelectItem key={c.id} value={c.clientId}>{c.name}</SelectItem>)}</SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Documento de Salida (Opcional)</Label>
+                    <Input value={document} onChange={(e) => setDocument(e.target.value)} autoComplete="off" />
+                  </div>
+                </div>
+
+                <Tabs value={activeTab} onValueChange={setActiveTab}>
+                    <TabsList className="grid w-full grid-cols-2">
+                        <TabsTrigger value="automatico">Despacho Automático (FIFO)</TabsTrigger>
+                        <TabsTrigger value="manual">Despacho Manual</TabsTrigger>
+                    </TabsList>
+                    <TabsContent value="automatico" className="mt-4">
+                        <Card>
+                          <CardHeader><CardTitle className="text-base">Añadir productos a despachar</CardTitle></CardHeader>
+                          <CardContent>
+                             <AutomaticDispatchTab
+                                  selectedClientId={selectedClientId}
+                                  document={document}
+                                  clientMasters={clientMasters}
+                                  clientStock={clientStock}
+                                  onSubmit={onSubmit}
+                              />
+                          </CardContent>
+                        </Card>
+                    </TabsContent>
+                    <TabsContent value="manual" className="mt-4">
+                        <ManualDispatchTab clientStock={clientStock} dispatchQuantities={dispatchQuantities} handleQuantityChange={handleQuantityChange} />
+                    </TabsContent>
+                </Tabs>
+                <div className="flex justify-between items-center mt-4">
+                  <div className="font-semibold text-sm">
+                      Total a Despachar: {activeTab === 'manual' ? totalSelectedPallets : autoDispatchForm.getValues('items').reduce((sum, i) => sum + (i.quantity || 0), 0)} pallets
+                  </div>
+                  <Button 
+                    onClick={activeTab === 'automatico' ? autoDispatchForm.handleSubmit((values) => onSubmit(values, 'automatico')) : () => onSubmit(null, 'manual')} 
+                    disabled={isSubmitting || !selectedClientId}
+                  >
+                      {isSubmitting ? 'Creando Solicitud...' : 'Crear Solicitud de Despacho'}
+                  </Button>
+                </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="pendientes">
+          <PendingPickingTab />
+        </TabsContent>
+      </Tabs>
+    </div>
   );
 }
