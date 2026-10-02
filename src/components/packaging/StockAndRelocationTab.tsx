@@ -522,22 +522,22 @@ export function StockAndRelocationTab() {
     <>
       <Card>
         <CardHeader>
-          <div className="flex flex-col sm:flex-row gap-4 justify-between">
+          <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
             <div>
-              <CardTitle>Stock Actual y Reubicación</CardTitle>
-              <CardDescription>Consulte el stock almacenado y reubique pallets según sea necesario.</CardDescription>
+              <CardTitle className="text-lg sm:text-xl font-bold">Stock Actual y Reubicación</CardTitle>
+              <CardDescription className="text-xs sm:text-sm">Consulte el stock almacenado y reubique pallets según sea necesario.</CardDescription>
             </div>
-             <div className="flex flex-col sm:flex-row gap-2">
-                <Button variant="outline" onClick={() => fileInputRef.current?.click()} disabled={isLoading}>
-                    <Upload className="mr-2 h-4 w-4" />
+             <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+                <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} disabled={isLoading} className="flex-1 sm:flex-initial text-xs">
+                    <Upload className="mr-1.5 h-3.5 w-3.5" />
                     Importar
                 </Button>
-                <Button variant="outline" onClick={handleDownloadTemplate}>
-                    <Download className="mr-2 h-4 w-4" />
+                <Button variant="outline" size="sm" onClick={handleDownloadTemplate} className="flex-1 sm:flex-initial text-xs">
+                    <Download className="mr-1.5 h-3.5 w-3.5" />
                     Plantilla
                 </Button>
-                <Button onClick={handleExport} disabled={isLoading || storedItems.length === 0}>
-                    <Download className="mr-2 h-4 w-4" />
+                <Button size="sm" onClick={handleExport} disabled={isLoading || storedItems.length === 0} className="flex-1 sm:flex-initial text-xs">
+                    <Download className="mr-1.5 h-3.5 w-3.5" />
                     Exportar
                 </Button>
                 <input
@@ -549,18 +549,18 @@ export function StockAndRelocationTab() {
                 />
             </div>
           </div>
-          <div className="pt-4">
+          <div className="pt-2 sm:pt-4">
               <Input
                 placeholder="Filtrar por UMP, código, artículo, lote o ubicación..."
                 value={codeFilter}
                 onChange={(e) => setCodeFilter(e.target.value)}
-                className="max-w-md"
+                className="max-w-md text-xs sm:text-sm h-9"
               />
           </div>
         </CardHeader>
         <CardContent className="pt-0">
-          <div className="rounded-md border">
-            <Table>
+          <div className="rounded-md border overflow-x-auto">
+            <Table className="min-w-[680px]">
               <TableHeader>
                 <TableRow>
                   <TableHead>Cliente</TableHead>

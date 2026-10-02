@@ -134,17 +134,25 @@ export default function EmbalajesPage() {
             )}
           </CardHeader>
           {visibleTabs.length > 0 && (
-            <CardContent>
-                <TabsList className="grid w-full" style={{ gridTemplateColumns: `repeat(${visibleTabs.length}, 1fr)`}}>
-                {visibleTabs.map(tab => (
-                    <TabsTrigger key={tab.value} value={tab.value} className="flex items-center justify-center gap-2">
-                      {tab.label}
+            <CardContent className="pt-0">
+              <div className="overflow-x-auto pb-1 -mx-2 px-2 sm:mx-0 sm:px-0">
+                <TabsList className="flex sm:grid w-max sm:w-full h-auto p-1 bg-muted/70 rounded-xl gap-1" style={{ gridTemplateColumns: `repeat(${visibleTabs.length}, minmax(0, 1fr))` }}>
+                  {visibleTabs.map(tab => (
+                    <TabsTrigger 
+                      key={tab.value} 
+                      value={tab.value} 
+                      className="flex items-center justify-center gap-1.5 py-2 px-3.5 text-xs sm:text-sm font-bold whitespace-nowrap shrink-0 data-[state=active]:shadow-sm"
+                    >
+                      <span>{tab.label}</span>
                       {tab.badge !== undefined && tab.badge > 0 && (
-                        <Badge className="h-5 min-w-5 px-1.5 flex items-center justify-center text-[10px] font-black">{tab.badge}</Badge>
+                        <Badge variant="destructive" className="h-4.5 min-w-4.5 px-1.5 flex items-center justify-center text-[10px] font-black leading-none">
+                          {tab.badge}
+                        </Badge>
                       )}
                     </TabsTrigger>
-                ))}
+                  ))}
                 </TabsList>
+              </div>
             </CardContent>
           )}
         </Card>

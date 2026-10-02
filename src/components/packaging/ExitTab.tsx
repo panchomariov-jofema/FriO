@@ -389,17 +389,22 @@ export function ExitTab() {
   return (
     <div className="space-y-4">
       <Tabs value={mainMode} onValueChange={(v) => setMainMode(v as any)}>
-        <TabsList className="grid w-full grid-cols-3 max-w-2xl mb-4">
-          <TabsTrigger value="vitafoods" className="flex items-center gap-1.5 font-bold">
-            <FileSpreadsheet className="h-4 w-4" /> Excel / Picking (Vitafoods)
-          </TabsTrigger>
-          <TabsTrigger value="clasico" className="flex items-center gap-1.5 font-bold">
-            <PackageCheck className="h-4 w-4" /> Despacho Clásico
-          </TabsTrigger>
-          <TabsTrigger value="pendientes" className="flex items-center gap-1.5 font-bold">
-            <ListOrdered className="h-4 w-4" /> En Picking / Historial
-          </TabsTrigger>
-        </TabsList>
+        <div className="overflow-x-auto pb-1 -mx-2 px-2 sm:mx-0 sm:px-0">
+          <TabsList className="flex sm:grid w-max sm:w-full sm:grid-cols-3 max-w-2xl mb-2 h-auto p-1 bg-muted/80 rounded-xl gap-1">
+            <TabsTrigger value="vitafoods" className="flex items-center gap-1.5 py-2 px-3 text-xs sm:text-sm font-bold whitespace-nowrap shrink-0">
+              <FileSpreadsheet className="h-4 w-4 shrink-0 text-emerald-600" />
+              <span>Excel / Picking Vitafoods</span>
+            </TabsTrigger>
+            <TabsTrigger value="clasico" className="flex items-center gap-1.5 py-2 px-3 text-xs sm:text-sm font-bold whitespace-nowrap shrink-0">
+              <PackageCheck className="h-4 w-4 shrink-0 text-blue-600" />
+              <span>Despacho Clásico</span>
+            </TabsTrigger>
+            <TabsTrigger value="pendientes" className="flex items-center gap-1.5 py-2 px-3 text-xs sm:text-sm font-bold whitespace-nowrap shrink-0">
+              <ListOrdered className="h-4 w-4 shrink-0 text-amber-600" />
+              <span>En Picking / Historial</span>
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
         <TabsContent value="vitafoods">
           <VitafoodDispatchTab />

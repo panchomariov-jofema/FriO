@@ -140,8 +140,15 @@ export interface PackagingMovement {
   id: string;
   type: 'entrada' | 'salida';
   clientId: string;
+  clientName?: string;
   document: string;
-  items: PackagingMovementItem[];
+  destination?: string;
+  carrier?: string;
+  licensePlate?: string;
+  fileName?: string;
+  rawUmps?: string[];
+  totalPallets?: number;
+  items: PackagingMovementItem[] | any[];
   status: 'Pendiente de Picking' | 'Completado';
   createdAt: Timestamp;
   userId?: string;

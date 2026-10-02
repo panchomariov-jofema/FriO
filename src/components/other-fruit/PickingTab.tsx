@@ -83,14 +83,14 @@ export function OtherFruitPickingTab() {
   const handleGeneratePdfForPackaging = (mov: PackagingMovement) => {
     const clientName = clientMap[mov.clientId] || mov.clientId;
     const totalPallets = mov.items.reduce((sum, item) => sum + item.palletCount, 0);
-    const flatItems = mov.items.flatMap(item => 
-        (item.locations || []).map(loc => ({
+    const flatItems = (mov.items as any[]).flatMap((item: any) => 
+        (item.locations || []).map((loc: any) => ({
             ...loc,
-            itemCode: item.packagingMasterCode,
-            itemName: item.packagingMasterName,
-            compositeKey: `${item.packagingMasterCode}_${loc.locationKey}`
+            itemCode: item.packagingMasterCode || item.productCode || '',
+            itemName: item.packagingMasterName || item.productName || '',
+            compositeKey: `${item.packagingMasterCode || item.ump}_${loc.locationKey || loc.receptionId}`
         }))
-    ).filter(item => item.palletsToWithdraw > 0);
+    ).filter((item: any) => item.palletsToWithdraw > 0 || item.quantity > 0);
 
     const doc = new jsPDF();
     

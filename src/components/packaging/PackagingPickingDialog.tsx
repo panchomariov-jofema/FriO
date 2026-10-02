@@ -31,14 +31,14 @@ export function PackagingPickingDialog({ movement, open, onOpenChange, onConfirm
 
   const flatItems = React.useMemo(() => {
     if (!movement?.items) return [];
-    return movement.items.flatMap(item => 
-        (item.locations || []).map(loc => ({
+    return (movement.items as any[]).flatMap((item: any) => 
+        (item.locations || []).map((loc: any) => ({
             ...loc,
-            itemCode: item.packagingMasterCode,
-            itemName: item.packagingMasterName,
-            compositeKey: `${item.packagingMasterCode}_${loc.locationKey}`
+            itemCode: item.packagingMasterCode || item.productCode || '',
+            itemName: item.packagingMasterName || item.productName || '',
+            compositeKey: `${item.packagingMasterCode || item.ump}_${loc.locationKey || loc.receptionId}`
         }))
-    ).filter(item => item.palletsToWithdraw > 0);
+    ).filter((item: any) => item.palletsToWithdraw > 0 || item.quantity > 0);
   }, [movement]);
 
   React.useEffect(() => {

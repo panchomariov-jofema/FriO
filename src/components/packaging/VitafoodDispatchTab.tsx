@@ -11,12 +11,12 @@ import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
-import type { OtherFruitReception, PackagingReception, OtherClient } from '@/lib/types';
+import type { OtherFruitReception, PackagingReception, OtherClient, PackagingMovement } from '@/lib/types';
 import { parseVitafoodDispatchFile, cleanFirestoreObject, VitafoodParsedDispatch } from '@/lib/vitafood-utils';
 import { chambersConfig } from '@/lib/chambers-config';
 import { useFirestore, useUser } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
-import { doc, writeBatch, serverTimestamp, collection, setDoc } from 'firebase/firestore';
+import { doc, writeBatch, serverTimestamp, collection, setDoc, deleteDoc } from 'firebase/firestore';
 import { 
   FileSpreadsheet, 
   UploadCloud, 
@@ -31,7 +31,12 @@ import {
   Warehouse as WarehouseIcon,
   Snowflake,
   Package,
-  Layers
+  Layers,
+  Smartphone,
+  Radio,
+  Clock,
+  ArrowRight,
+  RefreshCw
 } from 'lucide-react';
 import { BarcodeScanner } from '@/components/BarcodeScanner';
 
@@ -58,6 +63,7 @@ export function VitafoodDispatchTab() {
   const { data: otherFruitReceptions, loading: loadingFruit } = useFirestoreCollection<OtherFruitReception>('otherFruitReceptions');
   const { data: packagingReceptions, loading: loadingPackaging } = useFirestoreCollection<PackagingReception>('packagingReceptions');
   const { data: allClients, loading: loadingClients } = useFirestoreCollection<OtherClient>('otherClients');
+  const { data: allMovements, loading: loadingMovements } = useFirestoreCollection<PackagingMovement>('packagingMovements');
 
   const firestore = useFirestore();
   const { user } = useUser();
@@ -80,6 +86,14 @@ export function VitafoodDispatchTab() {
   const [isScannerOpen, setIsScannerOpen] = React.useState(false);
   const [activeInputMode, setActiveInputMode] = React.useState<'file' | 'manual'>('file');
   const [isDraftRestored, setIsDraftRestored] = React.useState(false);
+  const [activeCloudMovementId, setActiveCloudMovementId] = React.useState<string | null>(null);
+
+  // Pending picking movements in cloud
+  const pendingCloudMovements = React.useMemo(() => {
+    return (allMovements || [])
+      .filter(m => m.type === 'salida' && m.status === 'Pendiente de Picking')
+      .sort((a, b) => (b.createdAt?.toMillis?.() ?? 0) - (a.createdAt?.toMillis?.() ?? 0));
+  }, [allMovements]);
 
   // Load saved draft on mount
   React.useEffect(() => {
@@ -96,6 +110,7 @@ export function VitafoodDispatchTab() {
             setCarrier(parsed.carrier || '');
             setLicensePlate(parsed.licensePlate || '');
             setPickedState(parsed.pickedState || {});
+            setActiveCloudMovementId(parsed.activeCloudMovementId || null);
             setIsDraftRestored(true);
           }
         }
@@ -118,6 +133,7 @@ export function VitafoodDispatchTab() {
             carrier,
             licensePlate,
             pickedState,
+            activeCloudMovementId,
             savedAt: new Date().toISOString()
           }));
         } else {
@@ -127,7 +143,103 @@ export function VitafoodDispatchTab() {
         console.error("Error saving dispatch draft to storage:", e);
       }
     }
-  }, [requestedUmps, fileName, dispatchDocument, destination, carrier, licensePlate, pickedState]);
+  }, [requestedUmps, fileName, dispatchDocument, destination, carrier, licensePlate, pickedState, activeCloudMovementId]);
+
+  // Handle Loading a Pending Order from Cloud (PC to Mobile Sync)
+  const handleLoadPendingMovement = (mov: PackagingMovement) => {
+    const umps: string[] = mov.rawUmps && mov.rawUmps.length > 0
+      ? mov.rawUmps
+      : (mov.items || []).map((it: any) => it.ump || it.packagingMasterCode).filter(Boolean);
+
+    if (umps.length === 0) {
+      toast({
+        variant: "destructive",
+        title: "Sin UMPs en la orden",
+        description: "Esta orden no contiene una lista de UMPs válida para despachar.",
+      });
+      return;
+    }
+
+    setRequestedUmps(umps);
+    setFileName(mov.fileName || `Orden Guía ${mov.document || 'S/N'}`);
+    setDispatchDocument(mov.document || '');
+    setDestination(mov.destination || '');
+    setCarrier(mov.carrier || '');
+    setLicensePlate(mov.licensePlate || '');
+    setActiveCloudMovementId(mov.id);
+    setIsDraftRestored(false);
+
+    const initialPicked: Record<string, boolean> = {};
+    umps.forEach((u: string) => {
+      initialPicked[u] = true;
+    });
+    setPickedState(initialPicked);
+
+    toast({
+      title: "📱 Orden Sincronizada",
+      description: `Se cargó la orden ${mov.document ? `Guía N° ${mov.document}` : ''} con ${umps.length} pallets para picking.`,
+    });
+  };
+
+  // Handle Deleting a Pending Order from Cloud
+  const handleDeletePendingMovement = async (movementId: string, docName: string) => {
+    if (!firestore) return;
+    if (!confirm(`¿Está seguro de eliminar la orden pendiente "${docName || 'S/N'}" de la nube?`)) return;
+
+    try {
+      await deleteDoc(doc(firestore, 'packagingMovements', movementId));
+      if (activeCloudMovementId === movementId) {
+        handleReset();
+      }
+      toast({
+        title: "Orden Eliminada",
+        description: "La orden pendiente fue removida exitosamente.",
+      });
+    } catch (err: any) {
+      toast({
+        variant: "destructive",
+        title: "Error al eliminar",
+        description: err.message || "No se pudo eliminar la orden de la base de datos.",
+      });
+    }
+  };
+
+  // Helper to auto-save to cloud for instant cross-device availability
+  const autoSaveToCloud = async (
+    rawUmps: string[], 
+    docNum: string, 
+    dest: string, 
+    carr: string, 
+    fName: string
+  ) => {
+    if (!firestore || rawUmps.length === 0) return;
+    try {
+      const movementRef = activeCloudMovementId 
+        ? doc(firestore, 'packagingMovements', activeCloudMovementId)
+        : doc(collection(firestore, 'packagingMovements'));
+
+      await setDoc(movementRef, cleanFirestoreObject({
+        type: 'salida',
+        clientId: 'VITAFOODS',
+        clientName: 'Vitafoods',
+        document: docNum || 'Sin N° Guía',
+        destination: dest || '',
+        carrier: carr || '',
+        licensePlate: licensePlate || '',
+        fileName: fName,
+        rawUmps: rawUmps,
+        totalPallets: rawUmps.length,
+        status: 'Pendiente de Picking',
+        createdAt: serverTimestamp(),
+        userId: user?.uid || '',
+        userName: user?.displayName || user?.email || '',
+      }), { merge: true });
+
+      setActiveCloudMovementId(movementRef.id);
+    } catch (e) {
+      console.error("Auto cloud sync error:", e);
+    }
+  };
 
   // Handle File Upload
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -139,15 +251,13 @@ export function VitafoodDispatchTab() {
       setIsDraftRestored(false);
       const parsed: VitafoodParsedDispatch = await parseVitafoodDispatchFile(file);
       
-      if (parsed.header.documentNumber && !dispatchDocument) {
-        setDispatchDocument(parsed.header.documentNumber);
-      }
-      if (parsed.header.destination && !destination) {
-        setDestination(parsed.header.destination);
-      }
-      if (parsed.header.carrier && !carrier) {
-        setCarrier(parsed.header.carrier);
-      }
+      const docNum = parsed.header.documentNumber || dispatchDocument;
+      const dest = parsed.header.destination || destination;
+      const carr = parsed.header.carrier || carrier;
+
+      if (docNum) setDispatchDocument(docNum);
+      if (dest) setDestination(dest);
+      if (carr) setCarrier(carr);
 
       setRequestedUmps(parsed.rawUmps);
       const initialPicked: Record<string, boolean> = {};
@@ -156,9 +266,12 @@ export function VitafoodDispatchTab() {
       });
       setPickedState(initialPicked);
 
+      // Auto-save to cloud so it's instantly available on mobile phones
+      await autoSaveToCloud(parsed.rawUmps, docNum, dest, carr, file.name);
+
       toast({
-        title: "Archivo procesado",
-        description: `Se detectaron ${parsed.rawUmps.length} UMPs en ${file.name}.`,
+        title: "☁️ Archivo Procesado y Sincronizado",
+        description: `Se detectaron ${parsed.rawUmps.length} UMPs y se sincronizó en la nube para dispositivos móviles.`,
       });
     } catch (err: any) {
       console.error("Error parsing dispatch excel:", err);
@@ -173,7 +286,7 @@ export function VitafoodDispatchTab() {
   };
 
   // Handle Manual Text Process
-  const handleProcessManualText = () => {
+  const handleProcessManualText = async () => {
     if (!manualText.trim()) return;
     const lines = manualText
       .split(/[\n,;\t]+/)
@@ -191,9 +304,11 @@ export function VitafoodDispatchTab() {
     setFileName("Ingreso Manual");
     setIsDraftRestored(false);
 
+    await autoSaveToCloud(lines, dispatchDocument, destination, carrier, "Ingreso Manual");
+
     toast({
-      title: "Lista Procesada",
-      description: `Se cargaron ${lines.length} UMPs.`,
+      title: "☁️ Lista Procesada y Sincronizada",
+      description: `Se cargaron ${lines.length} UMPs y se sincronizó en la nube.`,
     });
   };
 
@@ -391,6 +506,7 @@ export function VitafoodDispatchTab() {
     setLicensePlate('');
     setManualText('');
     setIsDraftRestored(false);
+    setActiveCloudMovementId(null);
     if (typeof window !== 'undefined') {
       localStorage.removeItem('frio_vitafood_active_dispatch');
     }
@@ -409,7 +525,10 @@ export function VitafoodDispatchTab() {
 
     setIsSubmitting(true);
     try {
-      const movementRef = doc(collection(firestore, 'packagingMovements'));
+      const movementRef = activeCloudMovementId 
+        ? doc(firestore, 'packagingMovements', activeCloudMovementId)
+        : doc(collection(firestore, 'packagingMovements'));
+
       await setDoc(movementRef, cleanFirestoreObject({
         type: 'salida',
         clientId: matchedItems[0]?.clientId || 'VITAFOODS',
@@ -420,6 +539,7 @@ export function VitafoodDispatchTab() {
         licensePlate: licensePlate || '',
         totalPallets: matchedItems.length,
         fileName: fileName || 'Carga Excel',
+        rawUmps: requestedUmps,
         items: matchedItems.map(it => ({
           ump: it.ump,
           productCode: it.productCode,
@@ -436,11 +556,13 @@ export function VitafoodDispatchTab() {
         createdAt: serverTimestamp(),
         userId: user?.uid || '',
         userName: user?.displayName || user?.email || '',
-      }));
+      }), { merge: true });
+
+      setActiveCloudMovementId(movementRef.id);
 
       toast({
-        title: "📋 Solicitud de Picking Guardada",
-        description: `Se guardó la orden con ${matchedItems.length} pallets en "En Picking / Historial" para continuar desde cualquier dispositivo.`,
+        title: "📋 Solicitud de Picking Sincronizada",
+        description: `Se guardó la orden con ${matchedItems.length} pallets en la nube para continuar desde el teléfono móvil u otro dispositivo.`,
       });
     } catch (err: any) {
       console.error("Error saving picking order:", err);
@@ -805,7 +927,10 @@ export function VitafoodDispatchTab() {
         }
       }
 
-      const movementRef = doc(collection(firestore, 'packagingMovements'));
+      const movementRef = activeCloudMovementId 
+        ? doc(firestore, 'packagingMovements', activeCloudMovementId)
+        : doc(collection(firestore, 'packagingMovements'));
+
       batch.set(movementRef, cleanFirestoreObject({
         type: 'salida',
         clientId: itemsToDispatch[0]?.clientId || 'VITAFOODS',
@@ -814,6 +939,8 @@ export function VitafoodDispatchTab() {
         destination: destination || '',
         carrier: carrier || '',
         licensePlate: licensePlate || '',
+        fileName: fileName || 'Despacho Móvil/PC',
+        rawUmps: requestedUmps,
         totalPallets: itemsToDispatch.length,
         items: itemsToDispatch.map(it => ({
           ump: it.ump,
@@ -824,12 +951,15 @@ export function VitafoodDispatchTab() {
           unit: it.unit,
           location: it.locationDisplay,
           receptionId: it.receptionId,
+          itemIndex: it.itemIndex,
+          collectionType: it.collectionType,
         })),
         status: 'Completado',
+        completedAt: serverTimestamp(),
         createdAt: serverTimestamp(),
         userId: user?.uid || '',
         userName: user?.displayName || user?.email || '',
-      }));
+      }), { merge: true });
 
       await batch.commit();
 
@@ -856,37 +986,157 @@ export function VitafoodDispatchTab() {
 
   return (
     <div className="space-y-6">
+      {/* 0. Cloud Synchronized Pending Orders (PC to Mobile Sync) */}
+      {pendingCloudMovements.length > 0 && (
+        <Card className="border-2 border-emerald-500/40 bg-emerald-500/5 shadow-md">
+          <CardHeader className="pb-3">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+              <div className="flex items-center gap-2">
+                <div className="h-9 w-9 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-600">
+                  <Smartphone className="h-5 w-5" />
+                </div>
+                <div>
+                  <CardTitle className="text-base font-bold flex items-center gap-2 text-emerald-900 dark:text-emerald-300">
+                    <span>Órdenes de Despacho desde PC</span>
+                    <Badge variant="outline" className="bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-300 font-mono text-xs gap-1">
+                      <Radio className="h-3 w-3 animate-pulse text-emerald-600" />
+                      {pendingCloudMovements.length} Pendiente{pendingCloudMovements.length > 1 ? 's' : ''}
+                    </Badge>
+                  </CardTitle>
+                  <CardDescription className="text-xs text-emerald-700/80 dark:text-emerald-400/80">
+                    Archivos cargados en el computador listos para escanear y preparar físicamente en bodega.
+                  </CardDescription>
+                </div>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="pt-0 space-y-2.5">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {pendingCloudMovements.map((mov) => {
+                const isActive = activeCloudMovementId === mov.id;
+                const palletCount = mov.totalPallets || mov.rawUmps?.length || (mov.items?.length ?? 0);
+                const timeStr = mov.createdAt?.toDate 
+                  ? mov.createdAt.toDate().toLocaleString('es-CL', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) 
+                  : 'Reciente';
+
+                return (
+                  <div 
+                    key={mov.id} 
+                    className={`p-3.5 rounded-xl border transition-all flex flex-col justify-between gap-3 ${
+                      isActive 
+                        ? 'bg-emerald-500/15 border-emerald-500 shadow-sm ring-2 ring-emerald-500/20' 
+                        : 'bg-background hover:border-emerald-400 hover:bg-emerald-50/50 dark:hover:bg-emerald-950/20'
+                    }`}
+                  >
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-sm text-foreground">
+                            Guía N° {mov.document || '(Sin Guía)'}
+                          </span>
+                          {isActive && (
+                            <Badge className="bg-emerald-600 text-white text-[10px] font-bold">
+                              Activa en Pantalla
+                            </Badge>
+                          )}
+                        </div>
+                        <Badge variant="secondary" className="font-bold text-xs bg-primary/10 text-primary">
+                          {palletCount} Pallets
+                        </Badge>
+                      </div>
+
+                      <div className="text-xs text-muted-foreground space-y-0.5">
+                        {mov.destination && (
+                          <p className="truncate">📍 Destino: <strong className="text-foreground">{mov.destination}</strong></p>
+                        )}
+                        {mov.carrier && (
+                          <p className="truncate">🚚 Transportista: <strong className="text-foreground">{mov.carrier} {mov.licensePlate ? `(${mov.licensePlate})` : ''}</strong></p>
+                        )}
+                        <p className="text-[11px] text-muted-foreground/80 flex items-center gap-1 pt-0.5">
+                          <Clock className="h-3 w-3" /> {timeStr}
+                          {mov.userName && <span>&bull; Cargado por {mov.userName}</span>}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 pt-1 border-t border-border/50">
+                      <Button 
+                        size="sm" 
+                        onClick={() => handleLoadPendingMovement(mov)}
+                        disabled={isActive}
+                        className={`flex-1 font-bold text-xs gap-1.5 h-8 ${
+                          isActive 
+                            ? 'bg-emerald-700 text-white opacity-90 cursor-default' 
+                            : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm'
+                        }`}
+                      >
+                        {isActive ? (
+                          <>
+                            <CheckCircle2 className="h-3.5 w-3.5" /> En Preparación
+                          </>
+                        ) : (
+                          <>
+                            <Smartphone className="h-3.5 w-3.5" /> Cargar para Picking / Escaneo
+                          </>
+                        )}
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        variant="ghost" 
+                        onClick={() => handleDeletePendingMovement(mov.id, mov.document)}
+                        className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                        title="Eliminar orden de la nube"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* 1. Header & Dispatch Manifest Information */}
       <Card className="border-t-4 border-t-primary shadow-sm">
         <CardHeader className="pb-4">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
             <div>
-              <CardTitle className="text-xl flex items-center gap-2">
-                <Truck className="h-6 w-6 text-primary" />
-                Despacho y Picking List (Vitafoods / Embalajes)
+              <CardTitle className="text-lg sm:text-xl font-bold flex items-center gap-2">
+                <Truck className="h-5 w-5 sm:h-6 sm:w-6 text-primary shrink-0" />
+                <span>Despacho y Picking List (Embalajes)</span>
               </CardTitle>
-              <CardDescription>
+              <CardDescription className="text-xs sm:text-sm mt-1">
                 Cargue el archivo Excel con los UMP a despachar para cruzar contra el stock y generar el Picking List ordenado.
               </CardDescription>
             </div>
             {fileName && (
-              <Button variant="outline" size="sm" onClick={handleReset} className="text-destructive hover:bg-destructive/10">
-                <Trash2 className="h-4 w-4 mr-1.5" />
+              <Button variant="outline" size="sm" onClick={handleReset} className="w-full sm:w-auto text-destructive hover:bg-destructive/10 text-xs font-bold">
+                <Trash2 className="h-4 w-4 mr-1.5 shrink-0" />
                 Limpiar / Nueva Carga
               </Button>
             )}
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          {isDraftRestored && (
+          {activeCloudMovementId && (
+            <div className="bg-emerald-500/10 border border-emerald-500/30 p-2.5 rounded-lg text-xs flex items-center justify-between text-emerald-800 dark:text-emerald-300 font-medium">
+              <span className="flex items-center gap-1.5">
+                <Radio className="h-3.5 w-3.5 text-emerald-600 animate-pulse shrink-0" />
+                <span>Orden sincronizada con la nube en tiempo real.</span>
+              </span>
+            </div>
+          )}
+          {isDraftRestored && !activeCloudMovementId && (
             <div className="bg-primary/10 border border-primary/20 p-2.5 rounded-lg text-xs flex items-center justify-between text-primary font-medium">
-              <span>💾 Se ha restaurado automáticamente la orden de despacho en progreso.</span>
+              <span>💾 Se ha restaurado la orden en progreso.</span>
               <Button size="sm" variant="ghost" onClick={handleReset} className="h-6 text-xs text-destructive hover:bg-destructive/10">
                 Descartar
               </Button>
             </div>
           )}
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
             <div className="space-y-1.5">
               <Label className="text-xs font-bold text-foreground flex items-center gap-1">
                 N° Guía de Despacho <span className="text-destructive font-black">*</span>
@@ -929,19 +1179,21 @@ export function VitafoodDispatchTab() {
           {!requestedUmps.length && (
             <div className="mt-4 pt-4 border-t">
               <Tabs value={activeInputMode} onValueChange={(v) => setActiveInputMode(v as any)}>
-                <TabsList className="grid w-full grid-cols-2 max-w-md mb-4">
-                  <TabsTrigger value="file" className="flex items-center gap-1.5">
-                    <FileSpreadsheet className="h-4 w-4" /> Cargar Excel / CSV
-                  </TabsTrigger>
-                  <TabsTrigger value="manual" className="flex items-center gap-1.5">
-                    <FileText className="h-4 w-4" /> Ingreso / Pegado Manual
-                  </TabsTrigger>
-                </TabsList>
+                <div className="overflow-x-auto pb-1 -mx-2 px-2 sm:mx-0 sm:px-0">
+                  <TabsList className="grid grid-cols-2 w-full max-w-md mb-3 h-auto p-1 bg-muted/80 rounded-xl">
+                    <TabsTrigger value="file" className="flex items-center justify-center gap-1.5 py-2 px-2 text-xs sm:text-sm font-bold">
+                      <FileSpreadsheet className="h-4 w-4 shrink-0 text-emerald-600" /> Cargar Excel / CSV
+                    </TabsTrigger>
+                    <TabsTrigger value="manual" className="flex items-center justify-center gap-1.5 py-2 px-2 text-xs sm:text-sm font-bold">
+                      <FileText className="h-4 w-4 shrink-0 text-blue-600" /> Ingreso Manual
+                    </TabsTrigger>
+                  </TabsList>
+                </div>
 
                 <TabsContent value="file">
                   <div 
                     onClick={() => fileInputRef.current?.click()}
-                    className="border-2 border-dashed rounded-xl p-8 text-center hover:bg-muted/50 cursor-pointer transition-all flex flex-col items-center justify-center gap-3 border-primary/30 hover:border-primary bg-primary/5"
+                    className="border-2 border-dashed rounded-xl p-6 sm:p-8 text-center hover:bg-muted/50 cursor-pointer transition-all flex flex-col items-center justify-center gap-3 border-primary/30 hover:border-primary bg-primary/5"
                   >
                     <input 
                       type="file" 
@@ -950,11 +1202,11 @@ export function VitafoodDispatchTab() {
                       accept=".xlsx, .xls, .csv" 
                       className="hidden" 
                     />
-                    <div className="h-14 w-14 rounded-full bg-primary/10 flex items-center justify-center text-primary shadow-inner">
-                      <UploadCloud className="h-7 w-7" />
+                    <div className="h-12 w-12 sm:h-14 sm:w-14 rounded-full bg-primary/10 flex items-center justify-center text-primary shadow-inner">
+                      <UploadCloud className="h-6 w-6 sm:h-7 sm:w-7" />
                     </div>
                     <div>
-                      <p className="font-bold text-base text-foreground">Haga clic o arrastre el archivo de Despacho Vitafoods aquí</p>
+                      <p className="font-bold text-sm sm:text-base text-foreground">Haga clic o arrastre el archivo de Despacho aquí</p>
                       <p className="text-xs text-muted-foreground mt-1">Soporta formato Excel (.xlsx, .xls) o CSV con listado de UMP</p>
                     </div>
                     <Button type="button" variant="secondary" size="sm" className="mt-1 font-bold">
@@ -974,7 +1226,7 @@ export function VitafoodDispatchTab() {
                       className="font-mono text-sm"
                     />
                     <div className="flex justify-end">
-                      <Button onClick={handleProcessManualText} disabled={!manualText.trim()} className="font-bold">
+                      <Button onClick={handleProcessManualText} disabled={!manualText.trim()} className="font-bold w-full sm:w-auto">
                         Procesar Lista de UMPs
                       </Button>
                     </div>
@@ -1091,8 +1343,8 @@ export function VitafoodDispatchTab() {
             </CardHeader>
 
             <CardContent className="p-0">
-              <div className="border-t max-h-[500px] overflow-y-auto">
-                <Table>
+              <div className="border-t max-h-[500px] overflow-x-auto overflow-y-auto">
+                <Table className="min-w-[680px]">
                   <TableHeader className="bg-muted/40 sticky top-0 z-10">
                     <TableRow>
                       <TableHead className="w-12 text-center">
@@ -1185,17 +1437,17 @@ export function VitafoodDispatchTab() {
               </div>
 
               {/* 5. Footer Confirmation Actions */}
-              <div className="p-4 bg-muted/20 border-t flex flex-col sm:flex-row justify-between items-center gap-3">
-                <div className="text-xs text-muted-foreground">
+              <div className="p-4 bg-muted/20 border-t flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3">
+                <div className="text-xs text-muted-foreground text-center sm:text-left">
                   <span className="font-bold text-foreground">{pickedCount}</span> pallets listos para despachar con Guía <span className="font-mono font-bold text-foreground">{dispatchDocument || '(Pendiente)'}</span>.
                 </div>
 
-                <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
                   <Button 
                     variant="outline" 
                     onClick={handleReset} 
                     disabled={isSubmitting}
-                    className="flex-1 sm:flex-initial"
+                    className="w-full sm:w-auto text-xs"
                   >
                     Cancelar
                   </Button>
@@ -1203,14 +1455,14 @@ export function VitafoodDispatchTab() {
                     variant="secondary"
                     onClick={handleSaveAsPickingRequest} 
                     disabled={isSubmitting || matchedItems.length === 0}
-                    className="flex-1 sm:flex-initial font-bold"
+                    className="w-full sm:w-auto font-bold text-xs"
                   >
-                    Guardar Solicitud de Picking
+                    Guardar Solicitud
                   </Button>
                   <Button 
                     onClick={handleConfirmDispatch} 
                     disabled={isSubmitting || pickedCount === 0 || !dispatchDocument.trim()}
-                    className="flex-1 sm:flex-initial font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-600/20"
+                    className="w-full sm:w-auto font-bold text-xs bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-600/20"
                   >
                     {isSubmitting ? 'Confirmando Salida...' : `Confirmar Despacho (${pickedCount} Pallets)`}
                   </Button>
