@@ -6,7 +6,7 @@ import * as React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
-import type { ChamberLot, Exporter, OtherFruitReception, StoredItem, ChamberTemperature, ClientStorageConfig } from '@/lib/types';
+import type { ChamberLot, Exporter, OtherFruitReception, StoredItem, ChamberTemperature, ClientStorageConfig, OtherClient } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -96,9 +96,20 @@ export default function CamarasPage() {
   const firestore = useFirestore();
   const { data: exporters, loading: loadingExporters } = useFirestoreCollection<Exporter>('exporters');
   const { data: otherFruitReceptions, loading: loadingOtherFruit } = useFirestoreCollection<OtherFruitReception>('otherFruitReceptions');
+  const { data: otherClients } = useFirestoreCollection<OtherClient>('otherClients');
   const { data: clientConfigs, loading: loadingConfigs } = useFirestoreCollection<ClientStorageConfig>('clientStorageConfigs');
   const { data: chamberSettings } = useFirestoreCollection<{ id: string; row13Enabled?: boolean }>('chamberSettings');
   const { data: usersMaster } = useFirestoreCollection<any>('usersMaster');
+
+  const isVitafoodOrPackaging = React.useCallback((item?: StoredItem | null) => {
+    if (!item) return false;
+    const name = (item.ownerName || '').toUpperCase();
+    const id = (item.exporterId || '').toUpperCase();
+    if (name.includes('FALL CREEK') || id.includes('FALL CREEK')) return false;
+    if (name.includes('VITAFOOD') || id.includes('VITAFOOD') || name.includes('EMBALAJE') || id.includes('EMBALAJE')) return true;
+    const client = (otherClients || []).find(c => c.clientId === item.exporterId || c.name.toUpperCase() === name);
+    return client?.type?.toLowerCase() === 'embalaje';
+  }, [otherClients]);
 
   const pendingLotsQuery = useMemoFirebase(() => {
     if (!firestore) return null;
@@ -249,7 +260,8 @@ export default function CamarasPage() {
                 exporterId: reception.clientId,
                 document: reception.document,
                 documentNumber: reception.documentNumber,
-                palletId: item.palletId,
+                palletId: item.palletId || item.containerId || (item as any).ump,
+                containerId: item.containerId || item.palletId || (item as any).ump,
             }))
         )
     ];
@@ -287,7 +299,17 @@ export default function CamarasPage() {
             if (item.unit === 'Bins') {
                 return sum + item.quantity;
             } else if (item.unit === 'Pallets') {
+                if (isVitafoodOrPackaging(item)) {
+                    return sum + 2; // 1 pallet of packaging = 2 bins equiv
+                }
                 return sum + item.quantity; // Pallets now count as 1 unit for occupancy
+            }
+            return sum;
+        }, 0);
+
+        const totalPalletsInChamber = itemsInThisChamber.reduce((sum, item) => {
+            if (item.unit === 'Pallets') {
+                return sum + (isVitafoodOrPackaging(item) ? 1 : item.quantity);
             }
             return sum;
         }, 0);
@@ -296,9 +318,10 @@ export default function CamarasPage() {
             occupied: occupiedEquivalentBins,
             total: totalCapacity,
             percentage: totalCapacity > 0 ? (occupiedEquivalentBins / totalCapacity) * 100 : 0,
+            pallets: totalPalletsInChamber,
         };
         return acc;
-    }, {} as Record<string, {occupied: number; total: number; percentage: number}>);
+    }, {} as Record<string, {occupied: number; total: number; percentage: number; pallets: number}>);
 
 
     return { 
@@ -585,41 +608,70 @@ export default function CamarasPage() {
             return fruitUpdatesByReception[receptionId];
         };
 
-        for (const { reception, item, index } of fruitItemsToMove) {
-            if (remaining <= 0) break;
-            const avail = item.quantity;
-            const amountToMove = Math.min(avail, remaining);
-            if (amountToMove <= 0) continue;
+        const isRelocatingPackaging = fruitItemsToMove.some(({ reception, item }) =>
+            isVitafoodOrPackaging({
+                ...item,
+                ownerName: reception.clientName,
+                exporterId: reception.clientId,
+            } as any)
+        );
 
-            const itemsArray = getReceptionItemsArray(reception.id, reception.items);
-            const itemToUpdate = itemsArray[index];
+        if (isRelocatingPackaging) {
+            let palletsLeft = quantityToRelocate;
+            for (const { reception, item, index } of fruitItemsToMove) {
+                if (palletsLeft <= 0) break;
 
-            if (itemToUpdate) {
-                if (amountToMove === avail) {
-                    // Move full item
+                const itemsArray = getReceptionItemsArray(reception.id, reception.items);
+                const itemToUpdate = itemsArray[index];
+
+                if (itemToUpdate) {
                     itemToUpdate.storageLocation = {
                         chamberId: targetChamberId,
                         coordinate: targetCoordinate,
                     };
-                } else {
-                    // Split item: decrease original
-                    itemToUpdate.quantity = avail - amountToMove;
-                    // Add new split item in target
-                    itemsArray.push({
-                        ...itemToUpdate,
-                        quantity: amountToMove,
-                        status: 'Almacenado',
-                        storageLocation: {
-                            chamberId: targetChamberId,
-                            coordinate: targetCoordinate,
-                        },
-                        storedAt: new Date(),
-                        storedByUserName: user?.email || (user?.isAnonymous ? 'Anónimo' : user?.displayName || 'N/A'),
-                        storedByUserId: user?.uid || undefined,
-                    });
+                    itemToUpdate.storedAt = new Date();
+                    itemToUpdate.storedByUserName = user?.email || (user?.isAnonymous ? 'Anónimo' : user?.displayName || 'N/A');
+                    itemToUpdate.storedByUserId = user?.uid || undefined;
+                    palletsLeft--;
                 }
             }
-            remaining -= amountToMove;
+        } else {
+            for (const { reception, item, index } of fruitItemsToMove) {
+                if (remaining <= 0) break;
+                const avail = item.quantity;
+                const amountToMove = Math.min(avail, remaining);
+                if (amountToMove <= 0) continue;
+
+                const itemsArray = getReceptionItemsArray(reception.id, reception.items);
+                const itemToUpdate = itemsArray[index];
+
+                if (itemToUpdate) {
+                    if (amountToMove === avail) {
+                        // Move full item
+                        itemToUpdate.storageLocation = {
+                            chamberId: targetChamberId,
+                            coordinate: targetCoordinate,
+                        };
+                    } else {
+                        // Split item: decrease original
+                        itemToUpdate.quantity = avail - amountToMove;
+                        // Add new split item in target
+                        itemsArray.push({
+                            ...itemToUpdate,
+                            quantity: amountToMove,
+                            status: 'Almacenado',
+                            storageLocation: {
+                                chamberId: targetChamberId,
+                                coordinate: targetCoordinate,
+                            },
+                            storedAt: new Date(),
+                            storedByUserName: user?.email || (user?.isAnonymous ? 'Anónimo' : user?.displayName || 'N/A'),
+                            storedByUserId: user?.uid || undefined,
+                        });
+                    }
+                }
+                remaining -= amountToMove;
+            }
         }
 
         // Apply all other fruit updates
@@ -630,7 +682,12 @@ export default function CamarasPage() {
 
         await batch.commit();
         
-        toast({ title: 'Éxito', description: `Se reubicaron ${quantityToRelocate} unidades a ${chambersConfig[targetChamberId].name} - ${targetCoordinate}.` });
+        toast({ 
+            title: 'Éxito', 
+            description: isRelocatingPackaging 
+                ? `Se reubicaron ${quantityToRelocate} pallet(s) a ${chambersConfig[targetChamberId].name} - ${targetCoordinate}.` 
+                : `Se reubicaron ${quantityToRelocate} unidades a ${chambersConfig[targetChamberId].name} - ${targetCoordinate}.` 
+        });
 
     } catch (e: any) {
         console.error("Error al reubicar: ", e);
@@ -1052,8 +1109,8 @@ export default function CamarasPage() {
                                     </div>
                                     <div className="text-left sm:text-right w-full sm:w-auto">
                                         <p className={cn("font-mono font-semibold text-sm", (chamberOccupancy[chamberId]?.percentage ?? 0) > 50 ? 'text-destructive' : 'text-foreground')}>
-                                            {chamberOccupancy[chamberId]?.occupied ?? 0} / {chamberOccupancy[chamberId]?.total ?? 0} Bins Equiv.
-                                            ({safeFormatQuantity(chamberOccupancy[chamberId]?.percentage ?? 0, 1)}%)
+                                            {chamberOccupancy[chamberId]?.occupied ?? 0} / {chamberOccupancy[chamberId]?.total ?? 0} Bins Equiv. ({safeFormatQuantity(chamberOccupancy[chamberId]?.percentage ?? 0, 1)}%)
+                                            {chamberOccupancy[chamberId]?.pallets ? ` // ${chamberOccupancy[chamberId].pallets} Pallet${chamberOccupancy[chamberId].pallets > 1 ? 's' : ''}` : ''}
                                         </p>
                                         <Progress value={chamberOccupancy[chamberId]?.percentage ?? 0} className="w-full sm:w-48 h-2 mt-1" />
                                     </div>
@@ -1099,22 +1156,24 @@ export default function CamarasPage() {
                                           const isOccupied = itemsInCoord.length > 0;
                                         
                                           const totalBins = itemsInCoord.filter(i => i.unit === 'Bins').reduce((s, i) => s + i.quantity, 0);
-                                          const totalPallets = itemsInCoord.filter(i => i.unit === 'Pallets').reduce((s, i) => s + i.quantity, 0);
+                                          const totalPallets = itemsInCoord.filter(i => i.unit === 'Pallets').reduce((s, i) => s + (isVitafoodOrPackaging(i) ? 1 : i.quantity), 0);
                                           const totalNetWeight = itemsInCoord.reduce((sum, i) => sum + (i.quantity * (i.netWeightPerBin || 0)), 0);
                                           const clientLotIds = Array.from(new Set(itemsInCoord.map(i => i.clientLotId).filter(Boolean)));
-                                          const uniquePalletIds = Array.from(new Set(itemsInCoord.map(i => i.palletId).filter(Boolean)));
+                                          const uniquePalletIds = Array.from(new Set(itemsInCoord.map(i => i.palletId || i.containerId).filter(Boolean)));
                                         
                                           const firstItem = isOccupied ? itemsInCoord[0] : null;
                                           
                                           // Dynamic capacity lookup
                                           const clientName = firstItem?.ownerName || '';
                                           const clientConfig = (clientConfigs || []).find(c => c.clientName.toUpperCase() === clientName.toUpperCase());
+                                          const otherClient = (otherClients || []).find(c => c.name.toUpperCase() === clientName.toUpperCase() || c.clientId === firstItem?.exporterId);
                                           const isFC = clientName.toUpperCase() === 'FALL CREEK';
+                                          const isPkg = isVitafoodOrPackaging(firstItem);
                                           const defaultBins = isFC ? 9 : 6;
-                                          const defaultPallets = 3;
+                                          const defaultPallets = isPkg ? 4 : 3;
                                           const coordCapacity = clientConfig 
-                                            ? (firstItem?.unit === 'Pallets' ? (clientConfig.palletsPerCoordinate ?? defaultPallets) : (clientConfig.binsPerCoordinate ?? defaultBins))
-                                            : (firstItem?.unit === 'Pallets' ? defaultPallets : defaultBins);
+                                            ? (firstItem?.unit === 'Pallets' ? (clientConfig.palletsPerCoordinate ?? otherClient?.palletsPerCoordinate ?? defaultPallets) : (clientConfig.binsPerCoordinate ?? otherClient?.binsPerCoordinate ?? defaultBins))
+                                            : (firstItem?.unit === 'Pallets' ? (otherClient?.palletsPerCoordinate && otherClient.palletsPerCoordinate > 0 ? otherClient.palletsPerCoordinate : defaultPallets) : defaultBins);
      
                                           const occupancyPercentage = isOccupied ? (totalBins + totalPallets) / coordCapacity * 100 : 0;
 
@@ -1220,7 +1279,18 @@ export default function CamarasPage() {
                                                        <div className="border-b pb-1 flex justify-between items-start">
                                                            <div>
                                                                <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Ubicación {coord}</p>
-                                                               <p className="text-sm font-semibold">{uniqueLotIds.length > 1 ? 'Lotes Mezclados' : firstItem?.type === 'producerLot' ? `Lote: ${firstItem?.displayId}` : `Documento: ${firstItem?.document || '-'}`}</p>
+                                                               <p className="text-sm font-semibold">
+                                                                    {uniqueLotIds.length > 1 
+                                                                        ? (isVitafoodOrPackaging(firstItem) && uniquePalletIds.length > 0 
+                                                                            ? `UMP: ${uniquePalletIds.join(', ')}` 
+                                                                            : 'Lotes Mezclados') 
+                                                                        : firstItem?.type === 'producerLot' 
+                                                                            ? `Lote: ${firstItem?.displayId}` 
+                                                                            : isVitafoodOrPackaging(firstItem) 
+                                                                                ? `UMP: ${uniquePalletIds.join(', ') || firstItem?.palletId || firstItem?.containerId || '-'}` 
+                                                                                : `Documento: ${firstItem?.document || '-'}`
+                                                                    }
+                                                                </p>
                                                            </div>
                                                            {uniqueLotIds.length === 1 && (() => {
                                                                const canEdit = firstItem?.type === 'otherFruit' && firstItem?.ownerName?.toUpperCase() !== 'FALL CREEK';
@@ -1251,10 +1321,16 @@ export default function CamarasPage() {
                                                                         return (
                                                                             <div key={idx} className="text-xs border-b border-dashed pb-1.5 last:border-0 last:pb-0">
                                                                                 <div className="flex justify-between items-center">
-                                                                                    <span className="font-bold">{item.type === 'producerLot' ? `Lote: ${item.displayId}` : `Doc: ${item.document || '-'}`}</span>
+                                                                                    <span className="font-bold">
+                                                                                        {item.type === 'producerLot' 
+                                                                                            ? `Lote: ${item.displayId}` 
+                                                                                            : isVitafoodOrPackaging(item) 
+                                                                                                ? `UMP: ${item.palletId || item.containerId || item.document || '-'}` 
+                                                                                                : `Doc: ${item.document || '-'}`}
+                                                                                    </span>
                                                                                     <div className="flex items-center gap-1.5">
                                                                                         <Badge variant="outline" className="h-4 text-[9px] px-1 bg-primary/5 text-primary border-primary/20">
-                                                                                            {item.quantity} {item.unit}
+                                                                                            {isVitafoodOrPackaging(item) ? `1 Pallet (${item.quantity} UN)` : `${item.quantity} ${item.unit}`}
                                                                                         </Badge>
                                                                                         {canEditObs && (
                                                                                             <Button 

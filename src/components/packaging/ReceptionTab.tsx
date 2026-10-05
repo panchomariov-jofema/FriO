@@ -105,16 +105,20 @@ export function ReceptionTab() {
   const resolvedClientConfig = React.useMemo(() => {
     if (!itemToStore) return undefined;
     const explicit = clientConfigs?.find(c => c.id === itemToStore.clientId);
+    const client = (packagingClients || []).find(c => c.clientId === itemToStore.clientId || c.name.toUpperCase() === itemToStore.clientName?.toUpperCase());
+    const palletsPerCoord = explicit?.palletsPerCoordinate ?? 
+      (client?.palletsPerCoordinate && client.palletsPerCoordinate > 0 ? client.palletsPerCoordinate : 4);
+
     return {
       id: itemToStore.clientId,
       clientName: itemToStore.clientName,
-      strategy: (explicit?.strategy || 'secuencial') as any,
+      strategy: (explicit?.strategy || client?.storageStrategy || 'secuencial') as any,
       binsPerCoordinate: explicit?.binsPerCoordinate ?? 6,
-      palletsPerCoordinate: explicit?.palletsPerCoordinate ?? 2,
+      palletsPerCoordinate: palletsPerCoord,
       preferredChamberId: explicit?.preferredChamberId,
       chamberOverrides: explicit?.chamberOverrides
     };
-  }, [itemToStore, clientConfigs]);
+  }, [itemToStore, clientConfigs, packagingClients]);
 
   const onStoreConfirm = async (data: { 
     chamberId: string; 

@@ -58,6 +58,17 @@ export function RelocateLotDialog({
   
   const { data: chamberSettings } = useFirestoreCollection<{ id: string; row13Enabled?: boolean }>('chamberSettings');
   
+  const isPackaging = React.useMemo(() => {
+    const first = lotsInCoordinate[0];
+    if (!first) return false;
+    const name = (first.ownerName || '').toUpperCase();
+    const id = (first.exporterId || '').toUpperCase();
+    if (name.includes('FALL CREEK') || id.includes('FALL CREEK')) return false;
+    if (name.includes('VITAFOOD') || id.includes('VITAFOOD') || name.includes('EMBALAJE') || id.includes('EMBALAJE')) return true;
+    const client = (exporters || []).find(e => e.exporterId === first.exporterId || e.name.toUpperCase() === name);
+    return client?.type?.toUpperCase() === 'EMBALAJE';
+  }, [lotsInCoordinate, exporters]);
+
   const totalQuantityInCoord = React.useMemo(() => {
     return lotsInCoordinate.reduce((sum, item) => sum + item.quantity, 0);
   }, [lotsInCoordinate]);
@@ -91,11 +102,31 @@ export function RelocateLotDialog({
         .sort(naturalSort);
 
     // 1. Calculate current occupancy and document set for all coordinates in target chamber
-    const occupancyMap = new Map<string, { quantity: number; ownerName: string; unit: string; documents: Set<string>; productCodes: Set<string>; varieties: Set<string> }>();
+    const occupancyMap = new Map<string, { 
+      quantity: number; 
+      palletsCount: number;
+      ownerName: string; 
+      unit: string; 
+      documents: Set<string>; 
+      productCodes: Set<string>; 
+      varieties: Set<string>;
+      hasFruit: boolean;
+      hasPackaging: boolean;
+    }>();
     
     allChamberLots.forEach(lot => {
       if (lot.status === 'Almacenado' && lot.chamberId === targetChamberId && lot.coordinate) {
-        const current = occupancyMap.get(lot.coordinate) || { quantity: 0, ownerName: lot.producerShortName, unit: 'Bins', documents: new Set<string>(), productCodes: new Set<string>(), varieties: new Set<string>() };
+        const current = occupancyMap.get(lot.coordinate) || { 
+          quantity: 0, 
+          palletsCount: 0,
+          ownerName: lot.producerShortName, 
+          unit: 'Bins', 
+          documents: new Set<string>(), 
+          productCodes: new Set<string>(), 
+          varieties: new Set<string>(),
+          hasFruit: true,
+          hasPackaging: false
+        };
         const lotDoc = lot.displayLotId.split('-').slice(1).join('-');
         current.documents.add(lotDoc);
         if (lot.variety) {
@@ -103,19 +134,40 @@ export function RelocateLotDialog({
         }
         occupancyMap.set(lot.coordinate, { 
             quantity: current.quantity + lot.binCount, 
+            palletsCount: current.palletsCount,
             ownerName: lot.producerShortName, 
             unit: 'Bins',
             documents: current.documents,
             productCodes: current.productCodes,
             varieties: current.varieties,
+            hasFruit: true,
+            hasPackaging: current.hasPackaging
         });
       }
     });
 
     allOtherFruitReceptions.forEach(reception => {
+        const isFC = reception.clientName?.toUpperCase() === 'FALL CREEK';
+        const isPkg = Boolean(
+          reception.clientName?.toUpperCase().includes('VITAFOOD') ||
+          reception.clientId?.toUpperCase().includes('VITAFOOD') ||
+          reception.clientName?.toUpperCase().includes('EMBALAJE') ||
+          reception.clientId?.toUpperCase().includes('EMBALAJE')
+        );
+
         (reception.items || []).forEach(item => {
             if(item.status === 'Almacenado' && item.storageLocation?.chamberId === targetChamberId && item.storageLocation.coordinate) {
-                const current = occupancyMap.get(item.storageLocation.coordinate) || { quantity: 0, ownerName: reception.clientName, unit: reception.unit, documents: new Set<string>(), productCodes: new Set<string>(), varieties: new Set<string>() };
+                const current = occupancyMap.get(item.storageLocation.coordinate) || { 
+                  quantity: 0, 
+                  palletsCount: 0,
+                  ownerName: reception.clientName, 
+                  unit: reception.unit, 
+                  documents: new Set<string>(), 
+                  productCodes: new Set<string>(), 
+                  varieties: new Set<string>(),
+                  hasFruit: !isPkg,
+                  hasPackaging: isPkg
+                };
                 current.documents.add(reception.document);
                 if (item.productCode) {
                     current.productCodes.add(item.productCode);
@@ -123,18 +175,26 @@ export function RelocateLotDialog({
                 if (item.productName) {
                     current.varieties.add(item.productName.trim().toUpperCase());
                 }
+                if (isPkg) {
+                    current.hasPackaging = true;
+                } else {
+                    current.hasFruit = true;
+                }
                 
-                // Determine units: if it's Fall Creek, 1 pallet = 3 bins.
-                const multiplier = (reception.clientName?.toUpperCase() === 'FALL CREEK' && reception.unit === 'Pallets') ? 3 : (reception.unit === 'Bins' ? 1 : 2);
-                const equivalentUnits = item.quantity * multiplier;
+                // Packaging: each item is 1 pallet (counts as 1 pallet, 2 bins equiv).
+                const equivalentUnits = isPkg ? 2 : ((isFC && reception.unit === 'Pallets') ? 3 * item.quantity : (reception.unit === 'Bins' ? item.quantity : item.quantity * 2));
+                const itemPalletCount = isPkg ? 1 : (reception.unit === 'Pallets' ? item.quantity : 0);
 
                 occupancyMap.set(item.storageLocation.coordinate, { 
                     quantity: current.quantity + equivalentUnits, 
+                    palletsCount: current.palletsCount + itemPalletCount,
                     ownerName: reception.clientName, 
                     unit: reception.unit,
                     documents: current.documents,
                     productCodes: current.productCodes,
                     varieties: current.varieties,
+                    hasFruit: current.hasFruit,
+                    hasPackaging: current.hasPackaging
                 });
             }
         });
@@ -146,7 +206,9 @@ export function RelocateLotDialog({
     
     const qtyToMove = watchQuantityToRelocate !== undefined && !isNaN(Number(watchQuantityToRelocate)) 
       ? Number(watchQuantityToRelocate) 
-      : totalQuantityInCoord;
+      : (isPackaging ? lotsInCoordinate.length : totalQuantityInCoord);
+
+    const palletsToRelocate = isPackaging ? qtyToMove : 0;
     const quantityToRelocateInBins = qtyToMove * multiplier;
 
     const firstItemToRelocate = lotsInCoordinate[0];
@@ -161,9 +223,27 @@ export function RelocateLotDialog({
         if (targetChamberId === sourceChamberId && coord === sourceCoordinate) return false;
 
         const occupancyData = occupancyMap.get(coord);
+
+        if (isPackaging) {
+            // Sanitary check: cannot place packaging in coordinate with fruit
+            if (occupancyData && occupancyData.hasFruit) return false;
+
+            const currentPallets = occupancyData?.palletsCount || 0;
+            const MAX_PACKAGING_PALLETS = 4;
+            if ((currentPallets + palletsToRelocate) > MAX_PACKAGING_PALLETS) return false;
+
+            // If coordinate already has packaging items, must be same client
+            if (occupancyData && occupancyData.hasPackaging && currentPallets > 0) {
+                if (occupancyData.ownerName.toUpperCase() !== incomingOwnerName.toUpperCase()) return false;
+            }
+
+            return true;
+        }
+
+        // Regular fruit rules:
+        if (occupancyData && occupancyData.hasPackaging) return false;
+
         const currentOccupancy = occupancyData?.quantity || 0;
-        
-        // Rule: Absolute maximum capacity of 9 Bins
         const MAX_CAPACITY = 9;
         if ((currentOccupancy + quantityToRelocateInBins) > MAX_CAPACITY) return false;
 
@@ -186,13 +266,12 @@ export function RelocateLotDialog({
                 
                 const isFallCreek = incomingOwnerName.toUpperCase() === 'FALL CREEK';
                 if (isFallCreek) {
-                    // Para Fall Creek: la variedad (productName) es la que manda
                     const incomingVariety = (firstItemToRelocate.varietyOrProduct || '').trim().toUpperCase();
                     if (incomingVariety && occupancyData.varieties && occupancyData.varieties.size > 0) {
                         const targetHasDifferentVariety = Array.from(occupancyData.varieties).some(v => v !== incomingVariety);
                         if (targetHasDifferentVariety) return false;
                     }
-                } else if (firstItemToRelocate.displayId) { // displayId contains productCode for otherFruit
+                } else if (firstItemToRelocate.displayId) {
                     const targetHasDifferentProduct = Array.from(occupancyData.productCodes || []).some(code => code !== firstItemToRelocate.displayId);
                     if (targetHasDifferentProduct) return false;
                 }
@@ -219,7 +298,7 @@ export function RelocateLotDialog({
         availableCoordinates: available,
         occupancyMap
     };
-  }, [targetChamberId, allChamberLots, allOtherFruitReceptions, sourceChamberId, sourceCoordinate, lotsInCoordinate, clientConfigs, exporters, watchQuantityToRelocate, totalQuantityInCoord, chamberSettings]);
+  }, [targetChamberId, allChamberLots, allOtherFruitReceptions, sourceChamberId, sourceCoordinate, lotsInCoordinate, clientConfigs, exporters, watchQuantityToRelocate, totalQuantityInCoord, chamberSettings, isPackaging]);
 
   React.useEffect(() => {
     if (open) {
@@ -229,11 +308,11 @@ export function RelocateLotDialog({
       form.reset({
         targetChamberId: undefined,
         targetCoordinate: undefined,
-        quantityToRelocate: totalQuantityInCoord,
+        quantityToRelocate: isPackaging ? lotsInCoordinate.length : totalQuantityInCoord,
         selectedItemIds: defaultItemIds,
       });
     }
-  }, [open, form, totalQuantityInCoord, lotsInCoordinate]);
+  }, [open, form, totalQuantityInCoord, lotsInCoordinate, isPackaging]);
 
   const onSubmit = (values: RelocateFormValues) => {
     if (values.targetChamberId === sourceChamberId && values.targetCoordinate === sourceCoordinate) {
@@ -241,47 +320,84 @@ export function RelocateLotDialog({
         return;
     }
 
-    if (values.quantityToRelocate > totalQuantityInCoord) {
-        form.setError('quantityToRelocate', {
-            type: 'manual',
-            message: `La cantidad no puede ser mayor a la disponible en el origen (${totalQuantityInCoord}).`
-        });
-        return;
-    }
-
-    if (item.type === 'otherFruit') {
-        const selectedItems = lotsInCoordinate.filter(i => (values.selectedItemIds || []).includes(i.id));
-        const selectedTotal = selectedItems.reduce((sum, i) => sum + i.quantity, 0);
-        if (values.quantityToRelocate > selectedTotal) {
+    if (isPackaging) {
+        if (values.quantityToRelocate > lotsInCoordinate.length) {
             form.setError('quantityToRelocate', {
                 type: 'manual',
-                message: `La cantidad no puede ser mayor a la suma de los ítems seleccionados (${selectedTotal}).`
+                message: `La cantidad no puede ser mayor a los pallets disponibles (${lotsInCoordinate.length}).`
             });
             return;
         }
-    }
 
-    // Validate the target chamber's capacity conditions
-    const targetCoordinate = values.targetCoordinate;
-    const occupancyData = occupancyMap.get(targetCoordinate);
-    const currentOccupancy = occupancyData?.quantity || 0;
+        const selectedItems = lotsInCoordinate.filter(i => (values.selectedItemIds || []).includes(i.id));
+        if (values.selectedItemIds && values.selectedItemIds.length > 0 && values.quantityToRelocate > selectedItems.length) {
+            form.setError('quantityToRelocate', {
+                type: 'manual',
+                message: `La cantidad (${values.quantityToRelocate}) no puede ser mayor a los pallets seleccionados (${selectedItems.length}).`
+            });
+            return;
+        }
 
-    const unitType = lotsInCoordinate[0]?.unit || 'Bins';
-    const multiplier = (lotsInCoordinate[0]?.ownerName?.toUpperCase() === 'FALL CREEK' && unitType === 'Pallets') ? 3 : (unitType === 'Bins' ? 1 : 2);
-    const quantityToRelocateInBins = values.quantityToRelocate * multiplier;
+        // Validate target coordinate packaging capacity (max 4 pallets)
+        const targetCoordinate = values.targetCoordinate;
+        const occupancyData = occupancyMap.get(targetCoordinate);
+        const currentPallets = occupancyData?.palletsCount || 0;
 
-    const MAX_CAPACITY = 9;
-    if ((currentOccupancy + quantityToRelocateInBins) > MAX_CAPACITY) {
-        toast({
-            variant: 'destructive',
-            title: 'Error de Capacidad',
-            description: 'Límite máximo 9 Bins'
-        });
-        form.setError('targetCoordinate', {
-            type: 'manual',
-            message: 'Límite máximo 9 Bins'
-        });
-        return;
+        if ((currentPallets + values.quantityToRelocate) > 4) {
+            toast({
+                variant: 'destructive',
+                title: 'Error de Capacidad',
+                description: `Límite máximo 4 Pallets por coordenada (actualmente tiene ${currentPallets}).`
+            });
+            form.setError('targetCoordinate', {
+                type: 'manual',
+                message: 'Límite máximo 4 Pallets'
+            });
+            return;
+        }
+    } else {
+        if (values.quantityToRelocate > totalQuantityInCoord) {
+            form.setError('quantityToRelocate', {
+                type: 'manual',
+                message: `La cantidad no puede ser mayor a la disponible en el origen (${totalQuantityInCoord}).`
+            });
+            return;
+        }
+
+        if (item.type === 'otherFruit') {
+            const selectedItems = lotsInCoordinate.filter(i => (values.selectedItemIds || []).includes(i.id));
+            const selectedTotal = selectedItems.reduce((sum, i) => sum + i.quantity, 0);
+            if (values.quantityToRelocate > selectedTotal) {
+                form.setError('quantityToRelocate', {
+                    type: 'manual',
+                    message: `La cantidad no puede ser mayor a la suma de los ítems seleccionados (${selectedTotal}).`
+                });
+                return;
+            }
+        }
+
+        // Validate the target chamber's capacity conditions
+        const targetCoordinate = values.targetCoordinate;
+        const occupancyData = occupancyMap.get(targetCoordinate);
+        const currentOccupancy = occupancyData?.quantity || 0;
+
+        const unitType = lotsInCoordinate[0]?.unit || 'Bins';
+        const multiplier = (lotsInCoordinate[0]?.ownerName?.toUpperCase() === 'FALL CREEK' && unitType === 'Pallets') ? 3 : (unitType === 'Bins' ? 1 : 2);
+        const quantityToRelocateInBins = values.quantityToRelocate * multiplier;
+
+        const MAX_CAPACITY = 9;
+        if ((currentOccupancy + quantityToRelocateInBins) > MAX_CAPACITY) {
+            toast({
+                variant: 'destructive',
+                title: 'Error de Capacidad',
+                description: 'Límite máximo 9 Bins'
+            });
+            form.setError('targetCoordinate', {
+                type: 'manual',
+                message: 'Límite máximo 9 Bins'
+            });
+            return;
+        }
     }
 
     onRelocate({
@@ -314,7 +430,7 @@ export function RelocateLotDialog({
                     <span>
                       {item.type === 'producerLot' ? 'Productor' : 'Cliente'}: <span className="font-semibold">{item.ownerName}</span>
                     </span>
-                    <span>Cant. Disponible: <span className="font-semibold">{totalQuantityInCoord} {item.unit}</span></span>
+                    <span>Cant. Disponible: <span className="font-semibold">{isPackaging ? `${lotsInCoordinate.length} Pallet${lotsInCoordinate.length > 1 ? 's' : ''} (${totalQuantityInCoord} UN)` : `${totalQuantityInCoord} ${item.unit}`}</span></span>
                 </div>
              </AlertDescription>
           </Alert>
@@ -328,7 +444,7 @@ export function RelocateLotDialog({
                 render={({ field }) => (
                   <FormItem className="space-y-2 border p-3 rounded-lg bg-muted/10">
                     <FormLabel className="text-xs font-bold uppercase tracking-wider text-[#004b8d]">
-                      Seleccione Bins / Pallets a Reubicar
+                      {isPackaging ? 'Seleccione Pallets a Reubicar' : 'Seleccione Bins / Pallets a Reubicar'}
                     </FormLabel>
                     <div className="space-y-2 max-h-48 overflow-y-auto mt-1">
                       {lotsInCoordinate.map((coordItem) => {
@@ -345,9 +461,13 @@ export function RelocateLotDialog({
                                 field.onChange(newSelection);
                                 
                                 // Sync quantityToRelocate automatically!
-                                const selectedItems = lotsInCoordinate.filter(i => newSelection.includes(i.id));
-                                const totalQty = selectedItems.reduce((sum, i) => sum + i.quantity, 0);
-                                form.setValue('quantityToRelocate', totalQty);
+                                if (isPackaging) {
+                                  form.setValue('quantityToRelocate', newSelection.length);
+                                } else {
+                                  const selectedItems = lotsInCoordinate.filter(i => newSelection.includes(i.id));
+                                  const totalQty = selectedItems.reduce((sum, i) => sum + i.quantity, 0);
+                                  form.setValue('quantityToRelocate', totalQty);
+                                }
                               }}
                             />
                             <label 
@@ -357,7 +477,7 @@ export function RelocateLotDialog({
                               <div className="flex justify-between items-center">
                                 <span className="font-bold">{coordItem.palletId ? `Pallet: ${coordItem.palletId}` : `Ref: ${coordItem.displayId}`}</span>
                                 <Badge variant="outline" className="h-4 text-[9px] px-1 bg-[#7aba28]/10 text-[#7aba28] border-[#7aba28]/20">
-                                  {coordItem.quantity} {coordItem.unit}
+                                  {isPackaging ? `1 Pallet (${coordItem.quantity} UN)` : `${coordItem.quantity} ${coordItem.unit}`}
                                 </Badge>
                               </div>
                               <div className="text-[10px] text-muted-foreground mt-0.5">
@@ -379,12 +499,16 @@ export function RelocateLotDialog({
               name="quantityToRelocate"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Cantidad a Reubicar ({item.unit})</FormLabel>
+                  <FormLabel>
+                    {isPackaging 
+                      ? `Cantidad de Pallets a Reubicar (Máx. ${lotsInCoordinate.length})` 
+                      : `Cantidad a Reubicar (${item.unit})`}
+                  </FormLabel>
                   <FormControl>
                     <Input 
                       type="number" 
                       min={1} 
-                      max={totalQuantityInCoord} 
+                      max={isPackaging ? lotsInCoordinate.length : totalQuantityInCoord} 
                       placeholder="Ingrese cantidad..." 
                       {...field} 
                     />

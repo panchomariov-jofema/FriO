@@ -254,10 +254,25 @@ export function OtherFruitStorageTab({ clientId: fixedClientId, onlyPackaging }:
 
   const resolvedClientConfig = React.useMemo(() => {
     if (!selectedItem || selectedItem.type !== 'fruit') return undefined;
-    const clientId = (otherFruitReceptions || []).find(r => r.id === (selectedItem as any).receptionId)?.clientId;
+    const reception = (otherFruitReceptions || []).find(r => r.id === (selectedItem as any).receptionId);
+    const clientId = reception?.clientId;
     if (!clientId) return undefined;
-    return clientConfigs?.find(c => c.id === clientId);
-  }, [selectedItem, otherFruitReceptions, clientConfigs]);
+    const explicit = clientConfigs?.find(c => c.id === clientId);
+    const client = (otherClients || []).find(c => c.clientId === clientId || c.name.toUpperCase() === reception?.clientName?.toUpperCase());
+    const isPkg = isPackagingClient(reception || { clientId, clientName: selectedItem.clientName });
+    const palletsPerCoord = explicit?.palletsPerCoordinate ?? 
+      (client?.palletsPerCoordinate && client.palletsPerCoordinate > 0 ? client.palletsPerCoordinate : (isPkg ? 4 : 3));
+
+    return {
+      id: clientId,
+      clientName: reception?.clientName || clientId,
+      strategy: (explicit?.strategy || client?.storageStrategy || 'secuencial') as any,
+      binsPerCoordinate: explicit?.binsPerCoordinate ?? (client?.binsPerCoordinate && client.binsPerCoordinate > 0 ? client.binsPerCoordinate : 6),
+      palletsPerCoordinate: palletsPerCoord,
+      preferredChamberId: explicit?.preferredChamberId,
+      chamberOverrides: explicit?.chamberOverrides
+    };
+  }, [selectedItem, otherFruitReceptions, clientConfigs, otherClients, isPackagingClient]);
 
   const calculateFruitSuggestion = (item: PendingFruitItem) => {
     // REGLA: La sugerencia automática está VACÍA hasta que el usuario seleccione manualmente
@@ -290,7 +305,8 @@ export function OtherFruitStorageTab({ clientId: fixedClientId, onlyPackaging }:
 
     let strategy = explicitOverride?.strategy || masterData?.storageStrategy || 'secuencial';
     let binsPerCoordinate = explicitOverride?.binsPerCoordinate ?? masterData?.binsPerCoordinate ?? 6;
-    let palletsPerCoordinate = isItemPackaging ? 2 : (explicitOverride?.palletsPerCoordinate ?? masterData?.palletsPerCoordinate ?? 2);
+    let palletsPerCoordinate = explicitOverride?.palletsPerCoordinate ?? masterData?.palletsPerCoordinate ?? (isItemPackaging ? 4 : 3);
+    if (palletsPerCoordinate === 0 && isItemPackaging) palletsPerCoordinate = 4;
 
     if (item.clientName?.toUpperCase() === 'FALL CREEK') {
       if (!explicitOverride?.strategy && !masterData?.storageStrategy) strategy = 'aisle-access';
@@ -454,16 +470,19 @@ export function OtherFruitStorageTab({ clientId: fixedClientId, onlyPackaging }:
 
     // --- 1. Get available coordinates ---
     const occupancyMap = new Map<string, number>();
+    const isTargetPkg = isPackagingClient(originalReception);
+
     (allChamberLots || []).forEach(l => {
         if (l.status === 'Almacenado' && l.chamberId === chamberId && l.coordinate) {
             occupancyMap.set(l.coordinate, (occupancyMap.get(l.coordinate) || 0) + l.binCount);
         }
     });
     (otherFruitReceptions || []).forEach(r => {
+        const isRPkg = isPackagingClient(r);
         (r.items || []).forEach((item) => {
             if (item.status === 'Almacenado' && item.storageLocation?.chamberId === chamberId && item.storageLocation.coordinate) {
                 const multiplier = (r.clientName?.toUpperCase() === 'FALL CREEK' && r.unit === 'Pallets') ? 3 : (r.unit === 'Bins' ? 1 : 2);
-                const equivalentUnits = item.quantity * multiplier;
+                const equivalentUnits = (isRPkg && r.unit === 'Pallets') ? 1 : (item.quantity * multiplier);
                 occupancyMap.set(item.storageLocation.coordinate, (occupancyMap.get(item.storageLocation.coordinate) || 0) + equivalentUnits);
             }
         });
@@ -519,34 +538,25 @@ export function OtherFruitStorageTab({ clientId: fixedClientId, onlyPackaging }:
     let currentCoordIdx = 0;
     let currentCoord = coordsToFill[currentCoordIdx];
 
-    const unitsPerItem = (isFC && originalReception.unit === 'Pallets') ? 3 : (originalReception.unit === 'Bins' ? 1 : 2);
+    if (isTargetPkg) {
+        for (const itemToStore of itemsToProcess) {
+            if (remainingToStore <= 0) break;
+            while (currentCoordIdx < coordsToFill.length) {
+                currentCoord = coordsToFill[currentCoordIdx];
+                const currentOccupancy = occupancyMap.get(currentCoord) || 0;
+                if (currentOccupancy < occupancyThreshold && !chamberConfig.blocked?.includes(currentCoord)) {
+                    break;
+                }
+                currentCoordIdx++;
+            }
+            if (currentCoordIdx >= coordsToFill.length) break;
 
-    for (const itemToStore of itemsToProcess) {
-        if (remainingToStore <= 0) break;
-        if (currentCoordIdx >= coordsToFill.length) break;
-
-        let itemQuantityRemaining = itemToStore.quantity;
-
-        while (itemQuantityRemaining > 0 && currentCoordIdx < coordsToFill.length) {
             currentCoord = coordsToFill[currentCoordIdx];
             const currentOccupancy = occupancyMap.get(currentCoord) || 0;
-            const availableSpaceInBins = Math.max(0, occupancyThreshold - currentOccupancy);
-            const availableSpaceInItemUnits = Math.floor(availableSpaceInBins / unitsPerItem);
 
-            if (availableSpaceInItemUnits <= 0 || chamberConfig.blocked?.includes(currentCoord)) {
-                currentCoordIdx++;
-                continue;
-            }
-
-            const amountToStore = Math.min(itemQuantityRemaining, availableSpaceInItemUnits, remainingToStore);
-            if (amountToStore <= 0) {
-                currentCoordIdx++;
-                continue;
-            }
-            
             newStoredItems.push({
                 ...itemToStore,
-                quantity: amountToStore,
+                quantity: itemToStore.quantity,
                 status: 'Almacenado',
                 storageLocation: {
                     chamberId,
@@ -557,15 +567,61 @@ export function OtherFruitStorageTab({ clientId: fixedClientId, onlyPackaging }:
                 storedByUserId: user?.uid || undefined,
             });
 
-            const binsStored = amountToStore * unitsPerItem;
-            occupancyMap.set(currentCoord, currentOccupancy + binsStored);
-
-            itemQuantityRemaining -= amountToStore;
-            remainingToStore -= amountToStore;
-            
-            const remainingInCoord = availableSpaceInBins - binsStored;
-            if (remainingInCoord < unitsPerItem) {
+            occupancyMap.set(currentCoord, currentOccupancy + 1);
+            remainingToStore -= itemToStore.quantity;
+            if (currentOccupancy + 1 >= occupancyThreshold) {
                 currentCoordIdx++;
+            }
+        }
+    } else {
+        const unitsPerItem = (isFC && originalReception.unit === 'Pallets') ? 3 : (originalReception.unit === 'Bins' ? 1 : 2);
+
+        for (const itemToStore of itemsToProcess) {
+            if (remainingToStore <= 0) break;
+            if (currentCoordIdx >= coordsToFill.length) break;
+
+            let itemQuantityRemaining = itemToStore.quantity;
+
+            while (itemQuantityRemaining > 0 && currentCoordIdx < coordsToFill.length) {
+                currentCoord = coordsToFill[currentCoordIdx];
+                const currentOccupancy = occupancyMap.get(currentCoord) || 0;
+                const availableSpaceInBins = Math.max(0, occupancyThreshold - currentOccupancy);
+                const availableSpaceInItemUnits = Math.floor(availableSpaceInBins / unitsPerItem);
+
+                if (availableSpaceInItemUnits <= 0 || chamberConfig.blocked?.includes(currentCoord)) {
+                    currentCoordIdx++;
+                    continue;
+                }
+
+                const amountToStore = Math.min(itemQuantityRemaining, availableSpaceInItemUnits, remainingToStore);
+                if (amountToStore <= 0) {
+                    currentCoordIdx++;
+                    continue;
+                }
+                
+                newStoredItems.push({
+                    ...itemToStore,
+                    quantity: amountToStore,
+                    status: 'Almacenado',
+                    storageLocation: {
+                        chamberId,
+                        coordinate: currentCoord
+                    },
+                    storedAt: new Date(),
+                    storedByUserName: user?.email || (user?.isAnonymous ? 'Anónimo' : user?.displayName || 'N/A'),
+                    storedByUserId: user?.uid || undefined,
+                });
+
+                const binsStored = amountToStore * unitsPerItem;
+                occupancyMap.set(currentCoord, currentOccupancy + binsStored);
+
+                itemQuantityRemaining -= amountToStore;
+                remainingToStore -= amountToStore;
+                
+                const remainingInCoord = availableSpaceInBins - binsStored;
+                if (remainingInCoord < unitsPerItem) {
+                    currentCoordIdx++;
+                }
             }
         }
     }

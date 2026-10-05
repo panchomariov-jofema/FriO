@@ -30,6 +30,7 @@ interface StoredPackagingItem {
     name: string;
     lote?: string;
     palletCount: number;
+    unitsCount?: number;
     palletId?: string;
     locationDisplay: string;
     location: {
@@ -59,6 +60,7 @@ const EXPORT_HEADER_MAP: { [key: string]: string } = {
   'Lote': 'lote',
   'Ubicación': 'locationDisplay',
   'Cant. Pallets': 'palletCount',
+  'Unidades': 'unitsCount',
 };
 const SPANISH_EXPORT_HEADERS = Object.keys(EXPORT_HEADER_MAP);
 
@@ -133,6 +135,7 @@ export function StockAndRelocationTab() {
                         name: item.packagingMasterName,
                         lote: item.lote,
                         palletCount: item.palletCount,
+                        unitsCount: item.palletCount,
                         palletId: item.lote || item.packagingMasterCode || '-',
                         locationDisplay: locDisplay,
                         location: item.storageLocation || { warehouse: '', aisle: '' },
@@ -181,6 +184,7 @@ export function StockAndRelocationTab() {
                         name: item.productName,
                         lote: item.clientLotId,
                         palletCount: 1, // 1 Pallet item per row
+                        unitsCount: item.quantity, // exact units contained on the pallet!
                         palletId: item.palletId || item.containerId || '',
                         locationDisplay: locDisplay,
                         location: {
@@ -570,13 +574,14 @@ export function StockAndRelocationTab() {
                   <TableHead>Lote</TableHead>
                   <TableHead>Ubicación</TableHead>
                   <TableHead>Cant. Pallets</TableHead>
+                  <TableHead>Unidades</TableHead>
                   <TableHead className="text-right">Acciones</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {isLoading ? (
                   Array.from({ length: 5 }).map((_, i) => (
-                    <TableRow key={i}><TableCell colSpan={8}><Skeleton className="h-4 w-full" /></TableCell></TableRow>
+                    <TableRow key={i}><TableCell colSpan={9}><Skeleton className="h-4 w-full" /></TableCell></TableRow>
                   ))
                 ) : filteredItems.length > 0 ? (
                   filteredItems.map((item) => (
@@ -588,6 +593,7 @@ export function StockAndRelocationTab() {
                         <TableCell className="font-mono text-xs">{item.lote || '-'}</TableCell>
                         <TableCell className="font-medium text-xs">{item.locationDisplay}</TableCell>
                         <TableCell className="font-semibold text-xs">{item.palletCount}</TableCell>
+                        <TableCell className="font-semibold text-xs text-muted-foreground">{item.unitsCount !== undefined ? `${item.unitsCount} UN` : '-'}</TableCell>
                         <TableCell className="text-right">
                            <div className="flex gap-2 justify-end">
                                 <Button variant="outline" size="sm" onClick={() => handleAdjustClick(item)}>Ajustar</Button>
@@ -598,7 +604,7 @@ export function StockAndRelocationTab() {
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={8} className="h-24 text-center">
+                    <TableCell colSpan={9} className="h-24 text-center">
                         {codeFilter ? 'No se encontraron artículos con ese criterio.' : 'No hay stock almacenado.'}
                     </TableCell>
                   </TableRow>

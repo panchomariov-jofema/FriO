@@ -181,8 +181,8 @@ export function StoreOtherFruitDialog({
     if (item.unit === 'Bins') {
       return clientConfig?.binsPerCoordinate ?? (isFC ? 9 : DEFAULT_BINS_PER_COORDINATE);
     }
-    return clientConfig?.palletsPerCoordinate ?? (isFC ? 3 : (isVita ? 2 : DEFAULT_PALLETS_PER_COORDINATE));
-  }, [item, clientConfig]);
+    return clientConfig?.palletsPerCoordinate ?? (isFC ? 3 : (isVita || isItemPackaging ? 4 : DEFAULT_PALLETS_PER_COORDINATE));
+  }, [item, clientConfig, isItemPackaging]);
 
   const { availableCoordinates, suggestion } = useMemo(() => {
     if (!selectedChamberId || !item) {
@@ -233,11 +233,14 @@ export function StoreOtherFruitDialog({
     
     (allReceptions || []).forEach(reception => {
         const isFC = reception.clientName === 'FALL CREEK' || reception.clientName?.toUpperCase() === 'FALL CREEK';
+        const isPkg = reception.clientName?.toUpperCase().includes('VITAFOOD') || 
+                      reception.clientId?.toUpperCase().includes('VITAFOOD') ||
+                      reception.clientName?.toUpperCase().includes('EMBALAJE');
         const multiplier = (isFC && reception.unit === 'Pallets') ? 3 : (reception.unit === 'Bins' ? 1 : 2);
 
         (reception.items || []).forEach((storedItem, idx) => {
             if (storedItem.status === 'Almacenado' && storedItem.storageLocation?.chamberId === selectedChamberId && storedItem.storageLocation.coordinate && storedItem.quantity > 0) {
-                const equivalentUnits = storedItem.quantity * multiplier;
+                const equivalentUnits = (isPkg && reception.unit === 'Pallets') ? 1 : (storedItem.quantity * multiplier);
                 const lotId = `other_${reception.id}_${storedItem.containerId || storedItem.palletId || idx}`;
                 if (!occupancyMap.has(storedItem.storageLocation.coordinate)) {
                     occupancyMap.set(storedItem.storageLocation.coordinate, { lots: [] });
@@ -288,7 +291,7 @@ export function StoreOtherFruitDialog({
     }
     
     const occupancyThreshold = capacityPerCoord;
-    const unitsPerItem = (item.clientName?.toUpperCase() === 'FALL CREEK' && item.unit === 'Pallets') ? 3 : (item.unit === 'Bins' ? 1 : 2);
+    const unitsPerItem = (isItemPackaging && item.unit === 'Pallets') ? 1 : ((item.clientName?.toUpperCase() === 'FALL CREEK' && item.unit === 'Pallets') ? 3 : (item.unit === 'Bins' ? 1 : 2));
 
     // Determine the starting point for suggestion search
     let startIndex = 0;
@@ -396,7 +399,7 @@ export function StoreOtherFruitDialog({
        let totalQuantity = item.quantity;
        let qtyPerLocation = item.unit === 'Bins'
          ? (clientConfig?.binsPerCoordinate ?? (isFallCreek ? 9 : DEFAULT_BINS_PER_COORDINATE))
-         : (clientConfig?.palletsPerCoordinate ?? (isFallCreek ? 3 : DEFAULT_PALLETS_PER_COORDINATE));
+         : (clientConfig?.palletsPerCoordinate ?? (isFallCreek ? 3 : (isItemPackaging ? 4 : DEFAULT_PALLETS_PER_COORDINATE)));
 
         // Session continuity: Only preselect chamber if there is an active session choice from lastUsedChamberId
         let chamberId = (lastUsedChamberId && chambersConfig[lastUsedChamberId]) ? lastUsedChamberId : '';
@@ -436,13 +439,9 @@ export function StoreOtherFruitDialog({
     if (!item || !suggestion || !selectedChamberId) return;
 
     const values = form.getValues();
-    const qtyPerLocation = values.quantityPerLocation || capacityPerCoord;
+    const qtyPerLocation = Math.min(values.quantityPerLocation || capacityPerCoord, capacityPerCoord);
     const totalQuantity = values.totalQuantity || item.quantity;
 
-    if (qtyPerLocation > capacityPerCoord) {
-        toast({ variant: 'destructive', title: 'Límite Excedido', description: `La cantidad por ubicación no puede ser mayor a ${capacityPerCoord} para este cliente.`});
-        return;
-    }
     if (totalQuantity > item.quantity) {
         toast({ variant: 'destructive', title: 'Cantidad Inválida', description: `No puede almacenar más de lo pendiente (${item.quantity}).`});
         return;
@@ -488,11 +487,8 @@ export function StoreOtherFruitDialog({
 
     const onSubmit = (values: StoreFormValues) => {
     if (!item) return;
+    const effectiveQtyPerLoc = Math.min(values.quantityPerLocation || capacityPerCoord, capacityPerCoord);
     if (values.destinationType === 'chamber') {
-      if (values.quantityPerLocation > capacityPerCoord) {
-          toast({ variant: 'destructive', title: 'Límite Excedido', description: `La cantidad por ubicación no puede ser mayor a ${capacityPerCoord} para este cliente.`});
-          return;
-      }
       if (values.chamberId) {
           localStorage.setItem('frio_last_chamber_id', values.chamberId);
       }
@@ -509,7 +505,7 @@ export function StoreOtherFruitDialog({
       aisle: values.aisle,
       destinationType: values.destinationType,
       totalQuantity: values.totalQuantity,
-      quantityPerLocation: values.quantityPerLocation,
+      quantityPerLocation: effectiveQtyPerLoc,
       strategy: values.strategy || 'secuencial'
     });
   };

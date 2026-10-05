@@ -139,7 +139,8 @@ export function RelocateOtherFruitDialog({
                 const current = occupancyMap.get(it.storageLocation.coordinate) || { quantity: 0, ownerName: reception.clientName };
                 // Determine units: if it's Fall Creek, 1 pallet = 3 bins.
                 const multiplier = (reception.clientName?.toUpperCase() === 'FALL CREEK' && reception.unit === 'Pallets') ? 3 : (reception.unit === 'Bins' ? 1 : 2);
-                const equivalentUnits = it.quantity * multiplier;
+                const isRPkg = reception.clientName?.toUpperCase().includes('VITAFOOD') || reception.clientName?.toUpperCase().includes('EMBALAJE');
+                const equivalentUnits = (isRPkg && reception.unit === 'Pallets') ? 1 : (it.quantity * multiplier);
 
                 occupancyMap.set(it.storageLocation.coordinate, { 
                     quantity: current.quantity + equivalentUnits, 
@@ -152,7 +153,7 @@ export function RelocateOtherFruitDialog({
     // 2. Determine quantity to relocate
     if (!item) return { availableCoordinates: [] };
     const multiplier = (item.clientName?.toUpperCase() === 'FALL CREEK' && item.unit === 'Pallets') ? 3 : (item.unit === 'Bins' ? 1 : 2);
-    const quantityToRelocate = item.quantity * multiplier;
+    const quantityToRelocate = (isItemPackaging && item.unit === 'Pallets') ? 1 : (item.quantity * multiplier);
 
     // 3. Filter coordinates by capacity
     const available = allPossibleCoords.filter(coord => {
@@ -166,8 +167,8 @@ export function RelocateOtherFruitDialog({
         const relevantClientName = occupancyData?.ownerName || item.clientName || '';
         const clientConfig = clientConfigs.find(c => c.clientName.toUpperCase() === relevantClientName.toUpperCase());
         
-        const defaultBinsPerCoord = relevantClientName.toUpperCase() === 'FALL CREEK' ? 9 : 6;
-        const capacity = clientConfig?.binsPerCoordinate ?? defaultBinsPerCoord;
+        const defaultCap = isItemPackaging ? 4 : (relevantClientName.toUpperCase() === 'FALL CREEK' ? (item.unit === 'Pallets' ? 3 : 9) : (item.unit === 'Pallets' ? 3 : 6));
+        const capacity = item.unit === 'Pallets' ? (clientConfig?.palletsPerCoordinate ?? defaultCap) : (clientConfig?.binsPerCoordinate ?? defaultCap);
 
         return (currentOccupancy + quantityToRelocate) <= capacity;
     });
