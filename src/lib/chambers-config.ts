@@ -4,12 +4,23 @@ interface ChambersConfig {
     [key: string]: Chamber;
 }
 
-const columns1to3 = [
+export const columns1to3 = [
     { name: 'A', id: 'A' }, { name: 'B', id: 'B' }, { name: 'C', id: 'C' }, { name: 'D', id: 'D' }, 
     { name: 'E', id: 'E' }, { name: 'F', id: 'F' }, { name: 'G', id: 'G' }, { name: 'H', id: 'H' }, 
     { name: 'I', id: 'I' }, { name: 'J', id: 'J' }
 ];
-const columns4to6 = [
+
+export const auxColumnsKAndL = [
+    { name: 'K', id: 'K' },
+    { name: 'L', id: 'L' }
+];
+
+export const columnsChamber3WithAux = [
+    ...columns1to3,
+    ...auxColumnsKAndL
+];
+
+export const columns4to6 = [
     { name: 'A', id: 'A' }, { name: 'B', id: 'B' }, { name: 'C', id: 'C' }, { name: 'D', id: 'D' }, 
     { name: 'E', id: 'E' }, { name: 'F', id: 'F' }, { name: 'G', id: 'G' }, { name: 'H', id: 'H' }, 
     { name: 'I', id: 'I' }, { name: 'J', id: 'J' }, { name: 'K', id: 'K' }, { name: 'L', id: 'L' }, 

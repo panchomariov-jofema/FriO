@@ -19,7 +19,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '..
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Label } from '../ui/label';
 import { Checkbox } from '../ui/checkbox';
-import { cn, safeToMillis, formatLocaleDateString } from '@/lib/utils';
+import { cn, safeToMillis, formatLocaleDateString, getEffectiveChamberConfig } from '@/lib/utils';
 import { cleanVarietyName } from '@/lib/fall-creek-utils';
 import { chambersConfig } from '@/lib/chambers-config';
 import { Grid, List, Plus, Minus, Move, Search } from 'lucide-react';
@@ -62,6 +62,7 @@ export function OtherFruitExitTab({ clientId: fixedClientId }: { clientId?: stri
   const { data: allReceptions, loading: loadingReceptions } = useFirestoreCollection<OtherFruitReception>('otherFruitReceptions');
   const { data: allMovements, loading: loadingMovements } = useFirestoreCollection<OtherFruitMovement>('otherFruitMovements');
   const { data: allProducers } = useFirestoreCollection<Producer>('producers');
+  const { data: chamberSettings } = useFirestoreCollection<{ id: string; row13Enabled?: boolean; colsKLEnabled?: boolean }>('chamberSettings');
   const firestore = useFirestore();
   const { toast } = useToast();
   const { user } = useUser();
@@ -779,8 +780,12 @@ export function OtherFruitExitTab({ clientId: fixedClientId }: { clientId?: stri
 
                   {/* Chamber Map Grid */}
                   {(() => {
-                    const chamber = chambersConfig[activeChamber];
-                    if (!chamber) return <p className="text-sm text-red-500">Configuración de cámara no encontrada.</p>;
+                    const rawChamber = chambersConfig[activeChamber];
+                    if (!rawChamber) return <p className="text-sm text-red-500">Configuración de cámara no encontrada.</p>;
+
+                    const isRow13Enabled = !!chamberSettings?.find(s => s.id === activeChamber)?.row13Enabled;
+                    const isColsKLEnabled = activeChamber === 'CAMARA-3' && !!chamberSettings?.find(s => s.id === activeChamber)?.colsKLEnabled;
+                    const chamber = getEffectiveChamberConfig(rawChamber, isRow13Enabled, isColsKLEnabled);
 
                     return (
                       <div className="overflow-x-auto border rounded-lg p-4 bg-muted/5 shadow-inner">
@@ -807,7 +812,7 @@ export function OtherFruitExitTab({ clientId: fixedClientId }: { clientId?: stri
                               {chamber.columns.map(col => {
                                 const coordName = `${col.name}${row}`;
                                 const isLargeChamber = ['CAMARA-4', 'CAMARA-5', 'CAMARA-6'].includes(activeChamber);
-                                const allowedComodinCols = isLargeChamber ? ['A', 'B', 'C', 'M', 'N', 'O'] : ['A', 'B', 'C', 'H', 'I', 'J'];
+                                const allowedComodinCols = isLargeChamber ? ['A', 'B', 'C', 'M', 'N', 'O'] : (isColsKLEnabled ? ['A', 'B', 'C', 'H', 'I', 'J', 'K', 'L'] : ['A', 'B', 'C', 'H', 'I', 'J']);
                                 const isPermanentlyBlocked = (row === 13 || row === 14) && !allowedComodinCols.includes(col.name);
 
                                 // Find Fall Creek items in this coordinate

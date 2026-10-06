@@ -19,7 +19,7 @@ import { FirestorePermissionError } from '@/firebase/errors';
 import { chambersConfig } from '@/lib/chambers-config';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { cn, getSortedCoordinates, safeToDate, safeToMillis, safeStringCompare, safeFormatDate, safeFormatQuantity, formatLocaleDate, formatLocaleDateString } from '@/lib/utils';
+import { cn, getSortedCoordinates, getEffectiveChamberConfig, safeToDate, safeToMillis, safeStringCompare, safeFormatDate, safeFormatQuantity, formatLocaleDate, formatLocaleDateString } from '@/lib/utils';
 import { Progress } from '@/components/ui/progress';
 import { RelocateLotDialog } from '@/components/camaras/RelocateLotDialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
@@ -98,7 +98,7 @@ export default function CamarasPage() {
   const { data: otherFruitReceptions, loading: loadingOtherFruit } = useFirestoreCollection<OtherFruitReception>('otherFruitReceptions');
   const { data: otherClients } = useFirestoreCollection<OtherClient>('otherClients');
   const { data: clientConfigs, loading: loadingConfigs } = useFirestoreCollection<ClientStorageConfig>('clientStorageConfigs');
-  const { data: chamberSettings } = useFirestoreCollection<{ id: string; row13Enabled?: boolean }>('chamberSettings');
+  const { data: chamberSettings } = useFirestoreCollection<{ id: string; row13Enabled?: boolean; colsKLEnabled?: boolean }>('chamberSettings');
   const { data: usersMaster } = useFirestoreCollection<any>('usersMaster');
 
   const isVitafoodOrPackaging = React.useCallback((item?: StoredItem | null) => {
@@ -289,11 +289,13 @@ export default function CamarasPage() {
 
     const calculatedChamberOccupancy = Object.keys(chambersConfig).reduce((acc, chamberId) => {
         const chamberConfig = chambersConfig[chamberId];
+        const isChamberColsKLEnabled = chamberId === 'CAMARA-3' && !!chamberSettings?.find(s => s.id === chamberId)?.colsKLEnabled;
         const itemsInThisChamber = allStoredItems.filter(item => item.chamberId === chamberId);
         
         // Find if any client has an override for this chamber
         const clientWithOverride = configs.find(c => c.chamberOverrides?.[chamberId]);
-        const totalCapacity = clientWithOverride?.chamberOverrides?.[chamberId] || chamberConfig.capacity;
+        const baseCapacity = isChamberColsKLEnabled ? chamberConfig.capacity + 160 : chamberConfig.capacity;
+        const totalCapacity = clientWithOverride?.chamberOverrides?.[chamberId] || baseCapacity;
 
         const occupiedEquivalentBins = itemsInThisChamber.reduce((sum, item) => {
             if (item.unit === 'Bins') {
@@ -332,7 +334,7 @@ export default function CamarasPage() {
         exporterMap: calculatedExporterMap,
         allLotsInChambers: allStoredLots,
     };
-  }, [pendingLots, storedLots, otherFruitReceptions, exporters]);
+  }, [pendingLots, storedLots, otherFruitReceptions, exporters, chamberSettings]);
 
   const getCoordVariety = (cId: string, coordinate: string) => {
       const items = storedItemsByChamber[cId]?.[coordinate] || [];
@@ -411,7 +413,9 @@ export default function CamarasPage() {
     const clientConfig = (clientConfigs || []).find(c => c.clientName.toUpperCase() === lotToStore.producerShortName.toUpperCase());
     const BINS_PER_COORDINATE = clientConfig?.binsPerCoordinate || 6;
     const PALLETS_PER_COORDINATE = clientConfig?.palletsPerCoordinate || 3;
-    const chamberConfig = chambersConfig[chamberId];
+    const isChamberRow13Enabled = !!chamberSettings?.find(s => s.id === chamberId)?.row13Enabled;
+    const isChamberColsKLEnabled = chamberId === 'CAMARA-3' && !!chamberSettings?.find(s => s.id === chamberId)?.colsKLEnabled;
+    const chamberConfig = getEffectiveChamberConfig(chambersConfig[chamberId], isChamberRow13Enabled, isChamberColsKLEnabled);
     const exporter = (exporters || []).find(e => e.exporterId === lotToStore.exporterId);
     const strategy = exporter?.storageStrategy || 'secuencial';
   
@@ -1085,7 +1089,9 @@ export default function CamarasPage() {
             <Accordion type="single" collapsible className="w-full">
                 {Object.entries(chambersConfig).map(([chamberId, config]) => {
                     const isRow13Enabled = !!chamberSettings?.find(s => s.id === chamberId)?.row13Enabled;
-                    const activeRows = isRow13Enabled ? config.rows : config.rows.filter(r => r !== 13 && r !== 14);
+                    const isColsKLEnabled = chamberId === 'CAMARA-3' && !!chamberSettings?.find(s => s.id === chamberId)?.colsKLEnabled;
+                    const effectiveConfig = getEffectiveChamberConfig(config, isRow13Enabled, isColsKLEnabled);
+                    const activeRows = isRow13Enabled ? effectiveConfig.rows : effectiveConfig.rows.filter((r: number) => r !== 13 && r !== 14);
                     return (
                         <AccordionItem value={chamberId} key={chamberId}>
                             <div className="flex flex-col sm:flex-row w-full items-start sm:items-center justify-between pr-4">
@@ -1106,6 +1112,19 @@ export default function CamarasPage() {
                                             />
                                             <label htmlFor={`row13-${chamberId}`} className="text-[10px] font-black uppercase tracking-wider text-muted-foreground cursor-pointer select-none">Fila 13 y 14</label>
                                         </div>
+                                        {chamberId === 'CAMARA-3' && (
+                                            <div className="flex items-center gap-1.5 ml-1">
+                                                <Switch
+                                                    id={`colsKL-${chamberId}`}
+                                                    checked={isColsKLEnabled}
+                                                    onCheckedChange={async (checked) => {
+                                                        await setDoc(doc(firestore, 'chamberSettings', chamberId), { colsKLEnabled: checked }, { merge: true });
+                                                    }}
+                                                    className="scale-75 data-[state=checked]:bg-[#004b8d]"
+                                                />
+                                                <label htmlFor={`colsKL-${chamberId}`} className="text-[10px] font-black uppercase tracking-wider text-muted-foreground cursor-pointer select-none">Col. K y L</label>
+                                            </div>
+                                        )}
                                     </div>
                                     <div className="text-left sm:text-right w-full sm:w-auto">
                                         <p className={cn("font-mono font-semibold text-sm", (chamberOccupancy[chamberId]?.percentage ?? 0) > 50 ? 'text-destructive' : 'text-foreground')}>
@@ -1149,8 +1168,8 @@ export default function CamarasPage() {
                                             gridTemplateRows: `repeat(${activeRows.length}, minmax(0, 1fr))`,
                                             gridAutoFlow: 'column'
                                         }}>
-                                            {config.columns.map((col, colIdx) =>
-                                                activeRows.map((row, rowIdx) => {
+                                            {effectiveConfig.columns.map((col: any, colIdx: number) =>
+                                                activeRows.map((row: number, rowIdx: number) => {
                                             const coord = `${col.name}${row}`;
                                             const itemsInCoord = storedItemsByChamber[chamberId]?.[coord] || [];
                                           const isOccupied = itemsInCoord.length > 0;
@@ -1237,7 +1256,7 @@ export default function CamarasPage() {
                                           }
     
                                            const isLargeChamber = ['CAMARA-4', 'CAMARA-5', 'CAMARA-6'].includes(chamberId);
-                                           const allowedComodinCols = isLargeChamber ? ['A', 'B', 'C', 'M', 'N', 'O'] : ['A', 'B', 'C', 'H', 'I', 'J'];
+                                           const allowedComodinCols = isLargeChamber ? ['A', 'B', 'C', 'M', 'N', 'O'] : (isColsKLEnabled ? ['A', 'B', 'C', 'H', 'I', 'J', 'K', 'L'] : ['A', 'B', 'C', 'H', 'I', 'J']);
                                            const isPermanentlyBlocked = (row === 13 || row === 14) && !allowedComodinCols.includes(col.name);
                                           const isComodinRow = row === 13 || row === 14;
 
@@ -1259,7 +1278,7 @@ export default function CamarasPage() {
                                                   {!isPermanentlyBlocked && isComodinRow && (
                                                       <div className="absolute inset-0 bg-repeat bg-[length:12px_12px] opacity-25 z-0 pointer-events-none" style={{backgroundImage: "repeating-linear-gradient(-45deg, #f59e0b, #f59e0b 1px, transparent 1px, transparent 6px)"}} />
                                                   )}
-                                                  {renderVarietyBorders(chamberId, colIdx, rowIdx, config)}
+                                                  {renderVarietyBorders(chamberId, colIdx, rowIdx, effectiveConfig)}
                                                   <span className="relative z-10 font-semibold">{coord}</span>
                                                   {isMixed && (
                                                       <div className="absolute top-0.5 right-1 z-20 bg-black/60 rounded px-0.5 text-[8px] font-black text-amber-500 leading-none shadow-[0_0_2px_rgba(0,0,0,0.5)]">

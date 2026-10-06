@@ -107,7 +107,7 @@ export function StoreOtherFruitDialog({
   });
   const { toast } = useToast();
 
-  const { data: chamberSettings } = useFirestoreCollection<{ id: string; row13Enabled?: boolean }>('chamberSettings');
+  const { data: chamberSettings } = useFirestoreCollection<{ id: string; row13Enabled?: boolean; colsKLEnabled?: boolean }>('chamberSettings');
   const { data: warehouses } = useFirestoreCollection<Warehouse>('warehouses');
   const { data: allAisles } = useFirestoreCollection<Aisle>('aisles');
 
@@ -203,7 +203,8 @@ export function StoreOtherFruitDialog({
       return { availableCoordinates: [], suggestion: null };
     }
     const isChamberRow13Enabled = !!chamberSettings?.find(s => s.id === selectedChamberId)?.row13Enabled;
-    const chamberConfig = getEffectiveChamberConfig(rawChamberConfig, isChamberRow13Enabled);
+    const isChamberColsKLEnabled = selectedChamberId === 'CAMARA-3' && !!chamberSettings?.find(s => s.id === selectedChamberId)?.colsKLEnabled;
+    const chamberConfig = getEffectiveChamberConfig(rawChamberConfig, isChamberRow13Enabled, isChamberColsKLEnabled);
 
     const occupancyMap = new Map<string, { lots: {displayLotId: string, binCount: number, clientId: string, clientName?: string, productCode?: string, productName?: string, unit?: string }[] }>();
     let lastCoordInChamber: string | null = null;

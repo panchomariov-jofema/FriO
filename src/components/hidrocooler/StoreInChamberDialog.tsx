@@ -40,7 +40,7 @@ export function StoreInChamberDialog({ lot, open, onOpenChange, onStore, allCham
   });
 
   const selectedChamberId = form.watch('chamberId');
-  const { data: chamberSettings } = useFirestoreCollection<{ id: string; row13Enabled?: boolean }>('chamberSettings');
+  const { data: chamberSettings } = useFirestoreCollection<{ id: string; row13Enabled?: boolean; colsKLEnabled?: boolean }>('chamberSettings');
 
   const { availableCoordinatesForNewLots, suggestion } = React.useMemo(() => {
     if (!selectedChamberId || !lot) {
@@ -52,7 +52,8 @@ export function StoreInChamberDialog({ lot, open, onOpenChange, onStore, allCham
       return { availableCoordinatesForNewLots: [], suggestion: null };
     }
     const isChamberRow13Enabled = !!chamberSettings?.find(s => s.id === selectedChamberId)?.row13Enabled;
-    const chamberConfig = getEffectiveChamberConfig(rawChamberConfig, isChamberRow13Enabled);
+    const isChamberColsKLEnabled = selectedChamberId === 'CAMARA-3' && !!chamberSettings?.find(s => s.id === selectedChamberId)?.colsKLEnabled;
+    const chamberConfig = getEffectiveChamberConfig(rawChamberConfig, isChamberRow13Enabled, isChamberColsKLEnabled);
 
     // Get all occupied coordinates
     const occupiedCoords = new Set<string>();

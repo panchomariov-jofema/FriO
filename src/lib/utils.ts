@@ -20,16 +20,39 @@ export const naturalSort = (a: string, b: string) => {
   return aNum - bNum;
 };
 
-export const getEffectiveChamberConfig = (chamberConfig: Chamber, row13Enabled?: boolean): Chamber => {
-  if (!row13Enabled) {
-    return chamberConfig;
+export const getEffectiveChamberConfig = (
+  chamberConfig: Chamber,
+  row13EnabledOrSettings?: boolean | { row13Enabled?: boolean; colsKLEnabled?: boolean },
+  colsKLEnabledParam?: boolean
+): Chamber => {
+  const row13Enabled = typeof row13EnabledOrSettings === 'object'
+    ? !!row13EnabledOrSettings?.row13Enabled
+    : !!row13EnabledOrSettings;
+  const colsKLEnabled = typeof row13EnabledOrSettings === 'object'
+    ? !!row13EnabledOrSettings?.colsKLEnabled
+    : !!colsKLEnabledParam;
+
+  let columns = chamberConfig.columns;
+  let blocked = chamberConfig.blocked ? [...chamberConfig.blocked] : [];
+  let capacity = chamberConfig.capacity;
+
+  if (chamberConfig.id === 'CAMARA-3' && colsKLEnabled) {
+    if (!columns.some(c => c.name === 'K')) {
+      columns = [...columns, { name: 'K', id: 'K' }, { name: 'L', id: 'L' }];
+      blocked.push('K13', 'K14', 'L13', 'L14');
+      capacity = capacity + 160;
+    }
   }
-  const isLargeChamber = ['CAMARA-4', 'CAMARA-5', 'CAMARA-6'].includes(chamberConfig.id);
-  const allowedComodinCols = isLargeChamber ? ['A', 'B', 'C', 'M', 'N', 'O'] : ['A', 'B', 'C', 'H', 'I', 'J'];
-  
-  return {
-    ...chamberConfig,
-    blocked: chamberConfig.blocked?.filter(coord => {
+
+  if (row13Enabled) {
+    const isLargeChamber = ['CAMARA-4', 'CAMARA-5', 'CAMARA-6'].includes(chamberConfig.id);
+    const allowedComodinCols = isLargeChamber 
+      ? ['A', 'B', 'C', 'M', 'N', 'O'] 
+      : (colsKLEnabled && chamberConfig.id === 'CAMARA-3'
+          ? ['A', 'B', 'C', 'H', 'I', 'J', 'K', 'L']
+          : ['A', 'B', 'C', 'H', 'I', 'J']);
+
+    blocked = blocked.filter(coord => {
       const match = coord.match(/^([A-Z])(\d+)$/);
       if (match) {
         const col = match[1];
@@ -39,7 +62,14 @@ export const getEffectiveChamberConfig = (chamberConfig: Chamber, row13Enabled?:
         }
       }
       return true;
-    })
+    });
+  }
+
+  return {
+    ...chamberConfig,
+    columns,
+    capacity,
+    blocked,
   };
 };
 

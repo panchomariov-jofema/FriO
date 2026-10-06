@@ -56,7 +56,7 @@ export function RelocateLotDialog({
 }: RelocateLotDialogProps) {
   const { toast } = useToast();
   
-  const { data: chamberSettings } = useFirestoreCollection<{ id: string; row13Enabled?: boolean }>('chamberSettings');
+  const { data: chamberSettings } = useFirestoreCollection<{ id: string; row13Enabled?: boolean; colsKLEnabled?: boolean }>('chamberSettings');
   
   const isPackaging = React.useMemo(() => {
     const first = lotsInCoordinate[0];
@@ -94,7 +94,8 @@ export function RelocateLotDialog({
     if (!rawChamberConfig) return { availableCoordinates: [], occupancyMap: new Map() };
 
     const isChamberRow13Enabled = !!chamberSettings?.find(s => s.id === targetChamberId)?.row13Enabled;
-    const chamberConfig = getEffectiveChamberConfig(rawChamberConfig, isChamberRow13Enabled);
+    const isChamberColsKLEnabled = targetChamberId === 'CAMARA-3' && !!chamberSettings?.find(s => s.id === targetChamberId)?.colsKLEnabled;
+    const chamberConfig = getEffectiveChamberConfig(rawChamberConfig, isChamberRow13Enabled, isChamberColsKLEnabled);
 
     let allPossibleCoords = chamberConfig.columns
         .flatMap(col => chamberConfig.rows.map(row => `${col.name}${row}`))

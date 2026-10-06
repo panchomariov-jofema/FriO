@@ -279,6 +279,12 @@ export interface Chamber {
     blocked?: string[];
 }
 
+export interface ChamberSetting {
+  id: string;
+  row13Enabled?: boolean;
+  colsKLEnabled?: boolean;
+}
+
 export interface ChamberTemperature {
   id: string;
   chamberId: string;
