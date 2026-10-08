@@ -21,7 +21,7 @@ import { Label } from '../ui/label';
 import { Checkbox } from '../ui/checkbox';
 import { cn, safeToMillis, formatLocaleDateString, getEffectiveChamberConfig } from '@/lib/utils';
 import { cleanVarietyName } from '@/lib/fall-creek-utils';
-import { chambersConfig } from '@/lib/chambers-config';
+import { chambersConfig, getAllowedComodinCols } from '@/lib/chambers-config';
 import { Grid, List, Plus, Minus, Move, Search } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
@@ -811,8 +811,7 @@ export function OtherFruitExitTab({ clientId: fixedClientId }: { clientId?: stri
                               {/* Column Cells */}
                               {chamber.columns.map(col => {
                                 const coordName = `${col.name}${row}`;
-                                const isLargeChamber = ['CAMARA-4', 'CAMARA-5', 'CAMARA-6'].includes(activeChamber);
-                                const allowedComodinCols = isLargeChamber ? ['A', 'B', 'C', 'M', 'N', 'O'] : (isColsKLEnabled ? ['A', 'B', 'C', 'H', 'I', 'J', 'K', 'L'] : ['A', 'B', 'C', 'H', 'I', 'J']);
+                                const allowedComodinCols = getAllowedComodinCols(activeChamber, isColsKLEnabled);
                                 const isPermanentlyBlocked = (row === 13 || row === 14) && !allowedComodinCols.includes(col.name);
 
                                 // Find Fall Creek items in this coordinate

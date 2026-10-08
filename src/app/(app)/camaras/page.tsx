@@ -16,7 +16,7 @@ import { useFirestore, useCollection, useMemoFirebase, useUser } from '@/firebas
 import { useToast } from '@/hooks/use-toast';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
-import { chambersConfig } from '@/lib/chambers-config';
+import { chambersConfig, getAllowedComodinCols } from '@/lib/chambers-config';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn, getSortedCoordinates, getEffectiveChamberConfig, safeToDate, safeToMillis, safeStringCompare, safeFormatDate, safeFormatQuantity, formatLocaleDate, formatLocaleDateString } from '@/lib/utils';
@@ -1255,8 +1255,7 @@ export default function CamarasPage() {
                                               }
                                           }
     
-                                           const isLargeChamber = ['CAMARA-4', 'CAMARA-5', 'CAMARA-6'].includes(chamberId);
-                                           const allowedComodinCols = isLargeChamber ? ['A', 'B', 'C', 'M', 'N', 'O'] : (isColsKLEnabled ? ['A', 'B', 'C', 'H', 'I', 'J', 'K', 'L'] : ['A', 'B', 'C', 'H', 'I', 'J']);
+                                           const allowedComodinCols = getAllowedComodinCols(chamberId, isColsKLEnabled);
                                            const isPermanentlyBlocked = (row === 13 || row === 14) && !allowedComodinCols.includes(col.name);
                                           const isComodinRow = row === 13 || row === 14;
 

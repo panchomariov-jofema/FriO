@@ -1,6 +1,7 @@
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
 import type { Chamber, DTEGuiaDespacho } from './types';
+import { getAllowedComodinCols } from './chambers-config';
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -45,12 +46,7 @@ export const getEffectiveChamberConfig = (
   }
 
   if (row13Enabled) {
-    const isLargeChamber = ['CAMARA-4', 'CAMARA-5', 'CAMARA-6'].includes(chamberConfig.id);
-    const allowedComodinCols = isLargeChamber 
-      ? ['A', 'B', 'C', 'M', 'N', 'O'] 
-      : (colsKLEnabled && chamberConfig.id === 'CAMARA-3'
-          ? ['A', 'B', 'C', 'H', 'I', 'J', 'K', 'L']
-          : ['A', 'B', 'C', 'H', 'I', 'J']);
+    const allowedComodinCols = getAllowedComodinCols(chamberConfig.id, colsKLEnabled);
 
     blocked = blocked.filter(coord => {
       const match = coord.match(/^([A-Z])(\d+)$/);

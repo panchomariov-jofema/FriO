@@ -36,6 +36,19 @@ const generateComodinBlocked = (columns: { name: string }[]) => {
     ];
 };
 
+export const getAllowedComodinCols = (chamberId: string, colsKLEnabled?: boolean): string[] => {
+  const isLargeChamber = ['CAMARA-4', 'CAMARA-5', 'CAMARA-6'].includes(chamberId);
+  if (isLargeChamber) {
+    return ['A', 'B', 'C', 'M', 'N', 'O'];
+  }
+  if (chamberId === 'CAMARA-3') {
+    return colsKLEnabled 
+      ? ['A', 'B', 'C', 'D', 'E', 'H', 'I', 'J', 'K', 'L'] 
+      : ['A', 'B', 'C', 'D', 'E', 'H', 'I', 'J'];
+  }
+  return ['A', 'B', 'C', 'H', 'I', 'J'];
+};
+
 const blocked1to3 = generateComodinBlocked(columns1to3);
 const blocked4to6 = generateComodinBlocked(columns4to6);
 
