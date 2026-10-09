@@ -10,7 +10,7 @@ import {
     QrCode, PackageCheck, ScanLine, Trash2, CheckCircle2, Loader2, 
     AlertCircle, AlertTriangle, FileUp, ClipboardList, Plus, Sparkles, 
     Box, Check, ChevronsUpDown, Search, RotateCcw, FileText, Smartphone,
-    CheckCircle, X, Edit2, Save, Filter
+    CheckCircle, X, Edit2, Save, Filter, Ban, XCircle
 } from 'lucide-react';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
 import { useFirestore, useUser } from '@/firebase';
@@ -71,7 +71,7 @@ export function VitafoodReceptionWorkflow({
     const [scanSuccessFlash, setScanSuccessFlash] = React.useState(false);
 
     // Filter for Pallet List on Mobile
-    const [palletFilter, setPalletFilter] = React.useState<'todos' | 'pendientes' | 'recibidos' | 'almacenados'>('todos');
+    const [palletFilter, setPalletFilter] = React.useState<'todos' | 'pendientes' | 'recibidos' | 'almacenados' | 'no-recepcionados'>('todos');
 
     // Import state
     const fileInputRef = React.useRef<HTMLInputElement>(null);
@@ -80,6 +80,11 @@ export function VitafoodReceptionWorkflow({
     const [previewData, setPreviewData] = React.useState<VitafoodParsedManifest | null>(null);
     const [customGuiaNumber, setCustomGuiaNumber] = React.useState('');
     const [isConfirmingImport, setIsConfirmingImport] = React.useState(false);
+
+    // Dialog state for closing reception with missing pallets
+    const [isCloseReceptionDialogOpen, setIsCloseReceptionDialogOpen] = React.useState(false);
+    const [isClosingReception, setIsClosingReception] = React.useState(false);
+    const [itemToMarkNotReceived, setItemToMarkNotReceived] = React.useState<{ item: OtherFruitReceptionItem; index: number } | null>(null);
 
     // Edit Guia in Active Order
     const [isEditingGuia, setIsEditingGuia] = React.useState(false);
@@ -97,25 +102,37 @@ export function VitafoodReceptionWorkflow({
     const [manualProductSearchOpen, setManualProductSearchOpen] = React.useState(false);
     const [manualProductSearchTerm, setManualProductSearchTerm] = React.useState('');
 
-    // Active Manifests for Vitafood
+    // Active Manifests for Vitafood: Only show orders with pending items to scan ("Por Pistolear")
+    const [showCompletedOrders, setShowCompletedOrders] = React.useState(false);
+
     const vitafoodManifests = React.useMemo(() => {
         if (!allReceptions) return [];
-        return allReceptions.filter(r => 
-            (r.clientName?.toUpperCase().includes('VITAFOOD') || r.clientId === selectedClient?.clientId) &&
-            r.status !== 'Despachado'
-        );
-    }, [allReceptions, selectedClient]);
+        return allReceptions.filter(r => {
+            const isClientMatch = (r.clientName?.toUpperCase().includes('VITAFOOD') || r.clientId === selectedClient?.clientId);
+            if (!isClientMatch || r.status === 'Despachado' || r.status === 'Cerrado') return false;
+
+            // An order has pending scans if any item has status 'Pendiente de recibir'
+            const hasPendingReceive = r.items?.some(i => i.status === 'Pendiente de recibir');
+
+            // If user explicitly asks to view completed or if it's the currently selected manifest, keep it; otherwise filter out completed ("Listo")
+            if (showCompletedOrders || r.id === selectedManifestId) {
+                return true;
+            }
+            return hasPendingReceive;
+        });
+    }, [allReceptions, selectedClient, showCompletedOrders, selectedManifestId]);
 
     // Current active manifest
     const currentManifest = React.useMemo(() => {
-        return vitafoodManifests.find(r => r.id === selectedManifestId) || null;
-    }, [vitafoodManifests, selectedManifestId]);
+        if (!allReceptions) return null;
+        return allReceptions.find(r => r.id === selectedManifestId) || null;
+    }, [allReceptions, selectedManifestId]);
 
-    // Set default manifest & sync editable guia
+    // Set default manifest & sync editable guia (prioritize pending orders)
     React.useEffect(() => {
         if (vitafoodManifests.length > 0 && !selectedManifestId) {
             const pendingManifest = vitafoodManifests.find(m => 
-                m.items?.some(i => i.status === 'Pendiente de recibir' || i.status === 'Pendiente de almacenar')
+                m.items?.some(i => i.status === 'Pendiente de recibir')
             );
             setSelectedManifestId(pendingManifest ? pendingManifest.id : vitafoodManifests[0].id);
         }
@@ -159,15 +176,16 @@ export function VitafoodReceptionWorkflow({
     // Manifest Progress Statistics
     const manifestStats = React.useMemo(() => {
         if (!currentManifest || !currentManifest.items) {
-            return { total: 0, pendingReceive: 0, receivedPendingStore: 0, stored: 0, progressPct: 0 };
+            return { total: 0, pendingReceive: 0, receivedPendingStore: 0, stored: 0, notReceived: 0, progressPct: 0 };
         }
         const total = currentManifest.items.length;
         const pendingReceive = currentManifest.items.filter(i => i.status === 'Pendiente de recibir').length;
         const receivedPendingStore = currentManifest.items.filter(i => i.status === 'Pendiente de almacenar' || i.status === 'Recibido').length;
         const stored = currentManifest.items.filter(i => i.status === 'Almacenado').length;
-        const completed = receivedPendingStore + stored;
+        const notReceived = currentManifest.items.filter(i => i.status === 'No Recepcionado').length;
+        const completed = receivedPendingStore + stored + notReceived;
         const progressPct = total > 0 ? Math.round((completed / total) * 100) : 0;
-        return { total, pendingReceive, receivedPendingStore, stored, progressPct };
+        return { total, pendingReceive, receivedPendingStore, stored, notReceived, progressPct };
     }, [currentManifest]);
 
     // Filtered items list
@@ -177,6 +195,7 @@ export function VitafoodReceptionWorkflow({
             if (palletFilter === 'pendientes') return item.status === 'Pendiente de recibir';
             if (palletFilter === 'recibidos') return item.status === 'Pendiente de almacenar' || item.status === 'Recibido';
             if (palletFilter === 'almacenados') return item.status === 'Almacenado';
+            if (palletFilter === 'no-recepcionados') return item.status === 'No Recepcionado';
             return true;
         });
     }, [currentManifest, palletFilter]);
@@ -410,6 +429,128 @@ export function VitafoodReceptionWorkflow({
         }
     };
 
+    // Mark individual pallet as "No Recepcionado"
+    const handleMarkItemNotReceived = async (itemIndex: number) => {
+        if (!currentManifest || !firestore || !currentManifest.items?.[itemIndex]) return;
+        try {
+            const currentUserName = user?.displayName || user?.email?.split('@')[0] || 'Operador';
+            const currentUserId = user?.uid || '';
+            const now = new Date();
+
+            const updatedItems = [...currentManifest.items];
+            const targetItem = updatedItems[itemIndex];
+
+            if (targetItem.status === 'Almacenado') {
+                toast({
+                    variant: 'destructive',
+                    title: 'Pallet Almacenado',
+                    description: 'No se puede marcar como "No Recepcionado" un pallet que ya fue almacenado en cámara.'
+                });
+                return;
+            }
+
+            updatedItems[itemIndex] = {
+                ...targetItem,
+                status: 'No Recepcionado',
+                notReceivedAt: now,
+                notReceivedByUserName: currentUserName,
+                notReceivedByUserId: currentUserId,
+            };
+
+            const hasPendingReceive = updatedItems.some(i => i.status === 'Pendiente de recibir');
+            const hasPendingStore = updatedItems.some(i => i.status === 'Pendiente de almacenar');
+            
+            let newStatus: OtherFruitReception['status'] = 'Pendiente de almacenar';
+            if (hasPendingReceive) {
+                newStatus = 'Pendiente de recibir';
+            } else if (hasPendingStore) {
+                newStatus = 'Pendiente de almacenar';
+            } else {
+                // No remaining items pending receive or store: either all stored or not received
+                const hasStored = updatedItems.some(i => i.status === 'Almacenado');
+                newStatus = hasStored ? 'Almacenado' : 'Cerrado';
+            }
+
+            await updateDoc(doc(firestore, 'otherFruitReceptions', currentManifest.id), {
+                items: updatedItems,
+                status: newStatus,
+                updatedAt: serverTimestamp()
+            });
+
+            toast({
+                title: 'UMP Clasificado',
+                description: `El pallet UMP ${targetItem.palletId || `#${itemIndex + 1}`} fue marcado como "No Recepcionado".`
+            });
+            setItemToMarkNotReceived(null);
+        } catch (e) {
+            console.error('Error marking item as not received:', e);
+            toast({ variant: 'destructive', title: 'Error', description: 'No se pudo clasificar el pallet.' });
+        }
+    };
+
+    // Close Reception / Complete Entry with Missing Pallets
+    const handleCloseReceptionWithMissing = async () => {
+        if (!currentManifest || !firestore) return;
+        setIsClosingReception(true);
+        try {
+            const currentUserName = user?.displayName || user?.email?.split('@')[0] || 'Operador';
+            const currentUserId = user?.uid || '';
+            const now = new Date();
+
+            const updatedItems = currentManifest.items.map(item => {
+                if (item.status === 'Pendiente de recibir') {
+                    return {
+                        ...item,
+                        status: 'No Recepcionado' as const,
+                        notReceivedAt: now,
+                        notReceivedByUserName: currentUserName,
+                        notReceivedByUserId: currentUserId,
+                    };
+                }
+                return item;
+            });
+
+            const hasPendingStore = updatedItems.some(i => i.status === 'Pendiente de almacenar');
+            const hasStored = updatedItems.some(i => i.status === 'Almacenado');
+
+            let newStatus: OtherFruitReception['status'] = 'Cerrado';
+            if (hasPendingStore) {
+                newStatus = 'Pendiente de almacenar';
+            } else if (hasStored) {
+                newStatus = 'Almacenado';
+            } else {
+                newStatus = 'Cerrado';
+            }
+
+            await updateDoc(doc(firestore, 'otherFruitReceptions', currentManifest.id), {
+                items: updatedItems,
+                status: newStatus,
+                updatedAt: serverTimestamp()
+            });
+
+            const notReceivedCount = updatedItems.filter(i => i.status === 'No Recepcionado').length;
+
+            toast({
+                title: '✅ Recepción Cerrada',
+                description: `Entrada completada. Se clasificaron ${notReceivedCount} pallet(s) como "No Recepcionados".`
+            });
+
+            setIsCloseReceptionDialogOpen(false);
+            setScannedMatch(null);
+            setScannedUmpInput('');
+            setSelectedManifestId(null);
+        } catch (e: any) {
+            console.error('Error closing reception:', e);
+            toast({
+                variant: 'destructive',
+                title: 'Error',
+                description: 'No se pudo cerrar la recepción.'
+            });
+        } finally {
+            setIsClosingReception(false);
+        }
+    };
+
     // Lookup UMP when typed or scanned
     const handleUmpLookup = (rawVal: string) => {
         const val = rawVal.trim();
@@ -445,10 +586,17 @@ export function VitafoodReceptionWorkflow({
 
         setIsSubmittingReception(true);
         try {
+            const currentUserName = user?.displayName || user?.email?.split('@')[0] || 'Operador';
+            const currentUserId = user?.uid || '';
+            const now = new Date();
+
             const updatedItems = [...currentManifest.items];
             const updatedItem: OtherFruitReceptionItem = {
                 ...targetMatch.item,
-                status: 'Pendiente de almacenar'
+                status: 'Pendiente de almacenar',
+                receivedAt: now,
+                receivedByUserName: currentUserName,
+                receivedByUserId: currentUserId,
             };
             updatedItems[targetMatch.index] = updatedItem;
 
@@ -530,6 +678,10 @@ export function VitafoodReceptionWorkflow({
         try {
             const displayLotId = `VITA-${guiaFinal}`;
 
+            const currentUserName = user?.displayName || user?.email?.split('@')[0] || 'Operador';
+            const currentUserId = user?.uid || '';
+            const now = new Date();
+
             const newItem: any = {
                 productCode: String(manualProductCode).trim(),
                 productName: String(manualProductName || `PRODUCTO ${manualProductCode}`).trim(),
@@ -537,7 +689,10 @@ export function VitafoodReceptionWorkflow({
                 clientLotId: String(manualLote).trim() || 'S/L',
                 quantity: Number(manualQuantity) || 1,
                 unit: 'Pallets',
-                status: 'Pendiente de almacenar'
+                status: 'Pendiente de almacenar',
+                receivedAt: now,
+                receivedByUserName: currentUserName,
+                receivedByUserId: currentUserId,
             };
 
             let receptionId = currentManifest?.id;
@@ -682,9 +837,21 @@ export function VitafoodReceptionWorkflow({
                                 </Select>
                             ) : (
                                 <span className="text-xs text-muted-foreground italic">
-                                    Sin órdenes activas. Cargue una o use Modo Manual.
+                                    Todas las órdenes están completadas. Cargue una nueva orden.
                                 </span>
                             )}
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setShowCompletedOrders(prev => !prev)}
+                                className={cn(
+                                    "h-7 px-2 text-[11px] whitespace-nowrap",
+                                    showCompletedOrders ? "text-primary font-bold bg-primary/10" : "text-muted-foreground hover:text-foreground"
+                                )}
+                                title={showCompletedOrders ? "Ocultar órdenes completadas / listas" : "Ver también órdenes completadas"}
+                            >
+                                {showCompletedOrders ? "Ocultar completadas" : "Ver completadas"}
+                            </Button>
                         </div>
 
                         {/* Guía de Despacho Box (Prominent & Editable) */}
@@ -738,13 +905,27 @@ export function VitafoodReceptionWorkflow({
                                     </div>
                                 )}
 
+                                {/* Close Reception / Complete Entry with Missing Pallets */}
+                                {manifestStats.pendingReceive > 0 && (
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => setIsCloseReceptionDialogOpen(true)}
+                                        className="h-7 px-2.5 text-xs font-bold border-amber-500/50 text-amber-700 dark:text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 ml-1"
+                                        title="Cerrar la recepción marcando los pallets faltantes como No Recepcionados"
+                                    >
+                                        <Ban className="w-3.5 h-3.5 mr-1" />
+                                        Cerrar Ciclo ({manifestStats.pendingReceive} faltantes)
+                                    </Button>
+                                )}
+
                                 {/* Cancel Order Button */}
                                 <AlertDialog>
                                     <AlertDialogTrigger asChild>
                                         <Button
                                             variant="ghost"
                                             size="sm"
-                                            className="h-7 px-2 text-xs text-destructive hover:text-destructive hover:bg-destructive/10 ml-2"
+                                            className="h-7 px-2 text-xs text-destructive hover:text-destructive hover:bg-destructive/10 ml-1"
                                         >
                                             <Trash2 className="w-3.5 h-3.5 mr-1" />
                                             Anular
@@ -809,8 +990,8 @@ export function VitafoodReceptionWorkflow({
                             </div>
                             <Progress value={manifestStats.progressPct} className="h-2.5 bg-muted" />
 
-                            {/* 4 KPI Grid Cards (Thumb-friendly) */}
-                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
+                            {/* 5 KPI Grid Cards (Thumb-friendly) */}
+                            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 pt-1">
                                 <div className="bg-muted/40 p-2.5 rounded-xl border text-center">
                                     <span className="text-[10px] text-muted-foreground uppercase font-bold block">Total</span>
                                     <span className="text-lg sm:text-xl font-black text-foreground">{manifestStats.total}</span>
@@ -844,6 +1025,16 @@ export function VitafoodReceptionWorkflow({
                                 >
                                     <span className="text-[10px] text-emerald-600 dark:text-emerald-400 uppercase font-bold block">Almacenados</span>
                                     <span className="text-lg sm:text-xl font-black text-emerald-600 dark:text-emerald-400">{manifestStats.stored}</span>
+                                </div>
+                                <div 
+                                    className={cn(
+                                        "p-2.5 rounded-xl border text-center cursor-pointer transition-all",
+                                        palletFilter === 'no-recepcionados' ? "ring-2 ring-rose-500 bg-rose-500/15" : "bg-rose-500/10 border-rose-500/30"
+                                    )}
+                                    onClick={() => setPalletFilter(palletFilter === 'no-recepcionados' ? 'todos' : 'no-recepcionados')}
+                                >
+                                    <span className="text-[10px] text-rose-600 dark:text-rose-400 uppercase font-bold block">No Recepcionados</span>
+                                    <span className="text-lg sm:text-xl font-black text-rose-600 dark:text-rose-400">{manifestStats.notReceived}</span>
                                 </div>
                             </div>
                         </div>
@@ -1041,6 +1232,14 @@ export function VitafoodReceptionWorkflow({
                                         >
                                             Por Almacenar ({manifestStats.receivedPendingStore})
                                         </Button>
+                                        <Button
+                                            size="sm"
+                                            variant={palletFilter === 'no-recepcionados' ? 'secondary' : 'ghost'}
+                                            onClick={() => setPalletFilter('no-recepcionados')}
+                                            className="h-7 text-[11px] px-2 text-rose-600"
+                                        >
+                                            No Recepcionados ({manifestStats.notReceived})
+                                        </Button>
                                     </div>
                                 </div>
 
@@ -1050,6 +1249,7 @@ export function VitafoodReceptionWorkflow({
                                         const isPendingReceive = item.status === 'Pendiente de recibir';
                                         const isPendingStore = item.status === 'Pendiente de almacenar' || item.status === 'Recibido';
                                         const isStored = item.status === 'Almacenado';
+                                        const isNotReceived = item.status === 'No Recepcionado';
 
                                         return (
                                             <div
@@ -1058,7 +1258,8 @@ export function VitafoodReceptionWorkflow({
                                                     "p-3 rounded-xl border bg-card/90 shadow-xs space-y-2 transition-all",
                                                     isPendingReceive && "border-amber-500/30 hover:border-primary active:scale-[0.99]",
                                                     isPendingStore && "border-blue-500/40 bg-blue-50/10",
-                                                    isStored && "border-emerald-500/40 bg-emerald-50/10"
+                                                    isStored && "border-emerald-500/40 bg-emerald-50/10",
+                                                    isNotReceived && "border-rose-500/40 bg-rose-50/10 opacity-75"
                                                 )}
                                                 onClick={() => {
                                                     if (isPendingReceive) handleUmpLookup(item.palletId || '');
@@ -1069,7 +1270,10 @@ export function VitafoodReceptionWorkflow({
                                                         <span className="text-xs font-mono font-bold text-muted-foreground">
                                                             #{index + 1}
                                                         </span>
-                                                        <span className="font-mono font-black text-sm text-foreground">
+                                                        <span className={cn(
+                                                            "font-mono font-black text-sm",
+                                                            isNotReceived ? "text-muted-foreground line-through" : "text-foreground"
+                                                        )}>
                                                             {item.palletId || 'N/A'}
                                                         </span>
                                                     </div>
@@ -1087,6 +1291,11 @@ export function VitafoodReceptionWorkflow({
                                                         {isStored && (
                                                             <Badge variant="outline" className="text-[10px] bg-emerald-500/10 text-emerald-600 border-emerald-500/30 font-bold">
                                                                 {item.storageLocation?.chamberId} - {item.storageLocation?.coordinate}
+                                                            </Badge>
+                                                        )}
+                                                        {isNotReceived && (
+                                                            <Badge variant="outline" className="text-[10px] bg-rose-500/10 text-rose-600 border-rose-500/30 font-bold">
+                                                                No Recepcionado
                                                             </Badge>
                                                         )}
                                                     </div>
@@ -1110,17 +1319,49 @@ export function VitafoodReceptionWorkflow({
                                                 {/* Mobile Actions */}
                                                 <div className="flex items-center justify-end gap-2 pt-1">
                                                     {isPendingReceive && (
-                                                        <Button
-                                                            size="sm"
-                                                            className="w-full h-9 text-xs font-bold bg-primary hover:bg-primary/90 text-primary-foreground"
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                handleReceivePallet({ item, index });
-                                                            }}
-                                                        >
-                                                            <PackageCheck className="w-3.5 h-3.5 mr-1" />
-                                                            Recepcionar Pallet
-                                                        </Button>
+                                                        <div className="flex items-center gap-2 w-full">
+                                                            <Button
+                                                                size="sm"
+                                                                className="flex-1 h-9 text-xs font-bold bg-primary hover:bg-primary/90 text-primary-foreground"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    handleReceivePallet({ item, index });
+                                                                }}
+                                                            >
+                                                                <PackageCheck className="w-3.5 h-3.5 mr-1" />
+                                                                Recepcionar
+                                                            </Button>
+                                                            <Button
+                                                                size="sm"
+                                                                variant="outline"
+                                                                className="h-9 px-2.5 text-xs text-rose-600 border-rose-200 hover:bg-rose-50"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    setItemToMarkNotReceived({ item, index });
+                                                                }}
+                                                                title="Marcar como No Recepcionado (no llegó físicamente)"
+                                                            >
+                                                                <Ban className="w-3.5 h-3.5" />
+                                                            </Button>
+                                                        </div>
+                                                    )}
+
+                                                    {isNotReceived && (
+                                                        <div className="flex items-center justify-between w-full">
+                                                            <span className="text-xs text-rose-500 italic">No llegó físicamente</span>
+                                                            <Button
+                                                                size="sm"
+                                                                variant="ghost"
+                                                                className="h-8 text-xs text-muted-foreground hover:text-primary gap-1"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    handleUndoReception(index);
+                                                                }}
+                                                            >
+                                                                <RotateCcw className="w-3.5 h-3.5" />
+                                                                Revertir
+                                                            </Button>
+                                                        </div>
                                                     )}
 
                                                     {isPendingStore && (
@@ -1186,6 +1427,7 @@ export function VitafoodReceptionWorkflow({
                                                 const isPendingReceive = item.status === 'Pendiente de recibir';
                                                 const isPendingStore = item.status === 'Pendiente de almacenar' || item.status === 'Recibido';
                                                 const isStored = item.status === 'Almacenado';
+                                                const isNotReceived = item.status === 'No Recepcionado';
 
                                                 return (
                                                     <TableRow
@@ -1193,7 +1435,8 @@ export function VitafoodReceptionWorkflow({
                                                         className={cn(
                                                             "transition-colors",
                                                             isPendingReceive && "hover:bg-accent/40 cursor-pointer",
-                                                            isStored && "bg-emerald-50/30 dark:bg-emerald-950/10"
+                                                            isStored && "bg-emerald-50/30 dark:bg-emerald-950/10",
+                                                            isNotReceived && "bg-rose-50/20 dark:bg-rose-950/10 opacity-75"
                                                         )}
                                                         onClick={() => {
                                                             if (isPendingReceive) handleUmpLookup(item.palletId || '');
@@ -1202,7 +1445,10 @@ export function VitafoodReceptionWorkflow({
                                                         <TableCell className="text-center font-mono text-xs text-muted-foreground">
                                                             {index + 1}
                                                         </TableCell>
-                                                        <TableCell className="font-mono font-bold text-foreground">
+                                                        <TableCell className={cn(
+                                                            "font-mono font-bold",
+                                                            isNotReceived ? "text-muted-foreground line-through" : "text-foreground"
+                                                        )}>
                                                             {item.palletId || 'N/A'}
                                                         </TableCell>
                                                         <TableCell className="font-mono text-xs">
@@ -1233,20 +1479,54 @@ export function VitafoodReceptionWorkflow({
                                                                     {item.storageLocation?.chamberId} - {item.storageLocation?.coordinate}
                                                                 </Badge>
                                                             )}
+                                                            {isNotReceived && (
+                                                                <Badge variant="outline" className="text-[10px] bg-rose-500/10 text-rose-600 border-rose-500/30">
+                                                                    No Recepcionado
+                                                                </Badge>
+                                                            )}
                                                         </TableCell>
                                                         <TableCell className="text-right">
                                                             <div className="flex items-center justify-end gap-1">
                                                                 {isPendingReceive ? (
+                                                                    <>
+                                                                        <Button
+                                                                            size="sm"
+                                                                            variant="ghost"
+                                                                            className="h-7 text-xs font-semibold text-primary hover:text-primary"
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                handleReceivePallet({ item, index });
+                                                                            }}
+                                                                        >
+                                                                            Recibir
+                                                                        </Button>
+                                                                        <Button
+                                                                            size="sm"
+                                                                            variant="ghost"
+                                                                            className="h-7 px-2 text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50"
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                setItemToMarkNotReceived({ item, index });
+                                                                            }}
+                                                                            title="Marcar como No Recepcionado"
+                                                                        >
+                                                                            <Ban className="w-3.5 h-3.5 mr-1" />
+                                                                            No Llegó
+                                                                        </Button>
+                                                                    </>
+                                                                ) : isNotReceived ? (
                                                                     <Button
                                                                         size="sm"
                                                                         variant="ghost"
-                                                                        className="h-7 text-xs font-semibold text-primary hover:text-primary"
+                                                                        className="h-7 text-xs text-muted-foreground hover:text-primary gap-1"
                                                                         onClick={(e) => {
                                                                             e.stopPropagation();
-                                                                            handleReceivePallet({ item, index });
+                                                                            handleUndoReception(index);
                                                                         }}
+                                                                        title="Revertir a Por Pistolear"
                                                                     >
-                                                                        Recibir
+                                                                        <RotateCcw className="w-3.5 h-3.5" />
+                                                                        Revertir
                                                                     </Button>
                                                                 ) : isPendingStore ? (
                                                                     <>
@@ -1549,6 +1829,81 @@ export function VitafoodReceptionWorkflow({
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+
+            {/* CONFIRMATION DIALOG: CERRAR CICLO / ENTRADA CON FALTANTES */}
+            <AlertDialog open={isCloseReceptionDialogOpen} onOpenChange={setIsCloseReceptionDialogOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle className="flex items-center gap-2 text-amber-600 dark:text-amber-400">
+                            <AlertTriangle className="h-5 w-5" />
+                            ¿Cerrar Recepción con Faltantes?
+                        </AlertDialogTitle>
+                        <AlertDialogDescription className="space-y-2 text-sm text-foreground/80">
+                            <p>
+                                De un total de <strong>{manifestStats.total} pallets</strong> declarados en la Guía <strong>{currentManifest?.document}</strong>, hay <strong className="text-amber-600">{manifestStats.pendingReceive} pallets</strong> que aún están pendientes por pistolear porque no llegaron físicamente.
+                            </p>
+                            <p>
+                                Al cerrar el ciclo:
+                            </p>
+                            <ul className="list-disc pl-5 space-y-1 text-xs text-muted-foreground">
+                                <li>Los <strong>{manifestStats.pendingReceive} pallets no pistoleados</strong> quedarán clasificados como <span className="font-bold text-rose-600">"No Recepcionados"</span>.</li>
+                                <li>No quedarán pendientes de pistola y la entrada se considerará cerrada.</li>
+                                <li>Los pallets ya almacenados ({manifestStats.stored}) permanecerán seguros en cámara/bodega.</li>
+                            </ul>
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel disabled={isClosingReception}>Cancelar</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={handleCloseReceptionWithMissing}
+                            disabled={isClosingReception}
+                            className="bg-amber-600 hover:bg-amber-700 text-white font-black"
+                        >
+                            {isClosingReception ? (
+                                <>
+                                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                                    Cerrando...
+                                </>
+                            ) : (
+                                <>
+                                    <Check className="h-4 w-4 mr-1.5" />
+                                    Sí, Cerrar Entrada ({manifestStats.pendingReceive} faltantes)
+                                </>
+                            )}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+
+            {/* CONFIRMATION DIALOG: MARCAR PALLET INDIVIDUAL COMO NO RECEPCIONADO */}
+            <AlertDialog open={!!itemToMarkNotReceived} onOpenChange={(open) => !open && setItemToMarkNotReceived(null)}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle className="flex items-center gap-2 text-rose-600">
+                            <Ban className="h-5 w-5" />
+                            Marcar Pallet como No Recepcionado
+                        </AlertDialogTitle>
+                        <AlertDialogDescription className="text-sm">
+                            ¿Confirma que el pallet UMP <strong>{itemToMarkNotReceived?.item.palletId || `#${(itemToMarkNotReceived?.index ?? 0) + 1}`}</strong> ({itemToMarkNotReceived?.item.productName}) no llegó físicamente en el transporte?
+                            <br /><br />
+                            Quedará clasificado como <strong className="text-rose-600">"No Recepcionado"</strong>. Si llega posteriormente, podrá revertirlo a "Por Pistolear".
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={() => {
+                                if (itemToMarkNotReceived) {
+                                    handleMarkItemNotReceived(itemToMarkNotReceived.index);
+                                }
+                            }}
+                            className="bg-rose-600 hover:bg-rose-700 text-white font-bold"
+                        >
+                            Confirmar como No Recepcionado
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     );
 }

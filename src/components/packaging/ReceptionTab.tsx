@@ -13,7 +13,7 @@ import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
 import type { OtherClient, PackagingMaster, PackagingReceptionItem, OtherFruitReception, ChamberLot, ClientStorageConfig } from '@/lib/types';
 import { packagingReceptionSchema } from '@/lib/schemas';
 import { PlusCircle, Trash2, ScanLine } from 'lucide-react';
-import { useFirestore } from '@/firebase';
+import { useFirestore, useUser } from '@/firebase';
 import { addDoc, collection, serverTimestamp, doc, getDoc, updateDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { errorEmitter } from '@/firebase/error-emitter';
@@ -47,6 +47,7 @@ export function ReceptionTab() {
   const { data: chamberSettings } = useFirestoreCollection<{ id: string; row13Enabled?: boolean }>('chamberSettings');
 
   const firestore = useFirestore();
+  const { user } = useUser();
   const { toast } = useToast();
   const [scanningIndex, setScanningIndex] = React.useState<number | null>(null);
   const [isCreateProductOpen, setIsCreateProductOpen] = React.useState(false);
@@ -147,6 +148,10 @@ export function ReceptionTab() {
       const newStoredItems: any[] = [];
       let remainingToStore = totalQuantity;
 
+      const currentUserName = user?.displayName || user?.email?.split('@')[0] || 'Operador';
+      const currentUserId = user?.uid || '';
+      const now = new Date();
+
       if (destinationType === 'warehouse' || (warehouse && aisle)) {
         // Warehouse and Aisle storage (e.g., Almacén 7 / Pasillo 1)
         for (const itemToProcess of itemsToProcess) {
@@ -161,7 +166,9 @@ export function ReceptionTab() {
               chamberId: warehouse,
               coordinate: aisle
             },
-            storedAt: new Date(),
+            storedAt: now,
+            storedByUserName: currentUserName,
+            storedByUserId: currentUserId,
           });
           remainingToStore -= itemToProcess.quantity;
         }
@@ -208,7 +215,9 @@ export function ReceptionTab() {
               chamberId,
               coordinate: startCoordinate
             },
-            storedAt: new Date(),
+            storedAt: now,
+            storedByUserName: currentUserName,
+            storedByUserId: currentUserId,
           });
           remainingToStore -= itemToProcess.quantity;
         }

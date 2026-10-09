@@ -20,7 +20,8 @@ import {
     Truck,
     Thermometer,
     Clock,
-    FileText
+    FileText,
+    ScanLine
 } from 'lucide-react';
 import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import type { ReportSetting } from '@/lib/types';
@@ -130,6 +131,15 @@ const reportList = [
         icon: Box,
         color: 'text-amber-500',
         image: PlaceHolderImages.find(img => img.id === 'report-stock')
+    },
+    { 
+        id: 'trazabilidad-ump',
+        title: 'Trazabilidad de UMP (Pallets)', 
+        description: 'Auditoría total de pallets: recepcionados, almacenados y no recepcionados con fecha, lote, usuario y guía.',
+        href: '/reportes/trazabilidad-ump',
+        icon: ScanLine,
+        color: 'text-emerald-600',
+        image: PlaceHolderImages.find(img => img.id === 'report-fruit')
     },
     { 
         id: 'stock-bins-camaras',

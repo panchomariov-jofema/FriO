@@ -35,6 +35,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input';
 import * as XLSX from 'xlsx';
 import { parseTemperatureExcel } from '@/lib/fall-creek-utils';
+import { getVitafoodProductColor, hslToHsla } from '@/lib/vitafood-colors';
 
 
 
@@ -59,13 +60,17 @@ const lotColorPalette = [
 const lotColorMap = new Map<string, string>();
 let nextColorIndex = 0;
 
-const getColorForLot = (lotId: string) => {
-    if (!lotColorMap.has(lotId)) {
+const getColorForLot = (colorKey: string) => {
+    if (colorKey.startsWith('vitafood-prod-')) {
+        const prodIdentifier = colorKey.replace('vitafood-prod-', '');
+        return getVitafoodProductColor(prodIdentifier);
+    }
+    if (!lotColorMap.has(colorKey)) {
         const color = lotColorPalette[nextColorIndex];
-        lotColorMap.set(lotId, color);
+        lotColorMap.set(colorKey, color);
         nextColorIndex = (nextColorIndex + 1) % lotColorPalette.length;
     }
-    return lotColorMap.get(lotId)!;
+    return lotColorMap.get(colorKey)!;
 };
 
 const isFallCreekItem = (item: StoredItem) => {
@@ -78,16 +83,25 @@ const isFallCreekItem = (item: StoredItem) => {
   return false;
 };
 
+const isVitafoodOrPackagingItemStatic = (item: StoredItem) => {
+  const name = (item.ownerName || '').toUpperCase();
+  const id = (item.exporterId || '').toUpperCase();
+  if (name.includes('FALL CREEK') || id.includes('FALL CREEK')) return false;
+  return name.includes('VITAFOOD') || id.includes('VITAFOOD') || name.includes('EMBALAJE') || id.includes('EMBALAJE');
+};
+
 const getItemColorKey = (item: StoredItem) => {
   if (isFallCreekItem(item)) {
     return `${item.type}-${item.lotIdForColor}`;
-  } else {
-    if (item.type === 'otherFruit') {
-      return `client-${item.ownerName}`;
-    } else {
-      return `exporter-${item.exporterId || 'default'}`;
-    }
   }
+  if (isVitafoodOrPackagingItemStatic(item)) {
+    const prodKey = item.productCode || item.productName || item.varietyOrProduct || item.displayId || 'UNKNOWN';
+    return `vitafood-prod-${prodKey.trim().toUpperCase()}`;
+  }
+  if (item.type === 'otherFruit') {
+    return `client-${item.ownerName}`;
+  }
+  return `exporter-${item.exporterId || 'default'}`;
 };
 
 
@@ -262,6 +276,8 @@ export default function CamarasPage() {
                 documentNumber: reception.documentNumber,
                 palletId: item.palletId || item.containerId || (item as any).ump,
                 containerId: item.containerId || item.palletId || (item as any).ump,
+                productCode: item.productCode,
+                productName: item.productName,
             }))
         )
     ];
@@ -1163,6 +1179,39 @@ export default function CamarasPage() {
                                             </AlertDialog>
                                         </div>
                                     )}
+                                    {(() => {
+                                        const chamberCoords = Object.values(storedItemsByChamber[chamberId] || {});
+                                        const vitafoodItemsInChamber = chamberCoords.flat().filter(i => isVitafoodOrPackagingItemStatic(i));
+                                        if (vitafoodItemsInChamber.length === 0) return null;
+
+                                        const uniqueProducts = new Map<string, { key: string; name: string; color: string; count: number }>();
+                                        vitafoodItemsInChamber.forEach(item => {
+                                            const key = getItemColorKey(item);
+                                            const name = item.productName || item.varietyOrProduct || item.productCode || item.displayId || 'Producto';
+                                            const color = getColorForLot(key);
+                                            if (!uniqueProducts.has(key)) {
+                                                uniqueProducts.set(key, { key, name, color, count: 1 });
+                                            } else {
+                                                uniqueProducts.get(key)!.count += 1;
+                                            }
+                                        });
+                                        const productList = Array.from(uniqueProducts.values());
+
+                                        return (
+                                            <div className="mb-3 p-2.5 bg-background/90 rounded-lg border shadow-xs flex flex-wrap items-center gap-2">
+                                                <span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground mr-1">
+                                                    Códigos de Producto ({productList.length}):
+                                                </span>
+                                                {productList.map(prod => (
+                                                    <div key={prod.key} className="flex items-center gap-1.5 px-2.5 py-1 rounded-md border text-xs font-semibold bg-muted/40">
+                                                        <span className="w-3 h-3 rounded-full shrink-0 shadow-xs border border-black/20" style={{ backgroundColor: prod.color }} />
+                                                        <span className="truncate max-w-[220px]" title={prod.name}>{prod.name}</span>
+                                                        <span className="text-[10px] text-muted-foreground font-mono">({prod.count} {prod.count === 1 ? 'pallet' : 'pallets'})</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        );
+                                    })()}
                                     <div className="overflow-x-auto">
                                         <div className="grid gap-1" style={{ 
                                             gridTemplateRows: `repeat(${activeRows.length}, minmax(0, 1fr))`,
@@ -1209,11 +1258,12 @@ export default function CamarasPage() {
                                                   const color = getColorForLot(colorKey);
                                                   cellStyle = {
                                                       '--lot-color': color,
-                                                      '--lot-color-border': color.replace(')', ', 0.5)'),
-                                                      '--lot-color-bg': color.replace(')', ', 0.2)'),
+                                                      '--lot-color-border': hslToHsla(color, 0.7),
+                                                      '--lot-color-bg': hslToHsla(color, 0.28),
+                                                      borderColor: hslToHsla(color, 0.7),
                                                   } as React.CSSProperties;
                                                   progressStyle = {
-                                                      backgroundColor: color.replace(')', ', 0.3)'),
+                                                      backgroundColor: hslToHsla(color, 0.5),
                                                       right: `${Math.max(0, 100 - occupancyPercentage)}%`,
                                                   };
                                               } else {
@@ -1237,8 +1287,8 @@ export default function CamarasPage() {
                                                       accumulatedPct += share;
                                                       const end = Math.round(accumulatedPct);
 
-                                                      const colorBg = l.color.replace(')', ', 0.2)');
-                                                      const colorProg = l.color.replace(')', ', 0.3)');
+                                                      const colorBg = hslToHsla(l.color, 0.28);
+                                                      const colorProg = hslToHsla(l.color, 0.55);
 
                                                       bgGradients.push(`${colorBg} ${start}%, ${colorBg} ${end}%`);
                                                       progGradients.push(`${colorProg} ${start}%, ${colorProg} ${end}%`);
@@ -1246,8 +1296,10 @@ export default function CamarasPage() {
 
                                                   cellStyle = {
                                                       backgroundImage: `linear-gradient(135deg, ${bgGradients.join(', ')})`,
-                                                      borderColor: lotQuantities[0].color.replace(')', ', 0.5)'), // border color matches first lot's border style
-                                                  };
+                                                      '--lot-color-border': hslToHsla(lotQuantities[0].color, 0.75),
+                                                      '--lot-color-bg': 'transparent',
+                                                      borderColor: hslToHsla(lotQuantities[0].color, 0.75),
+                                                  } as React.CSSProperties;
                                                   progressStyle = {
                                                       backgroundImage: `linear-gradient(135deg, ${progGradients.join(', ')})`,
                                                       right: `${Math.max(0, 100 - occupancyPercentage)}%`,
@@ -1297,18 +1349,26 @@ export default function CamarasPage() {
                                                        <div className="border-b pb-1 flex justify-between items-start">
                                                            <div>
                                                                <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Ubicación {coord}</p>
-                                                               <p className="text-sm font-semibold">
-                                                                    {uniqueLotIds.length > 1 
-                                                                        ? (isVitafoodOrPackaging(firstItem) && uniquePalletIds.length > 0 
-                                                                            ? `UMP: ${uniquePalletIds.join(', ')}` 
-                                                                            : 'Lotes Mezclados') 
-                                                                        : firstItem?.type === 'producerLot' 
-                                                                            ? `Lote: ${firstItem?.displayId}` 
-                                                                            : isVitafoodOrPackaging(firstItem) 
-                                                                                ? `UMP: ${uniquePalletIds.join(', ') || firstItem?.palletId || firstItem?.containerId || '-'}` 
-                                                                                : `Documento: ${firstItem?.document || '-'}`
-                                                                    }
-                                                                </p>
+                                                               <div className="flex items-center gap-1.5 mt-0.5">
+                                                                    {firstItem && (
+                                                                        <span 
+                                                                            className="w-2.5 h-2.5 rounded-full shrink-0 border border-black/20 inline-block shadow-xs" 
+                                                                            style={{ backgroundColor: getColorForLot(getItemColorKey(firstItem)) }} 
+                                                                        />
+                                                                    )}
+                                                                    <p className="text-sm font-semibold truncate">
+                                                                        {uniqueLotIds.length > 1 
+                                                                            ? (isVitafoodOrPackaging(firstItem) && uniquePalletIds.length > 0 
+                                                                                ? `UMP: ${uniquePalletIds.join(', ')}` 
+                                                                                : 'Lotes Mezclados') 
+                                                                            : firstItem?.type === 'producerLot' 
+                                                                                ? `Lote: ${firstItem?.displayId}` 
+                                                                                : isVitafoodOrPackaging(firstItem) 
+                                                                                    ? `UMP: ${uniquePalletIds.join(', ') || firstItem?.palletId || firstItem?.containerId || '-'}` 
+                                                                                    : `Documento: ${firstItem?.document || '-'}`
+                                                                        }
+                                                                    </p>
+                                                                </div>
                                                            </div>
                                                            {uniqueLotIds.length === 1 && (() => {
                                                                const canEdit = firstItem?.type === 'otherFruit' && firstItem?.ownerName?.toUpperCase() !== 'FALL CREEK';
@@ -1336,10 +1396,15 @@ export default function CamarasPage() {
                                                                <div className="space-y-2 max-h-36 overflow-y-auto">
                                                                    {itemsInCoord.map((item, idx) => {
                                                                         const canEditObs = item.type === 'otherFruit' && item.ownerName?.toUpperCase() !== 'FALL CREEK';
+                                                                        const itemColor = getColorForLot(getItemColorKey(item));
                                                                         return (
                                                                             <div key={idx} className="text-xs border-b border-dashed pb-1.5 last:border-0 last:pb-0">
                                                                                 <div className="flex justify-between items-center">
-                                                                                    <span className="font-bold">
+                                                                                    <span className="font-bold flex items-center gap-1.5">
+                                                                                        <span 
+                                                                                            className="w-2.5 h-2.5 rounded-full shrink-0 border border-black/20 inline-block shadow-xs" 
+                                                                                            style={{ backgroundColor: itemColor }} 
+                                                                                        />
                                                                                         {item.type === 'producerLot' 
                                                                                             ? `Lote: ${item.displayId}` 
                                                                                             : isVitafoodOrPackaging(item) 

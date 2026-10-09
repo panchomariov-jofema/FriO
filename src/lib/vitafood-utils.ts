@@ -405,6 +405,8 @@ export function parseVitafoodDispatchFile(file: File): Promise<VitafoodParsedDis
 export function cleanFirestoreObject<T>(obj: T): T {
     if (obj === null || obj === undefined) return null as any;
     if (typeof obj !== 'object') return obj;
+    if (obj instanceof Date) return obj;
+    if (obj.constructor && obj.constructor.name !== 'Object') return obj;
     if (Array.isArray(obj)) {
         return obj.map(item => cleanFirestoreObject(item)).filter(item => item !== undefined) as any;
     }

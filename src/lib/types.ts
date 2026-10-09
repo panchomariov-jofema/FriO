@@ -325,13 +325,19 @@ export interface OtherFruitReceptionItem {
     productName: string;
     quantity: number;
     observation?: string;
-    status: 'Pendiente de recibir' | 'Recibido' | 'Pendiente de almacenar' | 'Almacenado' | 'Despachado';
+    status: 'Pendiente de recibir' | 'Recibido' | 'Pendiente de almacenar' | 'Almacenado' | 'Despachado' | 'No Recepcionado';
     storageLocation?: {
       chamberId: string;
       coordinate: string;
       warehouse?: string;
       aisle?: string;
     };
+    receivedAt?: Timestamp | Date;
+    receivedByUserName?: string;
+    receivedByUserId?: string;
+    notReceivedAt?: Timestamp | Date;
+    notReceivedByUserName?: string;
+    notReceivedByUserId?: string;
     storedAt?: Timestamp | Date;
     storedByUserName?: string;
     storedByUserId?: string;
@@ -356,7 +362,7 @@ export interface OtherFruitReception {
   document: string;
   temperature?: number;
   items: OtherFruitReceptionItem[];
-  status: 'Pendiente de recibir' | 'Recibido' | 'Pendiente de almacenar' | 'Parcialmente Almacenado' | 'Almacenado' | 'Despachado';
+  status: 'Pendiente de recibir' | 'Recibido' | 'Pendiente de almacenar' | 'Parcialmente Almacenado' | 'Almacenado' | 'Despachado' | 'Cerrado';
   createdAt: Timestamp;
   updatedAt?: Timestamp;
   userId?: string;
@@ -482,6 +488,8 @@ export type StoredItem = {
   palletId?: string;
   containerId?: string;
   storedAt?: any;
+  productCode?: string;
+  productName?: string;
 }
 
 export interface BusinessEntity {

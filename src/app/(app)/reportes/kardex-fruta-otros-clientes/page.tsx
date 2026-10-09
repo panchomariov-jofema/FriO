@@ -17,7 +17,7 @@ import { doc, deleteDoc, writeBatch, serverTimestamp, getDoc, Timestamp } from '
 import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
-import { safeToDate } from '@/lib/utils';
+import { safeToDate, safeToMillis } from '@/lib/utils';
 
 function convertToCSV(data: any[], headers: string[]) {
     const headerRow = headers.join(';');
@@ -333,29 +333,29 @@ export default function OtherFruitKardexReportPage() {
                 const receivedItems = (reception.items || []).filter(item => item && item.status !== 'Pendiente de recibir');
                 if (receivedItems.length === 0) return;
 
-                const totalQuantity = receivedItems.reduce((sum, item) => sum + item.quantity, 0);
-                const observations = [...new Set(receivedItems.map(i => i.observation).filter(Boolean))].join(', ');
+                const totalQuantity = receivedItems.reduce((sum, item) => sum + (Number(item?.quantity) || 0), 0);
+                const observations = [...new Set(receivedItems.map(i => i?.observation).filter(Boolean))].join(', ');
 
-                const productNames = [...new Set(receivedItems.map(i => i.productName))].join(', ');
-                const productCodes = [...new Set(receivedItems.map(i => i.productCode))].join(', ');
-                const clientLotIds = [...new Set(receivedItems.map(i => i.clientLotId).filter(Boolean))].join(', ');
+                const productNames = [...new Set(receivedItems.map(i => i?.productName).filter(Boolean))].join(', ');
+                const productCodes = [...new Set(receivedItems.map(i => i?.productCode).filter(Boolean))].join(', ');
+                const clientLotIds = [...new Set(receivedItems.map(i => i?.clientLotId).filter(Boolean))].join(', ');
 
                 allMovements.push({
                     key: `${reception.id}-E`,
                     id: reception.id,
                     date: reception.createdAt,
                     type: 'entrada',
-                    clientName: reception.clientName,
-                    document: reception.document,
-                    documentNumber: reception.documentNumber,
+                    clientName: reception.clientName || '',
+                    document: reception.document || '',
+                    documentNumber: reception.documentNumber || '',
                     temperature: reception.temperature,
                     clientLotId: clientLotIds || '-',
                     productCode: productCodes,
                     productName: productNames,
                     quantity: totalQuantity,
-                    unit: reception.unit,
+                    unit: reception.unit || 'Bins',
                     observation: observations || '-',
-                    userName: reception.userName,
+                    userName: reception.userName || '',
                 });
             });
         }
@@ -364,33 +364,34 @@ export default function OtherFruitKardexReportPage() {
             movements.forEach(movement => {
                 if (movement.type !== 'salida') return;
 
-                const totalQuantity = movement.items.reduce((sum, item) => sum + item.quantity, 0);
-                const observations = [...new Set(movement.items.map(i => i.observation).filter(Boolean))].join(', ');
+                const movItems = movement.items || [];
+                const totalQuantity = movItems.reduce((sum, item) => sum + (Number(item?.quantity) || 0), 0);
+                const observations = [...new Set(movItems.map(i => i?.observation).filter(Boolean))].join(', ');
 
-                const productNames = [...new Set(movement.items.map(i => i.productName))].join(', ');
-                const productCodes = [...new Set(movement.items.map(i => i.productCode))].join(', ');
-                const clientLotIds = [...new Set(movement.items.map(i => i.clientLotId).filter(Boolean))].join(', ');
+                const productNames = [...new Set(movItems.map(i => i?.productName).filter(Boolean))].join(', ');
+                const productCodes = [...new Set(movItems.map(i => i?.productCode).filter(Boolean))].join(', ');
+                const clientLotIds = [...new Set(movItems.map(i => i?.clientLotId).filter(Boolean))].join(', ');
 
                 allMovements.push({
                     key: `${movement.id}-S`,
                     id: movement.id,
                     date: movement.createdAt,
                     type: 'salida',
-                    clientName: movement.clientName,
-                    document: movement.document,
+                    clientName: movement.clientName || '',
+                    document: movement.document || '',
                     documentNumber: '',
                     clientLotId: clientLotIds || '-',
                     productCode: productCodes,
                     productName: productNames,
                     quantity: -totalQuantity,
-                    unit: movement.unit,
+                    unit: movement.unit || 'Bins',
                     observation: observations || '-',
-                    userName: movement.userName,
+                    userName: movement.userName || '',
                 });
             });
         }
 
-        return allMovements.sort((a, b) => (b.date?.toMillis() ?? 0) - (a.date?.toMillis() ?? 0));
+        return allMovements.sort((a, b) => safeToMillis(b.date) - safeToMillis(a.date));
     }, [receptions, movements]);
 
     const [clientFilter, setClientFilter] = React.useState('all');
@@ -398,14 +399,14 @@ export default function OtherFruitKardexReportPage() {
     
     const filteredData = React.useMemo(() => {
         return kardexData.filter(item => {
-            const clientMatch = clientFilter !== 'all' ? item.clientName.toLowerCase().includes(clientFilter.toLowerCase()) : true;
-            const productMatch = productFilter ? item.productCode.toLowerCase().includes(productFilter.toLowerCase()) : true;
+            const clientMatch = clientFilter !== 'all' ? (item.clientName || '').toLowerCase().includes(clientFilter.toLowerCase()) : true;
+            const productMatch = productFilter ? (item.productCode || '').toLowerCase().includes(productFilter.toLowerCase()) : true;
             return clientMatch && productMatch;
         });
     }, [kardexData, clientFilter, productFilter]);
 
     const clientOptions = React.useMemo(() => {
-        return [...new Set(kardexData.map(item => item.clientName))];
+        return [...new Set(kardexData.map(item => item.clientName).filter((name): name is string => typeof name === 'string' && name.trim().length > 0))];
     }, [kardexData]);
 
     const handleExport = () => {
@@ -416,16 +417,17 @@ export default function OtherFruitKardexReportPage() {
                 "Fecha": formattedDate,
                 "Tipo": item.type,
                 "Cliente": item.clientName,
-            "Documento": item.document,
-            "N° Documento": (item as any).documentNumber || '',
-            "Temperatura": item.temperature ? `${item.temperature.toFixed(1)}°C` : '',
-            "Lote Cliente": item.clientLotId || '',
-            "Codigo Producto": item.productCode,
-            "Nombre Producto": item.productName,
-            "Cantidad": `${item.quantity} ${item.unit}`,
-            "Observación": item.observation || '',
-            "Usuario": item.userName || '',
-        }; });
+                "Documento": item.document,
+                "N° Documento": (item as any).documentNumber || '',
+                "Temperatura": (typeof item.temperature === 'number') ? `${item.temperature.toFixed(1)}°C` : (item.temperature ? `${item.temperature}°C` : ''),
+                "Lote Cliente": item.clientLotId || '',
+                "Codigo Producto": item.productCode,
+                "Nombre Producto": item.productName,
+                "Cantidad": `${item.quantity} ${item.unit}`,
+                "Observación": item.observation || '',
+                "Usuario": item.userName || '',
+            };
+        });
         const headers = ["Fecha", "Tipo", "Cliente", "Documento", "N° Documento", "Temperatura", "Lote Cliente", "Codigo Producto", "Nombre Producto", "Cantidad", "Observación", "Usuario"];
         const csv = convertToCSV(dataToExport, headers);
         downloadCSV(csv, 'kardex_fruta_otros_clientes.csv');
@@ -576,17 +578,17 @@ export default function OtherFruitKardexReportPage() {
                                         </TableCell>
                                         <TableCell>
                                             <Badge variant={item.type === 'entrada' ? 'default' : 'secondary'}>
-                                                {item.type.charAt(0).toUpperCase() + item.type.slice(1)}
+                                                {item.type ? (item.type.charAt(0).toUpperCase() + item.type.slice(1)) : '-'}
                                             </Badge>
                                         </TableCell>
-                                        <TableCell>{item.clientName}</TableCell>
+                                        <TableCell>{item.clientName || '-'}</TableCell>
                                         <TableCell>
-                                            <div>{item.document}</div>
+                                            <div>{item.document || '-'}</div>
                                             {(item as any).documentNumber && (
                                                 <span className="text-[10px] text-muted-foreground block mt-0.5">Doc: {(item as any).documentNumber}</span>
                                             )}
                                         </TableCell>
-                                        <TableCell>{item.temperature ? item.temperature.toFixed(1) : '-'}</TableCell>
+                                        <TableCell>{typeof item.temperature === 'number' ? item.temperature.toFixed(1) : (item.temperature ? String(item.temperature) : '-')}</TableCell>
                                         <TableCell className="font-mono">{item.clientLotId || '-'}</TableCell>
                                         <TableCell>{item.productCode}</TableCell>
                                         <TableCell>{item.productName}</TableCell>
