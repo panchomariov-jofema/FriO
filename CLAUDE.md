@@ -41,6 +41,7 @@ firebase deploy    # App Hosting. NO usar Firebase Hosting ni apphosting:backend
 | Datos Maestros (`/datos-maestros`) | `docs/ai/modulos/datos-maestros.md` | `components/master-data/*` |
 | Deuda técnica y riesgos conocidos | `docs/ai/90-deuda-tecnica.md` | — |
 | Bitácora de cambios/decisiones | `docs/ai/99-bitacora.md` | — |
+| Plan de mantención priorizado | `docs/ai/plan-mejoras.md` | — |
 
 ## Reglas de trabajo (obligatorias)
 1. **Cambios mínimos y quirúrgicos.** Los archivos son enormes (fall-creek/page.tsx ~2.500 líneas, VitafoodReceptionWorkflow ~1.900). Edita la función puntual; no reescribas el archivo.
@@ -53,7 +54,9 @@ firebase deploy    # App Hosting. NO usar Firebase Hosting ni apphosting:backend
 8. Clientes especiales se detectan por **nombre** (`'FALL CREEK'`, `includes('VITAFOOD')`). No renombrar esos clientes en Datos Maestros. Si agregas lógica nueva por cliente, centralízala (ver deuda técnica).
 9. Correr `npm run typecheck` al terminar (el build no avisa errores).
 10. **Nunca** mostrar/commitear `.env.local`, `service-account.json`, ni tokens de Telegram (`settings/telegram`).
-11. Al terminar una mejora: agregar 1–3 líneas en `docs/ai/99-bitacora.md` y actualizar el doc del módulo si cambió un flujo, estado o colección.
+11. **Datos intocables:** clientes activos. Nunca borrar, reescribir ni "reparar" documentos en Firestore sin autorización explícita del dueño en esa misma conversación. Antes de cualquier cambio con impacto en datos: respaldo + conteos (ver `docs/ai/plan-mejoras.md` A0).
+12. **No cambiar el modelo de IA** (`src/ai/genkit.ts`, `gemini-1.5-flash`): decisión del dueño, funciona bien.
+13. Al terminar una mejora: agregar 1–3 líneas en `docs/ai/99-bitacora.md` y actualizar el doc del módulo si cambió un flujo, estado o colección.
 
 ## Archivos que NO son la app (ignorar salvo pedido)
 `scratch/`, `scratch_*.js` (scripts admin con service account), `*.html` de simulación en raíz y `docs/` (layouts, QRs, manuales), `*.xlsx`, `*.mp4`, `docs/backend.json` (blueprint viejo de Firebase Studio, **no** refleja la BD real), `src/lib/mock-chamber5.ts`, `src/firebase/query_cam6_direct.ts`.

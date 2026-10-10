@@ -22,5 +22,5 @@ Ordenado por prioridad sugerida. Al resolver uno, moverlo a la bitácora.
 13. Referencias por `itemIndex` en `items[]` (frágil). A futuro: ítems con id propio.
 14. Cereza: picking total **borra** el `chamberLot` (se pierde traza; el status `Despachado` existe pero no se usa ahí).
 15. Restos de plantilla: `README.md` de Firebase Studio, `docs/backend.json`, `mock-chamber5.ts`, `query_cam6_direct.ts`, `firebase/firestore/use-collection.tsx` casi sin uso, archivos vacíos `git` y `main` en la raíz.
-16. Modelo Genkit `gemini-1.5-flash` (antiguo); evaluar actualizar si falla la lectura de manifiestos.
+16. Modelo Genkit `gemini-1.5-flash`: **decisión del dueño mantenerlo** (funciona). No tocar.
 17. Raíz del proyecto mezclada con archivos de negocio (xlsx, mp4, html de simulación). Sugerido moverlos a `docs/negocio/` y `docs/simulaciones/`.
