@@ -29,6 +29,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
+import { useFirestoreQuery } from '@/hooks/use-firestore-query';
 import type { ChamberLot, Dispatch, Exporter, Producer, ReceptionLot, OtherFruitReception } from '@/lib/types';
 import { useFirestore, useCollection, useMemoFirebase, useUser } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
@@ -76,7 +77,10 @@ type DispatchFormValues = z.infer<typeof dispatchSchema>;
 
 function DespachosPageContent() {
   const { data: allExporters, loading: loadingExporters } = useFirestoreCollection<Exporter>('exporters');
-  const { data: chamberLots, loading: loadingChamberLots } = useFirestoreCollection<ChamberLot>('chamberLots');
+  const activeChamberLotsConstraints = React.useMemo(() => [
+    where('status', 'in', ['Pendiente por Almacenar', 'Almacenado'])
+  ], []);
+  const { data: chamberLots, loading: loadingChamberLots } = useFirestoreQuery<ChamberLot>('chamberLots', activeChamberLotsConstraints);
   const { data: allProducers, loading: loadingProducers } = useFirestoreCollection<Producer>('producers');
   const { data: otherFruitReceptions, loading: loadingOtherFruit } = useFirestoreCollection<OtherFruitReception>('otherFruitReceptions');
 

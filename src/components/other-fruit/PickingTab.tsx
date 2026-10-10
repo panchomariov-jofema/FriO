@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
+import { useFirestoreQuery } from '@/hooks/use-firestore-query';
 import type { OtherFruitMovement, OtherFruitReception, OtherClient, OtherFruitMovementLocation, PackagingMovement, PackagingReception, Dispatch, ChamberLot } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -10,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useFirestore, useUser } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
-import { doc, collection, writeBatch, serverTimestamp, deleteDoc } from 'firebase/firestore';
+import { doc, collection, writeBatch, serverTimestamp, deleteDoc, where } from 'firebase/firestore';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { OtherFruitPickingDialog } from './OtherFruitPickingDialog';
@@ -39,7 +40,10 @@ export function OtherFruitPickingTab() {
   const { data: otherFruitMovements, loading: loadingFruitMovements } = useFirestoreCollection<OtherFruitMovement>('otherFruitMovements');
   const { data: packagingMovements, loading: loadingPackagingMovements } = useFirestoreCollection<PackagingMovement>('packagingMovements');
   const { data: dispatches, loading: loadingDispatches } = useFirestoreCollection<Dispatch>('dispatches');
-  const { data: allChamberLots, loading: loadingChamberLots } = useFirestoreCollection<ChamberLot>('chamberLots');
+  const activeChamberLotsConstraints = React.useMemo(() => [
+    where('status', 'in', ['Pendiente por Almacenar', 'Almacenado'])
+  ], []);
+  const { data: allChamberLots, loading: loadingChamberLots } = useFirestoreQuery<ChamberLot>('chamberLots', activeChamberLotsConstraints);
   const { data: packagingReceptions, loading: loadingPackagingReceptions } = useFirestoreCollection<PackagingReception>('packagingReceptions');
   const { data: otherFruitReceptions, loading: loadingOtherFruitReceptions } = useFirestoreCollection<OtherFruitReception>('otherFruitReceptions');
   const { data: allClients, loading: loadingClients } = useFirestoreCollection<OtherClient>('otherClients');

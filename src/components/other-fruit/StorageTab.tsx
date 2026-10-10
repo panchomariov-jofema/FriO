@@ -4,13 +4,14 @@ import * as React from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
+import { useFirestoreQuery } from '@/hooks/use-firestore-query';
 import type { OtherFruitReception, OtherFruitReceptionItem, ChamberLot, PackagingReception, PackagingReceptionItem } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { StoreOtherFruitDialog } from './StoreOtherFruitDialog';
 import { useFirestore } from '@/firebase';
-import { doc, serverTimestamp, updateDoc, runTransaction } from 'firebase/firestore';
+import { doc, serverTimestamp, updateDoc, runTransaction, where } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { StorePackagingDialog } from '../packaging/StorePackagingDialog';
 import { chambersConfig } from '@/lib/chambers-config';
@@ -51,7 +52,10 @@ type ConsolidatedPendingItem = PendingFruitItem | PendingPackagingItem;
 export function OtherFruitStorageTab({ clientId: fixedClientId, onlyPackaging }: { clientId?: string; onlyPackaging?: boolean }) {
   const { data: otherFruitReceptions, loading: loadingFruit } = useFirestoreCollection<OtherFruitReception>('otherFruitReceptions');
   const { data: packagingReceptions, loading: loadingPackaging } = useFirestoreCollection<PackagingReception>('packagingReceptions');
-  const { data: allChamberLots, loading: loadingChamberLots } = useFirestoreCollection<ChamberLot>('chamberLots');
+  const activeChamberLotsConstraints = React.useMemo(() => [
+    where('status', 'in', ['Pendiente por Almacenar', 'Almacenado'])
+  ], []);
+  const { data: allChamberLots, loading: loadingChamberLots } = useFirestoreQuery<ChamberLot>('chamberLots', activeChamberLotsConstraints);
   const { data: clientConfigs } = useFirestoreCollection<ClientStorageConfig>('clientStorageConfigs');
   const { data: exporters } = useFirestoreCollection<Exporter>('exporters');
   const { data: otherClients } = useFirestoreCollection<OtherClient>('otherClients');
