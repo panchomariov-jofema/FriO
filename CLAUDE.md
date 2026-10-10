@@ -57,6 +57,7 @@ firebase deploy    # App Hosting. NO usar Firebase Hosting ni apphosting:backend
 11. **Datos intocables:** clientes activos. Nunca borrar, reescribir ni "reparar" documentos en Firestore sin autorización explícita del dueño en esa misma conversación. Antes de cualquier cambio con impacto en datos: respaldo + conteos (ver `docs/ai/plan-mejoras.md` A0).
 12. **No cambiar el modelo de IA** (`src/ai/genkit.ts`, `gemini-1.5-flash`): decisión del dueño, funciona bien.
 13. Al terminar una mejora: agregar 1–3 líneas en `docs/ai/99-bitacora.md` y actualizar el doc del módulo si cambió un flujo, estado o colección.
+14. **Cierre de ciclo Fall Creek (futuro):** Cuando se termine de despachar la totalidad de plantas de Fall Creek, cerrar el ciclo marcando formalmente los documentos/manifiestos de `otherFruitReceptions` como `'Despachado'` o `'Cerrado'` (cierre de temporada sin alterar historial).
 
 ## Archivos que NO son la app (ignorar salvo pedido)
 `scratch/`, `scratch_*.js` (scripts admin con service account), `*.html` de simulación en raíz y `docs/` (layouts, QRs, manuales), `*.xlsx`, `*.mp4`, `docs/backend.json` (blueprint viejo de Firebase Studio, **no** refleja la BD real), `src/lib/mock-chamber5.ts`, `src/firebase/query_cam6_direct.ts`.

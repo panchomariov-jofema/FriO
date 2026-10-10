@@ -918,10 +918,12 @@ export function VitafoodDispatchTab() {
             });
 
             const allDispatched = currentItems.every(i => (i.status as any) === 'Despachado');
+            const newStatus = allDispatched ? 'Despachado' : 'Parcialmente Despachado';
             batch.update(pkgRef, cleanFirestoreObject({
               items: currentItems,
-              status: allDispatched ? 'Almacenado' : 'Parcialmente Almacenado',
+              status: newStatus,
               updatedAt: serverTimestamp(),
+              lastDispatchDocument: dispatchDocument,
             }));
           }
         }
