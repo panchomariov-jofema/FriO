@@ -12,6 +12,7 @@ import { Timestamp, collection, doc, writeBatch, query, where, getDocs, serverTi
 import { Button } from '@/components/ui/button';
 import { Upload, Download, Trash2, Info, X, Calendar as CalendarIcon, Pencil } from 'lucide-react';
 import { useFirestore, useUser } from '@/firebase';
+import { isAdminUser, MASTER_ADMIN_EMAIL } from '@/lib/auth-utils';
 import { useToast } from '@/hooks/use-toast';
 import { parse, format, isWithinInterval, startOfDay, endOfDay } from 'date-fns';
 import {
@@ -123,8 +124,8 @@ export default function BinMaterialKardexReportPage() {
     const { toast } = useToast();
     const fileInputRef = React.useRef<HTMLInputElement>(null);
 
-    const isAuthorized = user?.email === 'francisco.villarreal@outlook.es' || user?.email === 'jlog@frio.cl';
-    const isAdmin = user?.email === 'francisco.villarreal@outlook.es';
+    const isAuthorized = isAdminUser(user) || user?.email === 'jlog@frio.cl';
+    const isAdmin = isAdminUser(user);
 
     // Filters State
     const [dateRange, setDateRange] = React.useState<DateRange | undefined>(undefined);
@@ -198,7 +199,7 @@ export default function BinMaterialKardexReportPage() {
             }
             return 'Sistema';
         }
-        if (name === 'francisco.villarreal@outlook.es') return 'ADMINISTRADOR';
+        if (name.toLowerCase() === MASTER_ADMIN_EMAIL.toLowerCase()) return 'ADMINISTRADOR';
         return name;
     };
 

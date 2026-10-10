@@ -14,13 +14,14 @@ import { StockTab } from '@/components/bins-materials/StockTab';
 import { Checkbox } from '@/components/ui/checkbox';
 import { usePermissions } from '@/contexts/PermissionsContext';
 import { useUser } from '@/firebase';
+import { isAdminUser } from '@/lib/auth-utils';
 import { Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { CreateProducerDialog } from '@/components/bins-materials/CreateProducerDialog';
 
 export default function BinsYMaterialesPage() {
   const { user } = useUser();
-  const isAdmin = user?.email === 'francisco.villarreal@outlook.es';
+  const isAdmin = isAdminUser(user);
 
   const [selectedExporterId, setSelectedExporterId] = React.useState<string | null>(null);
   const [selectedProducerId, setSelectedProducerId] = React.useState<string | null>(null);

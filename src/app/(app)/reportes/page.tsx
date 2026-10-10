@@ -24,6 +24,7 @@ import {
     ScanLine
 } from 'lucide-react';
 import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
+import { isAdminUser } from '@/lib/auth-utils';
 import type { ReportSetting } from '@/lib/types';
 import { collection, doc, setDoc } from 'firebase/firestore';
 import { Switch } from '@/components/ui/switch';
@@ -155,7 +156,7 @@ const reportList = [
 export default function ReportesPage() {
     const { user } = useUser();
     const firestore = useFirestore();
-    const isAdmin = user?.email === 'francisco.villarreal@outlook.es';
+    const isAdmin = isAdminUser(user);
 
     const reportSettingsQuery = useMemoFirebase(() => {
         if (!firestore) return null;

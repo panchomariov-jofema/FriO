@@ -188,6 +188,7 @@ export interface Profile {
   profileId: string;
   name: string;
   modulesAccess: ModulePermission[];
+  isAdmin?: boolean;
 }
 
 export type Variety = 'SANTINA' | 'LAPINS' | 'REGINA' | 'KORDIA' | 'SKEENA' | 'SWEETHEART' | 'SYLVIA' | 'SUNBURST';

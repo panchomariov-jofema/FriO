@@ -2,6 +2,7 @@
 
 Formato: `AAAA-MM-DD · módulo · qué cambió (archivos) · por qué`. Lo más nuevo arriba. 1–3 líneas por entrada.
 
+- 2026-10-10 · auth · M1: Centralización de rol administrador en `lib/auth-utils.ts` (`isAdminUser`, `MASTER_ADMIN_EMAIL`), preservando de forma permanente a `francisco.villarreal@outlook.es` como Administrador Maestro y habilitando `isAdmin?: boolean` opcional en `Profile` sin modificar perfiles en Firestore.
 - 2026-10-10 · limpieza · M5: Eliminado componente duplicado huérfano `src/components/hidrocooler/page.tsx` tras verificar que no tenía importaciones. La ruta activa es `src/app/(app)/hidrocooler/page.tsx`.
 - 2026-10-10 · vitafood/fallcreek · Estandarización de cierre de ciclo de despachos en `VitafoodDispatchTab.tsx` (`packagingReceptions` pasa a `'Despachado'`/`'Parcialmente Despachado'` de forma consistente). Se programa en `CLAUDE.md` regla para cierre formal de temporada Fall Creek.
 - 2026-10-10 · optimizacion · A3: Creación de hook `useFirestoreQuery` (`hooks/use-firestore-query.ts`) para consultar sólo stock vivo de `chamberLots` en pantallas operativas (`despachos/page.tsx`, `other-fruit/PickingTab.tsx`, `other-fruit/StorageTab.tsx`). Se preserva `otherFruitReceptions` intacto tras verificar inconsistencia de status de cabecera en BD. Reportes y kardex no tocados.

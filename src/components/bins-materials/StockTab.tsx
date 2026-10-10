@@ -8,6 +8,7 @@ import type { Exporter, BinMaterial, BinMaterialMovement, ChamberLot, Dispatch }
 import { collection, query, where, getDocs, writeBatch, doc, serverTimestamp } from 'firebase/firestore';
 import { Skeleton } from '../ui/skeleton';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
+import { isAdminUser } from '@/lib/auth-utils';
 import { Button } from '../ui/button';
 import { Trash2, Upload, Download } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -57,7 +58,7 @@ export function StockTab({ exporterId }: StockTabProps) {
   const { data: dispatches, loading: loadingDispatches } = useFirestoreCollection<Dispatch>('dispatches');
   const { data: allMaterials, loading: loadingMaterials } = useFirestoreCollection<BinMaterial>('binMaterials');
 
-  const isAdmin = user?.email === 'francisco.villarreal@outlook.es';
+  const isAdmin = isAdminUser(user);
 
   const loading = loadingExporters || loadingMovements || loadingChamberLots || loadingDispatches || loadingMaterials;
 
