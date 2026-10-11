@@ -2,6 +2,7 @@
 
 Formato: `AAAA-MM-DD · módulo · qué cambió (archivos) · por qué`. Lo más nuevo arriba. 1–3 líneas por entrada.
 
+- 2026-10-11 · release · Despliegue de "Mejoras Seguridad": compilación estricta validada, auth reforzado (M6/M1), consultas optimizadas (A3), reglas Firestore (A1) y limpieza de repo.
 - 2026-10-11 · config · B2: Habilitada verificación estricta de tipos en build (`ignoreBuildErrors: false` en `next.config.ts`) tras validar compilación limpia de 31 rutas estáticas y dinámicas al 100%.
 - 2026-10-11 · types · B1: Definición de tipo único `StorageStrategy` en `src/lib/types.ts` reutilizado en `Exporter`, `OtherClient`, `ClientStorageConfig` y `getSortedCoordinates` (`src/lib/utils.ts`). Sin alteración de valores, orden ni datos de Firestore.
 - 2026-10-11 · limpieza · B5: Organización de archivos del proyecto. Eliminados archivos residuales vacíos (`git`, `main`, `.modified`), archivos de negocio movidos a `docs/negocio/`, simulaciones HTML a `docs/simulaciones/`, manuales a `docs/manuales/`, y actualizado `README.md` apuntando a `CLAUDE.md`.
