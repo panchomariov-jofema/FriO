@@ -2,6 +2,7 @@
 
 Formato: `AAAA-MM-DD · módulo · qué cambió (archivos) · por qué`. Lo más nuevo arriba. 1–3 líneas por entrada.
 
+- 2026-10-11 · config · B2: Habilitada verificación estricta de tipos en build (`ignoreBuildErrors: false` en `next.config.ts`) tras validar compilación limpia de 31 rutas estáticas y dinámicas al 100%.
 - 2026-10-11 · types · B1: Definición de tipo único `StorageStrategy` en `src/lib/types.ts` reutilizado en `Exporter`, `OtherClient`, `ClientStorageConfig` y `getSortedCoordinates` (`src/lib/utils.ts`). Sin alteración de valores, orden ni datos de Firestore.
 - 2026-10-11 · limpieza · B5: Organización de archivos del proyecto. Eliminados archivos residuales vacíos (`git`, `main`, `.modified`), archivos de negocio movidos a `docs/negocio/`, simulaciones HTML a `docs/simulaciones/`, manuales a `docs/manuales/`, y actualizado `README.md` apuntando a `CLAUDE.md`.
 - 2026-10-11 · auth/seguridad · M6: Eliminación de auto-registro y acceso anónimo en `login/page.tsx`. Bloqueo estricto en `(app)/layout.tsx`: sólo usuarios con perfil configurado en `usersMaster` y el Administrador Maestro pueden acceder al sistema (acceso restringido para cuentas sin perfil).
@@ -20,4 +21,5 @@ Formato: `AAAA-MM-DD · módulo · qué cambió (archivos) · por qué`. Lo más
 - 2026-10-08 · docs · Se crea `CLAUDE.md` + `docs/ai/` (arquitectura, modelo de datos, cámaras, módulos, deuda técnica) y `.agents/rules/frio-context.md` para acelerar mejoras con IA.
 
 ## Pendientes conocidos
-- `ERROR DESPACHO 22.09.txt`: "bins sale 12783 / 12784" — revisar diferencia de 1 bin en despacho del 22-09.
+- `ERROR DESPACHO 22.09.txt`: Diagnóstico completado (M2). Pallet 12784 (Fall Creek, 3 bins) fragmentado deliberadamente por despacho de 40 bins exactos a Agrícola El Álamo (40 no es múltiplo de 3; salieron 2 bins y 1 quedó en stock). Stock histórico y físico cuadran al 100%. No requiere corrección en base de datos.
+- M4 (Ocupación de cámaras y cálculo dinámico): Postergado por decisión técnica (Alternativa 1) para evitar riesgos en renderizado y degradados durante temporada activa.
