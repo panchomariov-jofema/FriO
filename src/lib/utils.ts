@@ -1,6 +1,6 @@
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
-import type { Chamber, DTEGuiaDespacho } from './types';
+import type { Chamber, DTEGuiaDespacho, StorageStrategy } from './types';
 import { getAllowedComodinCols } from './chambers-config';
 
 export function cn(...inputs: ClassValue[]) {
@@ -108,7 +108,7 @@ export const getFifoVerticalCoordinates = (chamberConfig: Chamber): string[] => 
     return coords;
 };
 
-export const getSortedCoordinates = (chamberConfig: Chamber, strategy: 'secuencial' | 'fifo' | 'aisle-access' | 'horizontal-secuencial' | 'inverted-secuencial' | 'pareado' | 'serpentina-vertical' | 'modelo-sof' | 'fifo-vertical'): string[] => {
+export const getSortedCoordinates = (chamberConfig: Chamber, strategy: StorageStrategy): string[] => {
   if (strategy === 'fifo-vertical') {
     return getFifoVerticalCoordinates(chamberConfig);
   }

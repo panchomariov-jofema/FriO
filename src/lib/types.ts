@@ -3,6 +3,17 @@
 
 import type { Timestamp } from "firebase/firestore";
 
+export type StorageStrategy = 
+  | 'secuencial' 
+  | 'fifo' 
+  | 'aisle-access' 
+  | 'horizontal-secuencial' 
+  | 'inverted-secuencial' 
+  | 'pareado' 
+  | 'serpentina-vertical' 
+  | 'modelo-sof' 
+  | 'fifo-vertical';
+
 export interface Exporter {
   id: string;
   exporterId: string;
@@ -10,7 +21,7 @@ export interface Exporter {
   type: string;
   status?: 'activo' | 'inactivo';
   // Logistics Configuration
-  storageStrategy?: 'secuencial' | 'fifo' | 'aisle-access' | 'horizontal-secuencial' | 'inverted-secuencial' | 'pareado' | 'serpentina-vertical' | 'modelo-sof' | 'fifo-vertical';
+  storageStrategy?: StorageStrategy;
   binsPerCoordinate?: number;
   palletsPerCoordinate?: number;
 }
@@ -78,7 +89,7 @@ export interface OtherClient {
   unit: 'Bins' | 'Pallets';
   status?: 'activo' | 'inactivo';
   // Logistics Configuration
-  storageStrategy?: 'secuencial' | 'fifo' | 'aisle-access' | 'horizontal-secuencial' | 'inverted-secuencial' | 'pareado' | 'serpentina-vertical' | 'modelo-sof' | 'fifo-vertical';
+  storageStrategy?: StorageStrategy;
   binsPerCoordinate?: number;
   palletsPerCoordinate?: number;
 }
@@ -528,7 +539,7 @@ export interface Aisle {
 export interface ClientStorageConfig {
   id: string; // ClientId (Exporter ID or OtherClient ID)
   clientName: string;
-  strategy: 'secuencial' | 'fifo' | 'aisle-access' | 'horizontal-secuencial' | 'inverted-secuencial' | 'pareado' | 'serpentina-vertical' | 'modelo-sof' | 'fifo-vertical';
+  strategy: StorageStrategy;
   binsPerCoordinate: number;
   palletsPerCoordinate: number;
   preferredChamberId?: string;

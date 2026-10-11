@@ -2,6 +2,7 @@
 
 Formato: `AAAA-MM-DD · módulo · qué cambió (archivos) · por qué`. Lo más nuevo arriba. 1–3 líneas por entrada.
 
+- 2026-10-11 · types · B1: Definición de tipo único `StorageStrategy` en `src/lib/types.ts` reutilizado en `Exporter`, `OtherClient`, `ClientStorageConfig` y `getSortedCoordinates` (`src/lib/utils.ts`). Sin alteración de valores, orden ni datos de Firestore.
 - 2026-10-11 · limpieza · B5: Organización de archivos del proyecto. Eliminados archivos residuales vacíos (`git`, `main`, `.modified`), archivos de negocio movidos a `docs/negocio/`, simulaciones HTML a `docs/simulaciones/`, manuales a `docs/manuales/`, y actualizado `README.md` apuntando a `CLAUDE.md`.
 - 2026-10-11 · auth/seguridad · M6: Eliminación de auto-registro y acceso anónimo en `login/page.tsx`. Bloqueo estricto en `(app)/layout.tsx`: sólo usuarios con perfil configurado en `usersMaster` y el Administrador Maestro pueden acceder al sistema (acceso restringido para cuentas sin perfil).
 - 2026-10-11 · clientes · M3: Centralización de clientes especiales (Fall Creek, Vitafoods) y equivalencias de unidad en `lib/clients.ts` (`isFallCreek`, `isVitafood`, `binsPerUnit`). Unificados 8 archivos operativos sin modificar colecciones ni datos en Firestore.
