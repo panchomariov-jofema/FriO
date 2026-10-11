@@ -28,6 +28,8 @@ import { notifyPalletLogStored } from '@/lib/telegram';
 import { ChevronDown } from 'lucide-react';
 import { cleanFirestoreObject } from '@/lib/vitafood-utils';
 import { isFallCreek, binsPerUnit } from '@/lib/clients';
+import { useOfflineSync, OfflineSyncIndicator } from './OfflineSyncIndicator';
+import { applyOfflineQueueToManifest, enqueueOfflineAction } from '@/lib/vitafood-offline-sync';
 
 type PendingFruitItem = OtherFruitReceptionItem & {
     type: 'fruit';
@@ -94,6 +96,17 @@ export function OtherFruitStorageTab({ clientId: fixedClientId, onlyPackaging }:
   const firestore = useFirestore();
   const { user } = useUser();
   const { toast } = useToast();
+  const { queue: offlineQueue } = useOfflineSync();
+
+  const effectiveOtherFruitReceptions = React.useMemo(() => {
+    if (!otherFruitReceptions) return [];
+    return otherFruitReceptions.map(r => {
+      if (r.clientName?.toUpperCase().includes('VITAFOOD') || r.clientId?.toUpperCase().includes('VITAFOOD')) {
+        return applyOfflineQueueToManifest(r, offlineQueue);
+      }
+      return r;
+    });
+  }, [otherFruitReceptions, offlineQueue]);
 
   // Focus input when scanner closes
   React.useEffect(() => {
@@ -113,7 +126,7 @@ export function OtherFruitStorageTab({ clientId: fixedClientId, onlyPackaging }:
 
   const allConsolidatedItems = React.useMemo(() => {
         // Fruit/Packaging items from otherFruitReceptions
-        const fruitItemsRaw: PendingFruitItem[] = (otherFruitReceptions || [])
+        const fruitItemsRaw: PendingFruitItem[] = (effectiveOtherFruitReceptions || [])
             .filter(lot => {
                 if (onlyPackaging && !isPackagingClient(lot)) return false;
                 return ['Pendiente de almacenar', 'Parcialmente Almacenado', 'Recibido', 'Parcialmente Recibido'].includes(lot.status);
@@ -161,32 +174,32 @@ export function OtherFruitStorageTab({ clientId: fixedClientId, onlyPackaging }:
             );
 
         return [...fruitItems, ...packagingItems];
-    }, [otherFruitReceptions, packagingReceptions, onlyPackaging, isPackagingClient]);
+    }, [effectiveOtherFruitReceptions, packagingReceptions, onlyPackaging, isPackagingClient]);
 
     const pendingItems = React.useMemo(() => {
         return allConsolidatedItems.filter(item => {
             if (!selectedClientId) return true;
             
             const reception = item.type === 'fruit' ? 
-                otherFruitReceptions?.find(r => r.id === item.receptionId) : 
+                effectiveOtherFruitReceptions?.find(r => r.id === item.receptionId) : 
                 packagingReceptions?.find(r => r.id === item.receptionId);
             
             return reception?.clientId === selectedClientId;
         })
         .sort((a,b) => {
-            const allReceptions = [...(otherFruitReceptions || []), ...(packagingReceptions || [])];
+            const allReceptions = [...(effectiveOtherFruitReceptions || []), ...(packagingReceptions || [])];
             const lotA = allReceptions.find(l => l.id === a.receptionId);
             const lotB = allReceptions.find(l => l.id === b.receptionId);
             const timeA = lotA ? safeToMillis(lotA.createdAt) : 0;
             const timeB = lotB ? safeToMillis(lotB.createdAt) : 0;
             return timeA - timeB;
         });
-  }, [allConsolidatedItems, otherFruitReceptions, packagingReceptions, selectedClientId]);
+  }, [allConsolidatedItems, effectiveOtherFruitReceptions, packagingReceptions, selectedClientId]);
 
   const clientsWithPending = React.useMemo(() => {
     const clientsMap = new Map<string, { id: string; name: string; count: number }>();
     
-    (otherFruitReceptions || [])
+    (effectiveOtherFruitReceptions || [])
       .filter(r => !onlyPackaging || isPackagingClient(r))
       .forEach(reception => {
         const pendingCount = reception.items.filter(i => i.status === 'Pendiente de almacenar').length;
@@ -213,7 +226,7 @@ export function OtherFruitStorageTab({ clientId: fixedClientId, onlyPackaging }:
     });
 
     return Array.from(clientsMap.values()).sort((a, b) => b.count - a.count);
-  }, [otherFruitReceptions, packagingReceptions, onlyPackaging, isPackagingClient]);
+  }, [effectiveOtherFruitReceptions, packagingReceptions, onlyPackaging, isPackagingClient]);
 
   const chamberSanitaryMap = React.useMemo(() => {
     const map = new Map<string, { hasFruit: boolean; hasPackaging: boolean }>();
@@ -230,7 +243,7 @@ export function OtherFruitStorageTab({ clientId: fixedClientId, onlyPackaging }:
     });
 
     // 2. OtherFruit Receptions (Fruit vs Packaging)
-    (otherFruitReceptions || []).forEach(reception => {
+    (effectiveOtherFruitReceptions || []).forEach(reception => {
       const isPkg = reception.clientName?.toUpperCase().includes('VITAFOOD') || 
                     reception.clientId?.toUpperCase().includes('VITAFOOD') ||
                     reception.clientName?.toUpperCase().includes('EMBALAJE');
@@ -401,14 +414,48 @@ export function OtherFruitStorageTab({ clientId: fixedClientId, onlyPackaging }:
     strategy: 'secuencial' | 'pareado' | 'aisle-access' | 'inverted-secuencial' | 'horizontal-secuencial' | 'fifo' | 'serpentina-vertical' | 'modelo-sof' | 'fifo-vertical' 
   }, overrideItem?: PendingFruitItem) => {
     const itemToProcessScope = overrideItem || (selectedItem?.type === 'fruit' ? selectedItem : null);
-    if (!itemToProcessScope || !firestore) return;
+    if (!itemToProcessScope) return;
 
     const { chamberId, coordinate: startCoordinate, warehouse, aisle, destinationType, totalQuantity, quantityPerLocation, strategy } = data;
 
-    const originalReception = otherFruitReceptions.find(r => r.id === itemToProcessScope.receptionId);
+    const originalReception = (effectiveOtherFruitReceptions || []).find(r => r.id === itemToProcessScope.receptionId);
     if (!originalReception) {
         toast({ title: "Error", description: "No se encontró la recepción original.", variant: "destructive" });
         return;
+    }
+
+    const isTargetPkg = isPackagingClient(originalReception);
+    const isOffline = typeof navigator !== 'undefined' && !navigator.onLine;
+
+    // Offline / Modo Cámara for packaging & Vitafood items
+    if ((isOffline || !firestore) && isTargetPkg) {
+      const isWarehouse = destinationType === 'warehouse' || (warehouse && aisle);
+      const targetLocation = isWarehouse
+        ? { warehouse: warehouse || '', aisle: aisle || '', chamberId: warehouse || '', coordinate: aisle || '' }
+        : { chamberId, coordinate: startCoordinate };
+
+      itemToProcessScope.itemIndices.forEach((idx) => {
+        const itemUmp = itemToProcessScope.palletId || itemToProcessScope.containerId;
+        enqueueOfflineAction({
+          manifestId: itemToProcessScope.receptionId,
+          palletId: itemUmp || '',
+          itemIndex: idx,
+          type: 'store',
+          payload: { storageLocation: targetLocation },
+          userName: user?.displayName || user?.email?.split('@')[0] || 'Operador',
+          userId: user?.uid,
+        });
+      });
+
+      if (chamberId) setLastUsedChamberId(chamberId);
+      if (startCoordinate) setLastUsedCoordinate(startCoordinate);
+      setSelectedItem(null);
+      setQuickStoreItem(null);
+      toast({
+        title: '✅ Almacenado (Modo Cámara)',
+        description: `Ubicación registrada localmente en ${isWarehouse ? `${warehouse} - ${aisle}` : `${chamberId} - ${startCoordinate}`}. Se sincronizará al salir.`
+      });
+      return;
     }
 
     const itemsToProcess = itemToProcessScope.itemIndices.map(idx => originalReception.items[idx]);
@@ -439,8 +486,12 @@ export function OtherFruitStorageTab({ clientId: fixedClientId, onlyPackaging }:
         remainingToStore -= amountToStore;
       }
 
-      const finalItemsArray = originalReception.items.filter((_, index) => !itemToProcessScope.itemIndices.includes(index));
-      finalItemsArray.push(...newStoredItems);
+      const finalItemsArray = [...originalReception.items];
+      itemToProcessScope.itemIndices.forEach((idx, i) => {
+        if (newStoredItems[i]) {
+          finalItemsArray[idx] = newStoredItems[i];
+        }
+      });
       
       const stillHasPending = finalItemsArray.some(item => 
           (item.status === 'Pendiente de recibir' || item.status === 'Pendiente de almacenar') && 
@@ -458,7 +509,25 @@ export function OtherFruitStorageTab({ clientId: fixedClientId, onlyPackaging }:
         setSelectedItem(null);
         setQuickStoreItem(null);
       } catch (error) {
-        console.error("Error storing packaging in warehouse:", error);
+        console.warn("Fallo de red al almacenar en bodega, guardando en cola offline:", error);
+        if (isTargetPkg) {
+          itemToProcessScope.itemIndices.forEach((idx) => {
+            const itemUmp = itemToProcessScope.palletId || itemToProcessScope.containerId;
+            enqueueOfflineAction({
+              manifestId: itemToProcessScope.receptionId,
+              palletId: itemUmp || '',
+              itemIndex: idx,
+              type: 'store',
+              payload: { storageLocation: { warehouse: warehouse || '', aisle: aisle || '', chamberId: warehouse || '', coordinate: aisle || '' } },
+              userName: user?.displayName || user?.email?.split('@')[0] || 'Operador',
+              userId: user?.uid,
+            });
+          });
+          setSelectedItem(null);
+          setQuickStoreItem(null);
+          toast({ title: '✅ Guardado Localmente (Sin señal)', description: `Ubicación guardada en el dispositivo. Se sincronizará al salir.` });
+          return;
+        }
         toast({ variant: 'destructive', title: 'Error', description: 'No se pudo actualizar la ubicación.' });
       }
       return;
@@ -476,7 +545,6 @@ export function OtherFruitStorageTab({ clientId: fixedClientId, onlyPackaging }:
 
     // --- 1. Get available coordinates ---
     const occupancyMap = new Map<string, number>();
-    const isTargetPkg = isPackagingClient(originalReception);
 
     (allChamberLots || []).forEach(l => {
         if (l.status === 'Almacenado' && l.chamberId === chamberId && l.coordinate) {
@@ -643,8 +711,12 @@ export function OtherFruitStorageTab({ clientId: fixedClientId, onlyPackaging }:
         }
     }
 
-    const finalItemsArray = originalReception.items.filter((_, index) => !itemToProcessScope.itemIndices.includes(index));
-    finalItemsArray.push(...newStoredItems);
+    const finalItemsArray = [...originalReception.items];
+    itemToProcessScope.itemIndices.forEach((idx, i) => {
+      if (newStoredItems[i]) {
+        finalItemsArray[idx] = newStoredItems[i];
+      }
+    });
     
     const stillHasPending = finalItemsArray.some(item => 
         (item.status === 'Pendiente de recibir' || item.status === 'Pendiente de almacenar') && 
@@ -681,7 +753,28 @@ export function OtherFruitStorageTab({ clientId: fixedClientId, onlyPackaging }:
         setSelectedItem(null);
         setQuickStoreItem(null);
     } catch (error) {
-        console.error("Error storing fruit item:", error);
+        console.warn("Fallo de red al almacenar en cámara, guardando en cola offline:", error);
+        if (isTargetPkg) {
+          itemToProcessScope.itemIndices.forEach((idx) => {
+            const itemUmp = itemToProcessScope.palletId || itemToProcessScope.containerId;
+            enqueueOfflineAction({
+              manifestId: itemToProcessScope.receptionId,
+              palletId: itemUmp || '',
+              itemIndex: idx,
+              type: 'store',
+              payload: { storageLocation: { chamberId, coordinate: startCoordinate } },
+              userName: user?.displayName || user?.email?.split('@')[0] || 'Operador',
+              userId: user?.uid,
+            });
+          });
+          const finalSessionCoord = lastCoord || startCoordinate;
+          setLastUsedChamberId(chamberId);
+          setLastUsedCoordinate(finalSessionCoord);
+          setSelectedItem(null);
+          setQuickStoreItem(null);
+          toast({ title: '✅ Guardado Localmente (Sin señal)', description: `Ubicación guardada en el dispositivo. Se sincronizará al salir.` });
+          return;
+        }
         toast({ variant: 'destructive', title: 'Error', description: 'No se pudo actualizar la ubicación.' });
     }
   };
@@ -850,6 +943,7 @@ export function OtherFruitStorageTab({ clientId: fixedClientId, onlyPackaging }:
       {/* Global Control Bar */}
       <div className="flex items-center justify-between bg-card/30 backdrop-blur-md p-3 rounded-2xl border border-primary/5 shadow-sm">
         <div className="flex items-center gap-3">
+          <OfflineSyncIndicator />
           <div className={cn(
             "flex items-center gap-3 px-4 py-2 rounded-xl border transition-all duration-500",
             isDirectMode 

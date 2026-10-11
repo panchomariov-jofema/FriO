@@ -1,10 +1,11 @@
-const CACHE_NAME = 'frio-cache-v2';
+const CACHE_NAME = 'frio-cache-v3';
 
 const PRECACHE_ASSETS = [
   '/',
   '/login',
   '/camaras',
   '/otros-hortofruticolas',
+  '/embalajes',
   '/fall-creek',
   '/manifest.json',
   '/logo.svg',

@@ -2,6 +2,7 @@
 
 Formato: `AAAA-MM-DD · módulo · qué cambió (archivos) · por qué`. Lo más nuevo arriba. 1–3 líneas por entrada.
 
+- 2026-10-11 · embalajes/vitafood · Modo Offline (Cámara) para Recepción y Almacenamiento Vitafood (`vitafood-offline-sync.ts`, `OfflineSyncIndicator.tsx`, `VitafoodReceptionWorkflow.tsx`, `ReceptionTab.tsx`, `StorageTab.tsx`, `sw.js`): Cola local persistente en localStorage, merge optimista que previene pérdida de avance, actualización idempotente por UMP/índice exacto y auto-sincronización atómica (`writeBatch`/`updateDoc`) al reconectar o con botón manual.
 - 2026-10-11 · release · Despliegue de "Mejoras Seguridad": compilación estricta validada, auth reforzado (M6/M1), consultas optimizadas (A3), reglas Firestore (A1) y limpieza de repo.
 - 2026-10-11 · config · B2: Habilitada verificación estricta de tipos en build (`ignoreBuildErrors: false` en `next.config.ts`) tras validar compilación limpia de 31 rutas estáticas y dinámicas al 100%.
 - 2026-10-11 · types · B1: Definición de tipo único `StorageStrategy` en `src/lib/types.ts` reutilizado en `Exporter`, `OtherClient`, `ClientStorageConfig` y `getSortedCoordinates` (`src/lib/utils.ts`). Sin alteración de valores, orden ni datos de Firestore.

@@ -15,9 +15,13 @@ Archivos de apoyo en raíz: `Codigos_Vitafood.xlsx`, `Despacho_Vitafood.xlsx`, `
 | Stock | `StockAndRelocationTab` (mezcla ambos) | idem + `RelocatePackagingDialog`, `AdjustPackagingDialog` |
 
 ## Vitafood: recepción (`VitafoodReceptionWorkflow.tsx`, ~1.900 líneas)
-1. Subir **Orden de Entrada** (Excel SAP → `parseVitafoodManifest` en `lib/vitafood-utils.ts`; PDF/imagen → IA `parseVitafoodManifestAIAction` → `ai/vitafood-ai.ts`).
-2. Se crea la recepción con todos los pallets en `Pendiente de recibir` (manifiesto activo; guía editable).
-3. Escaneo/ingreso de UMP (`handleUmpLookup` maneja notación científica tipo `6.00609e+09`) → `handleReceivePallet` → `Pendiente de almacenar` (opción de almacenamiento directo).
+1. Subir **Orden de Entrada** (Excel SAP → `parseVitafoodManifest` en `lib/vitafood-utils.ts`; PDF/imagen → IA `parseVitafoodManifestAIAction` → `ai/vitafood-ai.ts`). Debe cargarse en modo Online (con red).
+2. Se crea la recepción con todos los pallets en `Pendiente de recibir` (manifiesto activo; guía editable) y se respalda copia local en `localStorage` (`frio_vitafood_manifest_backup_*`).
+3. **Modo Offline (Cámara / Sin Internet):**
+   - Escaneo de UMP (`handleReceivePallet`) y Almacenamiento (`onStoreConfirm`) operan sin conexión encolando en `frio_vitafood_offline_queue`.
+   - **Merge optimista:** la pantalla refleja el avance local inmediatamente sin esperar a Firestore ni perder datos ante recargas.
+   - **Idempotencia:** actualizaciones por `palletId` respetando los índices exactos de `items[]`.
+   - **Sincronización:** al recuperar señal o con botón manual (`OfflineSyncIndicator`), sube los pendientes en bloque con `cleanFirestoreObject` y `updateDoc`.
 4. Ingreso manual de pallet fuera de manifiesto (`handleManualSubmit`).
 5. Cierre con faltantes → ítems `No Recepcionado`. Deshacer recepción de pallet si no está almacenado.
 - Feedback sonido/vibración al escanear (uso móvil).

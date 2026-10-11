@@ -30,6 +30,13 @@ import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Progress } from '@/components/ui/progress';
+import { 
+    enqueueOfflineAction, 
+    saveActiveManifestBackup, 
+    getActiveManifestBackup, 
+    applyOfflineQueueToManifest 
+} from '@/lib/vitafood-offline-sync';
+import { OfflineSyncIndicator, useOfflineSync } from './OfflineSyncIndicator';
 
 export function VitafoodReceptionWorkflow({
     directStorageMode = true,
@@ -49,6 +56,7 @@ export function VitafoodReceptionWorkflow({
     const firestore = useFirestore();
     const { user } = useUser();
     const { toast } = useToast();
+    const { isOnline, queue: offlineQueue } = useOfflineSync();
     
     const { data: allReceptions, loading: loadingReceptions } = useFirestoreCollection<OtherFruitReception>('otherFruitReceptions');
     const { data: allPackagingMasters } = useFirestoreCollection<PackagingMaster>('packagingMaster');
@@ -122,11 +130,23 @@ export function VitafoodReceptionWorkflow({
         });
     }, [allReceptions, selectedClient, showCompletedOrders, selectedManifestId]);
 
-    // Current active manifest
-    const currentManifest = React.useMemo(() => {
-        if (!allReceptions) return null;
-        return allReceptions.find(r => r.id === selectedManifestId) || null;
+    // Current active manifest with offline fallback and optimistic queue merge
+    const rawManifest = React.useMemo(() => {
+        const found = allReceptions?.find(r => r.id === selectedManifestId);
+        if (found) {
+            saveActiveManifestBackup(found);
+            return found;
+        }
+        if (selectedManifestId) {
+            return getActiveManifestBackup(selectedManifestId);
+        }
+        return null;
     }, [allReceptions, selectedManifestId]);
+
+    const currentManifest = React.useMemo(() => {
+        if (!rawManifest) return null;
+        return applyOfflineQueueToManifest(rawManifest, offlineQueue);
+    }, [rawManifest, offlineQueue]);
 
     // Set default manifest & sync editable guia (prioritize pending orders)
     React.useEffect(() => {
@@ -471,16 +491,50 @@ export function VitafoodReceptionWorkflow({
                 newStatus = hasStored ? 'Almacenado' : 'Cerrado';
             }
 
-            await updateDoc(doc(firestore, 'otherFruitReceptions', currentManifest.id), {
-                items: updatedItems,
-                status: newStatus,
-                updatedAt: serverTimestamp()
-            });
+            const isOffline = typeof navigator !== 'undefined' && !navigator.onLine;
 
-            toast({
-                title: 'UMP Clasificado',
-                description: `El pallet UMP ${targetItem.palletId || `#${itemIndex + 1}`} fue marcado como "No Recepcionado".`
-            });
+            if (isOffline || !firestore) {
+                enqueueOfflineAction({
+                    manifestId: currentManifest.id,
+                    palletId: targetItem.palletId || '',
+                    itemIndex,
+                    type: 'mark_not_received',
+                    userName: currentUserName,
+                    userId: currentUserId,
+                });
+                toast({
+                    title: 'UMP Clasificado (Modo Cámara)',
+                    description: `El pallet UMP ${targetItem.palletId || `#${itemIndex + 1}`} fue marcado como "No Recepcionado" localmente.`
+                });
+            } else {
+                try {
+                    await updateDoc(doc(firestore, 'otherFruitReceptions', currentManifest.id), {
+                        items: updatedItems,
+                        status: newStatus,
+                        updatedAt: serverTimestamp()
+                    });
+
+                    toast({
+                        title: 'UMP Clasificado',
+                        description: `El pallet UMP ${targetItem.palletId || `#${itemIndex + 1}`} fue marcado como "No Recepcionado".`
+                    });
+                } catch (netErr) {
+                    console.warn('Fallo de red en markNotReceived, guardando offline:', netErr);
+                    enqueueOfflineAction({
+                        manifestId: currentManifest.id,
+                        palletId: targetItem.palletId || '',
+                        itemIndex,
+                        type: 'mark_not_received',
+                        userName: currentUserName,
+                        userId: currentUserId,
+                    });
+                    toast({
+                        title: 'UMP Clasificado (Guardado Local)',
+                        description: `El pallet UMP ${targetItem.palletId || `#${itemIndex + 1}`} fue marcado localmente. Se sincronizará al salir.`
+                    });
+                }
+            }
+
             setItemToMarkNotReceived(null);
         } catch (e) {
             console.error('Error marking item as not received:', e);
@@ -579,10 +633,10 @@ export function VitafoodReceptionWorkflow({
         }
     };
 
-    // Confirm Reception of Scanned Pallet
+    // Confirm Reception of Scanned Pallet (Supports Online + Offline Modo Cámara)
     const handleReceivePallet = async (matchToReceive?: { item: OtherFruitReceptionItem; index: number }) => {
         const targetMatch = matchToReceive || scannedMatch;
-        if (!targetMatch || !currentManifest || !firestore) return;
+        if (!targetMatch || !currentManifest) return;
 
         setIsSubmittingReception(true);
         try {
@@ -600,27 +654,63 @@ export function VitafoodReceptionWorkflow({
             };
             updatedItems[targetMatch.index] = updatedItem;
 
-            const hasPendingReceive = updatedItems.some(i => i.status === 'Pendiente de recibir');
-            const hasPendingStore = updatedItems.some(i => i.status === 'Pendiente de almacenar');
-            let newStatus: OtherFruitReception['status'] = 'Pendiente de almacenar';
-            if (!hasPendingReceive && !hasPendingStore) {
-                newStatus = 'Almacenado';
-            } else if (hasPendingReceive) {
-                newStatus = 'Pendiente de recibir';
+            const isOffline = typeof navigator !== 'undefined' && !navigator.onLine;
+
+            if (isOffline || !firestore) {
+                // Modo Cámara (Sin conexión): encolar localmente
+                enqueueOfflineAction({
+                    manifestId: currentManifest.id,
+                    palletId: targetMatch.item.palletId || '',
+                    itemIndex: targetMatch.index,
+                    type: 'receive',
+                    userName: currentUserName,
+                    userId: currentUserId,
+                });
+
+                triggerScanFeedback();
+                toast({
+                    title: '✅ ¡Pallet Recepcionado (Modo Cámara)!',
+                    description: `UMP ${targetMatch.item.palletId} registrado localmente. Se sincronizará al salir.`
+                });
+            } else {
+                try {
+                    const hasPendingReceive = updatedItems.some(i => i.status === 'Pendiente de recibir');
+                    const hasPendingStore = updatedItems.some(i => i.status === 'Pendiente de almacenar');
+                    let newStatus: OtherFruitReception['status'] = 'Pendiente de almacenar';
+                    if (!hasPendingReceive && !hasPendingStore) {
+                        newStatus = 'Almacenado';
+                    } else if (hasPendingReceive) {
+                        newStatus = 'Pendiente de recibir';
+                    }
+
+                    await updateDoc(doc(firestore, 'otherFruitReceptions', currentManifest.id), {
+                        items: updatedItems,
+                        status: newStatus,
+                        updatedAt: serverTimestamp()
+                    });
+
+                    triggerScanFeedback();
+                    toast({
+                        title: '✅ ¡Pallet Recepcionado!',
+                        description: `UMP ${targetMatch.item.palletId} (${targetMatch.item.productName}) registrado.`
+                    });
+                } catch (netErr) {
+                    console.warn('Fallo de conexión con Firestore, guardando en cola offline:', netErr);
+                    enqueueOfflineAction({
+                        manifestId: currentManifest.id,
+                        palletId: targetMatch.item.palletId || '',
+                        itemIndex: targetMatch.index,
+                        type: 'receive',
+                        userName: currentUserName,
+                        userId: currentUserId,
+                    });
+                    triggerScanFeedback();
+                    toast({
+                        title: '✅ Guardado Localmente (Sin señal)',
+                        description: `UMP ${targetMatch.item.palletId} protegido en el teléfono. Se sincronizará al salir.`
+                    });
+                }
             }
-
-            await updateDoc(doc(firestore, 'otherFruitReceptions', currentManifest.id), {
-                items: updatedItems,
-                status: newStatus,
-                updatedAt: serverTimestamp()
-            });
-
-            triggerScanFeedback();
-
-            toast({
-                title: '✅ ¡Pallet Recepcionado!',
-                description: `UMP ${targetMatch.item.palletId} (${targetMatch.item.productName}) registrado.`
-            });
 
             setScannedUmpInput('');
             setScannedMatch(null);
@@ -775,6 +865,7 @@ export function VitafoodReceptionWorkflow({
                                     <Smartphone className="w-3.5 h-3.5 text-primary" />
                                     <span>Modo Móvil + Pistola</span>
                                 </div>
+                                <OfflineSyncIndicator className="ml-auto sm:ml-2" />
                             </div>
                             <CardTitle className="text-xl sm:text-2xl font-black mt-1.5 tracking-tight text-foreground">
                                 Recepción de Pallets

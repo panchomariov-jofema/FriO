@@ -29,6 +29,7 @@ import { getSortedCoordinates, getPairedCoordinates, getEffectiveChamberConfig }
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { cleanFirestoreObject } from '@/lib/vitafood-utils';
 import { isVitafood } from '@/lib/clients';
+import { enqueueOfflineAction } from '@/lib/vitafood-offline-sync';
 
 type ReceptionFormValues = z.infer<typeof packagingReceptionSchema>;
 
@@ -132,9 +133,51 @@ export function ReceptionTab() {
     quantityPerLocation: number; 
     strategy: any 
   }) => {
-    if (!itemToStore || !firestore) return;
+    if (!itemToStore) return;
 
     const { chamberId, coordinate: startCoordinate, warehouse, aisle, destinationType, totalQuantity, quantityPerLocation, strategy } = data;
+    const currentUserName = user?.displayName || user?.email?.split('@')[0] || 'Operador';
+    const currentUserId = user?.uid || '';
+    const now = new Date();
+
+    const isWarehouse = destinationType === 'warehouse' || (warehouse && aisle);
+    const targetLocation: {
+      chamberId: string;
+      coordinate: string;
+      warehouse?: string;
+      aisle?: string;
+    } = isWarehouse
+      ? { warehouse: warehouse || '', aisle: aisle || '', chamberId: warehouse || '', coordinate: aisle || '' }
+      : { chamberId: chamberId || '', coordinate: startCoordinate || '' };
+
+    const isOffline = typeof navigator !== 'undefined' && !navigator.onLine;
+
+    // Offline / Modo Cámara: Enqueue immediately without network latency
+    if (isOffline || !firestore) {
+      itemToStore.itemIndices.forEach((idx: number) => {
+        const itemUmp = itemToStore.palletId || itemToStore.containerId;
+        enqueueOfflineAction({
+          manifestId: itemToStore.receptionId,
+          palletId: itemUmp || '',
+          itemIndex: idx,
+          type: 'store',
+          payload: { storageLocation: targetLocation },
+          userName: currentUserName,
+          userId: currentUserId,
+        });
+      });
+
+      if (chamberId) setLastUsedChamberId(chamberId);
+      if (startCoordinate) setLastUsedCoordinate(startCoordinate);
+      setIsStoreDialogOpen(false);
+      setItemToStore(null);
+      toast({
+        title: '✅ Almacenado (Modo Cámara)',
+        description: `Ubicación registrada localmente en ${isWarehouse ? `${warehouse} - ${aisle}` : `${chamberId} - ${startCoordinate}`}. Se sincronizará al salir.`
+      });
+      return;
+    }
+
     const receptionRef = doc(firestore, 'otherFruitReceptions', itemToStore.receptionId);
     
     try {
@@ -149,11 +192,7 @@ export function ReceptionTab() {
       const newStoredItems: any[] = [];
       let remainingToStore = totalQuantity;
 
-      const currentUserName = user?.displayName || user?.email?.split('@')[0] || 'Operador';
-      const currentUserId = user?.uid || '';
-      const now = new Date();
-
-      if (destinationType === 'warehouse' || (warehouse && aisle)) {
+      if (isWarehouse) {
         // Warehouse and Aisle storage (e.g., Almacén 7 / Pasillo 1)
         for (const itemToProcess of itemsToProcess) {
           if (remainingToStore <= 0) break;
@@ -161,12 +200,7 @@ export function ReceptionTab() {
             ...itemToProcess,
             quantity: itemToProcess.quantity,
             status: 'Almacenado',
-            storageLocation: {
-              warehouse: warehouse,
-              aisle: aisle,
-              chamberId: warehouse,
-              coordinate: aisle
-            },
+            storageLocation: targetLocation,
             storedAt: now,
             storedByUserName: currentUserName,
             storedByUserId: currentUserId,
@@ -174,8 +208,12 @@ export function ReceptionTab() {
           remainingToStore -= itemToProcess.quantity;
         }
 
-        const finalItemsArray = originalReception.items.filter((_, index) => !itemToStore.itemIndices.includes(index));
-        finalItemsArray.push(...newStoredItems);
+        const finalItemsArray = [...originalReception.items];
+        itemToStore.itemIndices.forEach((idx: number, i: number) => {
+          if (newStoredItems[i]) {
+            finalItemsArray[idx] = newStoredItems[i];
+          }
+        });
 
         const stillHasPending = finalItemsArray.some(item => (item.status === 'Pendiente de recibir' || item.status === 'Pendiente de almacenar') && item.quantity > 0);
         const newStatus = stillHasPending ? 'Parcialmente Almacenado' : 'Almacenado';
@@ -223,8 +261,12 @@ export function ReceptionTab() {
           remainingToStore -= itemToProcess.quantity;
         }
 
-        const finalItemsArray = originalReception.items.filter((_, index) => !itemToStore.itemIndices.includes(index));
-        finalItemsArray.push(...newStoredItems);
+        const finalItemsArray = [...originalReception.items];
+        itemToStore.itemIndices.forEach((idx: number, i: number) => {
+          if (newStoredItems[i]) {
+            finalItemsArray[idx] = newStoredItems[i];
+          }
+        });
 
         const stillHasPending = finalItemsArray.some(item => (item.status === 'Pendiente de recibir' || item.status === 'Pendiente de almacenar') && item.quantity > 0);
         const newStatus = stillHasPending ? 'Parcialmente Almacenado' : 'Almacenado';
@@ -241,8 +283,29 @@ export function ReceptionTab() {
         toast({ title: '✅ Éxito', description: `Pallet almacenado en ${chamberConfig.name} - ${startCoordinate}.` });
       }
     } catch (err: any) {
-      console.error('Error storing packaging in chamber/warehouse:', err);
-      toast({ variant: 'destructive', title: 'Error', description: 'No se pudo guardar la ubicación.' });
+      console.warn('Fallo de conexión al almacenar en Firestore, guardando en cola offline:', err);
+      // Fallback: enqueue offline action so work is never lost!
+      itemToStore.itemIndices.forEach((idx: number) => {
+        const itemUmp = itemToStore.palletId || itemToStore.containerId;
+        enqueueOfflineAction({
+          manifestId: itemToStore.receptionId,
+          palletId: itemUmp || '',
+          itemIndex: idx,
+          type: 'store',
+          payload: { storageLocation: targetLocation },
+          userName: currentUserName,
+          userId: currentUserId,
+        });
+      });
+
+      if (chamberId) setLastUsedChamberId(chamberId);
+      if (startCoordinate) setLastUsedCoordinate(startCoordinate);
+      setIsStoreDialogOpen(false);
+      setItemToStore(null);
+      toast({
+        title: '✅ Guardado Localmente (Sin señal)',
+        description: `Ubicación guardada en el dispositivo. Se sincronizará al salir.`
+      });
     }
   };
 
