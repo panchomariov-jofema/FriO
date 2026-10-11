@@ -28,6 +28,7 @@ import { chambersConfig } from '@/lib/chambers-config';
 import { getSortedCoordinates, getPairedCoordinates, getEffectiveChamberConfig } from '@/lib/utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { cleanFirestoreObject } from '@/lib/vitafood-utils';
+import { isVitafood } from '@/lib/clients';
 
 type ReceptionFormValues = z.infer<typeof packagingReceptionSchema>;
 
@@ -65,7 +66,7 @@ export function ReceptionTab() {
     return (allClients || []).filter(c => 
       c.status !== 'inactivo' && (
         c.type?.toLowerCase() === 'embalaje' || 
-        c.name?.toUpperCase().includes('VITAFOOD')
+        isVitafood(c)
       )
     );
   }, [allClients]);
@@ -94,7 +95,7 @@ export function ReceptionTab() {
   // Default to Vitafood if available and not selected
   React.useEffect(() => {
     if (packagingClients.length > 0 && !selectedClientId) {
-      const vita = packagingClients.find(c => c.name.toUpperCase().includes('VITAFOOD'));
+      const vita = packagingClients.find(c => isVitafood(c));
       if (vita) {
         form.setValue('clientId', vita.clientId);
       } else {
@@ -333,7 +334,7 @@ export function ReceptionTab() {
   };
 
   // IF VITAFOOD IS SELECTED -> RENDER VITAFOOD SPECIALIZED WORKFLOW
-  if (selectedClient?.name?.toUpperCase().includes('VITAFOOD') || selectedClient?.name?.toUpperCase() === 'VITAFOODS') {
+  if (selectedClient && isVitafood(selectedClient)) {
     return (
       <div className="space-y-4 sm:space-y-6">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-3 border-b gap-3">

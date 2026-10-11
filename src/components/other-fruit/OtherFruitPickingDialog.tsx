@@ -11,13 +11,14 @@ import {
   DialogClose,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Checkbox } from '@/components/ui/checkbox';
 import { QrCode, Trash2, CheckCircle2, ScanLine } from 'lucide-react';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
-import { Badge } from '../ui/badge';
 import { OtherFruitMovement, OtherFruitMovementLocation, OtherFruitReception } from '@/lib/types';
+import { isFallCreek as checkIsFallCreek } from '@/lib/clients';
 import { useToast } from '@/hooks/use-toast';
 
 interface OtherFruitPickingDialogProps {
@@ -53,7 +54,7 @@ export function OtherFruitPickingDialog({
   const inputRef = React.useRef<HTMLInputElement>(null);
 
   const isFallCreek = React.useMemo(() => {
-    return movement?.clientName?.toUpperCase() === 'FALL CREEK';
+    return checkIsFallCreek(movement);
   }, [movement]);
 
   const flatItems = React.useMemo((): PickingItem[] => {

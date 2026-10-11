@@ -16,6 +16,7 @@ import { chambersConfig } from '@/lib/chambers-config';
 import { useToast } from '@/hooks/use-toast';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
 import { getSortedCoordinates, getPairedCoordinates, safeToMillis, getEffectiveChamberConfig, cn, naturalSort } from '@/lib/utils';
+import { isFallCreek, isVitafood, binsPerUnit } from '@/lib/clients';
 import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
 import { Zap, Warehouse as WarehouseIcon, Snowflake } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -176,8 +177,8 @@ export function StoreOtherFruitDialog({
 
   const capacityPerCoord = useMemo(() => {
     if (!item) return DEFAULT_PALLETS_PER_COORDINATE;
-    const isFC = item.clientName === 'FALL CREEK' || item.clientName?.toUpperCase() === 'FALL CREEK';
-    const isVita = item.clientName?.toUpperCase().includes('VITAFOOD');
+    const isFC = isFallCreek(item);
+    const isVita = isVitafood(item);
     if (item.unit === 'Bins') {
       return clientConfig?.binsPerCoordinate ?? (isFC ? 9 : DEFAULT_BINS_PER_COORDINATE);
     }
@@ -233,11 +234,10 @@ export function StoreOtherFruitDialog({
     });
     
     (allReceptions || []).forEach(reception => {
-        const isFC = reception.clientName === 'FALL CREEK' || reception.clientName?.toUpperCase() === 'FALL CREEK';
-        const isPkg = reception.clientName?.toUpperCase().includes('VITAFOOD') || 
-                      reception.clientId?.toUpperCase().includes('VITAFOOD') ||
+        const isFC = isFallCreek(reception);
+        const isPkg = isVitafood(reception) ||
                       reception.clientName?.toUpperCase().includes('EMBALAJE');
-        const multiplier = (isFC && reception.unit === 'Pallets') ? 3 : (reception.unit === 'Bins' ? 1 : 2);
+        const multiplier = binsPerUnit(reception, reception.unit);
 
         (reception.items || []).forEach((storedItem, idx) => {
             if (storedItem.status === 'Almacenado' && storedItem.storageLocation?.chamberId === selectedChamberId && storedItem.storageLocation.coordinate && storedItem.quantity > 0) {
@@ -292,7 +292,7 @@ export function StoreOtherFruitDialog({
     }
     
     const occupancyThreshold = capacityPerCoord;
-    const unitsPerItem = (isItemPackaging && item.unit === 'Pallets') ? 1 : ((item.clientName?.toUpperCase() === 'FALL CREEK' && item.unit === 'Pallets') ? 3 : (item.unit === 'Bins' ? 1 : 2));
+    const unitsPerItem = (isItemPackaging && item.unit === 'Pallets') ? 1 : binsPerUnit(item, item.unit);
 
     // Determine the starting point for suggestion search
     let startIndex = 0;
@@ -328,7 +328,7 @@ export function StoreOtherFruitDialog({
         ...allPossibleCoords.slice(0, startIndex)
     ];
 
-    const isFallCreek = (item.clientName?.toUpperCase() === 'FALL CREEK' || item.clientId === '76361536-7');
+    const isFallCreekClient = isFallCreek(item);
 
     const currentSuggestion = prioritizedCoords.find(coord => {
         if (chamberConfig.blocked?.includes(coord)) return false;
@@ -345,7 +345,7 @@ export function StoreOtherFruitDialog({
 
         // Prevent mixing different varieties/products in the same coordinate
         const hasDifferentProduct = entry.lots.some(l => {
-            if (isFallCreek) {
+            if (isFallCreekClient) {
                 const targetVariety = (l.productName || '').trim().toUpperCase();
                 const incomingVariety = (item.productName || '').trim().toUpperCase();
                 return targetVariety && incomingVariety ? targetVariety !== incomingVariety : false;
@@ -375,7 +375,7 @@ export function StoreOtherFruitDialog({
 
         // Prevent mixing different varieties/products in the same coordinate
         const hasDifferentProduct = entry.lots.some(l => {
-            if (isFallCreek) {
+            if (isFallCreekClient) {
                 const targetVariety = (l.productName || '').trim().toUpperCase();
                 const incomingVariety = (item.productName || '').trim().toUpperCase();
                 return targetVariety && incomingVariety ? targetVariety !== incomingVariety : false;
@@ -395,12 +395,12 @@ export function StoreOtherFruitDialog({
 
   useEffect(() => {
     if (open && item) {
-       const isFallCreek = item.clientName === 'FALL CREEK' || item.clientName?.toUpperCase() === 'FALL CREEK';
-       let strategy = clientConfig?.strategy ?? (isFallCreek ? 'aisle-access' : 'secuencial');
+       const isFallCreekClient = isFallCreek(item);
+       let strategy = clientConfig?.strategy ?? (isFallCreekClient ? 'aisle-access' : 'secuencial');
        let totalQuantity = item.quantity;
        let qtyPerLocation = item.unit === 'Bins'
-         ? (clientConfig?.binsPerCoordinate ?? (isFallCreek ? 9 : DEFAULT_BINS_PER_COORDINATE))
-         : (clientConfig?.palletsPerCoordinate ?? (isFallCreek ? 3 : (isItemPackaging ? 4 : DEFAULT_PALLETS_PER_COORDINATE)));
+         ? (clientConfig?.binsPerCoordinate ?? (isFallCreekClient ? 9 : DEFAULT_BINS_PER_COORDINATE))
+         : (clientConfig?.palletsPerCoordinate ?? (isFallCreekClient ? 3 : (isItemPackaging ? 4 : DEFAULT_PALLETS_PER_COORDINATE)));
 
         // Session continuity: Only preselect chamber if there is an active session choice from lastUsedChamberId
         let chamberId = (lastUsedChamberId && chambersConfig[lastUsedChamberId]) ? lastUsedChamberId : '';

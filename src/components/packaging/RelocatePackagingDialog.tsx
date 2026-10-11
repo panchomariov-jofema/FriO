@@ -13,6 +13,7 @@ import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
 import type { Warehouse, Aisle, OtherFruitReception, ChamberLot } from '@/lib/types';
 import { chambersConfig } from '@/lib/chambers-config';
 import { naturalSort, getEffectiveChamberConfig, getSortedCoordinates } from '@/lib/utils';
+import { isVitafood } from '@/lib/clients';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Warehouse as WarehouseIcon, Snowflake, AlertTriangle, ShieldCheck } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -92,9 +93,7 @@ export function RelocatePackagingDialog({ item, open, onOpenChange, onConfirm }:
 
     // 2. OtherFruit Receptions (Fruit vs Packaging)
     (otherFruitReceptions || []).forEach(reception => {
-      const isPkg = reception.clientName?.toUpperCase().includes('VITAFOOD') || 
-                    reception.clientId?.toUpperCase().includes('VITAFOOD') ||
-                    reception.clientName?.toUpperCase().includes('EMBALAJE');
+      const isPkg = isVitafood(reception) || reception.clientName?.toUpperCase().includes('EMBALAJE');
       (reception.items || []).forEach(it => {
         if (it.status === 'Almacenado' && it.storageLocation?.chamberId && it.quantity > 0) {
           const entry = map.get(it.storageLocation.chamberId);

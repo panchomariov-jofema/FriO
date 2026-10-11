@@ -18,6 +18,7 @@ import { AdjustPackagingDialog } from './AdjustPackagingDialog';
 import { Input } from '@/components/ui/input';
 import { chambersConfig } from '@/lib/chambers-config';
 import { cleanFirestoreObject } from '@/lib/vitafood-utils';
+import { isVitafood } from '@/lib/clients';
 
 interface StoredPackagingItem {
     id: string; // receptionId + itemIndex
@@ -102,7 +103,7 @@ export function StockAndRelocationTab() {
     // Determine which clients are packaging clients
     const packagingClientIds = new Set<string>();
     (allClients || []).forEach(c => {
-      if (c.type?.toLowerCase() === 'embalaje' || c.name?.toUpperCase().includes('VITAFOOD') || c.clientId?.toUpperCase().includes('VITAFOOD')) {
+      if (c.type?.toLowerCase() === 'embalaje' || isVitafood(c)) {
         packagingClientIds.add(c.clientId.toUpperCase());
         packagingClientIds.add(c.name.toUpperCase());
       }
@@ -151,8 +152,7 @@ export function StockAndRelocationTab() {
           return (
             packagingClientIds.has(clientIdUpper) ||
             packagingClientIds.has(clientNameUpper) ||
-            clientNameUpper.includes('VITAFOOD') ||
-            clientIdUpper.includes('VITAFOOD') ||
+            isVitafood(reception) ||
             clientNameUpper.includes('EMBALAJE')
           );
         })

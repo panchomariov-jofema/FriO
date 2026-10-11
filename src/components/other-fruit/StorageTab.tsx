@@ -27,6 +27,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { notifyPalletLogStored } from '@/lib/telegram';
 import { ChevronDown } from 'lucide-react';
 import { cleanFirestoreObject } from '@/lib/vitafood-utils';
+import { isFallCreek, binsPerUnit } from '@/lib/clients';
 
 type PendingFruitItem = OtherFruitReceptionItem & {
     type: 'fruit';
@@ -128,8 +129,8 @@ export function OtherFruitStorageTab({ clientId: fixedClientId, onlyPackaging }:
         const fallCreekGroups = new Map<string, PendingFruitItem>();
 
         fruitItemsRaw.forEach(item => {
-            const isFallCreek = item.clientName?.toUpperCase() === 'FALL CREEK';
-            if (isFallCreek && item.palletId) {
+            const isFallCreekClient = isFallCreek(item.clientName);
+            if (isFallCreekClient && item.palletId) {
                 const key = `${item.receptionId}-${item.palletId}`;
                 if (fallCreekGroups.has(key)) {
                     const group = fallCreekGroups.get(key)!;
@@ -312,7 +313,7 @@ export function OtherFruitStorageTab({ clientId: fixedClientId, onlyPackaging }:
     let palletsPerCoordinate = explicitOverride?.palletsPerCoordinate ?? masterData?.palletsPerCoordinate ?? (isItemPackaging ? 4 : 3);
     if (palletsPerCoordinate === 0 && isItemPackaging) palletsPerCoordinate = 4;
 
-    if (item.clientName?.toUpperCase() === 'FALL CREEK') {
+    if (isFallCreek(item.clientName)) {
       if (!explicitOverride?.strategy && !masterData?.storageStrategy) strategy = 'aisle-access';
       if (explicitOverride?.binsPerCoordinate === undefined && masterData?.binsPerCoordinate === undefined) binsPerCoordinate = 9;
       if (explicitOverride?.palletsPerCoordinate === undefined && masterData?.palletsPerCoordinate === undefined) palletsPerCoordinate = 3;
@@ -337,8 +338,7 @@ export function OtherFruitStorageTab({ clientId: fixedClientId, onlyPackaging }:
     (otherFruitReceptions || []).forEach(r => {
       (r.items || []).forEach((it) => {
         if (it.status === 'Almacenado' && it.storageLocation && it.storageLocation.chamberId === chamberId && it.storageLocation.coordinate) {
-          const isFC = r.clientName?.toUpperCase() === 'FALL CREEK';
-          const multiplier = (isFC && r.unit === 'Pallets') ? 3 : (r.unit === 'Bins' ? 1 : 1);
+          const multiplier = binsPerUnit(r, r.unit);
           const equivalentUnits = (it.unit === 'Pallets' ? 1 : it.quantity) * multiplier;
           occupancyMap.set(it.storageLocation.coordinate, (occupancyMap.get(it.storageLocation.coordinate) || 0) + equivalentUnits);
         }
@@ -353,7 +353,7 @@ export function OtherFruitStorageTab({ clientId: fixedClientId, onlyPackaging }:
       allPossibleCoords = getSortedCoordinates(chamberConfig, finalStrategy as any);
     }
 
-    const isFC = item.clientName?.toUpperCase() === 'FALL CREEK';
+    const isFC = isFallCreek(item.clientName);
     const occupancyThreshold = (item.unit === 'Bins') ? binsPerCoordinate : palletsPerCoordinate;
     const unitsPerItem = (isFC && item.unit === 'Pallets') ? 3 : 1; // 1 pallet ocupa 1 posición de pallet
 
@@ -487,7 +487,7 @@ export function OtherFruitStorageTab({ clientId: fixedClientId, onlyPackaging }:
         const isRPkg = isPackagingClient(r);
         (r.items || []).forEach((item) => {
             if (item.status === 'Almacenado' && item.storageLocation?.chamberId === chamberId && item.storageLocation.coordinate) {
-                const multiplier = (r.clientName?.toUpperCase() === 'FALL CREEK' && r.unit === 'Pallets') ? 3 : (r.unit === 'Bins' ? 1 : 2);
+                const multiplier = binsPerUnit(r, r.unit);
                 const equivalentUnits = (isRPkg && r.unit === 'Pallets') ? 1 : (item.quantity * multiplier);
                 occupancyMap.set(item.storageLocation.coordinate, (occupancyMap.get(item.storageLocation.coordinate) || 0) + equivalentUnits);
             }
@@ -519,7 +519,7 @@ export function OtherFruitStorageTab({ clientId: fixedClientId, onlyPackaging }:
     }
     
     // --- 2. Prepare updates ---
-    const isFC = originalReception.clientName?.toUpperCase() === 'FALL CREEK';
+    const isFC = isFallCreek(originalReception.clientName);
     if (isFC) {
         const missingQrItems = itemsToProcess.filter(item => !item.containerId || item.containerId.trim() === '' || item.containerId === '-');
         if (missingQrItems.length > 0) {

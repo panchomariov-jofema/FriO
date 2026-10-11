@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
+import { isFallCreek, binsPerUnit } from '@/lib/clients';
 import type { OtherClient, OtherFruitReceptionItem, OtherFruitReception } from '@/lib/types';
 import { otherFruitReceptionSchema } from '@/lib/schemas';
 import { PlusCircle, ScanLine, Trash2, Search, Check, ChevronsUpDown } from 'lucide-react';
@@ -243,7 +244,7 @@ export function OtherFruitReceptionTab({ clientId: fixedClientId }: { clientId?:
     let preferredChamberId = explicitOverride?.preferredChamberId ?? (masterData as any)?.preferredChamberId;
 
     // Hardcoded defaults for Fall Creek
-    if (masterData?.name?.toUpperCase() === 'FALL CREEK' || masterData?.id?.toLowerCase() === 'fallcreek' || itemToStore.clientName?.toUpperCase() === 'FALL CREEK') {
+    if (isFallCreek(masterData) || isFallCreek(itemToStore)) {
         if (!explicitOverride?.strategy && !masterData?.storageStrategy) strategy = 'aisle-access';
         if (explicitOverride?.binsPerCoordinate === undefined && masterData?.binsPerCoordinate === undefined) binsPerCoordinate = 9;
         if (explicitOverride?.palletsPerCoordinate === undefined && masterData?.palletsPerCoordinate === undefined) palletsPerCoordinate = 3;
@@ -295,7 +296,7 @@ export function OtherFruitReceptionTab({ clientId: fixedClientId }: { clientId?:
     (allReceptions || []).forEach(r => {
         r.items.forEach((item) => {
             if (item.status === 'Almacenado' && item.storageLocation?.chamberId === chamberId && item.storageLocation.coordinate) {
-                const multiplier = (r.clientName?.toUpperCase() === 'FALL CREEK' && r.unit === 'Pallets') ? 3 : (r.unit === 'Bins' ? 1 : 2);
+                const multiplier = binsPerUnit(r, r.unit);
                 const equivalentUnits = item.quantity * multiplier;
                 occupancyMap.set(item.storageLocation.coordinate, (occupancyMap.get(item.storageLocation.coordinate) || 0) + equivalentUnits);
             }
@@ -325,8 +326,8 @@ export function OtherFruitReceptionTab({ clientId: fixedClientId }: { clientId?:
     let currentCoord = coordsToFill[currentCoordIdx];
     let newLastCoord: string | null = null;
 
-    const isFallCreek = originalReception.clientName?.toUpperCase() === 'FALL CREEK';
-    if (isFallCreek) {
+    const isFC = isFallCreek(originalReception);
+    if (isFC) {
         const missingQrItems = itemsToProcess.filter((item: any) => !item.containerId || item.containerId.trim() === '' || item.containerId === '-');
         if (missingQrItems.length > 0) {
             toast({
@@ -337,7 +338,7 @@ export function OtherFruitReceptionTab({ clientId: fixedClientId }: { clientId?:
             return;
         }
     }
-    const unitsPerItem = (isFallCreek && originalReception.unit === 'Pallets') ? 3 : (originalReception.unit === 'Bins' ? 1 : 2);
+    const unitsPerItem = binsPerUnit(originalReception, originalReception.unit);
 
     for (const itemToProcess of itemsToProcess) {
         if (remainingToStore <= 0) break;
@@ -449,7 +450,7 @@ export function OtherFruitReceptionTab({ clientId: fixedClientId }: { clientId?:
             }
         }
 
-        const isFC = originalReception.clientName?.toUpperCase() === 'FALL CREEK';
+        const isFC = isFallCreek(originalReception);
         if (directStorageMode && !isFC) {
             const nextPendingIndex = finalItemsArray.findIndex(item => item.status === 'Pendiente de almacenar' && item.quantity > 0);
             if (nextPendingIndex !== -1) {

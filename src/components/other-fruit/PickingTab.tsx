@@ -4,6 +4,7 @@ import * as React from 'react';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
 import { useFirestoreQuery } from '@/hooks/use-firestore-query';
 import type { OtherFruitMovement, OtherFruitReception, OtherClient, OtherFruitMovementLocation, PackagingMovement, PackagingReception, Dispatch, ChamberLot } from '@/lib/types';
+import { isFallCreek } from '@/lib/clients';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -228,8 +229,8 @@ export function OtherFruitPickingTab() {
             batch.update(update.ref, { items: update.items, updatedAt: serverTimestamp() });
         });
 
-        const isFallCreek = confirmedMovement.clientName?.toUpperCase() === 'FALL CREEK' || confirmedMovement.clientId === '76361536-7';
-        if (isFallCreek && confirmedMovement.destinationClientId) {
+        const isFallCreekClient = isFallCreek(confirmedMovement);
+        if (isFallCreekClient && confirmedMovement.destinationClientId) {
             const totalBins = confirmedMovement.items.reduce((sum, item) => sum + item.quantity, 0);
             if (totalBins > 0) {
                 const binMovementRef = doc(collection(firestore, 'binMaterialMovements'));
@@ -261,7 +262,7 @@ export function OtherFruitPickingTab() {
 
         await batch.commit();
 
-        if (isFallCreek) {
+        if (isFallCreek(confirmedMovement.clientName)) {
             notifyFallCreekPickingCompleted(firestore, confirmedMovement).catch(err => {
                 console.error("Error al enviar la notificación de Telegram de picking completado:", err);
             });

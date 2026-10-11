@@ -1,5 +1,6 @@
 import { doc, getDoc, Firestore } from 'firebase/firestore';
 import type { OtherFruitReception, OtherFruitMovement } from './types';
+import { binsPerUnit } from './clients';
 
 export interface TelegramConfig {
   botToken: string;
@@ -75,8 +76,7 @@ export async function notifyPalletLogStored(firestore: Firestore, reception: Oth
   const totalBins = (reception.items || []).reduce((sum, item) => {
     // Si es Fall Creek y está en Pallets, al descomponerse se registran en Bins.
     // Esta fórmula cubre cualquier caso multiplicando según la unidad de la línea
-    const isFC = reception.clientName?.toUpperCase() === 'FALL CREEK';
-    const multiplier = (isFC && item.unit === 'Pallets') ? 3 : (item.unit === 'Bins' ? 1 : 2);
+    const multiplier = binsPerUnit(reception, item.unit);
     return sum + ((item.quantity || 0) * multiplier);
   }, 0);
 
@@ -125,8 +125,7 @@ export async function notifyPalletLogStarted(firestore: Firestore, reception: Ot
 
   // Calcular la cantidad total de Bins
   const totalBins = (reception.items || []).reduce((sum, item) => {
-    const isFC = reception.clientName?.toUpperCase() === 'FALL CREEK';
-    const multiplier = (isFC && item.unit === 'Pallets') ? 3 : (item.unit === 'Bins' ? 1 : 2);
+    const multiplier = binsPerUnit(reception, item.unit);
     return sum + ((item.quantity || 0) * multiplier);
   }, 0);
 
