@@ -46,6 +46,7 @@ import { cn } from '@/lib/utils';
 import { FrioLogo } from '@/components/ui/FrioLogo';
 import { CustomAppleIcon } from '@/components/ui/CustomAppleIcon';
 import { PermissionsProvider } from '@/contexts/PermissionsContext';
+import { isAdminUser } from '@/lib/auth-utils';
 import { PwaInstallButton } from '@/components/pwa-install-button';
 
 // Define the structure with types and potential nesting

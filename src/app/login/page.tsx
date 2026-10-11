@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -25,15 +24,10 @@ import {
 import { Input } from '@/components/ui/input';
 import { useAuth, useUser } from '@/firebase';
 import { useRouter } from 'next/navigation';
-import {
-  createUserWithEmailAndPassword,
-  signInAnonymously,
-  signInWithEmailAndPassword,
-} from 'firebase/auth';
+import { signInWithEmailAndPassword } from 'firebase/auth';
 import { useToast } from '@/hooks/use-toast';
 import { FirebaseError } from 'firebase/app';
 import { LoadingScreen } from '@/components/LoadingScreen';
-import { Separator } from '@/components/ui/separator';
 import { FrioLogo } from '@/components/ui/FrioLogo';
 
 const loginSchema = z.object({
@@ -44,7 +38,6 @@ const loginSchema = z.object({
 type LoginFormValues = z.infer<typeof loginSchema>;
 
 export default function LoginPage() {
-  const [isSignUp, setIsSignUp] = React.useState(false);
   const auth = useAuth();
   const { user, isUserLoading } = useUser();
   const router = useRouter();
@@ -68,30 +61,23 @@ export default function LoginPage() {
     if (!auth) return;
 
     try {
-      if (isSignUp) {
-        await createUserWithEmailAndPassword(auth, values.email, values.password);
-        toast({ title: '¡Éxito!', description: 'Usuario registrado. Iniciando sesión...' });
-      } else {
-        await signInWithEmailAndPassword(auth, values.email, values.password);
-      }
-      // The onAuthStateChanged listener in the layout will handle the redirect
+      await signInWithEmailAndPassword(auth, values.email, values.password);
     } catch (error) {
       console.error(error);
       if (error instanceof FirebaseError) {
         let message = 'Ocurrió un error inesperado.';
         switch (error.code) {
           case 'auth/user-not-found':
-            message = 'No se encontró un usuario con ese email.';
-            break;
           case 'auth/wrong-password':
-            message = 'Contraseña incorrecta.';
-            break;
-          case 'auth/email-already-in-use':
-            message = 'Este email ya está en uso.';
+          case 'auth/invalid-credential':
+            message = 'Credenciales inválidas. Verifique su email y contraseña.';
             break;
           case 'auth/invalid-email':
-              message = 'El formato del email no es válido.';
-              break;
+            message = 'El formato del email no es válido.';
+            break;
+          case 'auth/too-many-requests':
+            message = 'Demasiados intentos fallidos. Intente nuevamente en unos minutos.';
+            break;
           default:
             message = error.message;
         }
@@ -103,46 +89,23 @@ export default function LoginPage() {
       }
     }
   };
-  
-  const handleAnonymousSignIn = async () => {
-    if (!auth) return;
-
-    try {
-      await signInAnonymously(auth);
-      toast({ title: '¡Éxito!', description: 'Iniciando sesión como invitado...' });
-      // Redirect is handled by the useEffect
-    } catch (error) {
-       console.error(error);
-       if (error instanceof FirebaseError) {
-         toast({
-          variant: 'destructive',
-          title: 'Error de autenticación',
-          description: 'No se pudo iniciar sesión como invitado.',
-        });
-       }
-    }
-  };
-
 
   if (isUserLoading || user) {
     return <LoadingScreen />;
   }
 
-
   return (
     <div className="flex items-center justify-center min-h-screen login-background">
-      <Card className="w-full max-w-md bg-card/95 backdrop-blur-sm border-border/20">
+      <Card className="w-full max-w-md bg-card/95 backdrop-blur-sm border-border/20 shadow-xl">
         <CardHeader className="text-center">
           <div className="flex justify-center items-center mb-4">
             <FrioLogo className="text-6xl text-primary" />
           </div>
-          <CardTitle className="text-2xl">
-            {isSignUp ? 'Crear una cuenta' : 'Iniciar Sesión'}
+          <CardTitle className="text-2xl font-bold">
+            Iniciar Sesión
           </CardTitle>
           <CardDescription>
-            {isSignUp
-              ? 'Ingrese sus datos para registrarse.'
-              : 'Bienvenido a FriO.'}
+            Sistema de Gestión Frigorífica FriO. Ingrese con sus credenciales autorizadas.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -177,7 +140,7 @@ export default function LoginPage() {
                         type="password"
                         placeholder="••••••••"
                         {...field}
-                        autoComplete={isSignUp ? 'new-password' : 'current-password'}
+                        autoComplete="current-password"
                       />
                     </FormControl>
                     <FormMessage />
@@ -189,44 +152,14 @@ export default function LoginPage() {
                 className="w-full"
                 disabled={form.formState.isSubmitting}
               >
-                {form.formState.isSubmitting
-                  ? 'Procesando...'
-                  : isSignUp
-                  ? 'Registrarse'
-                  : 'Iniciar Sesión'}
+                {form.formState.isSubmitting ? 'Iniciando sesión...' : 'Iniciar Sesión'}
               </Button>
             </form>
           </Form>
-
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t" />
-            </div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-background px-2 text-muted-foreground">
-                O continúa con
-              </span>
-            </div>
-          </div>
-          
-          <Button variant="outline" className="w-full" onClick={handleAnonymousSignIn}>
-            Ingresar como Invitado
-          </Button>
-
         </CardContent>
-        <CardFooter className="flex justify-center text-sm">
-          <p>
-            {isSignUp
-              ? '¿Ya tienes una cuenta?'
-              : '¿No tienes una cuenta?'}
-            <Button
-              variant="link"
-              className="p-1"
-              onClick={() => setIsSignUp(!isSignUp)}
-            >
-              {isSignUp ? 'Inicia sesión' : 'Regístrate'}
-            </Button>
-          </p>
+        <CardFooter className="flex flex-col text-center text-xs text-muted-foreground border-t pt-4">
+          <p>Acceso restringido a personal autorizado.</p>
+          <p className="mt-1">Para altas de cuenta o recuperación de acceso, contacte al Administrador.</p>
         </CardFooter>
       </Card>
     </div>

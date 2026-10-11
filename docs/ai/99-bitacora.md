@@ -2,6 +2,7 @@
 
 Formato: `AAAA-MM-DD · módulo · qué cambió (archivos) · por qué`. Lo más nuevo arriba. 1–3 líneas por entrada.
 
+- 2026-10-11 · auth/seguridad · M6: Eliminación de auto-registro y acceso anónimo en `login/page.tsx`. Bloqueo estricto en `(app)/layout.tsx`: sólo usuarios con perfil configurado en `usersMaster` y el Administrador Maestro pueden acceder al sistema (acceso restringido para cuentas sin perfil).
 - 2026-10-11 · clientes · M3: Centralización de clientes especiales (Fall Creek, Vitafoods) y equivalencias de unidad en `lib/clients.ts` (`isFallCreek`, `isVitafood`, `binsPerUnit`). Unificados 8 archivos operativos sin modificar colecciones ni datos en Firestore.
 - 2026-10-10 · auth · M1: Centralización de rol administrador en `lib/auth-utils.ts` (`isAdminUser`, `MASTER_ADMIN_EMAIL`), preservando de forma permanente a `francisco.villarreal@outlook.es` como Administrador Maestro y habilitando `isAdmin?: boolean` opcional en `Profile` sin modificar perfiles en Firestore.
 - 2026-10-10 · limpieza · M5: Eliminado componente duplicado huérfano `src/components/hidrocooler/page.tsx` tras verificar que no tenía importaciones. La ruta activa es `src/app/(app)/hidrocooler/page.tsx`.
