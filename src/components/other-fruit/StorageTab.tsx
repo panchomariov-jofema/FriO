@@ -132,9 +132,9 @@ export function OtherFruitStorageTab({ clientId: fixedClientId, onlyPackaging }:
                 return ['Pendiente de almacenar', 'Parcialmente Almacenado', 'Recibido', 'Parcialmente Recibido'].includes(lot.status);
             })
             .flatMap((lot) => 
-                lot.items
+                (lot.items || [])
                     .map((item, itemIndex) => ({ ...item, type: 'fruit' as const, receptionId: lot.id, clientName: lot.clientName, document: lot.document, itemIndices: [itemIndex], unit: lot.unit }))
-                    .filter(item => item.status === 'Pendiente de almacenar')
+                    .filter(item => item && item.status === 'Pendiente de almacenar')
             );
 
         // Group Fall Creek items by palletId
@@ -168,9 +168,9 @@ export function OtherFruitStorageTab({ clientId: fixedClientId, onlyPackaging }:
                 ['Pendiente de almacenar', 'Parcialmente Almacenado', 'Recibido', 'Parcialmente Recibido'].includes(lot.status)
             )
             .flatMap((lot) => 
-                lot.items
+                (lot.items || [])
                     .map((item, itemIndex) => ({ ...item, type: 'packaging' as const, receptionId: lot.id, clientName: lot.clientName, document: lot.document, itemIndex, unit: 'Pallets' as const }))
-                    .filter(item => item.status === 'Pendiente de almacenar')
+                    .filter(item => item && item.status === 'Pendiente de almacenar')
             );
 
         return [...fruitItems, ...packagingItems];
@@ -202,7 +202,7 @@ export function OtherFruitStorageTab({ clientId: fixedClientId, onlyPackaging }:
     (effectiveOtherFruitReceptions || [])
       .filter(r => !onlyPackaging || isPackagingClient(r))
       .forEach(reception => {
-        const pendingCount = reception.items.filter(i => i.status === 'Pendiente de almacenar').length;
+        const pendingCount = (reception.items || []).filter(i => i && i.status === 'Pendiente de almacenar').length;
         if (pendingCount > 0) {
             const existing = clientsMap.get(reception.clientId);
             if (existing) {
@@ -214,7 +214,7 @@ export function OtherFruitStorageTab({ clientId: fixedClientId, onlyPackaging }:
     });
 
     (packagingReceptions || []).forEach(reception => {
-        const pendingCount = reception.items.filter(i => i.status === 'Pendiente de almacenar').length;
+        const pendingCount = (reception.items || []).filter(i => i && i.status === 'Pendiente de almacenar').length;
         if (pendingCount > 0) {
             const existing = clientsMap.get(reception.clientId);
             if (existing) {
@@ -786,16 +786,16 @@ export function OtherFruitStorageTab({ clientId: fixedClientId, onlyPackaging }:
 
     // Search across ALL pending items (ignoring selectedClientId for the search)
     const fruitPending: (PendingFruitItem | PendingPackagingItem)[] = (otherFruitReceptions || []).flatMap(lot => {
-        const fruitItemsRaw = lot.items
+        const fruitItemsRaw = (lot.items || [])
             .map((item, itemIndex) => ({ ...item, type: 'fruit' as const, receptionId: lot.id, clientName: lot.clientName, document: lot.document, itemIndices: [itemIndex], unit: lot.unit }))
-            .filter(item => item.status === 'Pendiente de almacenar');
+            .filter(item => item && item.status === 'Pendiente de almacenar');
 
         return fruitItemsRaw;
     });
 
     const packagingPending: (PendingFruitItem | PendingPackagingItem)[] = (packagingReceptions || []).flatMap(lot => 
-        lot.items.map((item, itemIndex) => ({ ...item, type: 'packaging' as const, receptionId: lot.id, clientName: lot.clientName, document: lot.document, itemIndex, unit: 'Pallets' as const }))
-            .filter(item => item.status === 'Pendiente de almacenar')
+        (lot.items || []).map((item, itemIndex) => ({ ...item, type: 'packaging' as const, receptionId: lot.id, clientName: lot.clientName, document: lot.document, itemIndex, unit: 'Pallets' as const }))
+            .filter(item => item && item.status === 'Pendiente de almacenar')
     );
 
     const allPendingItems = fruitPending.concat(packagingPending);

@@ -21,7 +21,7 @@ export function usePackagingMastersByClient(clientId: string | null, isFruitAndN
     
     const mastersRef = collection(firestore, 'packagingMaster');
     const q = isFruitAndNotFC
-      ? query(mastersRef, where('clientId', 'in', [clientId, '99999']))
+      ? query(mastersRef, where('clientId', 'in', Array.from(new Set([clientId, '99999']))))
       : query(mastersRef, where('clientId', '==', clientId));
     
     const unsubscribe = onSnapshot(q, (querySnapshot) => {

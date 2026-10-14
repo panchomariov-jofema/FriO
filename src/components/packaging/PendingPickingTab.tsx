@@ -51,7 +51,7 @@ export function PendingPickingTab() {
         const movementRef = doc(firestore, 'packagingMovements', confirmedMovement.id);
         batch.update(movementRef, { status: 'Completado' });
         
-        for(const item of confirmedMovement.items) {
+        for(const item of (confirmedMovement.items || [])) {
             if (item.locations) {
               for(const loc of item.locations) {
                 if (loc.palletsToWithdraw > 0) {
@@ -123,7 +123,7 @@ export function PendingPickingTab() {
                       <TableCell>{mov.createdAt?.toDate()?.toLocaleString() ?? 'Sin fecha'}</TableCell>
                       <TableCell>{clientMap[mov.clientId] || mov.clientId}</TableCell>
                       <TableCell className="hidden sm:table-cell">{mov.document}</TableCell>
-                      <TableCell>{mov.items.reduce((sum, item) => sum + item.palletCount, 0)} pallets</TableCell>
+                      <TableCell>{(mov.items || []).reduce((sum, item) => sum + (item.palletCount || 0), 0) || mov.totalPallets || 0} pallets</TableCell>
                       <TableCell><Badge variant="secondary">{mov.status}</Badge></TableCell>
                       <TableCell className="text-right">
                         <Button size="sm" onClick={() => handleStartPicking(mov)}>Hacer Picking</Button>

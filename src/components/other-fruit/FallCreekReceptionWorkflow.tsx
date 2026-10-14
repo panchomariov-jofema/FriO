@@ -244,7 +244,7 @@ export function FallCreekReceptionWorkflow({
     const pendingManifests = React.useMemo(() => {
         return (allReceptions || []).filter(r => 
             r.clientName?.toUpperCase() === 'FALL CREEK' && 
-            (r.status === 'Pendiente de recibir' || r.items.some(item => item.status === 'Pendiente de recibir'))
+            (r.status === 'Pendiente de recibir' || (r.items && r.items.some(item => item && item.status === 'Pendiente de recibir')))
         );
     }, [allReceptions]);
 
@@ -266,8 +266,8 @@ export function FallCreekReceptionWorkflow({
         
         const pallets: Record<string, { id: string, total: number, received: number, varieties: Set<string> }> = {};
         
-        activeManifest.items.forEach(item => {
-            if (!item.palletId) return;
+        (activeManifest.items || []).forEach(item => {
+            if (!item || !item.palletId) return;
             if (!pallets[item.palletId]) {
                 pallets[item.palletId] = { id: item.palletId, total: 0, received: 0, varieties: new Set() };
             }
@@ -293,7 +293,7 @@ export function FallCreekReceptionWorkflow({
     // Get the 3 items for the current pallet to show their varieties in the slots
     const currentPalletItems = React.useMemo(() => {
         if (!activeManifest || !selectedPalletId) return [];
-        return activeManifest.items.filter(item => item.palletId === selectedPalletId);
+        return (activeManifest.items || []).filter(item => item && item.palletId === selectedPalletId);
     }, [activeManifest, selectedPalletId]);
 
     const activeScanDescription = React.useMemo(() => {
@@ -419,8 +419,8 @@ export function FallCreekReceptionWorkflow({
 
         // 2. Global Uniqueness Check (Across all manifests/years)
         const existingReception = allReceptions?.find(r => 
-            r.items.some(item => 
-                item.containerId === qrCode && 
+            (r.items || []).some(item => 
+                item && item.containerId === qrCode && 
                 !(r.id === activeManifest?.id && item.palletId === selectedPalletId)
             )
         );
@@ -502,7 +502,7 @@ export function FallCreekReceptionWorkflow({
                                         <div className="flex flex-col items-start py-1">
                                             <span className="font-bold">{m.document}</span>
                                             <span className="text-xs text-muted-foreground">
-                                                {m.items.filter(item => item.status === 'Pendiente de recibir').length} Bins por ingresar
+                                                {(m.items || []).filter(item => item && item.status === 'Pendiente de recibir').length} Bins por ingresar
                                             </span>
                                         </div>
                                     </SelectItem>

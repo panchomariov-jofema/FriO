@@ -87,8 +87,8 @@ export function OtherFruitPickingTab() {
   
   const handleGeneratePdfForPackaging = (mov: PackagingMovement) => {
     const clientName = clientMap[mov.clientId] || mov.clientId;
-    const totalPallets = mov.items.reduce((sum, item) => sum + item.palletCount, 0);
-    const flatItems = (mov.items as any[]).flatMap((item: any) => 
+    const totalPallets = ((mov.items || []) as any[]).reduce((sum, item) => sum + (item.palletCount || item.quantity || 0), 0) || (mov as any).totalPallets || 0;
+    const flatItems = ((mov.items || []) as any[]).flatMap((item: any) => 
         (item.locations || []).map((loc: any) => ({
             ...loc,
             itemCode: item.packagingMasterCode || item.productCode || '',
@@ -231,7 +231,7 @@ export function OtherFruitPickingTab() {
 
         const isFallCreekClient = isFallCreek(confirmedMovement);
         if (isFallCreekClient && confirmedMovement.destinationClientId) {
-            const totalBins = confirmedMovement.items.reduce((sum, item) => sum + item.quantity, 0);
+            const totalBins = (confirmedMovement.items || []).reduce((sum, item) => sum + (item.quantity || 0), 0);
             if (totalBins > 0) {
                 const binMovementRef = doc(collection(firestore, 'binMaterialMovements'));
                 const binMovementData = {
@@ -288,7 +288,7 @@ export function OtherFruitPickingTab() {
         const movementRef = doc(firestore, 'packagingMovements', pickingMovement.id);
         batch.update(movementRef, { status: 'Completado' });
         
-        for(const item of confirmedMovement.items) {
+        for(const item of (confirmedMovement.items || [])) {
             if (item.locations) {
               for(const loc of item.locations) {
                 if (loc.palletsToWithdraw > 0) {
@@ -419,7 +419,9 @@ export function OtherFruitPickingTab() {
                   pendingMovements.map((mov) => {
                      const isProducerFruit = mov.taskType === 'producerFruit';
                      const clientName = isProducerFruit ? (mov as Dispatch).exporterName : (mov as any).clientName || clientMap[mov.clientId];
-                     const quantity = isProducerFruit ? `${(mov as Dispatch).totalBins} Bins` : `${(mov as any).items.reduce((sum: number, item: any) => sum + (item.quantity || item.palletCount), 0)} ${(mov as any).unit || 'Pallets'}`;
+                     const quantity = isProducerFruit 
+                       ? `${(mov as Dispatch).totalBins} Bins` 
+                       : `${(((mov as any).items || []) as any[]).reduce((sum: number, item: any) => sum + (item.quantity || item.palletCount || 0), 0) || (mov as any).totalPallets || 0} ${(mov as any).unit || 'Pallets'}`;
                      const typeLabel = mov.taskType === 'fruit' ? 'Fruta (Socio)' : mov.taskType === 'packaging' ? 'Embalaje' : 'Fruta (Productor)';
 
                       return (
@@ -493,7 +495,9 @@ export function OtherFruitPickingTab() {
                   pendingMovements.map((mov) => {
                      const isProducerFruit = mov.taskType === 'producerFruit';
                      const clientName = isProducerFruit ? (mov as Dispatch).exporterName : (mov as any).clientName || clientMap[mov.clientId];
-                     const quantity = isProducerFruit ? `${(mov as Dispatch).totalBins} Bins` : `${(mov as any).items.reduce((sum: number, item: any) => sum + (item.quantity || item.palletCount), 0)} ${(mov as any).unit || 'Pallets'}`;
+                     const quantity = isProducerFruit 
+                       ? `${(mov as Dispatch).totalBins} Bins` 
+                       : `${(((mov as any).items || []) as any[]).reduce((sum: number, item: any) => sum + (item.quantity || item.palletCount || 0), 0) || (mov as any).totalPallets || 0} ${(mov as any).unit || 'Pallets'}`;
 
                      return (
                         <TableRow key={mov.id}>

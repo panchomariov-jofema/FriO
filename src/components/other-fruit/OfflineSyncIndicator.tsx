@@ -126,9 +126,14 @@ export function useOfflineSync() {
 }
 
 export function OfflineSyncIndicator({ className }: { className?: string }) {
+  const [mounted, setMounted] = React.useState(false);
   const { isOnline, pendingCount, isSyncing, syncNow } = useOfflineSync();
 
-  if (isOnline && pendingCount === 0) {
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted || (isOnline && pendingCount === 0)) {
     return (
       <div className={`flex items-center gap-1.5 text-xs text-muted-foreground ${className || ''}`}>
         <Badge variant="outline" className="border-emerald-500/30 text-emerald-600 bg-emerald-50/50 dark:bg-emerald-950/20 text-[11px] font-medium py-0.5 px-2">

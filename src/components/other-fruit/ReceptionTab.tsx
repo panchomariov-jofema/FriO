@@ -294,8 +294,8 @@ export function OtherFruitReceptionTab({ clientId: fixedClientId }: { clientId?:
         }
     });
     (allReceptions || []).forEach(r => {
-        r.items.forEach((item) => {
-            if (item.status === 'Almacenado' && item.storageLocation?.chamberId === chamberId && item.storageLocation.coordinate) {
+        (r.items || []).forEach((item) => {
+            if (item && item.status === 'Almacenado' && item.storageLocation?.chamberId === chamberId && item.storageLocation.coordinate) {
                 const multiplier = binsPerUnit(r, r.unit);
                 const equivalentUnits = item.quantity * multiplier;
                 occupancyMap.set(item.storageLocation.coordinate, (occupancyMap.get(item.storageLocation.coordinate) || 0) + equivalentUnits);
@@ -363,8 +363,8 @@ export function OtherFruitReceptionTab({ clientId: fixedClientId }: { clientId?:
                 if (l.chamberId === chamberId && l.coordinate === currentCoord) existingClientsInCoord.add(l.exporterId);
             });
             (allReceptions || []).forEach(r => {
-                r.items.forEach(it => {
-                    if (it.status === 'Almacenado' && it.storageLocation?.chamberId === chamberId && it.storageLocation.coordinate === currentCoord) {
+                (r.items || []).forEach(it => {
+                    if (it && it.status === 'Almacenado' && it.storageLocation?.chamberId === chamberId && it.storageLocation.coordinate === currentCoord) {
                         existingClientsInCoord.add(r.clientId);
                     }
                 });

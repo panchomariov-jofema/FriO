@@ -2,6 +2,7 @@
 
 Formato: `AAAA-MM-DD · módulo · qué cambió (archivos) · por qué`. Lo más nuevo arriba. 1–3 líneas por entrada.
 
+- 2026-10-14 · otros-hortofruticolas · Fix client exception en `/otros-hortofruticolas` (`PickingTab.tsx`, `PendingPickingTab.tsx`, `StorageTab.tsx`, `FallCreekReceptionWorkflow.tsx`, `ReceptionTab.tsx`, `OfflineSyncIndicator.tsx`, `usePackagingMastersByClient.ts`): Fallback seguro en cálculo de cantidades de despachos de embalaje/Vitafood en picking (`mov.items.reduce` sobre docs con `totalPallets`/`rawUmps` sin `items[]`), navegación defensiva en arrays de ítems y prevención de desajuste de hidratación en indicador offline.
 - 2026-10-11 · embalajes/vitafood · Modo Offline (Cámara) para Recepción y Almacenamiento Vitafood (`vitafood-offline-sync.ts`, `OfflineSyncIndicator.tsx`, `VitafoodReceptionWorkflow.tsx`, `ReceptionTab.tsx`, `StorageTab.tsx`, `sw.js`): Cola local persistente en localStorage, merge optimista que previene pérdida de avance, actualización idempotente por UMP/índice exacto y auto-sincronización atómica (`writeBatch`/`updateDoc`) al reconectar o con botón manual.
 - 2026-10-11 · release · Despliegue de "Mejoras Seguridad": compilación estricta validada, auth reforzado (M6/M1), consultas optimizadas (A3), reglas Firestore (A1) y limpieza de repo.
 - 2026-10-11 · config · B2: Habilitada verificación estricta de tipos en build (`ignoreBuildErrors: false` en `next.config.ts`) tras validar compilación limpia de 31 rutas estáticas y dinámicas al 100%.
