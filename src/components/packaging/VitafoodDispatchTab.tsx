@@ -37,7 +37,9 @@ import {
   Radio,
   Clock,
   ArrowRight,
-  RefreshCw
+  RefreshCw,
+  Undo2,
+  RotateCcw
 } from 'lucide-react';
 import { BarcodeScanner } from '@/components/BarcodeScanner';
 
@@ -82,6 +84,7 @@ export function VitafoodDispatchTab() {
   const [requestedUmps, setRequestedUmps] = React.useState<string[]>([]);
   const [fileName, setFileName] = React.useState<string | null>(null);
   const [pickedState, setPickedState] = React.useState<Record<string, boolean>>({});
+  const [rejectedState, setRejectedState] = React.useState<Record<string, boolean>>({});
   const [searchFilter, setSearchFilter] = React.useState('');
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [isScannerOpen, setIsScannerOpen] = React.useState(false);
@@ -111,6 +114,7 @@ export function VitafoodDispatchTab() {
             setCarrier(parsed.carrier || '');
             setLicensePlate(parsed.licensePlate || '');
             setPickedState(parsed.pickedState || {});
+            setRejectedState(parsed.rejectedState || {});
             setActiveCloudMovementId(parsed.activeCloudMovementId || null);
             setIsDraftRestored(true);
           }
@@ -134,6 +138,7 @@ export function VitafoodDispatchTab() {
             carrier,
             licensePlate,
             pickedState,
+            rejectedState,
             activeCloudMovementId,
             savedAt: new Date().toISOString()
           }));
@@ -144,7 +149,7 @@ export function VitafoodDispatchTab() {
         console.error("Error saving dispatch draft to storage:", e);
       }
     }
-  }, [requestedUmps, fileName, dispatchDocument, destination, carrier, licensePlate, pickedState, activeCloudMovementId]);
+  }, [requestedUmps, fileName, dispatchDocument, destination, carrier, licensePlate, pickedState, rejectedState, activeCloudMovementId]);
 
   // Handle Loading a Pending Order from Cloud (PC to Mobile Sync)
   const handleLoadPendingMovement = (mov: PackagingMovement) => {
@@ -171,10 +176,16 @@ export function VitafoodDispatchTab() {
     setIsDraftRestored(false);
 
     const initialPicked: Record<string, boolean> = {};
+    const initialRejected: Record<string, boolean> = {};
+    const rejectedList: string[] = (mov as any).rejectedUmps || [];
+    rejectedList.forEach((u: string) => {
+      initialRejected[u] = true;
+    });
     umps.forEach((u: string) => {
-      initialPicked[u] = true;
+      initialPicked[u] = !initialRejected[u];
     });
     setPickedState(initialPicked);
+    setRejectedState(initialRejected);
 
     toast({
       title: "📱 Orden Sincronizada",
@@ -480,10 +491,43 @@ export function VitafoodDispatchTab() {
     setPickedState(updated);
   };
 
+  const handleToggleReject = (ump: string) => {
+    setRejectedState(prev => {
+      const willReject = !prev[ump];
+      const updated = { ...prev, [ump]: willReject };
+      if (!willReject) {
+        delete updated[ump];
+      }
+      return updated;
+    });
+
+    const isNowRejected = !rejectedState[ump];
+    const found = matchedItems.find(it => it.ump === ump);
+    if (isNowRejected) {
+      toast({
+        title: "↩️ Pallet Re-Almacenado",
+        description: `El UMP ${ump} se canceló del camión y permanece en ${found?.locationDisplay || 'su coordenada de stock'}.`,
+      });
+    } else {
+      toast({
+        title: "✅ Pallet Reincorporado",
+        description: `El UMP ${ump} se reincorporó a la lista de despacho.`,
+      });
+    }
+  };
+
   const handleBarcodeScanned = (scannedCode: string) => {
     const code = scannedCode.trim().toUpperCase();
     const found = matchedItems.find(it => it.ump.toUpperCase() === code || code.includes(it.ump.toUpperCase()));
     if (found) {
+      if (rejectedState[found.ump]) {
+        toast({
+          variant: "destructive",
+          title: "⚠️ UMP Re-Almacenado",
+          description: `El pallet ${found.ump} está cancelado de esta carga (queda en ${found.locationDisplay}). Deshaga el re-almacenamiento para despacharlo.`,
+        });
+        return;
+      }
       setPickedState(prev => ({ ...prev, [found.ump]: true }));
       toast({
         title: "✅ UMP Verificado",
@@ -502,6 +546,7 @@ export function VitafoodDispatchTab() {
     setRequestedUmps([]);
     setFileName(null);
     setPickedState({});
+    setRejectedState({});
     setDispatchDocument('');
     setDestination('');
     setCarrier('');
@@ -542,6 +587,7 @@ export function VitafoodDispatchTab() {
         totalPallets: matchedItems.length,
         fileName: fileName || 'Carga Excel',
         rawUmps: requestedUmps,
+        rejectedUmps: Object.keys(rejectedState).filter(u => rejectedState[u]),
         items: matchedItems.map(it => ({
           ump: it.ump,
           productCode: it.productCode,
@@ -592,9 +638,10 @@ export function VitafoodDispatchTab() {
     const now = new Date();
     const dateStr = now.toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit', year: 'numeric' });
     const timeStr = now.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' });
-    const totalUnits = matchedItems.reduce((sum, item) => sum + (item.quantity || 0), 0);
+    const activeForPrint = matchedItems.filter(it => !rejectedState[it.ump]);
+    const totalUnits = activeForPrint.reduce((sum, item) => sum + (item.quantity || 0), 0);
 
-    const rowsHtml = matchedItems.map((item, idx) => `
+    const rowsHtml = activeForPrint.map((item, idx) => `
       <tr>
         <td style="text-align: center; font-weight: bold; width: 30px;">${idx + 1}</td>
         <td style="font-weight: bold; background-color: #f1f5f9; text-transform: uppercase; font-size: 11px; white-space: nowrap;">
@@ -805,10 +852,16 @@ export function VitafoodDispatchTab() {
         </table>
 
         <div class="summary-bar">
-          <span>TOTAL PALLETS: <strong>${matchedItems.length}</strong></span>
+          <span>TOTAL PALLETS: <strong>${activeForPrint.length}</strong></span>
           <span>TOTAL BULTOS / UNIDADES: <strong>${totalUnits.toLocaleString('es-CL')}</strong></span>
           <span>EMITIDO POR: <strong>${user?.displayName || user?.email || 'BODEGA'}</strong></span>
         </div>
+        ${Object.keys(rejectedState).filter(u => rejectedState[u]).length > 0 ? `
+          <div style="font-size: 10px; color: #b45309; background-color: #fef3c7; border: 1px solid #fde68a; padding: 5px 8px; border-radius: 4px; margin-bottom: 12px;">
+            &bull; NOTA: ${Object.keys(rejectedState).filter(u => rejectedState[u]).length} pallet(s) re-almacenados / excluidos de esta carga (permanecen en cámara): 
+            <strong>${Object.keys(rejectedState).filter(u => rejectedState[u]).join(', ')}</strong>
+          </div>
+        ` : ''}
 
         <div class="signatures-grid">
           <div class="signature-box">
@@ -856,7 +909,7 @@ export function VitafoodDispatchTab() {
       return;
     }
 
-    const itemsToDispatch = matchedItems.filter(it => pickedState[it.ump]);
+    const itemsToDispatch = matchedItems.filter(it => !rejectedState[it.ump] && pickedState[it.ump]);
     if (itemsToDispatch.length === 0) {
       toast({
         variant: "destructive",
@@ -945,6 +998,7 @@ export function VitafoodDispatchTab() {
         licensePlate: licensePlate || '',
         fileName: fileName || 'Despacho Móvil/PC',
         rawUmps: requestedUmps,
+        rejectedUmps: Object.keys(rejectedState).filter(u => rejectedState[u]),
         totalPallets: itemsToDispatch.length,
         items: itemsToDispatch.map(it => ({
           ump: it.ump,
@@ -985,8 +1039,16 @@ export function VitafoodDispatchTab() {
     }
   };
 
-  const allPicked = matchedItems.length > 0 && matchedItems.every(it => pickedState[it.ump]);
-  const pickedCount = matchedItems.filter(it => pickedState[it.ump]).length;
+  const activeMatchedItems = React.useMemo(() => {
+    return matchedItems.filter(it => !rejectedState[it.ump]);
+  }, [matchedItems, rejectedState]);
+
+  const rejectedCount = React.useMemo(() => {
+    return matchedItems.filter(it => rejectedState[it.ump]).length;
+  }, [matchedItems, rejectedState]);
+
+  const allPicked = activeMatchedItems.length > 0 && activeMatchedItems.every(it => pickedState[it.ump]);
+  const pickedCount = activeMatchedItems.filter(it => pickedState[it.ump]).length;
 
   return (
     <div className="space-y-6">
@@ -1245,7 +1307,7 @@ export function VitafoodDispatchTab() {
       {/* 3. Match Results & KPI Summary */}
       {requestedUmps.length > 0 && (
         <div className="space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <Card className="bg-blue-50/50 dark:bg-blue-950/20 border-blue-200">
               <CardContent className="p-4 flex items-center justify-between">
                 <div>
@@ -1261,8 +1323,8 @@ export function VitafoodDispatchTab() {
             <Card className="bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-200">
               <CardContent className="p-4 flex items-center justify-between">
                 <div>
-                  <p className="text-xs font-bold uppercase text-emerald-600 dark:text-emerald-400">Encontrados en Stock</p>
-                  <p className="text-3xl font-black text-emerald-950 dark:text-emerald-100">{stats.matched}</p>
+                  <p className="text-xs font-bold uppercase text-emerald-600 dark:text-emerald-400">A Despachar (Camión)</p>
+                  <p className="text-3xl font-black text-emerald-950 dark:text-emerald-100">{activeMatchedItems.length}</p>
                 </div>
                 <div className="h-12 w-12 rounded-xl bg-emerald-100 dark:bg-emerald-900/50 flex items-center justify-center text-emerald-600">
                   <CheckCircle2 className="h-6 w-6" />
@@ -1270,13 +1332,25 @@ export function VitafoodDispatchTab() {
               </CardContent>
             </Card>
 
+            <Card className={rejectedCount > 0 ? "bg-amber-50/50 dark:bg-amber-950/20 border-amber-300" : "bg-muted/30"}>
+              <CardContent className="p-4 flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-bold uppercase text-amber-600 dark:text-amber-400">Re-Almacenados (Cámara)</p>
+                  <p className="text-3xl font-black text-slate-800 dark:text-slate-100">{rejectedCount}</p>
+                </div>
+                <div className="h-12 w-12 rounded-xl bg-amber-100 dark:bg-amber-900/50 flex items-center justify-center text-amber-600">
+                  <Undo2 className="h-6 w-6" />
+                </div>
+              </CardContent>
+            </Card>
+
             <Card className={stats.missing > 0 ? "bg-amber-50/50 dark:bg-amber-950/20 border-amber-200" : "bg-muted/30"}>
               <CardContent className="p-4 flex items-center justify-between">
                 <div>
-                  <p className="text-xs font-bold uppercase text-amber-600 dark:text-amber-400">No Encontrados / Faltantes</p>
-                  <p className="text-3xl font-black text-amber-950 dark:text-amber-100">{stats.missing}</p>
+                  <p className="text-xs font-bold uppercase text-muted-foreground">No Encontrados / Falt.</p>
+                  <p className="text-3xl font-black text-foreground">{stats.missing}</p>
                 </div>
-                <div className="h-12 w-12 rounded-xl bg-amber-100 dark:bg-amber-900/50 flex items-center justify-center text-amber-600">
+                <div className="h-12 w-12 rounded-xl bg-muted flex items-center justify-center text-muted-foreground">
                   <AlertTriangle className="h-6 w-6" />
                 </div>
               </CardContent>
@@ -1310,7 +1384,7 @@ export function VitafoodDispatchTab() {
                     Picking List Ordenado por Ubicación Física
                   </CardTitle>
                   <CardDescription>
-                    {pickedCount} de {matchedItems.length} pallets seleccionados para despacho.
+                    {pickedCount} de {activeMatchedItems.length} pallets seleccionados para despacho{rejectedCount > 0 ? ` (${rejectedCount} re-almacenado${rejectedCount > 1 ? 's' : ''} en cámara)` : ''}.
                   </CardDescription>
                 </div>
 
@@ -1348,7 +1422,7 @@ export function VitafoodDispatchTab() {
 
             <CardContent className="p-0">
               <div className="border-t max-h-[500px] overflow-x-auto overflow-y-auto">
-                <Table className="min-w-[680px]">
+                <Table className="min-w-[720px]">
                   <TableHeader className="bg-muted/40 sticky top-0 z-10">
                     <TableRow>
                       <TableHead className="w-12 text-center">
@@ -1363,23 +1437,37 @@ export function VitafoodDispatchTab() {
                       <TableHead className="font-bold">Lote Cliente</TableHead>
                       <TableHead className="font-bold">Producto / Material</TableHead>
                       <TableHead className="text-right font-bold">Cant.</TableHead>
-                      <TableHead className="w-24 text-center">Estado</TableHead>
+                      <TableHead className="w-32 text-center font-normal text-muted-foreground">Excepción</TableHead>
+                      <TableHead className="w-28 text-center font-bold">Estado</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {filteredMatched.length > 0 ? (
                       filteredMatched.map((item, idx) => {
-                        const isChecked = pickedState[item.ump] ?? true;
+                        const isRejected = !!rejectedState[item.ump];
+                        const isChecked = !isRejected && (pickedState[item.ump] ?? true);
                         return (
                           <TableRow 
                             key={item.key} 
-                            className={`cursor-pointer transition-colors ${isChecked ? 'bg-primary/5 hover:bg-primary/10' : 'opacity-60 hover:opacity-100'}`}
-                            onClick={() => handleTogglePick(item.ump)}
+                            className={`transition-colors ${
+                              isRejected 
+                                ? 'bg-amber-500/10 opacity-70 hover:opacity-100' 
+                                : isChecked 
+                                  ? 'bg-primary/5 hover:bg-primary/10 cursor-pointer' 
+                                  : 'hover:bg-muted/30 cursor-pointer'
+                            }`}
+                            onClick={() => {
+                              if (!isRejected) handleTogglePick(item.ump);
+                            }}
                           >
                             <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
                               <Checkbox 
                                 checked={isChecked} 
-                                onCheckedChange={() => handleTogglePick(item.ump)}
+                                disabled={isRejected}
+                                onCheckedChange={() => {
+                                  if (!isRejected) handleTogglePick(item.ump);
+                                }}
+                                className={isRejected ? "opacity-40 cursor-not-allowed" : ""}
                               />
                             </TableCell>
                             <TableCell className="text-center text-xs text-muted-foreground font-mono">
@@ -1401,7 +1489,11 @@ export function VitafoodDispatchTab() {
                               </div>
                             </TableCell>
                             <TableCell className="font-mono font-bold text-sm text-foreground">
-                              {item.ump}
+                              {isRejected ? (
+                                <span className="line-through text-muted-foreground">{item.ump}</span>
+                              ) : (
+                                item.ump
+                              )}
                             </TableCell>
                             <TableCell className="font-mono text-xs">
                               {item.clientLotId}
@@ -1415,15 +1507,52 @@ export function VitafoodDispatchTab() {
                             <TableCell className="text-right font-black text-sm">
                               {item.quantity} <span className="text-[10px] font-normal text-muted-foreground">{item.unit}</span>
                             </TableCell>
-                            <TableCell className="text-center">
-                              {isChecked ? (
-                                <Badge variant="secondary" className="bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-300 text-[10px]">
-                                  Listo
+                            <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
+                              {isRejected ? (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleToggleReject(item.ump)}
+                                  className="h-7 text-[11px] text-primary hover:underline font-semibold gap-1 px-2"
+                                  title="Reincorporar al despacho"
+                                >
+                                  <RotateCcw className="h-3 w-3" /> Deshacer
+                                </Button>
+                              ) : (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleToggleReject(item.ump)}
+                                  className="h-7 text-[11px] font-medium text-muted-foreground hover:text-amber-700 hover:bg-amber-500/10 gap-1 px-2"
+                                  title="Re-Almacenar en cámara si no cabe en el camión"
+                                >
+                                  <Undo2 className="h-3 w-3" /> Re-Almacenar
+                                </Button>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
+                              {isRejected ? (
+                                <Badge variant="outline" className="w-full justify-center gap-1 bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-300 text-[11px] font-bold py-1">
+                                  En Cámara
                                 </Badge>
                               ) : (
-                                <Badge variant="outline" className="text-muted-foreground text-[10px]">
-                                  Pendiente
-                                </Badge>
+                                <Button
+                                  size="sm"
+                                  onClick={() => handleTogglePick(item.ump)}
+                                  className={`w-full h-8 text-xs font-bold gap-1.5 shadow-sm transition active:scale-95 ${
+                                    isChecked 
+                                      ? 'bg-emerald-600 hover:bg-emerald-700 text-white' 
+                                      : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                                  }`}
+                                >
+                                  {isChecked ? (
+                                    <>
+                                      <CheckCircle2 className="h-3.5 w-3.5" /> Listo
+                                    </>
+                                  ) : (
+                                    'Pendiente'
+                                  )}
+                                </Button>
                               )}
                             </TableCell>
                           </TableRow>
@@ -1431,7 +1560,7 @@ export function VitafoodDispatchTab() {
                       })
                     ) : (
                       <TableRow>
-                        <TableCell colSpan={8} className="h-32 text-center text-muted-foreground">
+                        <TableCell colSpan={9} className="h-32 text-center text-muted-foreground">
                           {searchFilter ? 'No se encontraron UMPs con ese criterio de búsqueda.' : 'No hay UMPs para mostrar.'}
                         </TableCell>
                       </TableRow>
@@ -1443,7 +1572,10 @@ export function VitafoodDispatchTab() {
               {/* 5. Footer Confirmation Actions */}
               <div className="p-4 bg-muted/20 border-t flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3">
                 <div className="text-xs text-muted-foreground text-center sm:text-left">
-                  <span className="font-bold text-foreground">{pickedCount}</span> pallets listos para despachar con Guía <span className="font-mono font-bold text-foreground">{dispatchDocument || '(Pendiente)'}</span>.
+                  <span className="font-bold text-foreground">{pickedCount}</span> pallets listos para despachar con Guía <span className="font-mono font-bold text-foreground">{dispatchDocument || '(Pendiente)'}</span>
+                  {rejectedCount > 0 && (
+                    <span> • <strong className="text-amber-700 dark:text-amber-400">{rejectedCount}</strong> re-almacenado{rejectedCount > 1 ? 's' : ''} en cámara</span>
+                  )}.
                 </div>
 
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
