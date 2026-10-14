@@ -141,14 +141,16 @@ export function parseVitafoodManifest(file: File): Promise<VitafoodParsedManifes
                     // Extract UMP (Un.manip. / Unidad manipulacion / UMP)
                     let ump = '';
                     for (const key of Object.keys(r)) {
+                        if (/\b(um|unidad\s+de\s+medida|un\.?\s*med)\b/i.test(key)) continue;
                         if (/manip|ump/i.test(key)) {
-                            ump = String(r[key] || '').trim();
-                            // Handle scientific notation e.g. 6.00609e+09
-                            if (ump.includes('e+')) {
-                                const num = Number(ump);
-                                if (!isNaN(num)) ump = num.toFixed(0);
+                            let valStr = String(r[key] || '').trim();
+                            if (/^(un|kg|cj|caja|cajas|unidad|unidades|pz|pza)$/i.test(valStr)) continue;
+                            if (valStr.includes('e+')) {
+                                const num = Number(valStr);
+                                if (!isNaN(num)) valStr = num.toFixed(0);
                             }
-                            break;
+                            ump = valStr;
+                            if (ump) break;
                         }
                     }
 
@@ -331,21 +333,28 @@ export function parseVitafoodDispatchFile(file: File): Promise<VitafoodParsedDis
                             if (!isNaN(num)) valStr = num.toFixed(0);
                         }
 
-                        if (/manip|ump|pallet|sscc|hu\b/i.test(key)) {
-                            ump = valStr.replace(/\.0$/, '');
-                        } else if (/material|art[ií]culo|item/i.test(key)) {
-                            material = valStr.replace(/\.0$/, '');
-                        } else if (/descrip|denominac/i.test(key)) {
+                        const isUnitKey = /\b(um|unidad\s+de\s+medida|un\.?\s*med)\b/i.test(key);
+                        const isUnitVal = /^(un|kg|cj|caja|cajas|unidad|unidades|pz|pza|pallet|pallets)$/i.test(valStr);
+
+                        if (!isUnitKey && !isUnitVal && /manip|ump|pallet|sscc|hu\b/i.test(key)) {
+                            const cleanVal = valStr.replace(/\.0$/, '');
+                            // Prioritize longer/numeric UMP codes over short or generic strings
+                            if (!ump || /^\d{6,22}$/.test(cleanVal)) {
+                                ump = cleanVal;
+                            }
+                        } else if (/descrip|denominac|texto.*material/i.test(key)) {
                             description = valStr;
-                        } else if (/lote|lot/i.test(key)) {
+                        } else if (/material|art[ií]culo|item/i.test(key) && !/texto/i.test(key)) {
+                            material = valStr.replace(/\.0$/, '');
+                        } else if (/lote|lot/i.test(key) && !/proveedor/i.test(key)) {
                             lote = valStr.replace(/\.0$/, '');
-                        } else if (/cant|qty|unidades/i.test(key)) {
+                        } else if (/cant|qty|unidades/i.test(key) && !/unidad\s+de\s+medida/i.test(key)) {
                             const num = Number(rawVal);
                             if (!isNaN(num) && num > 0) quantity = num;
                         }
                     }
 
-                    // Fallback: if no key matched but row has a value with 8-20 digits, treat as UMP
+                    // Fallback: if no key matched but row has a value with 6-22 digits, treat as UMP
                     if (!ump) {
                         for (const val of Object.values(r)) {
                             const str = String(val || '').trim();

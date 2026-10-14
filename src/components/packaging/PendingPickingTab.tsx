@@ -3,6 +3,7 @@
 import * as React from 'react';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
 import type { PackagingMovement, PackagingReception, OtherClient } from '@/lib/types';
+import { isVitafood } from '@/lib/clients';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -27,7 +28,7 @@ export function PendingPickingTab() {
 
   const pendingMovements = React.useMemo(() => {
     return (allMovements || [])
-      .filter(m => m.type === 'salida' && m.status === 'Pendiente de Picking')
+      .filter(m => m.type === 'salida' && m.status === 'Pendiente de Picking' && !isVitafood(m.clientId) && !isVitafood((m as any).clientName) && !isVitafood((m as any).client))
       .sort((a, b) => (b.createdAt?.toMillis() ?? 0) - (a.createdAt?.toMillis() ?? 0));
   }, [allMovements]);
   

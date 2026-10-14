@@ -4,7 +4,7 @@ import * as React from 'react';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
 import { useFirestoreQuery } from '@/hooks/use-firestore-query';
 import type { OtherFruitMovement, OtherFruitReception, OtherClient, OtherFruitMovementLocation, PackagingMovement, PackagingReception, Dispatch, ChamberLot } from '@/lib/types';
-import { isFallCreek } from '@/lib/clients';
+import { isFallCreek, isVitafood } from '@/lib/clients';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -58,16 +58,19 @@ export function OtherFruitPickingTab() {
   const [isDeleting, setIsDeleting] = React.useState(false);
 
   const pendingMovements = React.useMemo((): ConsolidatedMovement[] => {
+    const isVitafoodMovement = (mov: any) => 
+      isVitafood(mov.clientId) || isVitafood(mov.clientName) || isVitafood(mov.client);
+
     const fruitTasks: ConsolidatedMovement[] = (otherFruitMovements || [])
-      .filter(m => m.type === 'salida' && m.status === 'Pendiente de Picking')
+      .filter(m => m.type === 'salida' && m.status === 'Pendiente de Picking' && !isVitafoodMovement(m))
       .map(m => ({ ...m, taskType: 'fruit' }));
 
     const packagingTasks: ConsolidatedMovement[] = (packagingMovements || [])
-      .filter(m => m.type === 'salida' && m.status === 'Pendiente de Picking')
+      .filter(m => m.type === 'salida' && m.status === 'Pendiente de Picking' && !isVitafoodMovement(m))
       .map(m => ({ ...m, taskType: 'packaging' }));
       
     const producerFruitTasks: ConsolidatedMovement[] = (dispatches || [])
-      .filter(d => d.status === 'Pendiente de Picking')
+      .filter(d => d.status === 'Pendiente de Picking' && !isVitafoodMovement(d))
       .map(d => ({ ...d, taskType: 'producerFruit' }));
 
     return [...fruitTasks, ...packagingTasks, ...producerFruitTasks]

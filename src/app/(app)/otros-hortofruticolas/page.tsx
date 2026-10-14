@@ -13,6 +13,7 @@ import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
 import type { OtherFruitMovement, OtherFruitReception, PackagingMovement, PackagingReception } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
 import { usePermissions } from '@/contexts/PermissionsContext';
+import { isVitafood } from '@/lib/clients';
 
 export default function OtrosHortofruticolasPage() {
     const { data: otherFruitMovements } = useFirestoreCollection<OtherFruitMovement>('otherFruitMovements');
@@ -22,11 +23,14 @@ export default function OtrosHortofruticolasPage() {
     const { permissions } = usePermissions();
 
     const pendingPickingCount = React.useMemo(() => {
+        const isVitafoodMovement = (mov: any) => 
+            isVitafood(mov.clientId) || isVitafood(mov.clientName) || isVitafood(mov.client);
+
         const fruitCount = (otherFruitMovements || []).filter(
-            (mov) => mov.type === 'salida' && mov.status === 'Pendiente de Picking'
+            (mov) => mov.type === 'salida' && mov.status === 'Pendiente de Picking' && !isVitafoodMovement(mov)
         ).length;
         const packagingCount = (packagingMovements || []).filter(
-            (mov) => mov.type === 'salida' && mov.status === 'Pendiente de Picking'
+            (mov) => mov.type === 'salida' && mov.status === 'Pendiente de Picking' && !isVitafoodMovement(mov)
         ).length;
         return fruitCount + packagingCount;
     }, [otherFruitMovements, packagingMovements]);

@@ -13,6 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
 import type { OtherFruitReception, PackagingReception, OtherClient, PackagingMovement } from '@/lib/types';
 import { parseVitafoodDispatchFile, cleanFirestoreObject, VitafoodParsedDispatch } from '@/lib/vitafood-utils';
+import { isVitafood } from '@/lib/clients';
 import { chambersConfig } from '@/lib/chambers-config';
 import { useFirestore, useUser } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
@@ -91,7 +92,7 @@ export function VitafoodDispatchTab() {
   // Pending picking movements in cloud
   const pendingCloudMovements = React.useMemo(() => {
     return (allMovements || [])
-      .filter(m => m.type === 'salida' && m.status === 'Pendiente de Picking')
+      .filter(m => m.type === 'salida' && m.status === 'Pendiente de Picking' && (isVitafood(m.clientId) || isVitafood((m as any).clientName) || isVitafood((m as any).client)))
       .sort((a, b) => (b.createdAt?.toMillis?.() ?? 0) - (a.createdAt?.toMillis?.() ?? 0));
   }, [allMovements]);
 
@@ -229,6 +230,7 @@ export function VitafoodDispatchTab() {
         fileName: fName,
         rawUmps: rawUmps,
         totalPallets: rawUmps.length,
+        items: [],
         status: 'Pendiente de Picking',
         createdAt: serverTimestamp(),
         userId: user?.uid || '',
