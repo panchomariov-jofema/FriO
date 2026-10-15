@@ -60,6 +60,7 @@ export interface MatchedPickingItem {
   clientName: string;
   clientId: string;
   isPicked: boolean;
+  isDispatched?: boolean;
 }
 
 export function VitafoodDispatchTab() {
@@ -264,7 +265,7 @@ export function VitafoodDispatchTab() {
       setIsDraftRestored(false);
       const parsed: VitafoodParsedDispatch = await parseVitafoodDispatchFile(file);
       
-      const docNum = parsed.header.documentNumber || dispatchDocument;
+      const docNum = parsed.header.documentNumber || dispatchDocument || (file.name ? `DESP-${file.name.replace(/\.[^/.]+$/, '').slice(0, 18)}` : '');
       const dest = parsed.header.destination || destination;
       const carr = parsed.header.carrier || carrier;
 
@@ -273,11 +274,7 @@ export function VitafoodDispatchTab() {
       if (carr) setCarrier(carr);
 
       setRequestedUmps(parsed.rawUmps);
-      const initialPicked: Record<string, boolean> = {};
-      parsed.rawUmps.forEach(ump => {
-        initialPicked[ump] = true;
-      });
-      setPickedState(initialPicked);
+      setPickedState({});
 
       // Auto-save to cloud so it's instantly available on mobile phones
       await autoSaveToCloud(parsed.rawUmps, docNum, dest, carr, file.name);
@@ -309,11 +306,7 @@ export function VitafoodDispatchTab() {
     if (lines.length === 0) return;
 
     setRequestedUmps(lines);
-    const initialPicked: Record<string, boolean> = {};
-    lines.forEach(ump => {
-      initialPicked[ump] = true;
-    });
-    setPickedState(initialPicked);
+    setPickedState({});
     setFileName("Ingreso Manual");
     setIsDraftRestored(false);
 
@@ -347,16 +340,17 @@ export function VitafoodDispatchTab() {
       collectionType: 'otherFruitReceptions' | 'packagingReceptions';
       clientName: string;
       clientId: string;
+      isDispatched: boolean;
     }[] = [];
 
     (otherFruitReceptions || []).forEach(reception => {
       (reception.items || []).forEach((item, index) => {
-        if (item.status === 'Almacenado' && item.quantity > 0) {
+        if ((item.status === 'Almacenado' || item.status === 'Despachado') && item.quantity > 0) {
           const ump = String(item.palletId || item.containerId || '').trim();
           const loc = item.storageLocation as any;
-          let locationDisplay = 'Almacenado';
+          let locationDisplay = item.status === 'Despachado' ? 'Despachado' : 'Almacenado';
           let locationType: 'chamber' | 'warehouse' = 'warehouse';
-          let locationSortKey = 'ZZZ';
+          let locationSortKey = item.status === 'Despachado' ? 'ZZZ_DESP' : 'ZZZ';
 
           if (loc) {
             if (loc.warehouse && loc.aisle) {
@@ -390,6 +384,7 @@ export function VitafoodDispatchTab() {
               collectionType: 'otherFruitReceptions',
               clientName: reception.clientName || 'Vitafoods',
               clientId: reception.clientId || 'VITAFOODS',
+              isDispatched: item.status === 'Despachado',
             });
           }
         }
@@ -398,10 +393,10 @@ export function VitafoodDispatchTab() {
 
     (packagingReceptions || []).forEach(reception => {
       (reception.items || []).forEach((item, index) => {
-        if (item.status === 'Almacenado' && item.palletCount > 0) {
+        if ((item.status === 'Almacenado' || (item.status as any) === 'Despachado') && item.palletCount > 0) {
           const ump = String(item.lote || item.packagingMasterCode || '').trim();
           const loc = item.storageLocation as any;
-          let locationDisplay = (loc?.warehouse && loc?.aisle) ? `${loc.warehouse} / ${loc.aisle}` : 'Almacenado';
+          let locationDisplay = (loc?.warehouse && loc?.aisle) ? `${loc.warehouse} / ${loc.aisle}` : ((item.status as any) === 'Despachado' ? 'Despachado' : 'Almacenado');
           let locationSortKey = (loc?.warehouse && loc?.aisle) ? `W_${loc.warehouse}_${loc.aisle}` : 'ZZZ';
 
           if (ump) {
@@ -420,6 +415,7 @@ export function VitafoodDispatchTab() {
               collectionType: 'packagingReceptions',
               clientName: reception.clientName || 'Embalajes',
               clientId: reception.clientId || 'EMBALAJES',
+              isDispatched: (item.status as any) === 'Despachado',
             });
           }
         }
@@ -432,19 +428,22 @@ export function VitafoodDispatchTab() {
 
     requestedUmps.forEach(reqUmp => {
       const cleanReq = reqUmp.trim().toUpperCase();
-      const foundIdx = availableItems.findIndex(it => 
+      const candidates = availableItems.filter(it => 
         !usedKeys.has(`${it.receptionId}-${it.itemIndex}`) &&
         (it.ump.toUpperCase() === cleanReq || it.ump.toUpperCase().includes(cleanReq))
       );
 
-      if (foundIdx !== -1) {
-        const item = availableItems[foundIdx];
-        const key = `${item.receptionId}-${item.itemIndex}`;
+      // Prioritize active (not yet dispatched) stock before already dispatched stock
+      candidates.sort((a, b) => (a.isDispatched === b.isDispatched ? 0 : a.isDispatched ? 1 : -1));
+      const found = candidates[0];
+
+      if (found) {
+        const key = `${found.receptionId}-${found.itemIndex}`;
         usedKeys.add(key);
         matched.push({
-          ...item,
+          ...found,
           key,
-          isPicked: pickedState[item.ump] ?? true,
+          isPicked: found.isDispatched ? true : (pickedState[found.ump] ?? false),
         });
       } else {
         missing.push(reqUmp);
@@ -516,7 +515,132 @@ export function VitafoodDispatchTab() {
     }
   };
 
-  const handleBarcodeScanned = (scannedCode: string) => {
+  const executeSingleDispatch = async (item: MatchedPickingItem, docNum: string) => {
+    if (!firestore) return;
+    setIsSubmitting(true);
+    try {
+      const batch = writeBatch(firestore);
+
+      if (item.collectionType === 'otherFruitReceptions') {
+        const recDoc = otherFruitReceptions?.find(r => r.id === item.receptionId);
+        if (recDoc) {
+          const recRef = doc(firestore, 'otherFruitReceptions', item.receptionId);
+          const currentItems = [...recDoc.items];
+          if (currentItems[item.itemIndex]) {
+            currentItems[item.itemIndex] = {
+              ...currentItems[item.itemIndex],
+              status: 'Despachado',
+            } as any;
+          }
+          const allDispatched = currentItems.every(i => i.status === 'Despachado');
+          batch.update(recRef, cleanFirestoreObject({
+            items: currentItems,
+            status: allDispatched ? 'Despachado' : 'Parcialmente Despachado',
+            updatedAt: serverTimestamp(),
+            lastDispatchDocument: docNum,
+          }));
+        }
+      } else {
+        const pkgDoc = packagingReceptions?.find(r => r.id === item.receptionId);
+        if (pkgDoc) {
+          const pkgRef = doc(firestore, 'packagingReceptions', item.receptionId);
+          const currentItems = [...pkgDoc.items];
+          if (currentItems[item.itemIndex]) {
+            currentItems[item.itemIndex] = {
+              ...currentItems[item.itemIndex],
+              status: 'Despachado' as any,
+            };
+          }
+          const allDispatched = currentItems.every(i => (i.status as any) === 'Despachado');
+          batch.update(pkgRef, cleanFirestoreObject({
+            items: currentItems,
+            status: allDispatched ? 'Despachado' : 'Parcialmente Despachado',
+            updatedAt: serverTimestamp(),
+            lastDispatchDocument: docNum,
+          }));
+        }
+      }
+
+      // Record/Update in packagingMovements
+      const movementRef = activeCloudMovementId 
+        ? doc(firestore, 'packagingMovements', activeCloudMovementId)
+        : doc(collection(firestore, 'packagingMovements'));
+
+      batch.set(movementRef, cleanFirestoreObject({
+        type: 'salida',
+        clientId: item.clientId || 'VITAFOODS',
+        clientName: item.clientName || 'Vitafoods',
+        document: docNum,
+        destination: destination || '',
+        carrier: carrier || '',
+        licensePlate: licensePlate || '',
+        fileName: fileName || 'Despacho Móvil/PC',
+        rawUmps: requestedUmps,
+        rejectedUmps: Object.keys(rejectedState).filter(u => rejectedState[u]),
+        totalPallets: requestedUmps.length,
+        status: 'En Proceso',
+        updatedAt: serverTimestamp(),
+        createdAt: serverTimestamp(),
+        userId: user?.uid || '',
+        userName: user?.displayName || user?.email || '',
+      }), { merge: true });
+
+      setPickedState(prev => ({ ...prev, [item.ump]: true }));
+      await batch.commit();
+
+      toast({
+        title: "🚀 Pallet Despachado (Rebajado de Stock)",
+        description: `El UMP ${item.ump} fue despachado exitosamente (Rebajado de ${item.locationDisplay}).`,
+      });
+    } catch (err: any) {
+      console.error("Error in single dispatch:", err);
+      toast({
+        variant: "destructive",
+        title: "Error al despachar pallet",
+        description: err.message || "Ocurrió un error al rebajar el UMP en la base de datos.",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDispatchSingleUmp = async (item: MatchedPickingItem) => {
+    if (item.isDispatched) {
+      toast({
+        title: "ℹ️ Pallet ya Despachado",
+        description: `El UMP ${item.ump} ya fue rebajado del inventario.`,
+      });
+      return;
+    }
+    if (rejectedState[item.ump]) {
+      toast({
+        variant: "destructive",
+        title: "⚠️ Pallet Re-Almacenado",
+        description: `El pallet ${item.ump} está cancelado de este despacho y permanece en cámara.`,
+      });
+      return;
+    }
+
+    let docNum = dispatchDocument.trim();
+    if (!docNum) {
+      const fallback = fileName ? `DESP-${fileName.replace(/\.[^/.]+$/, '').slice(0, 15)}` : `GUIA-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}`;
+      const entered = window.prompt("Ingrese N° de Guía de Despacho:", fallback);
+      if (!entered || !entered.trim()) {
+        toast({
+          variant: "destructive",
+          title: "Guía Obligatoria",
+          description: "Debe ingresar el número de Guía para proceder con el despacho.",
+        });
+        return;
+      }
+      docNum = entered.trim();
+      setDispatchDocument(docNum);
+    }
+
+    await executeSingleDispatch(item, docNum);
+  };
+
+  const handleBarcodeScanned = async (scannedCode: string) => {
     const code = scannedCode.trim().toUpperCase();
     const found = matchedItems.find(it => it.ump.toUpperCase() === code || code.includes(it.ump.toUpperCase()));
     if (found) {
@@ -528,16 +652,28 @@ export function VitafoodDispatchTab() {
         });
         return;
       }
+      if (found.isDispatched) {
+        toast({
+          title: "ℹ️ UMP Ya Despachado",
+          description: `El pallet ${found.ump} ya fue rebajado y despachado previamente.`,
+        });
+        return;
+      }
+
       setPickedState(prev => ({ ...prev, [found.ump]: true }));
-      toast({
-        title: "✅ UMP Verificado",
-        description: `${found.ump} marcado para despacho (${found.locationDisplay}).`,
-      });
+
+      let docNum = dispatchDocument.trim();
+      if (!docNum) {
+        docNum = fileName ? `DESP-${fileName.replace(/\.[^/.]+$/, '').slice(0, 15)}` : `GUIA-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}`;
+        setDispatchDocument(docNum);
+      }
+
+      await executeSingleDispatch(found, docNum);
     } else {
       toast({
         variant: "destructive",
         title: "⚠️ UMP no encontrado en Picking",
-        description: `El código ${code} no está en la lista de despacho activa.`,
+        description: `El código ${code} no coincide con ningún pallet de la lista activa.`,
       });
     }
   };
@@ -1047,8 +1183,12 @@ export function VitafoodDispatchTab() {
     return matchedItems.filter(it => rejectedState[it.ump]).length;
   }, [matchedItems, rejectedState]);
 
-  const allPicked = activeMatchedItems.length > 0 && activeMatchedItems.every(it => pickedState[it.ump]);
-  const pickedCount = activeMatchedItems.filter(it => pickedState[it.ump]).length;
+  const completedOrPickedCount = React.useMemo(() => {
+    return activeMatchedItems.filter(it => it.isDispatched || pickedState[it.ump]).length;
+  }, [activeMatchedItems, pickedState]);
+
+  const allPicked = activeMatchedItems.length > 0 && activeMatchedItems.every(it => it.isDispatched || pickedState[it.ump]);
+  const pickedCount = completedOrPickedCount;
 
   return (
     <div className="space-y-6">
@@ -1445,29 +1585,31 @@ export function VitafoodDispatchTab() {
                     {filteredMatched.length > 0 ? (
                       filteredMatched.map((item, idx) => {
                         const isRejected = !!rejectedState[item.ump];
-                        const isChecked = !isRejected && (pickedState[item.ump] ?? true);
+                        const isChecked = !isRejected && (item.isDispatched || pickedState[item.ump]);
                         return (
                           <TableRow 
                             key={item.key} 
                             className={`transition-colors ${
                               isRejected 
                                 ? 'bg-amber-500/10 opacity-70 hover:opacity-100' 
-                                : isChecked 
-                                  ? 'bg-primary/5 hover:bg-primary/10 cursor-pointer' 
-                                  : 'hover:bg-muted/30 cursor-pointer'
+                                : item.isDispatched
+                                  ? 'bg-emerald-500/10'
+                                  : isChecked 
+                                    ? 'bg-primary/5 hover:bg-primary/10 cursor-pointer' 
+                                    : 'hover:bg-muted/30 cursor-pointer'
                             }`}
                             onClick={() => {
-                              if (!isRejected) handleTogglePick(item.ump);
+                              if (!isRejected && !item.isDispatched) handleTogglePick(item.ump);
                             }}
                           >
                             <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
                               <Checkbox 
-                                checked={isChecked} 
-                                disabled={isRejected}
+                                checked={item.isDispatched || isChecked} 
+                                disabled={isRejected || item.isDispatched}
                                 onCheckedChange={() => {
-                                  if (!isRejected) handleTogglePick(item.ump);
+                                  if (!isRejected && !item.isDispatched) handleTogglePick(item.ump);
                                 }}
-                                className={isRejected ? "opacity-40 cursor-not-allowed" : ""}
+                                className={isRejected || item.isDispatched ? "opacity-40 cursor-not-allowed" : ""}
                               />
                             </TableCell>
                             <TableCell className="text-center text-xs text-muted-foreground font-mono">
@@ -1512,16 +1654,20 @@ export function VitafoodDispatchTab() {
                                 <Button
                                   variant="ghost"
                                   size="sm"
+                                  disabled={isSubmitting}
                                   onClick={() => handleToggleReject(item.ump)}
                                   className="h-7 text-[11px] text-primary hover:underline font-semibold gap-1 px-2"
                                   title="Reincorporar al despacho"
                                 >
                                   <RotateCcw className="h-3 w-3" /> Deshacer
                                 </Button>
+                              ) : item.isDispatched ? (
+                                <span className="text-[11px] text-muted-foreground font-medium">-</span>
                               ) : (
                                 <Button
                                   variant="ghost"
                                   size="sm"
+                                  disabled={isSubmitting}
                                   onClick={() => handleToggleReject(item.ump)}
                                   className="h-7 text-[11px] font-medium text-muted-foreground hover:text-amber-700 hover:bg-amber-500/10 gap-1 px-2"
                                   title="Re-Almacenar en cámara si no cabe en el camión"
@@ -1535,23 +1681,19 @@ export function VitafoodDispatchTab() {
                                 <Badge variant="outline" className="w-full justify-center gap-1 bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-300 text-[11px] font-bold py-1">
                                   En Cámara
                                 </Badge>
+                              ) : item.isDispatched ? (
+                                <Badge className="w-full justify-center gap-1 bg-emerald-600 text-white hover:bg-emerald-600 text-xs font-bold py-1.5 shadow-sm">
+                                  <CheckCircle2 className="h-3.5 w-3.5" /> Despachado
+                                </Badge>
                               ) : (
                                 <Button
                                   size="sm"
-                                  onClick={() => handleTogglePick(item.ump)}
-                                  className={`w-full h-8 text-xs font-bold gap-1.5 shadow-sm transition active:scale-95 ${
-                                    isChecked 
-                                      ? 'bg-emerald-600 hover:bg-emerald-700 text-white' 
-                                      : 'bg-muted text-muted-foreground hover:bg-muted/80'
-                                  }`}
+                                  disabled={isSubmitting}
+                                  onClick={() => handleDispatchSingleUmp(item)}
+                                  className="w-full h-8 text-xs font-bold gap-1.5 shadow-sm transition active:scale-95 bg-emerald-600 hover:bg-emerald-700 text-white"
+                                  title="Haga clic para despachar y rebajar este pallet de stock en 1 clic"
                                 >
-                                  {isChecked ? (
-                                    <>
-                                      <CheckCircle2 className="h-3.5 w-3.5" /> Listo
-                                    </>
-                                  ) : (
-                                    'Pendiente'
-                                  )}
+                                  <CheckCircle2 className="h-3.5 w-3.5" /> Listo
                                 </Button>
                               )}
                             </TableCell>
@@ -1572,7 +1714,7 @@ export function VitafoodDispatchTab() {
               {/* 5. Footer Confirmation Actions */}
               <div className="p-4 bg-muted/20 border-t flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3">
                 <div className="text-xs text-muted-foreground text-center sm:text-left">
-                  <span className="font-bold text-foreground">{pickedCount}</span> pallets listos para despachar con Guía <span className="font-mono font-bold text-foreground">{dispatchDocument || '(Pendiente)'}</span>
+                  <span className="font-bold text-foreground">{completedOrPickedCount}</span> de <span className="font-bold text-foreground">{activeMatchedItems.length}</span> pallets listos/despachados con Guía <span className="font-mono font-bold text-foreground">{dispatchDocument || '(Pendiente)'}</span>
                   {rejectedCount > 0 && (
                     <span> • <strong className="text-amber-700 dark:text-amber-400">{rejectedCount}</strong> re-almacenado{rejectedCount > 1 ? 's' : ''} en cámara</span>
                   )}.
@@ -1597,10 +1739,10 @@ export function VitafoodDispatchTab() {
                   </Button>
                   <Button 
                     onClick={handleConfirmDispatch} 
-                    disabled={isSubmitting || pickedCount === 0 || !dispatchDocument.trim()}
+                    disabled={isSubmitting || completedOrPickedCount === 0 || !dispatchDocument.trim()}
                     className="w-full sm:w-auto font-bold text-xs bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-600/20"
                   >
-                    {isSubmitting ? 'Confirmando Salida...' : `Confirmar Despacho (${pickedCount} Pallets)`}
+                    {isSubmitting ? 'Confirmando Salida...' : `Confirmar Despacho (${completedOrPickedCount}/${activeMatchedItems.length} Pallets)`}
                   </Button>
                 </div>
               </div>
@@ -1615,8 +1757,13 @@ export function VitafoodDispatchTab() {
         onOpenChange={setIsScannerOpen} 
         onScan={handleBarcodeScanned}
         title="Escanear UMP para Despacho"
-        description="Escanee el código de barras o QR del UMP para marcarlo en el Picking List."
+        description="Escanee el código de barras o QR del UMP para verificar y rebajar de stock."
         closeOnScan={false}
+        currentCount={completedOrPickedCount}
+        totalCount={activeMatchedItems.length}
+        counterLabel="Pallets Despachados"
+        onComplete={handleConfirmDispatch}
+        completeButtonText={`Finalizar Despacho (${completedOrPickedCount}/${activeMatchedItems.length})`}
       />
     </div>
   );

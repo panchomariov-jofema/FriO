@@ -14,8 +14,10 @@ Ruta: `/reportes` (índice con tarjetas; se pueden ocultar vía `reportSettings`
 | `registro-temperaturas` | `chamberTemperatures` | |
 | `stock-fruta-otros-clientes` | `otherFruitReceptions` | |
 | `kardex-fruta-otros-clientes` | `otherFruitReceptions`, `otherFruitMovements` | Usa batch (ajustes). |
-| `permanencia-stock-otros-clientes` | `otherFruitReceptions`, `otherFruitMovements` | Días en cámara (base de facturación). |
+| `permanencia-stock-otros-clientes` | `otherFruitReceptions`, `otherFruitMovements`, `packagingMovements`, `otherClients` | Días de permanencia de Pallets/UMP (Vitafood) y fruta para cobro de arriendo. Filtro por cliente/proveedor. |
 | `stock-embalajes` | `packagingReceptions` | |
+| `trazabilidad-ump` | `otherFruitReceptions` | Auditoría de UMPs (recepcionados, almacenados, no recepcionados). |
+| `recepciones-vitafood` | `otherFruitReceptions`, `packagingMovements` | Detalle de UMPs con fechas, descripción, ubicación y edición de despacho (guía, chofer, patente, destino). |
 
 Mockups de referencia: `docs/*.jpeg` (Stock por Ubicación, Saldo de Bins, Stock Bins en Cámaras, Stock Bins y Mat. en Planta).
 

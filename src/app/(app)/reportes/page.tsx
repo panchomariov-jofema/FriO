@@ -117,8 +117,8 @@ const reportList = [
     },
     {
         id: 'permanencia-stock',
-        title: "Días de Permanencia en Frío",
-        description: "Cálculo automático de cuántos días lleva la fruta de terceros en las cámaras.",
+        title: "Días de Permanencia (Arriendo y Frío)",
+        description: "Cálculo de permanencia de Pallets (Vitafood), UMP y stock en dependencias para cobro de arriendo.",
         href: "/reportes/permanencia-stock-otros-clientes",
         icon: Clock,
         color: 'text-slate-500',
@@ -140,6 +140,15 @@ const reportList = [
         href: '/reportes/trazabilidad-ump',
         icon: ScanLine,
         color: 'text-emerald-600',
+        image: PlaceHolderImages.find(img => img.id === 'report-fruit')
+    },
+    { 
+        id: 'recepciones-vitafood',
+        title: 'Recepciones Vitafoods', 
+        description: 'Detalle de UMPs con fechas, descripción, ubicación y edición de despacho (guía, chofer, patente y destino).',
+        href: '/reportes/recepciones-vitafood',
+        icon: Truck,
+        color: 'text-blue-600',
         image: PlaceHolderImages.find(img => img.id === 'report-fruit')
     },
     { 

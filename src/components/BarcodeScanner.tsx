@@ -19,6 +19,9 @@ interface BarcodeScannerProps {
   usePhysicalScanner?: boolean;
   currentCount?: number;
   totalCount?: number;
+  counterLabel?: string;
+  onComplete?: () => void;
+  completeButtonText?: string;
 }
 
 const qrcodeRegionId = "reader";
@@ -32,7 +35,10 @@ export function BarcodeScanner({
   description,
   usePhysicalScanner: propUsePhysicalScanner,
   currentCount,
-  totalCount
+  totalCount,
+  counterLabel,
+  onComplete,
+  completeButtonText
 }: BarcodeScannerProps) {
   const { toast } = useToast();
   const [localUsePhysicalScanner, setLocalUsePhysicalScanner] = React.useState<boolean>(false);
@@ -334,6 +340,25 @@ export function BarcodeScanner({
           )}
         </DialogHeader>
 
+        {/* Universal live counter banner for both camera and physical scanner modes */}
+        {currentCount !== undefined && totalCount !== undefined && (
+          <div className="flex items-center justify-between bg-primary/10 border border-primary/20 rounded-xl px-4 py-2.5 my-1 shadow-sm">
+            <div className="flex flex-col text-left">
+              <span className="text-[11px] uppercase font-bold tracking-wider text-primary">
+                {counterLabel || 'Progreso de Escaneo'}
+              </span>
+              <span className="text-xs text-muted-foreground">
+                {currentCount >= totalCount ? '¡Completado!' : `${totalCount - currentCount} pendientes`}
+              </span>
+            </div>
+            <div className="flex items-baseline gap-1 bg-white dark:bg-zinc-800 px-3.5 py-1 rounded-lg border shadow-sm">
+              <span className="text-2xl font-black text-primary">{currentCount}</span>
+              <span className="text-sm font-bold text-muted-foreground/60">/</span>
+              <span className="text-sm font-bold text-muted-foreground">{totalCount}</span>
+            </div>
+          </div>
+        )}
+
         {/* ALWAYS keep the reader div mounted in DOM to prevent html5-qrcode crashes, 
             but hide it using 'hidden' class when physical scanner mode is active */}
         <div 
@@ -398,7 +423,7 @@ export function BarcodeScanner({
                   <span className="text-3xl font-bold text-muted-foreground">{totalCount}</span>
                 </div>
                 <span className="text-xs uppercase font-extrabold tracking-widest text-[#004b8d] mt-2">
-                  Bins Escaneados
+                  {counterLabel || 'Pallets / Bins Escaneados'}
                 </span>
               </div>
             ) : (
@@ -452,10 +477,24 @@ export function BarcodeScanner({
           </div>
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="flex flex-row justify-between sm:justify-between items-center gap-2">
           <Button type="button" variant="secondary" onClick={() => onOpenChange(false)}>
             Cerrar
           </Button>
+          {onComplete && (
+            <Button 
+              type="button" 
+              onClick={() => {
+                onComplete();
+                onOpenChange(false);
+              }}
+              disabled={(currentCount ?? 0) === 0}
+              className="bg-[#7aba28] hover:bg-[#689f22] text-white font-bold"
+            >
+              <Check className="h-4 w-4 mr-1.5" />
+              {completeButtonText || 'Confirmar Despacho'}
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>
