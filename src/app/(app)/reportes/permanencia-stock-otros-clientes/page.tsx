@@ -54,6 +54,12 @@ function formatLocation(loc: any): string {
     return '—';
 }
 
+function resolveItemDate(dateVal: any): Date | null {
+    if (!dateVal) return null;
+    const d = safeToDate(dateVal);
+    return isNaN(d.getTime()) ? null : d;
+}
+
 function convertToCSV(data: any[], headers: { key: string; label: string }[]) {
     const headerRow = headers.map(h => h.label).join(';');
     const rows = data.map(row => 
@@ -133,8 +139,10 @@ export default function PermanenceReportPage() {
                     return;
                 }
 
-                const fechaIngreso = safeToDate(item.storedAt || item.receivedAt || reception.createdAt);
-                if (isNaN(fechaIngreso.getTime())) return;
+                const fechaIngreso = resolveItemDate(item.storedAt) 
+                    || resolveItemDate(item.receivedAt) 
+                    || resolveItemDate(reception.createdAt);
+                if (!fechaIngreso) return;
 
                 const palletId = String(item.palletId || item.containerId || '').trim();
                 const ubicacion = formatLocation(item.storageLocation);

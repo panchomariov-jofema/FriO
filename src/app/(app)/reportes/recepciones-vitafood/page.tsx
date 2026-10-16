@@ -76,6 +76,12 @@ function formatLocation(loc: any): string {
     return '—';
 }
 
+function resolveItemDate(dateVal: any): Date | null {
+    if (!dateVal) return null;
+    const d = safeToDate(dateVal);
+    return isNaN(d.getTime()) ? null : d;
+}
+
 function convertToCSV(data: any[], headers: { key: string; label: string }[]) {
     const headerRow = headers.map(h => `"${h.label}"`).join(';');
     const rows = data.map(row => 
@@ -172,7 +178,25 @@ export default function VitafoodReceptionsReportPage() {
             const receptionDate = reception.createdAt ? safeToDate(reception.createdAt) : null;
 
             (reception.items || []).forEach((item, index) => {
-                const storedDate = item.storedAt ? safeToDate(item.storedAt) : (item.receivedAt ? safeToDate(item.receivedAt) : null);
+                // Fecha de almacenamiento del ítem
+                let storedDate = resolveItemDate(item.storedAt);
+
+                // Si está almacenado pero storedAt vino vacío ({}) o no existe,
+                // usar como fecha de almacenamiento su fecha de recepción o de la orden
+                if (!storedDate && (item.status === 'Almacenado' || item.status === 'Despachado')) {
+                    storedDate = resolveItemDate(item.receivedAt) || resolveItemDate(reception.updatedAt) || resolveItemDate(reception.createdAt);
+                }
+
+                // Fecha de recepción del ítem: preferencia receivedAt individual, luego reception.createdAt
+                let receptionDate = resolveItemDate(item.receivedAt) || resolveItemDate(reception.createdAt);
+
+                // Coherencia cronológica de negocio:
+                // Si el pallet fue almacenado físicamente en una hora anterior (ej. por modo offline o desfase de reloj),
+                // la recepción física ocurrió como máximo en ese mismo momento.
+                if (storedDate && receptionDate && storedDate.getTime() < receptionDate.getTime()) {
+                    receptionDate = storedDate;
+                }
+
                 const ump = String(item.palletId || item.containerId || '').trim();
                 const location = formatLocation(item.storageLocation);
 
@@ -538,7 +562,6 @@ export default function VitafoodReceptionsReportPage() {
                             <TableHeader>
                                 <TableRow>
                                     <TableHead>Fecha Recep.</TableHead>
-                                    <TableHead>Fecha Almac.</TableHead>
                                     <TableHead>UMP</TableHead>
                                     <TableHead>Cód. Material</TableHead>
                                     <TableHead>Descripción</TableHead>
@@ -556,7 +579,7 @@ export default function VitafoodReceptionsReportPage() {
                                 {loading ? (
                                     Array.from({ length: 8 }).map((_, i) => (
                                         <TableRow key={i}>
-                                            <TableCell colSpan={13}><Skeleton className="h-6 w-full" /></TableCell>
+                                            <TableCell colSpan={12}><Skeleton className="h-6 w-full" /></TableCell>
                                         </TableRow>
                                     ))
                                 ) : filteredRows && filteredRows.length > 0 ? (
@@ -564,9 +587,6 @@ export default function VitafoodReceptionsReportPage() {
                                         <TableRow key={row.id} className="hover:bg-muted/50">
                                             <TableCell className="text-xs whitespace-nowrap">
                                                 {safeFormatDate(row.receptionDate, 'dd/MM/yyyy HH:mm')}
-                                            </TableCell>
-                                            <TableCell className="text-xs whitespace-nowrap">
-                                                {safeFormatDate(row.storedDate, 'dd/MM/yyyy HH:mm')}
                                             </TableCell>
                                             <TableCell className="font-mono font-bold text-xs text-blue-700 whitespace-nowrap">
                                                 {row.ump}
@@ -631,7 +651,7 @@ export default function VitafoodReceptionsReportPage() {
                                     ))
                                 ) : (
                                     <TableRow>
-                                        <TableCell colSpan={13} className="h-28 text-center text-muted-foreground">
+                                        <TableCell colSpan={12} className="h-28 text-center text-muted-foreground">
                                             No se encontraron recepciones de Vitafoods para el filtro seleccionado.
                                         </TableCell>
                                     </TableRow>
