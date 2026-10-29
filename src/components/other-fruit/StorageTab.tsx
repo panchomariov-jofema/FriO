@@ -424,12 +424,21 @@ export function OtherFruitStorageTab({ clientId: fixedClientId, onlyPackaging }:
         return;
     }
 
+    const isWarehouse = destinationType === 'warehouse' || Boolean(warehouse && aisle);
+    if (!isWarehouse && (!startCoordinate || !startCoordinate.trim() || !chamberId)) {
+      toast({ variant: 'destructive', title: 'Coordenada Inválida', description: 'Debe seleccionar una cámara y una coordenada válida.' });
+      return;
+    }
+    if (isWarehouse && (!warehouse || !aisle || !aisle.trim())) {
+      toast({ variant: 'destructive', title: 'Ubicación Inválida', description: 'Debe seleccionar un almacén y pasillo válido.' });
+      return;
+    }
+
     const isTargetPkg = isPackagingClient(originalReception);
     const isOffline = typeof navigator !== 'undefined' && !navigator.onLine;
 
     // Offline / Modo Cámara for packaging & Vitafood items
     if ((isOffline || !firestore) && isTargetPkg) {
-      const isWarehouse = destinationType === 'warehouse' || (warehouse && aisle);
       const targetLocation = isWarehouse
         ? { warehouse: warehouse || '', aisle: aisle || '', chamberId: warehouse || '', coordinate: aisle || '' }
         : { chamberId, coordinate: startCoordinate };
@@ -755,6 +764,10 @@ export function OtherFruitStorageTab({ clientId: fixedClientId, onlyPackaging }:
     } catch (error) {
         console.warn("Fallo de red al almacenar en cámara, guardando en cola offline:", error);
         if (isTargetPkg) {
+          if (!startCoordinate || !startCoordinate.trim() || !chamberId) {
+            toast({ variant: 'destructive', title: 'Error de ubicación', description: 'No se puede guardar localmente sin una coordenada válida.' });
+            return;
+          }
           itemToProcessScope.itemIndices.forEach((idx) => {
             const itemUmp = itemToProcessScope.palletId || itemToProcessScope.containerId;
             enqueueOfflineAction({

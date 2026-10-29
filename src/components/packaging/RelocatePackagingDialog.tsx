@@ -256,7 +256,9 @@ export function RelocatePackagingDialog({ item, open, onOpenChange, onConfirm }:
                  ? `🏢 ${item.location.warehouse} / ${item.location.aisle}`
                  : (item.location?.chamberId && item.location?.coordinate
                      ? `❄️ ${chambersConfig[item.location.chamberId]?.name || item.location.chamberId} / ${item.location.coordinate}`
-                     : (item.location?.coordinate || 'No especificada'))}
+                     : (item.location?.chamberId
+                         ? `❄️ ${chambersConfig[item.location.chamberId]?.name || item.location.chamberId} (Sin coord.)`
+                         : (item.location?.coordinate || 'No especificada')))}
             </AlertDescription>
         </Alert>
 

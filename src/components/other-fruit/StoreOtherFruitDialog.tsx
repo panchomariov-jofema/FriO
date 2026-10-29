@@ -437,7 +437,10 @@ export function StoreOtherFruitDialog({
       e.preventDefault();
       e.stopPropagation();
     }
-    if (!item || !suggestion || !selectedChamberId) return;
+    if (!item || !suggestion || !suggestion.trim() || !selectedChamberId) {
+      toast({ variant: 'destructive', title: 'Ubicación Incompleta', description: 'No hay una coordenada válida sugerida para confirmar.' });
+      return;
+    }
 
     const values = form.getValues();
     const qtyPerLocation = Math.min(values.quantityPerLocation || capacityPerCoord, capacityPerCoord);
@@ -488,12 +491,21 @@ export function StoreOtherFruitDialog({
 
     const onSubmit = (values: StoreFormValues) => {
     if (!item) return;
-    const effectiveQtyPerLoc = Math.min(values.quantityPerLocation || capacityPerCoord, capacityPerCoord);
+
     if (values.destinationType === 'chamber') {
-      if (values.chamberId) {
-          localStorage.setItem('frio_last_chamber_id', values.chamberId);
+      if (!values.chamberId || !values.coordinate || !values.coordinate.trim()) {
+        toast({ variant: 'destructive', title: 'Ubicación Incompleta', description: 'Debe seleccionar una cámara y una coordenada válida.' });
+        return;
+      }
+      localStorage.setItem('frio_last_chamber_id', values.chamberId);
+    } else {
+      if (!values.warehouse || !values.aisle || !values.aisle.trim()) {
+        toast({ variant: 'destructive', title: 'Ubicación Incompleta', description: 'Debe seleccionar un almacén y un pasillo válido.' });
+        return;
       }
     }
+
+    const effectiveQtyPerLoc = Math.min(values.quantityPerLocation || capacityPerCoord, capacityPerCoord);
     if (values.totalQuantity > item.quantity) {
         toast({ variant: 'destructive', title: 'Cantidad Inválida', description: `No puede almacenar más de lo pendiente (${item.quantity}).`});
         return;

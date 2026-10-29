@@ -140,7 +140,16 @@ export function ReceptionTab() {
     const currentUserId = user?.uid || '';
     const now = new Date();
 
-    const isWarehouse = destinationType === 'warehouse' || (warehouse && aisle);
+    const isWarehouse = destinationType === 'warehouse' || Boolean(warehouse && aisle);
+    if (!isWarehouse && (!startCoordinate || !startCoordinate.trim() || !chamberId)) {
+      toast({ variant: 'destructive', title: 'Coordenada Inválida', description: 'Debe seleccionar una cámara y una coordenada válida.' });
+      return;
+    }
+    if (isWarehouse && (!warehouse || !aisle || !aisle.trim())) {
+      toast({ variant: 'destructive', title: 'Ubicación Inválida', description: 'Debe seleccionar un almacén y pasillo válido.' });
+      return;
+    }
+
     const targetLocation: {
       chamberId: string;
       coordinate: string;
@@ -285,6 +294,10 @@ export function ReceptionTab() {
     } catch (err: any) {
       console.warn('Fallo de conexión al almacenar en Firestore, guardando en cola offline:', err);
       // Fallback: enqueue offline action so work is never lost!
+      if (!isWarehouse && (!startCoordinate || !startCoordinate.trim() || !chamberId)) {
+        toast({ variant: 'destructive', title: 'Error de ubicación', description: 'No se puede guardar localmente sin una coordenada válida.' });
+        return;
+      }
       itemToStore.itemIndices.forEach((idx: number) => {
         const itemUmp = itemToStore.palletId || itemToStore.containerId;
         enqueueOfflineAction({

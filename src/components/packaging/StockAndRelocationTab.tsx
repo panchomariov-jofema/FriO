@@ -123,7 +123,9 @@ export function StockAndRelocationTab() {
                       ? `${loc.warehouse} / ${loc.aisle}`
                       : ((loc && loc.chamberId && loc.coordinate)
                           ? `${chambersConfig[loc.chamberId]?.name || loc.chamberId} / ${loc.coordinate}`
-                          : (loc?.coordinate || 'Almacenado'));
+                          : ((loc && loc.chamberId)
+                              ? `${chambersConfig[loc.chamberId]?.name || loc.chamberId} (Sin coord.)`
+                              : (loc?.coordinate || 'Almacenado')));
 
                     return {
                         id: `${reception.id}-${index}`,
@@ -168,6 +170,8 @@ export function StockAndRelocationTab() {
                         locDisplay = `${loc.warehouse} / ${loc.aisle}`;
                       } else if (loc.chamberId && loc.coordinate) {
                         locDisplay = `${chambersConfig[loc.chamberId]?.name || loc.chamberId} / ${loc.coordinate}`;
+                      } else if (loc.chamberId) {
+                        locDisplay = `${chambersConfig[loc.chamberId]?.name || loc.chamberId} (Sin coord.)`;
                       } else if (loc.coordinate) {
                         locDisplay = loc.coordinate;
                       }

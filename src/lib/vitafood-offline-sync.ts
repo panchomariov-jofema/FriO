@@ -95,6 +95,16 @@ export function getActiveManifestBackup(manifestId: string): OtherFruitReception
 export function enqueueOfflineAction(
   actionData: Omit<OfflinePalletAction, 'id' | 'timestamp'>
 ): OfflinePalletAction {
+  if (actionData.type === 'store') {
+    const loc = actionData.payload?.storageLocation;
+    const isWarehouse = Boolean(loc?.warehouse && loc?.aisle && loc.warehouse.trim() && loc.aisle.trim());
+    const isChamber = Boolean(loc?.chamberId && loc?.coordinate && loc.coordinate.trim() !== '');
+    if (!isWarehouse && !isChamber) {
+      console.error('[OfflineQueue] Rechazado almacenamiento sin coordenada ni almacén válido:', actionData);
+      throw new Error('No se puede almacenar sin una coordenada o ubicación válida.');
+    }
+  }
+
   const currentQueue = getOfflineQueue();
   const cleanUmp = normalizeUmp(actionData.palletId);
   const actionId = `${actionData.manifestId}_${cleanUmp}_${actionData.type}_${Date.now()}`;
@@ -172,11 +182,16 @@ export function applyOfflineQueueToManifest(
         };
       }
     } else if (action.type === 'store') {
-      // Set to Almacenado with location
+      const loc = action.payload?.storageLocation;
+      const isWarehouse = Boolean(loc?.warehouse && loc?.aisle && loc.warehouse.trim() && loc.aisle.trim());
+      const isChamber = Boolean(loc?.chamberId && loc?.coordinate && loc.coordinate.trim() !== '');
+      const validLocation = (isWarehouse || isChamber) ? loc : currentItem.storageLocation;
+
+      // Set to Almacenado with location only if valid
       updatedItems[itemIndex] = {
         ...currentItem,
         status: 'Almacenado',
-        storageLocation: action.payload?.storageLocation || currentItem.storageLocation,
+        storageLocation: validLocation,
         storedAt: actionDate,
         storedByUserName: action.userName,
         storedByUserId: action.userId,
