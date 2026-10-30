@@ -128,6 +128,26 @@ export default function PermanenceReportPage() {
         return map;
     }, [packagingMovements]);
 
+    // Map reception items to dispatch movement data (for Fall Creek and other commercial clients)
+    const fruitDispatchMap = React.useMemo(() => {
+        const map = new Map<string, { date: Date; document: string }>();
+        (movements || []).forEach(mov => {
+            if (mov.type === 'salida' && mov.locations && Array.isArray(mov.locations)) {
+                const date = mov.createdAt ? safeToDate(mov.createdAt) : null;
+                const doc = mov.document || (mov as any).dispatchDocument || 'S/N';
+                mov.locations.forEach(loc => {
+                    if (loc.receptionId !== undefined && loc.itemIndex !== undefined) {
+                        const key = `${loc.receptionId}-${loc.itemIndex}`;
+                        if (date && !map.has(key)) {
+                            map.set(key, { date, document: doc });
+                        }
+                    }
+                });
+            }
+        });
+        return map;
+    }, [movements]);
+
     // Build unified permanence dataset
     const reportData = React.useMemo(() => {
         if (loading) return [];
@@ -163,19 +183,28 @@ export default function PermanenceReportPage() {
                 const ubicacion = formatLocation(item.storageLocation);
 
                 if (item.status === 'Despachado') {
-                    // Item dispatched
-                    let fechaSalida: Date;
+                    // Item despachado
+                    let fechaSalida: Date | null = null;
                     let docSalida = (reception as any).lastDispatchDocument || (reception as any).dispatchDocument || 'S/N';
 
-                    if (isVita && palletId && umpDispatchMap.has(palletId)) {
+                    const itemKey = `${reception.id}-${index}`;
+                    if (fruitDispatchMap.has(itemKey)) {
+                        const dispatchInfo = fruitDispatchMap.get(itemKey)!;
+                        fechaSalida = dispatchInfo.date;
+                        if (dispatchInfo.document && dispatchInfo.document !== 'S/N') {
+                            docSalida = dispatchInfo.document;
+                        }
+                    } else if (isVita && palletId && umpDispatchMap.has(palletId)) {
                         const dispatchInfo = umpDispatchMap.get(palletId)!;
                         fechaSalida = dispatchInfo.date;
-                        if (dispatchInfo.document) docSalida = dispatchInfo.document;
+                        if (dispatchInfo.document && dispatchInfo.document !== 'S/N') {
+                            docSalida = dispatchInfo.document;
+                        }
                     } else {
                         fechaSalida = safeToDate((item as any).dispatchedAt || (reception as any).updatedAt || item.storedAt || reception.createdAt);
                     }
 
-                    if (isNaN(fechaSalida.getTime())) {
+                    if (!fechaSalida || isNaN(fechaSalida.getTime())) {
                         fechaSalida = now;
                     }
 
@@ -200,7 +229,7 @@ export default function PermanenceReportPage() {
                         isCurrentlyStored: false,
                     });
                 } else if (item.status === 'Almacenado' || item.status === 'Pendiente de almacenar' || item.status === 'Recibido') {
-                    // Currently stored in facilities
+                    // Actualmente almacenado en cámaras (aún no se despacha, fecha de salida vacía)
                     const diasPermanencia = Math.max(0, differenceInDays(now, fechaIngreso));
 
                     data.push({
@@ -217,7 +246,7 @@ export default function PermanenceReportPage() {
                         nombreProducto: item.productName || 'Producto',
                         cantidad: `${item.quantity || 1} ${reception.unit || (isVita ? 'Pallet' : 'Unid.')}`,
                         fechaRecepcion: fechaIngreso,
-                        fechaSalida: now,
+                        fechaSalida: null,
                         diasPermanencia,
                         isCurrentlyStored: true,
                     });
@@ -225,56 +254,9 @@ export default function PermanenceReportPage() {
             });
         });
 
-        // 2. Process dispatched movements from otherFruitMovements (for other commercial clients)
-        (movements || []).forEach(movement => {
-            if (movement.type === 'salida' && movement.status === 'Completado' && movement.locations) {
-                // If movement belongs to Vitafood, skip to avoid double counting with UMP dispatch map
-                if (isVitafood(movement.clientName) || isVitafood((movement as any).clientId)) {
-                    return;
-                }
-
-                movement.locations.forEach((loc, index) => {
-                    // Omitir registros de prueba asociados a la variedad Sekoya Suziblue
-                    if (isExcludedPermanenceItem(loc.productName, movement.document)) {
-                        return;
-                    }
-
-                    const reception = receptionMap.get(loc.receptionId);
-                    if (reception && isExcludedPermanenceItem(loc.productName, reception.documentNumber || reception.document)) {
-                        return;
-                    }
-                    const fechaRecepcion = safeToDate(reception?.createdAt || (reception as any)?.storedAt);
-                    const fechaSalida = safeToDate(movement.createdAt || (movement as any).dispatchDate);
-
-                    if (!isNaN(fechaRecepcion.getTime()) && !isNaN(fechaSalida.getTime())) {
-                        const diasPermanencia = Math.max(0, differenceInDays(fechaSalida, fechaRecepcion));
-
-                        data.push({
-                            id: `mov-${movement.id}-${index}`,
-                            palletId: (loc as any).palletId || (loc as any).containerId || '—',
-                            cliente: movement.clientName || reception?.clientName || 'Cliente',
-                            clientId: (movement as any).clientId || reception?.clientId,
-                            estado: 'Despachado',
-                            ubicacion: formatLocation(loc.location),
-                            documentoEntrada: reception?.documentNumber || reception?.document || 'S/N',
-                            documentoSalida: movement.document || 'S/N',
-                            loteCliente: loc.clientLotId || '—',
-                            codProducto: loc.productCode || '—',
-                            nombreProducto: loc.productName || 'Producto',
-                            cantidad: `${loc.quantity} ${loc.unit || 'Bins'}`,
-                            fechaRecepcion,
-                            fechaSalida,
-                            diasPermanencia,
-                            isCurrentlyStored: false,
-                        });
-                    }
-                });
-            }
-        });
-
-        // Sort descending by permanence days (longest stay first)
+        // Ordenar descendentemente por días de permanencia (mayor estadía primero)
         return data.sort((a, b) => b.diasPermanencia - a.diasPermanencia);
-    }, [loading, movements, receptions, umpDispatchMap]);
+    }, [loading, receptions, umpDispatchMap, fruitDispatchMap]);
 
     // Unique non-Vitafood client names for selector
     const clientOptions = React.useMemo(() => {
@@ -355,7 +337,7 @@ export default function PermanenceReportPage() {
             { key: 'estado', label: 'Estado' },
             { key: 'ubicacion', label: 'Ubicación' },
             { key: 'fechaRecepcionStr', label: 'Fecha Ingreso / Almacenamiento' },
-            { key: 'fechaSalidaStr', label: 'Fecha Salida / Corte' },
+            { key: 'fechaSalidaStr', label: 'Fecha Salida' },
             { key: 'diasPermanencia', label: 'Días de Permanencia (Arriendo)' },
             { key: 'documentoEntrada', label: 'Documento Entrada' },
             { key: 'documentoSalida', label: 'Documento Salida' },
@@ -368,9 +350,7 @@ export default function PermanenceReportPage() {
         const dataForExport = filteredData.map(item => ({
             ...item,
             fechaRecepcionStr: item.fechaRecepcion ? safeFormatDate(item.fechaRecepcion, 'yyyy-MM-dd HH:mm') : '',
-            fechaSalidaStr: item.fechaSalida 
-                ? (item.isCurrentlyStored ? `${safeFormatDate(item.fechaSalida, 'yyyy-MM-dd')} (Corte Actual)` : safeFormatDate(item.fechaSalida, 'yyyy-MM-dd HH:mm')) 
-                : '',
+            fechaSalidaStr: item.fechaSalida ? safeFormatDate(item.fechaSalida, 'yyyy-MM-dd HH:mm') : '',
         }));
 
         const csv = convertToCSV(dataForExport, headers);
@@ -501,7 +481,7 @@ export default function PermanenceReportPage() {
                                     <TableHead>Estado</TableHead>
                                     <TableHead>Ubicación</TableHead>
                                     <TableHead>Fecha Ingreso</TableHead>
-                                    <TableHead>Fecha Salida / Corte</TableHead>
+                                    <TableHead>Fecha Salida</TableHead>
                                     <TableHead>Doc. Entrada</TableHead>
                                     <TableHead>Doc. Salida</TableHead>
                                     <TableHead>Lote</TableHead>
@@ -548,12 +528,10 @@ export default function PermanenceReportPage() {
                                                 {safeFormatDate(item.fechaRecepcion, 'dd/MM/yyyy HH:mm')}
                                             </TableCell>
                                             <TableCell className="text-xs">
-                                                {item.isCurrentlyStored ? (
-                                                    <span className="text-emerald-700 font-medium">
-                                                        {safeFormatDate(item.fechaSalida, 'dd/MM/yyyy')} (Hoy)
-                                                    </span>
-                                                ) : (
+                                                {item.fechaSalida ? (
                                                     safeFormatDate(item.fechaSalida, 'dd/MM/yyyy HH:mm')
+                                                ) : (
+                                                    <span className="text-muted-foreground">—</span>
                                                 )}
                                             </TableCell>
                                             <TableCell className="text-xs">{item.documentoEntrada}</TableCell>
