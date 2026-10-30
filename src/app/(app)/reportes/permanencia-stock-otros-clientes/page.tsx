@@ -60,6 +60,16 @@ function resolveItemDate(dateVal: any): Date | null {
     return isNaN(d.getTime()) ? null : d;
 }
 
+function isExcludedPermanenceItem(productName?: string | null, doc?: string | null): boolean {
+    const pName = (productName || '').toLowerCase().trim();
+    const dName = (doc || '').toLowerCase().trim();
+    // Excluir registros de prueba (variedad Sekoya Suziblue no utilizada comercialmente por Fall Creek y documento de prueba)
+    if (pName.includes('suziblue') || dName.includes('prueba despacho 3')) {
+        return true;
+    }
+    return false;
+}
+
 function convertToCSV(data: any[], headers: { key: string; label: string }[]) {
     const headerRow = headers.map(h => h.label).join(';');
     const rows = data.map(row => 
@@ -136,6 +146,11 @@ export default function PermanenceReportPage() {
             (reception.items || []).forEach((item, index) => {
                 // Ignore items that never reached warehouse storage
                 if (item.status === 'No Recepcionado' || item.status === 'Pendiente de recibir') {
+                    return;
+                }
+
+                // Omitir registros de prueba asociados a la variedad Sekoya Suziblue
+                if (isExcludedPermanenceItem(item.productName, docEntrada)) {
                     return;
                 }
 
@@ -219,7 +234,15 @@ export default function PermanenceReportPage() {
                 }
 
                 movement.locations.forEach((loc, index) => {
+                    // Omitir registros de prueba asociados a la variedad Sekoya Suziblue
+                    if (isExcludedPermanenceItem(loc.productName, movement.document)) {
+                        return;
+                    }
+
                     const reception = receptionMap.get(loc.receptionId);
+                    if (reception && isExcludedPermanenceItem(loc.productName, reception.documentNumber || reception.document)) {
+                        return;
+                    }
                     const fechaRecepcion = safeToDate(reception?.createdAt || (reception as any)?.storedAt);
                     const fechaSalida = safeToDate(movement.createdAt || (movement as any).dispatchDate);
 
