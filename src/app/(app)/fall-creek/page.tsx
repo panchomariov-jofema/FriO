@@ -510,7 +510,7 @@ export default function FallCreekPage() {
             }
 
             let binsQty = 0;
-            (mov.items || []).forEach(item => {
+            (Array.isArray(mov.items) ? mov.items : []).forEach(item => {
                 binsQty += item.quantity;
             });
 
@@ -1208,8 +1208,9 @@ export default function FallCreekPage() {
             .sort((a,b) => safeToMillis(b.createdAt) - safeToMillis(a.createdAt));
 
         return sortedMovements.map(mov => {
-            const totalQuantity = mov.items.reduce((sum, item) => sum + item.quantity, 0);
-            const lotes = [...new Set(mov.items.map(item => item.clientLotId || item.productName))].join(', ');
+            const movItems = Array.isArray(mov.items) ? mov.items : [];
+            const totalQuantity = movItems.reduce((sum, item) => sum + item.quantity, 0);
+            const lotes = [...new Set(movItems.map(item => item.clientLotId || item.productName))].join(', ');
             return {
                 ...mov,
                 totalQuantity,

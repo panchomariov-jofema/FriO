@@ -1,4 +1,7 @@
 # 99 · Bitácora de cambios y decisiones
+- 2026-11-04 · fall-creek/reportes · Reparación de estructura de `items[]` en `otherFruitMovements/nbMN5J6vIFfjBimaLmd5` y blindaje defensivo en vistas (`fall-creek/page.tsx`, `reportes/despachos-fallcreek/page.tsx`, `reportes/kardex-fruta-otros-clientes/page.tsx`): se corrigió en Firestore el campo `items` que había quedado guardado como objeto mapa en lugar de array al actualizar el movimiento, y se agregaron validaciones `Array.isArray()` defensivas en las tres vistas para prevenir client-side exceptions ante inconsistencias de esquema.
+- 2026-11-03 · fall-creek · Ajuste de bins no cargados en despacho Fall Creek para 22 de Abril (`otherFruitReceptions/XBRsCw0LeiKNJmOBKP42`, `otherFruitReceptions/Q5Nbtyrjxkh6qnetgoWB`, `otherFruitMovements/nbMN5J6vIFfjBimaLmd5`): por revisión física del cliente, los 4 bins que quedan en stock corresponden al lote `C5B20142B-327-66` (`PALLET-16624` x1 y `PALLET-16622` x3, todos en `CAMARA-2 • J3`), reintegrando `PALLET-16836` (x3, `C5B22291H-321-36`) a despachado (camión con 13 bins, deuda en 145 bins).
+- 2026-10-31 · datos-maestros · Corrección de espacios en blanco (`\u00a0`) en `name` y `shortName` del documento `producers/zxzqbe5gF6n1Oy5CdR3D` (`"Agricola Hune"`) en Firestore para evitar que aparezca como dos productores distintos al exportar el Kardex de Movimientos de Bins y Materiales.
 
 Formato: `AAAA-MM-DD · módulo · qué cambió (archivos) · por qué`. Lo más nuevo arriba. 1–3 líneas por entrada.
 

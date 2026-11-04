@@ -364,7 +364,7 @@ export default function OtherFruitKardexReportPage() {
             movements.forEach(movement => {
                 if (movement.type !== 'salida') return;
 
-                const movItems = movement.items || [];
+                const movItems = Array.isArray(movement.items) ? movement.items : [];
                 const totalQuantity = movItems.reduce((sum, item) => sum + (Number(item?.quantity) || 0), 0);
                 const observations = [...new Set(movItems.map(i => i?.observation).filter(Boolean))].join(', ');
 

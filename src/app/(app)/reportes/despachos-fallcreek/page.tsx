@@ -180,9 +180,10 @@ export default function FallCreekDispatchReportPage() {
                 m.status === 'Completado'
             )
             .map(m => {
-                const varieties = (m.items || []).map(item => item.productName);
+                const movItems = Array.isArray(m.items) ? m.items : [];
+                const varieties = movItems.map(item => item.productName);
                 const uniqueVarieties = Array.from(new Set(varieties));
-                const totalBins = (m.items || []).reduce((sum, item) => sum + item.quantity, 0);
+                const totalBins = movItems.reduce((sum, item) => sum + item.quantity, 0);
 
                 // Build detailed bin list for this dispatch
                 const binsDetail: DispatchedBinDetail[] = [];
