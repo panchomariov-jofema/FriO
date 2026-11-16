@@ -8,6 +8,7 @@ Archivos: `src/lib/chambers-config.ts` (estática), `src/lib/utils.ts` (orden de
 | CAMARA-1..3 | A–J (10) | 1–14 | 800 | Filas 13-14 bloqueadas por defecto |
 | CAMARA-3 | + K, L opcionales | | +160 | Si `chamberSettings/CAMARA-3.colsKLEnabled` |
 | CAMARA-4..6 | A–O (15) | 1–14 | 1500 | Filas 13-14 bloqueadas por defecto |
+| CAMARA-5 | + P, Q, R opcionales | | +300 | Si `chamberSettings/CAMARA-5.colsPQREnabled` |
 
 - Coordenada = `Columna + Fila` (`A1`, `K12`). Ordenar siempre con `naturalSort`.
 - **Filas comodín 13-14**: si `row13Enabled`, se desbloquean solo en las columnas de `getAllowedComodinCols()` (chicas: A,B,C,H,I,J; grandes: A,B,C,M,N,O; cámara 3 incluye D,E y K,L si aplica). F-G (o centro) es pasillo.

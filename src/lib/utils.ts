@@ -23,8 +23,9 @@ export const naturalSort = (a: string, b: string) => {
 
 export const getEffectiveChamberConfig = (
   chamberConfig: Chamber,
-  row13EnabledOrSettings?: boolean | { row13Enabled?: boolean; colsKLEnabled?: boolean },
-  colsKLEnabledParam?: boolean
+  row13EnabledOrSettings?: boolean | { row13Enabled?: boolean; colsKLEnabled?: boolean; colsPQREnabled?: boolean },
+  colsKLEnabledParam?: boolean,
+  colsPQREnabledParam?: boolean
 ): Chamber => {
   const row13Enabled = typeof row13EnabledOrSettings === 'object'
     ? !!row13EnabledOrSettings?.row13Enabled
@@ -32,6 +33,9 @@ export const getEffectiveChamberConfig = (
   const colsKLEnabled = typeof row13EnabledOrSettings === 'object'
     ? !!row13EnabledOrSettings?.colsKLEnabled
     : !!colsKLEnabledParam;
+  const colsPQREnabled = typeof row13EnabledOrSettings === 'object'
+    ? !!row13EnabledOrSettings?.colsPQREnabled
+    : !!colsPQREnabledParam;
 
   let columns = chamberConfig.columns;
   let blocked = chamberConfig.blocked ? [...chamberConfig.blocked] : [];
@@ -45,8 +49,16 @@ export const getEffectiveChamberConfig = (
     }
   }
 
+  if (chamberConfig.id === 'CAMARA-5' && colsPQREnabled) {
+    if (!columns.some(c => c.name === 'P')) {
+      columns = [...columns, { name: 'P', id: 'P' }, { name: 'Q', id: 'Q' }, { name: 'R', id: 'R' }];
+      blocked.push('P13', 'P14', 'Q13', 'Q14', 'R13', 'R14');
+      capacity = capacity + 300;
+    }
+  }
+
   if (row13Enabled) {
-    const allowedComodinCols = getAllowedComodinCols(chamberConfig.id, colsKLEnabled);
+    const allowedComodinCols = getAllowedComodinCols(chamberConfig.id, colsKLEnabled, colsPQREnabled);
 
     blocked = blocked.filter(coord => {
       const match = coord.match(/^([A-Z])(\d+)$/);

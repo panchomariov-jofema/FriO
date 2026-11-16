@@ -284,8 +284,8 @@ export function OtherFruitReceptionTab({ clientId: fixedClientId }: { clientId?:
 
     const rawChamberConfig = chambersConfig[chamberId];
     if (!rawChamberConfig) return;
-    const isChamberRow13Enabled = !!chamberSettings?.find((s: any) => s.id === chamberId)?.row13Enabled;
-    const chamberConfig = getEffectiveChamberConfig(rawChamberConfig, isChamberRow13Enabled);
+    const chamberSetting = chamberSettings?.find((s: any) => s.id === chamberId);
+    const chamberConfig = getEffectiveChamberConfig(rawChamberConfig, chamberSetting);
 
     const occupancyMap = new Map<string, number>();
     (allChamberLots || []).forEach(l => {

@@ -112,7 +112,7 @@ export default function CamarasPage() {
   const { data: otherFruitReceptions, loading: loadingOtherFruit } = useFirestoreCollection<OtherFruitReception>('otherFruitReceptions');
   const { data: otherClients } = useFirestoreCollection<OtherClient>('otherClients');
   const { data: clientConfigs, loading: loadingConfigs } = useFirestoreCollection<ClientStorageConfig>('clientStorageConfigs');
-  const { data: chamberSettings } = useFirestoreCollection<{ id: string; row13Enabled?: boolean; colsKLEnabled?: boolean }>('chamberSettings');
+  const { data: chamberSettings } = useFirestoreCollection<{ id: string; row13Enabled?: boolean; colsKLEnabled?: boolean; colsPQREnabled?: boolean }>('chamberSettings');
   const { data: usersMaster } = useFirestoreCollection<any>('usersMaster');
 
   const isVitafoodOrPackaging = React.useCallback((item?: StoredItem | null) => {
@@ -306,11 +306,14 @@ export default function CamarasPage() {
     const calculatedChamberOccupancy = Object.keys(chambersConfig).reduce((acc, chamberId) => {
         const chamberConfig = chambersConfig[chamberId];
         const isChamberColsKLEnabled = chamberId === 'CAMARA-3' && !!chamberSettings?.find(s => s.id === chamberId)?.colsKLEnabled;
+        const isChamberColsPQREnabled = chamberId === 'CAMARA-5' && !!chamberSettings?.find(s => s.id === chamberId)?.colsPQREnabled;
         const itemsInThisChamber = allStoredItems.filter(item => item.chamberId === chamberId);
         
         // Find if any client has an override for this chamber
         const clientWithOverride = configs.find(c => c.chamberOverrides?.[chamberId]);
-        const baseCapacity = isChamberColsKLEnabled ? chamberConfig.capacity + 160 : chamberConfig.capacity;
+        let baseCapacity = chamberConfig.capacity;
+        if (isChamberColsKLEnabled) baseCapacity += 160;
+        if (isChamberColsPQREnabled) baseCapacity += 300;
         const totalCapacity = clientWithOverride?.chamberOverrides?.[chamberId] || baseCapacity;
 
         const occupiedEquivalentBins = itemsInThisChamber.reduce((sum, item) => {
@@ -431,7 +434,8 @@ export default function CamarasPage() {
     const PALLETS_PER_COORDINATE = clientConfig?.palletsPerCoordinate || 3;
     const isChamberRow13Enabled = !!chamberSettings?.find(s => s.id === chamberId)?.row13Enabled;
     const isChamberColsKLEnabled = chamberId === 'CAMARA-3' && !!chamberSettings?.find(s => s.id === chamberId)?.colsKLEnabled;
-    const chamberConfig = getEffectiveChamberConfig(chambersConfig[chamberId], isChamberRow13Enabled, isChamberColsKLEnabled);
+    const isChamberColsPQREnabled = chamberId === 'CAMARA-5' && !!chamberSettings?.find(s => s.id === chamberId)?.colsPQREnabled;
+    const chamberConfig = getEffectiveChamberConfig(chambersConfig[chamberId], isChamberRow13Enabled, isChamberColsKLEnabled, isChamberColsPQREnabled);
     const exporter = (exporters || []).find(e => e.exporterId === lotToStore.exporterId);
     const strategy = exporter?.storageStrategy || 'secuencial';
   
@@ -1106,7 +1110,8 @@ export default function CamarasPage() {
                 {Object.entries(chambersConfig).map(([chamberId, config]) => {
                     const isRow13Enabled = !!chamberSettings?.find(s => s.id === chamberId)?.row13Enabled;
                     const isColsKLEnabled = chamberId === 'CAMARA-3' && !!chamberSettings?.find(s => s.id === chamberId)?.colsKLEnabled;
-                    const effectiveConfig = getEffectiveChamberConfig(config, isRow13Enabled, isColsKLEnabled);
+                    const isColsPQREnabled = chamberId === 'CAMARA-5' && !!chamberSettings?.find(s => s.id === chamberId)?.colsPQREnabled;
+                    const effectiveConfig = getEffectiveChamberConfig(config, isRow13Enabled, isColsKLEnabled, isColsPQREnabled);
                     const activeRows = isRow13Enabled ? effectiveConfig.rows : effectiveConfig.rows.filter((r: number) => r !== 13 && r !== 14);
                     return (
                         <AccordionItem value={chamberId} key={chamberId}>
@@ -1139,6 +1144,19 @@ export default function CamarasPage() {
                                                     className="scale-75 data-[state=checked]:bg-[#004b8d]"
                                                 />
                                                 <label htmlFor={`colsKL-${chamberId}`} className="text-[10px] font-black uppercase tracking-wider text-muted-foreground cursor-pointer select-none">Col. K y L</label>
+                                            </div>
+                                        )}
+                                        {chamberId === 'CAMARA-5' && (
+                                            <div className="flex items-center gap-1.5 ml-1">
+                                                <Switch
+                                                    id={`colsPQR-${chamberId}`}
+                                                    checked={isColsPQREnabled}
+                                                    onCheckedChange={async (checked) => {
+                                                        await setDoc(doc(firestore, 'chamberSettings', chamberId), { colsPQREnabled: checked }, { merge: true });
+                                                    }}
+                                                    className="scale-75 data-[state=checked]:bg-[#004b8d]"
+                                                />
+                                                <label htmlFor={`colsPQR-${chamberId}`} className="text-[10px] font-black uppercase tracking-wider text-muted-foreground cursor-pointer select-none">Col. P, Q y R</label>
                                             </div>
                                         )}
                                     </div>
@@ -1307,7 +1325,7 @@ export default function CamarasPage() {
                                               }
                                           }
     
-                                           const allowedComodinCols = getAllowedComodinCols(chamberId, isColsKLEnabled);
+                                           const allowedComodinCols = getAllowedComodinCols(chamberId, isColsKLEnabled, isColsPQREnabled);
                                            const isPermanentlyBlocked = (row === 13 || row === 14) && !allowedComodinCols.includes(col.name);
                                           const isComodinRow = row === 13 || row === 14;
 

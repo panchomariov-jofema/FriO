@@ -157,8 +157,8 @@ export function RelocatePackagingDialog({ item, open, onOpenChange, onConfirm }:
 
     const rawChamberConfig = chambersConfig[selectedChamberId];
     if (!rawChamberConfig) return [];
-    const isChamberRow13Enabled = !!chamberSettings?.find(s => s.id === selectedChamberId)?.row13Enabled;
-    const effectiveChamberConfig = getEffectiveChamberConfig(rawChamberConfig, isChamberRow13Enabled);
+    const chamberSetting = chamberSettings?.find(s => s.id === selectedChamberId);
+    const effectiveChamberConfig = getEffectiveChamberConfig(rawChamberConfig, chamberSetting);
     const allCoords = getSortedCoordinates(effectiveChamberConfig, 'secuencial');
 
     // Calculate occupied coordinates in this chamber

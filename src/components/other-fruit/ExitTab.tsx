@@ -62,7 +62,7 @@ export function OtherFruitExitTab({ clientId: fixedClientId }: { clientId?: stri
   const { data: allReceptions, loading: loadingReceptions } = useFirestoreCollection<OtherFruitReception>('otherFruitReceptions');
   const { data: allMovements, loading: loadingMovements } = useFirestoreCollection<OtherFruitMovement>('otherFruitMovements');
   const { data: allProducers } = useFirestoreCollection<Producer>('producers');
-  const { data: chamberSettings } = useFirestoreCollection<{ id: string; row13Enabled?: boolean; colsKLEnabled?: boolean }>('chamberSettings');
+  const { data: chamberSettings } = useFirestoreCollection<{ id: string; row13Enabled?: boolean; colsKLEnabled?: boolean; colsPQREnabled?: boolean }>('chamberSettings');
   const firestore = useFirestore();
   const { toast } = useToast();
   const { user } = useUser();
@@ -785,7 +785,8 @@ export function OtherFruitExitTab({ clientId: fixedClientId }: { clientId?: stri
 
                     const isRow13Enabled = !!chamberSettings?.find(s => s.id === activeChamber)?.row13Enabled;
                     const isColsKLEnabled = activeChamber === 'CAMARA-3' && !!chamberSettings?.find(s => s.id === activeChamber)?.colsKLEnabled;
-                    const chamber = getEffectiveChamberConfig(rawChamber, isRow13Enabled, isColsKLEnabled);
+                    const isColsPQREnabled = activeChamber === 'CAMARA-5' && !!chamberSettings?.find(s => s.id === activeChamber)?.colsPQREnabled;
+                    const chamber = getEffectiveChamberConfig(rawChamber, isRow13Enabled, isColsKLEnabled, isColsPQREnabled);
 
                     return (
                       <div className="overflow-x-auto border rounded-lg p-4 bg-muted/5 shadow-inner">
@@ -811,7 +812,7 @@ export function OtherFruitExitTab({ clientId: fixedClientId }: { clientId?: stri
                               {/* Column Cells */}
                               {chamber.columns.map(col => {
                                 const coordName = `${col.name}${row}`;
-                                const allowedComodinCols = getAllowedComodinCols(activeChamber, isColsKLEnabled);
+                                const allowedComodinCols = getAllowedComodinCols(activeChamber, isColsKLEnabled, isColsPQREnabled);
                                 const isPermanentlyBlocked = (row === 13 || row === 14) && !allowedComodinCols.includes(col.name);
 
                                 // Find Fall Creek items in this coordinate

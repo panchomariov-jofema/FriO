@@ -243,8 +243,8 @@ export function ReceptionTab() {
           return;
         }
 
-        const isChamberRow13Enabled = !!chamberSettings?.find(s => s.id === chamberId)?.row13Enabled;
-        const chamberConfig = getEffectiveChamberConfig(rawChamberConfig, isChamberRow13Enabled);
+        const chamberSetting = chamberSettings?.find(s => s.id === chamberId);
+        const chamberConfig = getEffectiveChamberConfig(rawChamberConfig, chamberSetting);
         let allPossibleCoords = (strategy === 'pareado') ? getPairedCoordinates(chamberConfig) : getSortedCoordinates(chamberConfig, strategy || 'secuencial');
 
         const startIndex = allPossibleCoords.indexOf(startCoordinate);

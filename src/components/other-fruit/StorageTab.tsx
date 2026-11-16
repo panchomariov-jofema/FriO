@@ -62,7 +62,7 @@ export function OtherFruitStorageTab({ clientId: fixedClientId, onlyPackaging }:
   const { data: clientConfigs } = useFirestoreCollection<ClientStorageConfig>('clientStorageConfigs');
   const { data: exporters } = useFirestoreCollection<Exporter>('exporters');
   const { data: otherClients } = useFirestoreCollection<OtherClient>('otherClients');
-  const { data: chamberSettings } = useFirestoreCollection<{ id: string; row13Enabled?: boolean; colsKLEnabled?: boolean }>('chamberSettings');
+  const { data: chamberSettings } = useFirestoreCollection<{ id: string; row13Enabled?: boolean; colsKLEnabled?: boolean; colsPQREnabled?: boolean }>('chamberSettings');
   
   const [selectedItem, setSelectedItem] = React.useState<ConsolidatedPendingItem | null>(null);
   const [quickStoreItem, setQuickStoreItem] = React.useState<{
@@ -337,7 +337,8 @@ export function OtherFruitStorageTab({ clientId: fixedClientId, onlyPackaging }:
     if (!rawChamberConfig) return null;
     const isChamberRow13Enabled = !!chamberSettings?.find(s => s.id === chamberId)?.row13Enabled;
     const isChamberColsKLEnabled = chamberId === 'CAMARA-3' && !!chamberSettings?.find(s => s.id === chamberId)?.colsKLEnabled;
-    const chamberConfig = getEffectiveChamberConfig(rawChamberConfig, isChamberRow13Enabled, isChamberColsKLEnabled);
+    const isChamberColsPQREnabled = chamberId === 'CAMARA-5' && !!chamberSettings?.find(s => s.id === chamberId)?.colsPQREnabled;
+    const chamberConfig = getEffectiveChamberConfig(rawChamberConfig, isChamberRow13Enabled, isChamberColsKLEnabled, isChamberColsPQREnabled);
 
     // Calculate real occupancy in this chamber
     const occupancyMap = new Map<string, number>();
@@ -550,7 +551,8 @@ export function OtherFruitStorageTab({ clientId: fixedClientId, onlyPackaging }:
     }
     const isChamberRow13Enabled = !!chamberSettings?.find(s => s.id === chamberId)?.row13Enabled;
     const isChamberColsKLEnabled = chamberId === 'CAMARA-3' && !!chamberSettings?.find(s => s.id === chamberId)?.colsKLEnabled;
-    const chamberConfig = getEffectiveChamberConfig(rawChamberConfig, isChamberRow13Enabled, isChamberColsKLEnabled);
+    const isChamberColsPQREnabled = chamberId === 'CAMARA-5' && !!chamberSettings?.find(s => s.id === chamberId)?.colsPQREnabled;
+    const chamberConfig = getEffectiveChamberConfig(rawChamberConfig, isChamberRow13Enabled, isChamberColsKLEnabled, isChamberColsPQREnabled);
 
     // --- 1. Get available coordinates ---
     const occupancyMap = new Map<string, number>();

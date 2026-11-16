@@ -295,6 +295,7 @@ export interface ChamberSetting {
   id: string;
   row13Enabled?: boolean;
   colsKLEnabled?: boolean;
+  colsPQREnabled?: boolean;
 }
 
 export interface ChamberTemperature {

@@ -16,8 +16,8 @@ import { FirestorePermissionError } from '@/firebase/errors';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { cn, safeToMillis, safeToDate, safeFormatDate, safeFormatQuantity, formatLocaleDate, formatLocaleDateString, safeStringCompare } from '@/lib/utils';
-import { chambersConfig } from '@/lib/chambers-config';
+import { cn, safeToMillis, safeToDate, safeFormatDate, safeFormatQuantity, formatLocaleDate, formatLocaleDateString, safeStringCompare, getEffectiveChamberConfig } from '@/lib/utils';
+import { chambersConfig, getAllowedComodinCols } from '@/lib/chambers-config';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -69,7 +69,7 @@ export default function FallCreekPage() {
     const { data: allReceptions, loading: loadingReceptions } = useFirestoreCollection<OtherFruitReception>('otherFruitReceptions');
     const { data: allMovements, loading: loadingMovements } = useFirestoreCollection<OtherFruitMovement>('otherFruitMovements');
     const { data: allChamberLots, loading: loadingChamberLots } = useFirestoreCollection<ChamberLot>('chamberLots');
-    const { data: chamberSettings } = useFirestoreCollection<{ id: string; row13Enabled?: boolean }>('chamberSettings');
+    const { data: chamberSettings } = useFirestoreCollection<{ id: string; row13Enabled?: boolean; colsKLEnabled?: boolean; colsPQREnabled?: boolean }>('chamberSettings');
     const { data: usersMaster } = useFirestoreCollection<UserMaster>('usersMaster');
     const { data: allTemperatures } = useFirestoreCollection<ChamberTemperature>('chamberTemperatures');
     const { data: allProducers, loading: loadingProducers } = useFirestoreCollection<Producer>('producers');
@@ -1329,9 +1329,11 @@ export default function FallCreekPage() {
                             {Object.keys(chambersConfig)
                                 .filter(id => id !== 'CAMARA-1' && id !== 'CAMARA-6')
                                 .map(chamberId => {
-                                    const config = chambersConfig[chamberId];
+                                    const rawConfig = chambersConfig[chamberId];
+                                    const chamberSetting = chamberSettings?.find(s => s.id === chamberId);
+                                    const config = getEffectiveChamberConfig(rawConfig, chamberSetting);
                                     const occupancy = chamberOccupancy[chamberId];
-                                    const isRow13Enabled = !!chamberSettings?.find(s => s.id === chamberId)?.row13Enabled;
+                                    const isRow13Enabled = !!chamberSetting?.row13Enabled;
                                     const activeRows = isRow13Enabled ? config.rows : config.rows.filter(r => r !== 13 && r !== 14);
                                     return (
                                         <AccordionItem value={chamberId} key={chamberId} className="border rounded-lg mb-2 px-4">
@@ -1402,8 +1404,7 @@ export default function FallCreekPage() {
                                                                     } as React.CSSProperties;
                                                                 }
                                                             }
-                                                             const isLargeChamber = ['CAMARA-4', 'CAMARA-5', 'CAMARA-6'].includes(chamberId);
-                                                             const allowedComodinCols = isLargeChamber ? ['A', 'B', 'C', 'M', 'N', 'O'] : ['A', 'B', 'C', 'H', 'I', 'J'];
+                                                             const allowedComodinCols = getAllowedComodinCols(chamberId, chamberSetting?.colsKLEnabled, chamberSetting?.colsPQREnabled);
                                                              const isPermanentlyBlocked = (row === 13 || row === 14) && !allowedComodinCols.includes(col.name);
                                                             const isComodinRow = row === 13 || row === 14;
 
