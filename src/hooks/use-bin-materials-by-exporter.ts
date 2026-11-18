@@ -23,18 +23,13 @@ export function useBinMaterialsByExporter(exporterId: string | null) {
     const materialsRef = collection(firestore, 'binMaterials');
     const q = exporterId === 'EXP004'
       ? query(materialsRef, where('code', '==', '10017'))
-      : exporterId === FNO_EXPORTER_ID
-        ? query(materialsRef, where('exporterId', '==', FNO_EXPORTER_ID))
-        : query(materialsRef, where('exporterId', 'in', [exporterId, FNO_EXPORTER_ID]));
+      : query(materialsRef, where('exporterId', '==', exporterId));
     
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
       const items: BinMaterial[] = [];
       querySnapshot.forEach((doc) => {
         const mat = { id: doc.id, ...doc.data() } as BinMaterial;
         if (mat.status === 'inactivo') return;
-        if (exporterId !== FNO_EXPORTER_ID && exporterId !== 'EXP004' && mat.exporterId === FNO_EXPORTER_ID) {
-          if (!isBinMaterialItem(mat)) return;
-        }
         items.push(mat);
       });
       // Sort: Bins first (own bins, then FÑO rental bins), followed by Totes, Laminas and other materials by code
