@@ -3,10 +3,11 @@
 import * as React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
-import type { Exporter, BinMaterial, BinMaterialMovement, ChamberLot, Dispatch } from '@/lib/types';
+import type { Exporter, BinMaterial, BinMaterialMovement, ChamberLot, Dispatch, Producer } from '@/lib/types';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ReportHeader } from '@/components/reports/ReportHeader';
+import { resolveLeasedTargetExporterId } from '@/lib/bins-rental-utils';
 
 function convertToCSV(data: any[], headers: {key: string, label: string}[]) {
     const headerRow = headers.map(h => h.label).join(';');
@@ -36,8 +37,9 @@ export default function BinMaterialStockReportPage() {
     const { data: chamberLots, loading: loadingChamberLots } = useFirestoreCollection<ChamberLot>('chamberLots');
     const { data: dispatches, loading: loadingDispatches } = useFirestoreCollection<Dispatch>('dispatches');
     const { data: materials, loading: loadingMaterials } = useFirestoreCollection<BinMaterial>('binMaterials');
+    const { data: producers, loading: loadingProducers } = useFirestoreCollection<Producer>('producers');
 
-    const loading = loadingExporters || loadingMovements || loadingChamberLots || loadingDispatches || loadingMaterials;
+    const loading = loadingExporters || loadingMovements || loadingChamberLots || loadingDispatches || loadingMaterials || loadingProducers;
 
     const stockData = React.useMemo(() => {
         if (loading) return [];
@@ -80,6 +82,16 @@ export default function BinMaterialStockReportPage() {
                 const currentName = materialMap.get(item.binMaterialCode) || item.binMaterialName;
                 addToAggregation(mov.exporterId, item.binMaterialCode, currentName, qty);
             });
+
+            // Reflejar arriendo FÑO (EXP005) -> Exportador (Subsole, Meyer, Blossom, etc.)
+            const leasedTargetExpId = resolveLeasedTargetExporterId(mov, exporters, producers);
+            if (leasedTargetExpId) {
+                mov.items.forEach(item => {
+                    const leasedQty = mov.type === 'salida' ? item.quantity : -item.quantity;
+                    const currentName = materialMap.get(item.binMaterialCode) || item.binMaterialName;
+                    addToAggregation(leasedTargetExpId, item.binMaterialCode, currentName, leasedQty);
+                });
+            }
         });
 
         // 2. Bins con Fruta en Cámaras (Entrada al Stock de Planta)
@@ -99,7 +111,7 @@ export default function BinMaterialStockReportPage() {
         return Object.values(aggregation)
             .filter(item => item.quantity !== 0)
             .sort((a, b) => a.exporterName.localeCompare(b.exporterName) || a.materialCode.localeCompare(b.materialCode));
-    }, [loading, exporters, movements, chamberLots, dispatches, materials]);
+    }, [loading, exporters, movements, chamberLots, dispatches, materials, producers]);
 
     const totalStockQuantity = React.useMemo(() => {
         return stockData.reduce((sum, item) => sum + item.quantity, 0);

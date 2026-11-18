@@ -5,10 +5,11 @@ Clientes: exportadoras (`exporters`) con sus productores (`producers`). Unidad: 
 
 ## 1. Bins y Materiales (`/bins-y-materiales`)
 - Tabs: `entradas` (EntriesTab), `salidas` (ExitsTab), `stock` (StockTab). Docs DTE pendientes en `PendingDocsTab`.
-- Entrada de bins sugiere totes y láminas (proporción 1:24).
+- Entrada/Salida de bins (propios o arrendados de FÑO) sugiere totes y láminas sumando el total de bins (proporción 1:24 totes, 1:1 lámina).
+- **Subarriendo FÑO (`EXP005`) → Exportadoras (`SUBSOLE`, `MEYER`, `BLOSSOM`):** Cuando FÑO registra una salida hacia una exportadora (`bins-rental-utils.ts`), se rebaja del stock de FÑO y se acredita automáticamente en el stock disponible de la exportadora para que pueda subarrendar esos bins (`BINS_PALOGIX`, `BINS_VT`, etc.) a sus propios productores y recibirlos de vuelta vacíos desde su Packing.
 - Salida → `binMaterialMovements` (salida) y, si hay `businessEntities`, un DTE en `documentosPendientes`.
 - "Despacho directo" exportador→productor: movimiento con `noAffectStock: true`.
-- Stock = suma de movimientos (+ efectos de recepción/despacho de fruta). Admin (email hardcode) puede importar saldos y limpiar historial.
+- Stock = suma de movimientos (+ arriendos desde FÑO + efectos de recepción/despacho de fruta). Admin (email hardcode) puede importar saldos y limpiar historial.
 
 ## 2. Recepción (`/recepcion`)
 Componentes: `LotCreationForm` → `LotList` → `WeightCalculator` → `TemperatureForm` (`EditLotDialog` para correcciones).

@@ -41,6 +41,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { cn, safeToMillis, safeToDate, safeFormatDate, safeFormatQuantity, formatLocaleDate, formatLocaleDateString } from '@/lib/utils';
+import { resolveLeasedTargetExporterId } from '@/lib/bins-rental-utils';
 import { DateRange } from 'react-day-picker';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useForm } from 'react-hook-form';
@@ -226,6 +227,7 @@ export default function BinMaterialKardexReportPage() {
             const correctedDate = getCorrectedTimestamp(mov.createdAt);
             const isDirectDispatch = mov.observation === 'Despacho Directo';
             const typeLabel = (mov.type === 'entrada' && !isDirectDispatch) ? 'Entrada' : 'Salida';
+            const leasedTargetExpId = resolveLeasedTargetExporterId(mov, exporters, producers);
             
             mov.items.forEach((item, index) => {
                 let currentProductorName = producerMap.get(mov.producerId) || exporterMap.get(mov.producerId) || mov.producerId;
@@ -257,6 +259,32 @@ export default function BinMaterialKardexReportPage() {
                     noAffectStock: mov.noAffectStock,
                     afectaStock: mov.noAffectStock ? 'No' : 'Sí',
                 });
+
+                if (leasedTargetExpId) {
+                    const mirrorTypeLabel = mov.type === 'salida' ? 'Entrada' : 'Salida';
+                    const mirrorMovLabel = mov.type === 'salida'
+                        ? 'Arriendo desde FÑO (Bins y Materiales)'
+                        : 'Devolución Arriendo a FÑO';
+                    allItems.push({
+                        key: `lease-mirror-${mov.id}_${index}`,
+                        fecha: correctedDate,
+                        exportador: exporterMap.get(leasedTargetExpId) || leasedTargetExpId,
+                        productor: 'FÑO (Arriendo)',
+                        codigoProducto: item.binMaterialCode,
+                        nombreProducto: currentMaterialName,
+                        cantidad: item.quantity,
+                        movimiento: mirrorMovLabel,
+                        tipo: mirrorTypeLabel,
+                        userName: formatUserName(mov.userName, mov.observation),
+                        documento: mov.document,
+                        driverName: mov.driverName || '',
+                        driverRUT: mov.driverRUT || '',
+                        patente: (mov as any).patente_vehiculo || '',
+                        sourceType: 'automatic',
+                        noAffectStock: false,
+                        afectaStock: 'Sí',
+                    });
+                }
             });
         });
 

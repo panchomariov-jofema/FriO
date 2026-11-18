@@ -20,6 +20,7 @@ import { BinMaterialMovement } from '@/lib/types';
 import { usePackingsByExporter } from '@/hooks/use-packings-by-exporter';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
+import { isBinMaterialItem } from '@/lib/bins-rental-utils';
 
 const movementItemSchema = z.object({
   binMaterialId: z.string(),
@@ -128,16 +129,21 @@ export function EntriesTab({ exporterId, exporterName, producerId, isDirectDispa
       const changedIndex = parseInt(changedIndexMatch[1], 10);
       const changedItem = allItems[changedIndex];
 
-      if (changedItem && changedItem.binMaterialCode === rules.binCode) {
-        const pivotQty = Number(changedItem.quantity);
-        
-        if (isNaN(pivotQty)) return;
+      if (changedItem && (changedItem.binMaterialCode === rules.binCode || isBinMaterialItem(changedItem))) {
+        const totalBinsQty = allItems.reduce((sum, item) => {
+          if (!item) return sum;
+          if (item.binMaterialCode === rules.binCode || isBinMaterialItem(item)) {
+            const q = Number(item.quantity);
+            return sum + (isNaN(q) ? 0 : q);
+          }
+          return sum;
+        }, 0);
 
         Object.entries(rules.related).forEach(([relatedCode, multiplier]) => {
           const relatedItemIndex = allItems.findIndex(item => item && item.binMaterialCode === relatedCode);
 
           if (relatedItemIndex !== -1) {
-            const newVal = pivotQty * multiplier;
+            const newVal = totalBinsQty * multiplier;
             if (Number(form.getValues(`items.${relatedItemIndex}.quantity`)) !== newVal) {
               form.setValue(`items.${relatedItemIndex}.quantity`, newVal, { shouldValidate: true });
             }

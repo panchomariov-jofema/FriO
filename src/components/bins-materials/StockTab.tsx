@@ -4,11 +4,12 @@ import * as React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useFirestore, useUser } from '@/firebase';
-import type { Exporter, BinMaterial, BinMaterialMovement, ChamberLot, Dispatch } from '@/lib/types';
+import type { Exporter, BinMaterial, BinMaterialMovement, ChamberLot, Dispatch, Producer } from '@/lib/types';
 import { collection, query, where, getDocs, writeBatch, doc, serverTimestamp } from 'firebase/firestore';
 import { Skeleton } from '../ui/skeleton';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
 import { isAdminUser } from '@/lib/auth-utils';
+import { resolveLeasedTargetExporterId } from '@/lib/bins-rental-utils';
 import { Button } from '../ui/button';
 import { Trash2, Upload, Download } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -57,10 +58,11 @@ export function StockTab({ exporterId }: StockTabProps) {
   const { data: chamberLots, loading: loadingChamberLots } = useFirestoreCollection<ChamberLot>('chamberLots');
   const { data: dispatches, loading: loadingDispatches } = useFirestoreCollection<Dispatch>('dispatches');
   const { data: allMaterials, loading: loadingMaterials } = useFirestoreCollection<BinMaterial>('binMaterials');
+  const { data: producers, loading: loadingProducers } = useFirestoreCollection<Producer>('producers');
 
   const isAdmin = isAdminUser(user);
 
-  const loading = loadingExporters || loadingMovements || loadingChamberLots || loadingDispatches || loadingMaterials;
+  const loading = loadingExporters || loadingMovements || loadingChamberLots || loadingDispatches || loadingMaterials || loadingProducers;
 
   const stockData = React.useMemo(() => {
     if (loading) return [];
@@ -104,11 +106,22 @@ export function StockTab({ exporterId }: StockTabProps) {
     (movements || []).forEach(mov => {
         if (mov.observation === 'Despacho Directo') return;
         if (mov.noAffectStock || (mov as any).isFruitDispatch) return;
+
         mov.items.forEach(item => {
             const qty = mov.type === 'entrada' ? item.quantity : -item.quantity;
             const currentName = materialMap.get(item.binMaterialCode) || item.binMaterialName;
             addToAggregation(mov.exporterId, item.binMaterialCode, currentName, qty);
         });
+
+        // Reflejar arriendo FÑO (EXP005) -> Exportador (Subsole, Meyer, Blossom, etc.) en el stock del exportador
+        const leasedTargetExpId = resolveLeasedTargetExporterId(mov, exporters, producers);
+        if (leasedTargetExpId) {
+            mov.items.forEach(item => {
+                const leasedQty = mov.type === 'salida' ? item.quantity : -item.quantity;
+                const currentName = materialMap.get(item.binMaterialCode) || item.binMaterialName;
+                addToAggregation(leasedTargetExpId, item.binMaterialCode, currentName, leasedQty);
+            });
+        }
     });
 
     // 2. Fruit Bins in Chambers (In-stock in plant)
@@ -128,7 +141,7 @@ export function StockTab({ exporterId }: StockTabProps) {
     return Object.values(aggregation)
         .filter(item => item.quantity !== 0)
         .sort((a, b) => a.exporterName.localeCompare(b.exporterName) || a.materialCode.localeCompare(b.materialCode));
-  }, [loading, exporters, movements, chamberLots, dispatches, allMaterials, exporterId]);
+  }, [loading, exporters, movements, chamberLots, dispatches, allMaterials, producers, exporterId]);
 
   const handleClearStock = async () => {
     if (!firestore) return;

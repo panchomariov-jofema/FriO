@@ -2,6 +2,77 @@ import vitafoodCatalogJson from './vitafood-catalog.json';
 
 const vitafoodCatalog: Record<string, number> = vitafoodCatalogJson as Record<string, number>;
 
+// Mapa inverso: índice de catálogo -> código numérico de material (ej. 0 -> "15000004")
+const catalogIndexToCode = new Map<number, string>();
+for (const [key, idx] of Object.entries(vitafoodCatalog)) {
+  if (/^\d+$/.test(key.trim())) {
+    catalogIndexToCode.set(idx, key.trim());
+  }
+}
+
+/**
+ * Extrae o resuelve el código numérico de material Vitafood (ej. "15003271")
+ * a partir de productCode y/o productName.
+ */
+export function resolveVitafoodMaterialCode(
+  productCode?: string | null,
+  productName?: string | null,
+  dynamicNameToCodeMap?: Map<string, string>
+): string {
+  const cleanCode = (productCode || '').trim().toUpperCase().replace(/^MATERIAL\s+/i, '').trim();
+  if (/^\d+$/.test(cleanCode)) {
+    return cleanCode;
+  }
+
+  const cleanName = (productName || '').trim().toUpperCase();
+  const nameWithoutPrefix = cleanName.replace(/^MATERIAL\s+/i, '').trim();
+  if (/^\d+$/.test(nameWithoutPrefix)) {
+    return nameWithoutPrefix;
+  }
+
+  if (dynamicNameToCodeMap) {
+    if (cleanName && dynamicNameToCodeMap.has(cleanName)) {
+      return dynamicNameToCodeMap.get(cleanName)!;
+    }
+    if (cleanCode && dynamicNameToCodeMap.has(cleanCode)) {
+      return dynamicNameToCodeMap.get(cleanCode)!;
+    }
+  }
+
+  if (cleanCode && typeof vitafoodCatalog[cleanCode] === 'number') {
+    const mapped = catalogIndexToCode.get(vitafoodCatalog[cleanCode]);
+    if (mapped) return mapped;
+  }
+
+  if (cleanName && typeof vitafoodCatalog[cleanName] === 'number') {
+    const mapped = catalogIndexToCode.get(vitafoodCatalog[cleanName]);
+    if (mapped) return mapped;
+  }
+
+  const digitsInCode = cleanCode.match(/\b(\d{6,10})\b/);
+  if (digitsInCode) return digitsInCode[1];
+
+  const digitsInName = cleanName.match(/\b(\d{6,10})\b/);
+  if (digitsInName) return digitsInName[1];
+
+  return cleanCode || cleanName || 'S/C';
+}
+
+/**
+ * Formatea de manera uniforme la etiqueta visual como "MATERIAL <código>"
+ */
+export function formatVitafoodMaterialLabel(
+  productCode?: string | null,
+  productName?: string | null,
+  dynamicNameToCodeMap?: Map<string, string>
+): string {
+  const code = resolveVitafoodMaterialCode(productCode, productName, dynamicNameToCodeMap);
+  if (code.toUpperCase().startsWith('MATERIAL ')) {
+    return code.toUpperCase();
+  }
+  return `MATERIAL ${code}`;
+}
+
 /**
  * Hash function for strings not found in catalog
  */

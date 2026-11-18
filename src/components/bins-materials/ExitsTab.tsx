@@ -14,6 +14,7 @@ import { collection, query, where, runTransaction, serverTimestamp, getDocs, doc
 import type { BinMaterialMovement, Producer, BusinessEntity, DTEGuiaDespacho, ChamberLot, Dispatch, Exporter } from '@/lib/types';
 import { useBinMaterialsByExporter } from '@/hooks/use-bin-materials-by-exporter';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
+import { FNO_EXPORTER_ID, isBinMaterialItem, resolveLeasedTargetExporterId } from '@/lib/bins-rental-utils';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { Table, TableBody, TableCell, TableHeader, TableRow, TableHead } from '../ui/table';
@@ -63,6 +64,7 @@ export function ExitsTab({ exporterId, exporterName, producerId }: ExitsTabProps
   const { data: chamberLots, loading: loadingChamberLots } = useFirestoreCollection<ChamberLot>('chamberLots');
   const { data: dispatches, loading: loadingDispatches } = useFirestoreCollection<Dispatch>('dispatches');
   const { data: exporters, loading: loadingExporters } = useFirestoreCollection<Exporter>('exporters');
+  const { data: producers, loading: loadingProducers } = useFirestoreCollection<Producer>('producers');
 
   const form = useForm<MovementFormValues>({
     resolver: zodResolver(movementSchema),
@@ -101,7 +103,7 @@ export function ExitsTab({ exporterId, exporterName, producerId }: ExitsTabProps
 
   // --- Dynamic Stock Calculation Logic ---
   const dynamicStock = React.useMemo(() => {
-    if (loadingExporters || loadingMovements || loadingChamberLots || loadingDispatches || loadingMaterials) {
+    if (loadingExporters || loadingMovements || loadingChamberLots || loadingDispatches || loadingMaterials || loadingProducers) {
         return new Map<string, number>();
     }
 
@@ -110,15 +112,31 @@ export function ExitsTab({ exporterId, exporterName, producerId }: ExitsTabProps
     
     if (!activeExporterIds.has(exporterId)) return stockMap;
 
-    // 1. Manual Movements from Kardex
+    // 1. Manual Movements from Kardex (own movements + bins leased from FÑO EXP005 to this exporter)
     (movements || []).forEach(mov => {
-        if (mov.exporterId !== exporterId || mov.observation === 'Despacho Directo') return;
+        if (mov.observation === 'Despacho Directo') return;
         if (mov.noAffectStock || (mov as any).isFruitDispatch) return;
-        mov.items.forEach(item => {
-            const current = stockMap.get(item.binMaterialCode) || 0;
-            const qty = mov.type === 'entrada' ? item.quantity : -item.quantity;
-            stockMap.set(item.binMaterialCode, current + qty);
-        });
+
+        if (mov.exporterId === exporterId) {
+            mov.items.forEach(item => {
+                const current = stockMap.get(item.binMaterialCode) || 0;
+                const qty = mov.type === 'entrada' ? item.quantity : -item.quantity;
+                stockMap.set(item.binMaterialCode, current + qty);
+            });
+            return;
+        }
+
+        if (exporterId !== FNO_EXPORTER_ID && mov.exporterId === FNO_EXPORTER_ID) {
+            const leasedTargetExpId = resolveLeasedTargetExporterId(mov, exporters, producers);
+            if (leasedTargetExpId === exporterId) {
+                mov.items.forEach(item => {
+                    const current = stockMap.get(item.binMaterialCode) || 0;
+                    // Salida desde FÑO hacia el exportador = entrada de stock arrendado para el exportador
+                    const qty = mov.type === 'salida' ? item.quantity : -item.quantity;
+                    stockMap.set(item.binMaterialCode, current + qty);
+                });
+            }
+        }
     });
 
     // 2. Fruit Bins in Chambers (In-stock in plant)
@@ -138,7 +156,7 @@ export function ExitsTab({ exporterId, exporterName, producerId }: ExitsTabProps
     });
 
     return stockMap;
-  }, [movements, chamberLots, dispatches, exporters, exporterId, loadingExporters, loadingMovements, loadingChamberLots, loadingDispatches, loadingMaterials]);
+  }, [movements, chamberLots, dispatches, exporters, producers, exporterId, loadingExporters, loadingMovements, loadingChamberLots, loadingDispatches, loadingMaterials, loadingProducers]);
 
   const getStockForMaterial = React.useCallback((binMaterialCode: string) => {
     return dynamicStock.get(binMaterialCode) || 0;
@@ -165,16 +183,21 @@ export function ExitsTab({ exporterId, exporterName, producerId }: ExitsTabProps
       const changedIndex = parseInt(changedIndexMatch[1], 10);
       const changedItem = allItems[changedIndex];
 
-      if (changedItem && changedItem.binMaterialCode === rules.binCode) {
-        const pivotQty = Number(changedItem.quantity);
-        
-        if (isNaN(pivotQty)) return;
+      if (changedItem && (changedItem.binMaterialCode === rules.binCode || isBinMaterialItem(changedItem))) {
+        const totalBinsQty = allItems.reduce((sum, item) => {
+          if (!item) return sum;
+          if (item.binMaterialCode === rules.binCode || isBinMaterialItem(item)) {
+            const q = Number(item.quantity);
+            return sum + (isNaN(q) ? 0 : q);
+          }
+          return sum;
+        }, 0);
 
         Object.entries(rules.related).forEach(([relatedCode, multiplier]) => {
           const relatedItemIndex = allItems.findIndex(item => item && item.binMaterialCode === relatedCode);
 
           if (relatedItemIndex !== -1) {
-            const newVal = pivotQty * multiplier;
+            const newVal = totalBinsQty * multiplier;
             if (Number(form.getValues(`items.${relatedItemIndex}.quantity`)) !== newVal) {
               form.setValue(`items.${relatedItemIndex}.quantity`, newVal, { shouldValidate: true });
             }
@@ -236,14 +259,21 @@ export function ExitsTab({ exporterId, exporterName, producerId }: ExitsTabProps
         }
     }
     
-    const producerQuery = query(collection(firestore, 'producers'), where('producerId', '==', producerId));
-    const producerQuerySnap = await getDocs(producerQuery);
+    let producerData: Producer | undefined = (producers || []).find(
+      p => p.producerId === producerId || p.id === producerId
+    );
+    if (!producerData) {
+      const producerQuery = query(collection(firestore, 'producers'), where('producerId', '==', producerId));
+      const producerQuerySnap = await getDocs(producerQuery);
+      if (!producerQuerySnap.empty) {
+        producerData = producerQuerySnap.docs[0].data() as Producer;
+      }
+    }
 
-    if (producerQuerySnap.empty) {
+    if (!producerData) {
         toast({ variant: 'destructive', title: 'Error', description: 'No se encontraron los datos del productor.' });
         return;
     }
-    const producerData = producerQuerySnap.docs[0].data() as Producer;
 
     try {
       await runTransaction(firestore, async (transaction) => {

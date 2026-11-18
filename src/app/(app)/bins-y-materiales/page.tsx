@@ -18,6 +18,7 @@ import { isAdminUser } from '@/lib/auth-utils';
 import { Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { CreateProducerDialog } from '@/components/bins-materials/CreateProducerDialog';
+import { ProducerCombobox } from '@/components/bins-materials/ProducerCombobox';
 
 export default function BinsYMaterialesPage() {
   const { user } = useUser();
@@ -31,7 +32,9 @@ export default function BinsYMaterialesPage() {
   const { data: allExporters, loading: loadingExporters } = useFirestoreCollection<Exporter>('exporters');
   
   const exporters = React.useMemo(() => {
-    return allExporters.filter(e => e.status !== 'inactivo');
+    return allExporters
+      .filter(e => e.status !== 'inactivo')
+      .sort((a, b) => (a.name || '').localeCompare(b.name || '', 'es', { sensitivity: 'base' }));
   }, [allExporters]);
 
   const { data: producers, loading: loadingProducers } = useProducersByExporter(selectedExporterId);
@@ -117,22 +120,16 @@ export default function BinsYMaterialesPage() {
             <div className="md:col-span-5 space-y-2">
               <Label htmlFor="producer-select">Productor / Arrendatario</Label>
               <div className="flex gap-2">
-                <Select
-                  value={selectedProducerId ?? ''}
-                  onValueChange={(value) => setSelectedProducerId(value)}
-                  disabled={!selectedExporterId || loadingProducers}
-                >
-                  <SelectTrigger id="producer-select" className="flex-1">
-                    <SelectValue placeholder="Seleccione un productor..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {producers.map(p => (
-                      <SelectItem key={p.id} value={p.producerId}>
-                        {p.shortName}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <div className="flex-1 min-w-0">
+                  <ProducerCombobox
+                    producers={producers}
+                    value={selectedProducerId}
+                    onSelect={(value) => setSelectedProducerId(value)}
+                    disabled={!selectedExporterId || loadingProducers}
+                    loading={loadingProducers}
+                    hasExporterSelected={!!selectedExporterId}
+                  />
+                </div>
                 {selectedExporterId === 'EXP005' && (
                   <Button 
                     variant="outline" 

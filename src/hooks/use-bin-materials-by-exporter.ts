@@ -1,9 +1,10 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { collection, onSnapshot, query, where, DocumentData } from 'firebase/firestore';
+import { collection, onSnapshot, query, where } from 'firebase/firestore';
 import { useFirestore } from '@/firebase';
 import type { BinMaterial } from '@/lib/types';
+import { FNO_EXPORTER_ID, isBinMaterialItem } from '@/lib/bins-rental-utils';
 
 export function useBinMaterialsByExporter(exporterId: string | null) {
   const [materials, setMaterials] = useState<BinMaterial[]>([]);
@@ -22,15 +23,31 @@ export function useBinMaterialsByExporter(exporterId: string | null) {
     const materialsRef = collection(firestore, 'binMaterials');
     const q = exporterId === 'EXP004'
       ? query(materialsRef, where('code', '==', '10017'))
-      : query(materialsRef, where('exporterId', '==', exporterId));
+      : exporterId === FNO_EXPORTER_ID
+        ? query(materialsRef, where('exporterId', '==', FNO_EXPORTER_ID))
+        : query(materialsRef, where('exporterId', 'in', [exporterId, FNO_EXPORTER_ID]));
     
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
       const items: BinMaterial[] = [];
       querySnapshot.forEach((doc) => {
-        items.push({ id: doc.id, ...doc.data() } as BinMaterial);
+        const mat = { id: doc.id, ...doc.data() } as BinMaterial;
+        if (exporterId !== FNO_EXPORTER_ID && exporterId !== 'EXP004' && mat.exporterId === FNO_EXPORTER_ID) {
+          if (!isBinMaterialItem(mat)) return;
+        }
+        items.push(mat);
       });
-      // Sort materials by product code
-      items.sort((a, b) => a.code.localeCompare(b.code, undefined, { numeric: true }));
+      // Sort: Bins first (own bins, then FÑO rental bins), followed by Totes, Laminas and other materials by code
+      items.sort((a, b) => {
+        const aIsBin = isBinMaterialItem(a);
+        const bIsBin = isBinMaterialItem(b);
+        if (aIsBin !== bIsBin) return aIsBin ? -1 : 1;
+        if (aIsBin && bIsBin) {
+          const aIsOwn = a.exporterId === exporterId;
+          const bIsOwn = b.exporterId === exporterId;
+          if (aIsOwn !== bIsOwn) return aIsOwn ? -1 : 1;
+        }
+        return a.code.localeCompare(b.code, undefined, { numeric: true });
+      });
       setMaterials(items);
       setLoading(false);
     }, (error) => {

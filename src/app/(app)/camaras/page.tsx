@@ -35,7 +35,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input';
 import * as XLSX from 'xlsx';
 import { parseTemperatureExcel } from '@/lib/fall-creek-utils';
-import { getVitafoodProductColor, hslToHsla } from '@/lib/vitafood-colors';
+import { getVitafoodProductColor, hslToHsla, resolveVitafoodMaterialCode, formatVitafoodMaterialLabel } from '@/lib/vitafood-colors';
 
 
 
@@ -95,8 +95,8 @@ const getItemColorKey = (item: StoredItem) => {
     return `${item.type}-${item.lotIdForColor}`;
   }
   if (isVitafoodOrPackagingItemStatic(item)) {
-    const prodKey = item.productCode || item.productName || item.varietyOrProduct || item.displayId || 'UNKNOWN';
-    return `vitafood-prod-${prodKey.trim().toUpperCase()}`;
+    const resolvedCode = resolveVitafoodMaterialCode(item.productCode, item.productName || item.varietyOrProduct || item.displayId);
+    return `vitafood-prod-${resolvedCode}`;
   }
   if (item.type === 'otherFruit') {
     return `client-${item.ownerName}`;
@@ -228,6 +228,20 @@ export default function CamarasPage() {
       .sort((a, b) => safeToMillis(a.receptionDate) - safeToMillis(b.receptionDate));
 
     const configs = clientConfigs || [];
+
+    // Mapa dinámico descripción -> código de material para ítems Vitafood donde falte productCode puntual
+    const vitafoodNameToCodeMap = new Map<string, string>();
+    allOtherFruitReceptions.forEach(reception => {
+      (reception.items || []).forEach(item => {
+        if (item?.productCode && item?.productName) {
+          const cleanCode = item.productCode.trim().replace(/^MATERIAL\s+/i, '').trim();
+          const cleanName = item.productName.trim().toUpperCase();
+          if (/^\d+$/.test(cleanCode) && cleanName) {
+            vitafoodNameToCodeMap.set(cleanName, cleanCode);
+          }
+        }
+      });
+    });
       
     const allStoredItems: StoredItem[] = [
       ...allStoredLots
@@ -253,32 +267,35 @@ export default function CamarasPage() {
         .flatMap(reception => (reception.items || [])
             .map((item, index) => ({ item, index })) // Map to include original index
             .filter(({ item }) => item && item.status === 'Almacenado' && item.storageLocation?.chamberId && item.storageLocation?.coordinate && item.quantity > 0)
-            .map(({ item, index }) => ({ // Use original index
-                id: `${reception.id}-${index}`,
-                type: 'otherFruit' as const,
-                displayId: item.productCode,
-                lotIdForColor: item.clientLotId 
-                    ? `${reception.displayLotId || reception.id}-${item.clientLotId}-${item.productName}` 
-                    : `${reception.displayLotId || reception.id}-${item.productName}`,
-                ownerName: reception.clientName,
-                varietyOrProduct: item.productName,
-                quantity: item.quantity,
-                unit: reception.unit,
-                chamberId: item.storageLocation!.chamberId,
-                coordinate: item.storageLocation!.coordinate,
-                receptionId: reception.id,
-                itemIndex: index, // This is now the correct original index
-                netWeightPerBin: 0,
-                clientLotId: item.clientLotId,
-                observation: item.observation,
-                exporterId: reception.clientId,
-                document: reception.document,
-                documentNumber: reception.documentNumber,
-                palletId: item.palletId || item.containerId || (item as any).ump,
-                containerId: item.containerId || item.palletId || (item as any).ump,
-                productCode: item.productCode,
-                productName: item.productName,
-            }))
+            .map(({ item, index }) => { // Use original index
+                const resolvedCode = item.productCode || vitafoodNameToCodeMap.get((item.productName || '').trim().toUpperCase());
+                return {
+                    id: `${reception.id}-${index}`,
+                    type: 'otherFruit' as const,
+                    displayId: resolvedCode || item.productCode,
+                    lotIdForColor: item.clientLotId 
+                        ? `${reception.displayLotId || reception.id}-${item.clientLotId}-${item.productName}` 
+                        : `${reception.displayLotId || reception.id}-${item.productName}`,
+                    ownerName: reception.clientName,
+                    varietyOrProduct: item.productName,
+                    quantity: item.quantity,
+                    unit: reception.unit,
+                    chamberId: item.storageLocation!.chamberId,
+                    coordinate: item.storageLocation!.coordinate,
+                    receptionId: reception.id,
+                    itemIndex: index, // This is now the correct original index
+                    netWeightPerBin: 0,
+                    clientLotId: item.clientLotId,
+                    observation: item.observation,
+                    exporterId: reception.clientId,
+                    document: reception.document,
+                    documentNumber: reception.documentNumber,
+                    palletId: item.palletId || item.containerId || (item as any).ump,
+                    containerId: item.containerId || item.palletId || (item as any).ump,
+                    productCode: resolvedCode || item.productCode,
+                    productName: item.productName,
+                };
+            })
         )
     ];
 
@@ -1202,13 +1219,14 @@ export default function CamarasPage() {
                                         const vitafoodItemsInChamber = chamberCoords.flat().filter(i => isVitafoodOrPackagingItemStatic(i));
                                         if (vitafoodItemsInChamber.length === 0) return null;
 
-                                        const uniqueProducts = new Map<string, { key: string; name: string; color: string; count: number }>();
+                                        const uniqueProducts = new Map<string, { key: string; name: string; description?: string; color: string; count: number }>();
                                         vitafoodItemsInChamber.forEach(item => {
                                             const key = getItemColorKey(item);
-                                            const name = item.productName || item.varietyOrProduct || item.productCode || item.displayId || 'Producto';
+                                            const rawName = item.productName || item.varietyOrProduct || '';
+                                            const name = formatVitafoodMaterialLabel(item.productCode || item.displayId, rawName);
                                             const color = getColorForLot(key);
                                             if (!uniqueProducts.has(key)) {
-                                                uniqueProducts.set(key, { key, name, color, count: 1 });
+                                                uniqueProducts.set(key, { key, name, description: rawName, color, count: 1 });
                                             } else {
                                                 uniqueProducts.get(key)!.count += 1;
                                             }
@@ -1223,7 +1241,7 @@ export default function CamarasPage() {
                                                 {productList.map(prod => (
                                                     <div key={prod.key} className="flex items-center gap-1.5 px-2.5 py-1 rounded-md border text-xs font-semibold bg-muted/40">
                                                         <span className="w-3 h-3 rounded-full shrink-0 shadow-xs border border-black/20" style={{ backgroundColor: prod.color }} />
-                                                        <span className="truncate max-w-[220px]" title={prod.name}>{prod.name}</span>
+                                                        <span className="truncate max-w-[220px]" title={prod.description && prod.description !== prod.name ? `${prod.name} — ${prod.description}` : prod.name}>{prod.name}</span>
                                                         <span className="text-[10px] text-muted-foreground font-mono">({prod.count} {prod.count === 1 ? 'pallet' : 'pallets'})</span>
                                                     </div>
                                                 ))}

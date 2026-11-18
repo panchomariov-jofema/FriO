@@ -3,10 +3,11 @@
 import * as React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
-import type { BinMaterialMovement, Exporter, Producer, BinMaterial } from '@/lib/types';
+import type { BinMaterialMovement, Exporter, Producer, BinMaterial, ReceptionLot } from '@/lib/types';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ReportHeader } from '@/components/reports/ReportHeader';
+import { isBinMaterialItem, isExporterSelfMovement } from '@/lib/bins-rental-utils';
 import {
     Accordion,
     AccordionContent,
@@ -46,8 +47,9 @@ export default function ProducerBalanceReportPage() {
     const { data: allExporters, loading: loadingExporters } = useFirestoreCollection<Exporter>('exporters');
     const { data: allProducers, loading: loadingProducers } = useFirestoreCollection<Producer>('producers');
     const { data: allMaterials, loading: loadingMaterials } = useFirestoreCollection<BinMaterial>('binMaterials');
+    const { data: receptionLots, loading: loadingReceptions } = useFirestoreCollection<ReceptionLot>('receptionLots');
 
-    const loading = loadingMovements || loadingExporters || loadingProducers || loadingMaterials;
+    const loading = loadingMovements || loadingExporters || loadingProducers || loadingMaterials || loadingReceptions;
 
     const balanceData = React.useMemo(() => {
         if (loading) return [];
@@ -112,6 +114,8 @@ export default function ProducerBalanceReportPage() {
 
         (movements || []).forEach(mov => {
             if (!activeExporterIds.has(mov.exporterId)) return;
+            // Excluir retornos de Packing al propio exportador (ej. SUBSOLE -> SUBSOLE con Packing seleccionado)
+            if (isExporterSelfMovement(mov, allExporters, allProducers)) return;
 
             mov.items.forEach(item => {
                 const matchingProd = findProducer(mov.producerId);
@@ -127,10 +131,10 @@ export default function ProducerBalanceReportPage() {
                 }
 
                 // Si no es la excepción y el productor no es activo, ignorar para este reporte
-                if (!isException && !activeProducerIds.has(mov.producerId)) return;
+                if (!isException && !activeProducerIds.has(mov.producerId) && !matchingProd) return;
 
                 const expName = exporterMap.get(mov.exporterId) || mov.exporterId;
-                const key = `${mov.exporterId}_${effectiveProducerId}_${item.binMaterialId}`;
+                const key = `${mov.exporterId}_${effectiveProducerId}_${item.binMaterialCode || item.binMaterialId}`;
                 
                 if (!aggregation[key]) {
                     // Try to get fresh name from master data
@@ -141,7 +145,7 @@ export default function ProducerBalanceReportPage() {
                         producerName: effectiveProducerName,
                         materialName: m?.name || item.binMaterialName,
                         materialCode: item.binMaterialCode,
-                        materialType: m?.type || 'material',
+                        materialType: m?.type || (isBinMaterialItem(item) ? 'BINS' : 'material'),
                         entradas: 0,
                         salidas: 0,
                     };
@@ -155,6 +159,51 @@ export default function ProducerBalanceReportPage() {
             });
         });
 
+        // Descontar del saldo general del productor los Bins y Totes ingresados con fruta en Recepción (/recepcion)
+        (receptionLots || []).forEach(lot => {
+            if (!lot.exporterId || !activeExporterIds.has(lot.exporterId)) return;
+            const matchingProd = findProducer(lot.producerId);
+            if (!matchingProd && !activeProducerIds.has(lot.producerId)) return;
+
+            const effectiveProducerId = matchingProd ? matchingProd.producerId : lot.producerId;
+            const effectiveProducerName = matchingProd ? (matchingProd.shortName || matchingProd.name) : (producerMap.get(lot.producerId) || lot.producerId);
+            const expName = exporterMap.get(lot.exporterId) || lot.exporterId;
+
+            const binCount = Number(lot.binCount) || 0;
+            if (binCount > 0) {
+                const binKey = `${lot.exporterId}_${effectiveProducerId}_REC_FRUTA_BINS`;
+                if (!aggregation[binKey]) {
+                    aggregation[binKey] = {
+                        exporterName: expName,
+                        producerName: effectiveProducerName,
+                        materialName: 'Retorno Bins con Fruta (Recepción)',
+                        materialCode: 'REC-FRUTA',
+                        materialType: 'BINS',
+                        entradas: 0,
+                        salidas: 0,
+                    };
+                }
+                aggregation[binKey].entradas += binCount;
+            }
+
+            const toteCount = Number(lot.toteCount) || 0;
+            if (toteCount > 0) {
+                const toteKey = `${lot.exporterId}_${effectiveProducerId}_REC_FRUTA_TOTES`;
+                if (!aggregation[toteKey]) {
+                    aggregation[toteKey] = {
+                        exporterName: expName,
+                        producerName: effectiveProducerName,
+                        materialName: 'Retorno Totes con Fruta (Recepción)',
+                        materialCode: 'REC-TOTES',
+                        materialType: 'TOTES',
+                        entradas: 0,
+                        salidas: 0,
+                    };
+                }
+                aggregation[toteKey].entradas += toteCount;
+            }
+        });
+
         return Object.values(aggregation)
             .map(item => ({
                 ...item,
@@ -162,7 +211,7 @@ export default function ProducerBalanceReportPage() {
             }))
             .filter(item => item.entradas !== 0 || item.salidas !== 0)
             .sort((a, b) => a.exporterName.localeCompare(b.exporterName) || a.producerName.localeCompare(b.producerName));
-    }, [loading, movements, allExporters, allProducers, allMaterials]);
+    }, [loading, movements, allExporters, allProducers, allMaterials, receptionLots]);
 
     const groupedBalance = React.useMemo(() => {
         const groups: Record<string, {
@@ -170,6 +219,10 @@ export default function ProducerBalanceReportPage() {
             producerName: string;
             items: typeof balanceData;
             summary: string;
+            binsEntradas: number;
+            binsSalidas: number;
+            binsSaldo: number;
+            hasBins: boolean;
         }> = {};
 
         balanceData.forEach(item => {
@@ -180,6 +233,10 @@ export default function ProducerBalanceReportPage() {
                     producerName: item.producerName,
                     items: [],
                     summary: '',
+                    binsEntradas: 0,
+                    binsSalidas: 0,
+                    binsSaldo: 0,
+                    hasBins: false,
                 };
             }
             groups[groupKey].items.push(item);
@@ -188,8 +245,18 @@ export default function ProducerBalanceReportPage() {
         return Object.values(groups).map(group => {
             const totalsByType: Record<string, number> = {};
             group.items.forEach(item => {
-                const typeLabel = item.materialType === 'bin' ? 'Bins' : 'Materiales';
+                const upperType = (item.materialType || '').toUpperCase();
+                const isBin = upperType.includes('BIN') || item.materialCode === 'REC-FRUTA' || isBinMaterialItem({ binMaterialCode: item.materialCode, binMaterialName: item.materialName, type: item.materialType });
+                const isTote = upperType.includes('TOTE') || item.materialCode === 'REC-TOTES';
+                const typeLabel = isBin ? 'Bins' : isTote ? 'Totes' : 'Materiales';
                 totalsByType[typeLabel] = (totalsByType[typeLabel] || 0) + item.saldo;
+
+                if (isBin) {
+                    group.hasBins = true;
+                    group.binsEntradas += item.entradas;
+                    group.binsSalidas += item.salidas;
+                    group.binsSaldo += item.saldo;
+                }
             });
             
             const summaryParts = Object.entries(totalsByType).map(([label, total]) => `${total} ${label}`);
@@ -280,6 +347,17 @@ export default function ProducerBalanceReportPage() {
                                                                 </TableCell>
                                                             </TableRow>
                                                         ))}
+                                                        {group.hasBins && (
+                                                            <TableRow className="bg-muted/40 font-bold border-t">
+                                                                <TableCell className="py-2 font-mono text-xs">TOTAL-BINS</TableCell>
+                                                                <TableCell className="py-2 text-xs font-bold">Saldo General Bins (Entregados − Recepcionados con Fruta)</TableCell>
+                                                                <TableCell className="py-2 text-right text-xs">{group.binsEntradas}</TableCell>
+                                                                <TableCell className="py-2 text-right text-xs">{group.binsSalidas}</TableCell>
+                                                                <TableCell className={`py-2 text-right text-xs font-black ${group.binsSaldo > 0 ? 'text-orange-600' : 'text-green-600'}`}>
+                                                                    {group.binsSaldo}
+                                                                </TableCell>
+                                                            </TableRow>
+                                                        )}
                                                     </TableBody>
                                                 </Table>
                                             </div>
