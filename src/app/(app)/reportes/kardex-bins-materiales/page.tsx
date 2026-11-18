@@ -232,7 +232,9 @@ export default function BinMaterialKardexReportPage() {
             mov.items.forEach((item, index) => {
                 let currentProductorName = producerMap.get(mov.producerId) || exporterMap.get(mov.producerId) || mov.producerId;
                 
-                if (mov.document === 'SALDO-INICIAL-2028' && item.binMaterialCode === '10017') {
+                if (mov.producerId === 'TRANSFORMACION_INTERNA') {
+                    currentProductorName = 'Transformación Interna (FÑO)';
+                } else if (mov.document === 'SALDO-INICIAL-2028' && item.binMaterialCode === '10017') {
                     currentProductorName = 'PALOGIX';
                 }
 

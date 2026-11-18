@@ -51,6 +51,9 @@ export function resolveLeasedTargetExporterId(
   if (mov.observation === 'Despacho Directo') return null;
   if (mov.noAffectStock || (mov as any).isFruitDispatch) return null;
 
+  const obsLower = (mov.observation || '').toLowerCase();
+  if (obsLower.includes('transformaci') || obsLower.includes('traspaso interno')) return null;
+
   const rawProdId = (mov.producerId || '').trim();
   if (!rawProdId) return null;
 
