@@ -544,7 +544,7 @@ export function MasterDataShell<T extends MasterData>({
                         <TableCell key={String(col.key)}>
                             {col.render ? (
                                 col.render(item)
-                            ) : ['exporters', 'producers', 'otherClients'].includes(collectionName) && col.key === 'status' ? (
+                            ) : ['exporters', 'producers', 'otherClients', 'binMaterials'].includes(collectionName) && col.key === 'status' ? (
                                 <div className="flex items-center space-x-2">
                                     <Switch
                                         checked={(item as any).status !== 'inactivo'}

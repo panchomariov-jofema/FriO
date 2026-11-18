@@ -31,6 +31,7 @@ export const binMaterialSchema = z.object({
   name: z.string().min(1, 'El nombre es obligatorio'),
   exporterId: z.string().min(1, 'El ID de exportador es obligatorio'),
   type: z.string().min(1, 'El tipo es obligatorio'),
+  status: z.enum(['activo', 'inactivo']).default('activo'),
 });
 
 export const otherClientSchema = z.object({

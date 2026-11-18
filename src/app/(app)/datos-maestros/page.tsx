@@ -393,6 +393,26 @@ const BinMaterialForm = ({ form, exporters, binMaterials }: { form: any, exporte
       <FormField control={form.control} name="type" render={({ field }) => (
         <FormItem><FormLabel>Tipo</FormLabel><FormControl><Input {...field} placeholder="Ej: bin, material" autoComplete="off" /></FormControl><FormMessage /></FormItem>
       )} />
+      <FormField
+        control={form.control}
+        name="status"
+        render={({ field }) => (
+          <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
+            <div className="space-y-0.5">
+              <FormLabel>Estado</FormLabel>
+              <FormDescription>
+                Materiales inactivos no se mostrarán en la grilla de trabajo.
+              </FormDescription>
+            </div>
+            <FormControl>
+              <Switch
+                checked={field.value !== 'inactivo'}
+                onCheckedChange={(checked) => field.onChange(checked ? 'activo' : 'inactivo')}
+              />
+            </FormControl>
+          </FormItem>
+        )}
+      />
     </>
   )
 };
@@ -805,10 +825,16 @@ export default function DatosMaestrosPage() {
               title="Bins y Materiales"
               collectionName="binMaterials"
               schema={binMaterialSchema}
-              columns={[{key: 'code', header: 'Código'}, {key: 'name', header: 'Nombre'}, {key: 'exporterId', header: 'ID Exportador'}, {key: 'type', header: 'Tipo'}]}
+              columns={[
+                {key: 'code', header: 'Código'},
+                {key: 'name', header: 'Nombre'},
+                {key: 'exporterId', header: 'ID Exportador'},
+                {key: 'type', header: 'Tipo'},
+                {key: 'status', header: 'Estado'},
+              ]}
               RenderFormComponent={BinMaterialForm}
               docNameField="name"
-              csvHeaders={['code', 'name', 'exporterId', 'type']}
+              csvHeaders={['code', 'name', 'exporterId', 'type', 'status']}
               csvTemplateFileName="plantilla_bins_y_materiales.csv"
               formProps={{ 
                 exporters: loadingExporters ? [] : exporters,

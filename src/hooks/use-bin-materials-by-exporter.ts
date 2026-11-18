@@ -31,6 +31,7 @@ export function useBinMaterialsByExporter(exporterId: string | null) {
       const items: BinMaterial[] = [];
       querySnapshot.forEach((doc) => {
         const mat = { id: doc.id, ...doc.data() } as BinMaterial;
+        if (mat.status === 'inactivo') return;
         if (exporterId !== FNO_EXPORTER_ID && exporterId !== 'EXP004' && mat.exporterId === FNO_EXPORTER_ID) {
           if (!isBinMaterialItem(mat)) return;
         }

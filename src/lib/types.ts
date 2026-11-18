@@ -46,6 +46,7 @@ export interface BinMaterial {
   name: string;
   exporterId: string;
   type: string;
+  status?: 'activo' | 'inactivo';
 }
 
 export interface BinMaterialMovement {
