@@ -44,6 +44,20 @@ export function isVitafood(input: ClientInput): boolean {
 }
 
 /**
+ * Determina si una entidad, nombre o ID corresponde al cliente Olmué.
+ */
+export function isOlmue(input: ClientInput): boolean {
+  if (!input) return false;
+  if (typeof input === 'string') {
+    const upper = input.trim().toUpperCase();
+    return upper === 'OLMUE' || upper === 'OLMUÉ' || upper === 'OLM';
+  }
+  const name = (input.name || input.clientName || input.ownerName || '').trim().toUpperCase();
+  const id = (input.clientId || input.id || '').trim().toUpperCase();
+  return name === 'OLMUE' || name === 'OLMUÉ' || id === 'OLM' || id === 'OLMUE';
+}
+
+/**
  * Calcula la equivalencia en bins según el cliente y la unidad de almacenamiento.
  * 
  * Reglas de negocio:

@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
-import { isFallCreek, binsPerUnit } from '@/lib/clients';
+import { isFallCreek, isOlmue, binsPerUnit } from '@/lib/clients';
 import type { OtherClient, OtherFruitReceptionItem, OtherFruitReception } from '@/lib/types';
 import { otherFruitReceptionSchema } from '@/lib/schemas';
 import { PlusCircle, ScanLine, Trash2, Search, Check, ChevronsUpDown } from 'lucide-react';
@@ -131,6 +131,7 @@ const defaultItem = {
   productCode: '',
   productName: '',
   quantity: 1,
+  fruitType: 'Convencional' as const,
   observation: '',
 };
 
@@ -501,7 +502,7 @@ export function OtherFruitReceptionTab({ clientId: fixedClientId }: { clientId?:
 
   const isFruitAndNotFC = React.useMemo(() => {
     const client = fruitClients.find(c => c.clientId === selectedClientId);
-    return client ? (client.type && client.type.toUpperCase() === 'FRUTA' && client.name.toUpperCase() !== 'FALL CREEK') : false;
+    return client ? Boolean(client.type && client.type.toUpperCase() === 'FRUTA' && !isFallCreek(client) && !isOlmue(client)) : false;
   }, [fruitClients, selectedClientId]);
 
   const { data: clientProducts, loading: loadingProducts } = usePackagingMastersByClient(selectedClientId, isFruitAndNotFC);
@@ -666,6 +667,9 @@ export function OtherFruitReceptionTab({ clientId: fixedClientId }: { clientId?:
         if (!item.clientLotId) {
             delete newItem.clientLotId;
         }
+        if (!item.fruitType) {
+            delete newItem.fruitType;
+        }
 
         return newItem as OtherFruitReceptionItem;
     });
@@ -746,7 +750,7 @@ export function OtherFruitReceptionTab({ clientId: fixedClientId }: { clientId?:
     }
   }
 
-  const gridColsClass = showClientLot ? 'sm:grid-cols-4' : 'sm:grid-cols-3';
+  const gridColsClass = 'sm:grid-cols-12';
 
   if (selectedClient?.name?.toUpperCase().includes('VITAFOOD') || selectedClient?.name?.toUpperCase() === 'VITAFOODS') {
     return (
@@ -1015,7 +1019,7 @@ export function OtherFruitReceptionTab({ clientId: fixedClientId }: { clientId?:
                         control={form.control}
                         name={`items.${index}.clientLotId`}
                         render={({ field }) => (
-                          <FormItem>
+                          <FormItem className="sm:col-span-2">
                             <FormLabel>Lote Cliente</FormLabel>
                             <FormControl>
                               <Input {...field} value={field.value ?? ''} autoComplete="off" />
@@ -1038,7 +1042,7 @@ export function OtherFruitReceptionTab({ clientId: fixedClientId }: { clientId?:
                         control={form.control}
                         name={`items.${index}.productName`}
                         render={({ field: itemField }) => (
-                          <FormItem className="flex flex-col gap-1.5">
+                          <FormItem className={cn("flex flex-col gap-1.5", showClientLot ? "sm:col-span-3" : "sm:col-span-4")}>
                             <FormLabel>Nombre Producto</FormLabel>
                             <FormControl>
                               <ProductSearchSelect
@@ -1056,7 +1060,7 @@ export function OtherFruitReceptionTab({ clientId: fixedClientId }: { clientId?:
                         control={form.control}
                         name={`items.${index}.quantity`}
                         render={({ field }) => (
-                          <FormItem>
+                          <FormItem className="sm:col-span-2">
                             <FormLabel>Cantidad ({selectedClient?.unit || 'Unidades'})</FormLabel>
                             <FormControl><Input type="number" {...field} value={field.value ?? ''} autoComplete="off" min="1" inputMode="numeric" /></FormControl>
                             <FormMessage />
@@ -1065,9 +1069,30 @@ export function OtherFruitReceptionTab({ clientId: fixedClientId }: { clientId?:
                       />
                       <FormField
                         control={form.control}
+                        name={`items.${index}.fruitType`}
+                        render={({ field }) => (
+                          <FormItem className={showClientLot ? "sm:col-span-2" : "sm:col-span-3"}>
+                            <FormLabel>Tipo Fruta</FormLabel>
+                            <Select onValueChange={field.onChange} value={field.value || 'Convencional'} disabled={!selectedClient}>
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Seleccione tipo..." />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="Convencional">Convencional</SelectItem>
+                                <SelectItem value="Organico">Organico</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
                         name={`items.${index}.observation`}
                         render={({ field }) => (
-                          <FormItem>
+                          <FormItem className="sm:col-span-3">
                             <FormLabel>Observación</FormLabel>
                             <FormControl>
                               <Input

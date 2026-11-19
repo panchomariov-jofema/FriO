@@ -36,6 +36,7 @@ import { Input } from '@/components/ui/input';
 import * as XLSX from 'xlsx';
 import { parseTemperatureExcel } from '@/lib/fall-creek-utils';
 import { getVitafoodProductColor, hslToHsla, resolveVitafoodMaterialCode, formatVitafoodMaterialLabel } from '@/lib/vitafood-colors';
+import { isOlmue } from '@/lib/clients';
 
 
 
@@ -196,9 +197,12 @@ export default function CamarasPage() {
       return;
     }
     setLoadingProducts(true);
+    const clientIdsToFetch = isOlmue(editingItem.exporterId) || isOlmue(editingItem.ownerName)
+      ? [editingItem.exporterId]
+      : [editingItem.exporterId, '99999'];
     const q = query(
       collection(firestore, 'packagingMaster'),
-      where('clientId', 'in', [editingItem.exporterId, '99999'])
+      where('clientId', 'in', clientIdsToFetch)
     );
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const items: any[] = [];

@@ -329,6 +329,8 @@ export interface Dispatch {
   userName?: string;
 }
 
+export type FruitType = 'Convencional' | 'Organico';
+
 export interface OtherFruitReceptionItem {
     clientLotId?: string;
     palletId?: string;
@@ -338,6 +340,7 @@ export interface OtherFruitReceptionItem {
     productCode: string;
     productName: string;
     quantity: number;
+    fruitType?: FruitType;
     observation?: string;
     status: 'Pendiente de recibir' | 'Recibido' | 'Pendiente de almacenar' | 'Almacenado' | 'Despachado' | 'No Recepcionado';
     storageLocation?: {
@@ -392,6 +395,7 @@ export interface OtherFruitMovementLocation {
   unit: 'Bins' | 'Pallets';
   productCode: string;
   productName: string;
+  fruitType?: FruitType;
   clientLotId?: string;
   location: {
     chamberId: string;
@@ -413,6 +417,7 @@ export interface OtherFruitMovement {
     productCode: string;
     productName: string;
     quantity: number;
+    fruitType?: FruitType;
     observation?: string;
     clientLotId?: string;
   }[];

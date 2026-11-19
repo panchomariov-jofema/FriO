@@ -334,11 +334,12 @@ export function OtherFruitPickingDialog({
     
     // Recalculate summary items based on what was actually picked
     const summaryItems = newLocations.reduce((acc, loc) => {
-      const key = loc.productCode;
+      const key = `${loc.productCode}_${loc.fruitType || ''}`;
       if (!acc[key]) {
           acc[key] = {
               productCode: loc.productCode,
               productName: loc.productName,
+              fruitType: loc.fruitType,
               quantity: 0,
               clientLotIds: new Set<string>(),
           };
@@ -348,7 +349,7 @@ export function OtherFruitPickingDialog({
           acc[key].clientLotIds.add(loc.clientLotId);
       }
       return acc;
-    }, {} as Record<string, { productCode: string; productName: string; quantity: number; clientLotIds: Set<string> }>);
+    }, {} as Record<string, { productCode: string; productName: string; fruitType?: string; quantity: number; clientLotIds: Set<string> }>);
     
     newMovement.items = Object.values(summaryItems).map(summary => {
         const item: any = {
@@ -356,6 +357,9 @@ export function OtherFruitPickingDialog({
             productName: summary.productName,
             quantity: summary.quantity,
         };
+        if (summary.fruitType) {
+            item.fruitType = summary.fruitType;
+        }
         const clientLotIds = Array.from(summary.clientLotIds).join(', ');
         if (clientLotIds) {
             item.clientLotId = clientLotIds;

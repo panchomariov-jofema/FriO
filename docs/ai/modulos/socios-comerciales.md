@@ -6,7 +6,7 @@ Clientes: `otherClients` (unidad **Bins** o **Pallets** según cliente). Product
 ## Tabs (filtradas por `allowedTabs` del perfil; `stock` siempre visible)
 | Tab | Componente | Hace |
 |---|---|---|
-| `recepcion` | `other-fruit/ReceptionTab.tsx` | Crea `otherFruitReceptions` (guía, temperatura opcional, `items[]` con producto, cantidad, lote cliente). Si el cliente es Vitafood o Fall Creek, deriva a su workflow propio. |
+| `recepcion` | `other-fruit/ReceptionTab.tsx` | Crea `otherFruitReceptions` (guía, temperatura opcional, `items[]` con producto, cantidad, `fruitType` (`Convencional` \| `Organico`), observación, lote cliente). Si el cliente es Vitafood o Fall Creek, deriva a su workflow propio. Para `OLMUE` (`isOlmue`), filtra `packagingMaster` exclusivamente por `clientId == 'OLM'` (sin globales `'99999'`). |
 | `almacenamiento` | `StorageTab.tsx` + `StoreOtherFruitDialog.tsx` | Asigna `storageLocation` a ítems `Pendiente de almacenar` (cámara/coordenada para fruta; almacén/pasillo para embalaje). Modo directo y escaneo. Sugerencia según `clientStorageConfigs`. Puede **dividir** un ítem en varias coordenadas. |
 | `stock` | `StockAndRelocationTab.tsx` + `RelocateOtherFruitDialog.tsx` | Stock por cliente/coordenada y reubicación parcial. |
 | `salidas` | `ExitTab.tsx` (~1.400 líneas) | Arma salida eligiendo coordenadas (FIFO por lote/variedad, clic en celdas, +/-). Crea `otherFruitMovements` en `Pendiente de Picking` con `locations[]` (`receptionId` + `itemIndex`). |

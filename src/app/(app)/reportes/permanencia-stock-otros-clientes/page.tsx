@@ -27,6 +27,7 @@ interface PermanenceRow {
     loteCliente: string;
     codProducto: string;
     nombreProducto: string;
+    tipoFruta: string;
     cantidad: string;
     fechaRecepcion: Date | null;
     fechaSalida: Date | null;
@@ -222,6 +223,7 @@ export default function PermanenceReportPage() {
                         loteCliente: item.clientLotId || '—',
                         codProducto: item.productCode || '—',
                         nombreProducto: item.productName || 'Producto',
+                        tipoFruta: item.fruitType || '—',
                         cantidad: `${item.quantity || 1} ${reception.unit || (isVita ? 'Pallet' : 'Unid.')}`,
                         fechaRecepcion: fechaIngreso,
                         fechaSalida,
@@ -244,6 +246,7 @@ export default function PermanenceReportPage() {
                         loteCliente: item.clientLotId || '—',
                         codProducto: item.productCode || '—',
                         nombreProducto: item.productName || 'Producto',
+                        tipoFruta: item.fruitType || '—',
                         cantidad: `${item.quantity || 1} ${reception.unit || (isVita ? 'Pallet' : 'Unid.')}`,
                         fechaRecepcion: fechaIngreso,
                         fechaSalida: null,
@@ -305,10 +308,11 @@ export default function PermanenceReportPage() {
                 const matchLote = item.loteCliente.toLowerCase().includes(term);
                 const matchCode = item.codProducto.toLowerCase().includes(term);
                 const matchProd = item.nombreProducto.toLowerCase().includes(term);
+                const matchTipo = item.tipoFruta.toLowerCase().includes(term);
                 const matchUbic = item.ubicacion.toLowerCase().includes(term);
                 const matchCli = item.cliente.toLowerCase().includes(term);
 
-                if (!matchUmp && !matchDocEntrada && !matchDocSalida && !matchLote && !matchCode && !matchProd && !matchUbic && !matchCli) {
+                if (!matchUmp && !matchDocEntrada && !matchDocSalida && !matchLote && !matchCode && !matchProd && !matchTipo && !matchUbic && !matchCli) {
                     return false;
                 }
             }
@@ -344,6 +348,7 @@ export default function PermanenceReportPage() {
             { key: 'loteCliente', label: 'Lote Cliente' },
             { key: 'codProducto', label: 'Cód. Producto' },
             { key: 'nombreProducto', label: 'Producto' },
+            { key: 'tipoFruta', label: 'Tipo Fruta' },
             { key: 'cantidad', label: 'Cantidad' },
         ];
 
@@ -486,6 +491,7 @@ export default function PermanenceReportPage() {
                                     <TableHead>Doc. Salida</TableHead>
                                     <TableHead>Lote</TableHead>
                                     <TableHead>Producto</TableHead>
+                                    <TableHead>Tipo Fruta</TableHead>
                                     <TableHead>Cantidad</TableHead>
                                     <TableHead className="text-right font-bold">Días Permanencia</TableHead>
                                 </TableRow>
@@ -494,7 +500,7 @@ export default function PermanenceReportPage() {
                                 {loading ? (
                                     Array.from({ length: 8 }).map((_, i) => (
                                         <TableRow key={i}>
-                                            <TableCell colSpan={12}><Skeleton className="h-6 w-full" /></TableCell>
+                                            <TableCell colSpan={13}><Skeleton className="h-6 w-full" /></TableCell>
                                         </TableRow>
                                     ))
                                 ) : filteredData && filteredData.length > 0 ? (
@@ -540,6 +546,7 @@ export default function PermanenceReportPage() {
                                             <TableCell className="text-xs max-w-[180px] truncate" title={item.nombreProducto}>
                                                 {item.nombreProducto}
                                             </TableCell>
+                                            <TableCell className="text-xs">{item.tipoFruta}</TableCell>
                                             <TableCell className="text-xs">{item.cantidad}</TableCell>
                                             <TableCell className="text-right font-bold text-sm">
                                                 <span className={`inline-block px-2 py-0.5 rounded ${
@@ -556,7 +563,7 @@ export default function PermanenceReportPage() {
                                     ))
                                 ) : (
                                     <TableRow>
-                                        <TableCell colSpan={12} className="h-28 text-center text-muted-foreground">
+                                        <TableCell colSpan={13} className="h-28 text-center text-muted-foreground">
                                             No se encontraron registros de permanencia para el filtro seleccionado.
                                         </TableCell>
                                     </TableRow>

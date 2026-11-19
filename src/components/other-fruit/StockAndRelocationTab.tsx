@@ -29,6 +29,7 @@ interface StoredOtherFruitItem {
     palletId?: string;
     containerId?: string;
     clientLotId?: string;
+    fruitType?: string;
     document?: string;
     storedAt?: any;
 }
@@ -58,6 +59,7 @@ export function StockAndRelocationTab({ clientId: fixedClientId }: { clientId?: 
                     palletId: item.palletId,
                     containerId: item.containerId,
                     clientLotId: item.clientLotId,
+                    fruitType: item.fruitType,
                     document: reception.document,
                     storedAt: item.storedAt || reception.createdAt,
                 } as StoredOtherFruitItem))
@@ -75,6 +77,7 @@ export function StockAndRelocationTab({ clientId: fixedClientId }: { clientId?: 
         const lotStr = String(item.clientLotId || '').toLowerCase();
         const clientStr = String(item.clientName || '').toLowerCase();
         const prodStr = String(item.productName || '').toLowerCase();
+        const fruitTypeStr = String(item.fruitType || '').toLowerCase();
         const chamberStr = String(chambersConfig[item.location.chamberId]?.name || item.location.chamberId).toLowerCase();
         const coordStr = String(item.location.coordinate || '').toLowerCase();
 
@@ -84,6 +87,7 @@ export function StockAndRelocationTab({ clientId: fixedClientId }: { clientId?: 
                lotStr.includes(q) ||
                clientStr.includes(q) ||
                prodStr.includes(q) ||
+               fruitTypeStr.includes(q) ||
                chamberStr.includes(q) ||
                coordStr.includes(q);
     });
@@ -175,6 +179,7 @@ export function StockAndRelocationTab({ clientId: fixedClientId }: { clientId?: 
                   <TableHead className="font-bold text-xs uppercase">QR</TableHead>
                   <TableHead className="font-bold text-xs uppercase">Lote Cliente</TableHead>
                   <TableHead className="font-bold text-xs uppercase">Variedad</TableHead>
+                  <TableHead className="font-bold text-xs uppercase">Tipo Fruta</TableHead>
                   <TableHead className="font-bold text-xs uppercase">Cámara</TableHead>
                   <TableHead className="font-bold text-xs uppercase">Ubicación</TableHead>
                   <TableHead className="font-bold text-xs uppercase">Cantidad</TableHead>
@@ -184,7 +189,7 @@ export function StockAndRelocationTab({ clientId: fixedClientId }: { clientId?: 
                 {loading ? (
                   Array.from({ length: 5 }).map((_, i) => (
                     <TableRow key={i}>
-                      <TableCell colSpan={fixedClientId ? 9 : 10}>
+                      <TableCell colSpan={fixedClientId ? 10 : 11}>
                         <Skeleton className="h-4 w-full" />
                       </TableCell>
                     </TableRow>
@@ -208,6 +213,7 @@ export function StockAndRelocationTab({ clientId: fixedClientId }: { clientId?: 
                         </TableCell>
                         <TableCell className="font-mono text-xs">{item.clientLotId || '-'}</TableCell>
                         <TableCell className="text-xs">{item.productName}</TableCell>
+                        <TableCell className="text-xs">{item.fruitType || '-'}</TableCell>
                         <TableCell className="text-xs">{chambersConfig[item.location.chamberId]?.name || item.location.chamberId}</TableCell>
                         <TableCell className="font-mono font-bold text-[#004b8d] text-xs">{item.location.coordinate}</TableCell>
                         <TableCell className="font-bold text-xs text-zinc-900 dark:text-zinc-100">{item.quantity} {item.unit}</TableCell>
@@ -216,7 +222,7 @@ export function StockAndRelocationTab({ clientId: fixedClientId }: { clientId?: 
                   })
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={fixedClientId ? 9 : 10} className="h-24 text-center text-xs text-muted-foreground">
+                    <TableCell colSpan={fixedClientId ? 10 : 11} className="h-24 text-center text-xs text-muted-foreground">
                       No se encontraron registros de stock con los criterios ingresados.
                     </TableCell>
                   </TableRow>

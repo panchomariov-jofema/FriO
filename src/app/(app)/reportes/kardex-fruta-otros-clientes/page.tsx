@@ -187,6 +187,7 @@ function EditMovementDialog({ open, onOpenChange, item, onSave }: EditMovementDi
                             productCode: it.productCode,
                             productName: it.productName,
                             quantity: Number(it.quantity),
+                            ...(it.fruitType ? { fruitType: it.fruitType } : {}),
                             observation: it.observation || '',
                             clientLotId: it.clientLotId || ''
                         })),
@@ -264,7 +265,7 @@ function EditMovementDialog({ open, onOpenChange, item, onSave }: EditMovementDi
                                             </Badge>
                                         )}
                                     </div>
-                                    <div className="grid grid-cols-3 gap-2">
+                                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                                         <div className="space-y-1">
                                             <Label className="text-[10px] uppercase font-bold text-muted-foreground">Cantidad ({item?.unit})</Label>
                                             <Input 
@@ -273,6 +274,21 @@ function EditMovementDialog({ open, onOpenChange, item, onSave }: EditMovementDi
                                                 value={it.quantity}
                                                 onChange={(e) => handleItemChange(idx, 'quantity', Number(e.target.value))}
                                             />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <Label className="text-[10px] uppercase font-bold text-muted-foreground">Tipo Fruta</Label>
+                                            <Select 
+                                                value={it.fruitType || 'Convencional'} 
+                                                onValueChange={(val) => handleItemChange(idx, 'fruitType', val)}
+                                            >
+                                                <SelectTrigger className="h-8 text-xs">
+                                                    <SelectValue placeholder="Seleccione..." />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="Convencional">Convencional</SelectItem>
+                                                    <SelectItem value="Organico">Organico</SelectItem>
+                                                </SelectContent>
+                                            </Select>
                                         </div>
                                         <div className="space-y-1">
                                             <Label className="text-[10px] uppercase font-bold text-muted-foreground">Lote Cliente</Label>
@@ -339,6 +355,7 @@ export default function OtherFruitKardexReportPage() {
                 const productNames = [...new Set(receivedItems.map(i => i?.productName).filter(Boolean))].join(', ');
                 const productCodes = [...new Set(receivedItems.map(i => i?.productCode).filter(Boolean))].join(', ');
                 const clientLotIds = [...new Set(receivedItems.map(i => i?.clientLotId).filter(Boolean))].join(', ');
+                const fruitTypes = [...new Set(receivedItems.map(i => i?.fruitType).filter(Boolean))].join(', ');
 
                 allMovements.push({
                     key: `${reception.id}-E`,
@@ -352,6 +369,7 @@ export default function OtherFruitKardexReportPage() {
                     clientLotId: clientLotIds || '-',
                     productCode: productCodes,
                     productName: productNames,
+                    fruitType: fruitTypes || '-',
                     quantity: totalQuantity,
                     unit: reception.unit || 'Bins',
                     observation: observations || '-',
@@ -371,6 +389,11 @@ export default function OtherFruitKardexReportPage() {
                 const productNames = [...new Set(movItems.map(i => i?.productName).filter(Boolean))].join(', ');
                 const productCodes = [...new Set(movItems.map(i => i?.productCode).filter(Boolean))].join(', ');
                 const clientLotIds = [...new Set(movItems.map(i => i?.clientLotId).filter(Boolean))].join(', ');
+                const movLocations = Array.isArray(movement.locations) ? movement.locations : [];
+                const fruitTypes = [...new Set([
+                    ...movItems.map(i => i?.fruitType),
+                    ...movLocations.map(l => l?.fruitType)
+                ].filter(Boolean))].join(', ');
 
                 allMovements.push({
                     key: `${movement.id}-S`,
@@ -383,6 +406,7 @@ export default function OtherFruitKardexReportPage() {
                     clientLotId: clientLotIds || '-',
                     productCode: productCodes,
                     productName: productNames,
+                    fruitType: fruitTypes || '-',
                     quantity: -totalQuantity,
                     unit: movement.unit || 'Bins',
                     observation: observations || '-',
@@ -423,12 +447,13 @@ export default function OtherFruitKardexReportPage() {
                 "Lote Cliente": item.clientLotId || '',
                 "Codigo Producto": item.productCode,
                 "Nombre Producto": item.productName,
+                "Tipo Fruta": item.fruitType || '',
                 "Cantidad": `${item.quantity} ${item.unit}`,
                 "Observación": item.observation || '',
                 "Usuario": item.userName || '',
             };
         });
-        const headers = ["Fecha", "Tipo", "Cliente", "Documento", "N° Documento", "Temperatura", "Lote Cliente", "Codigo Producto", "Nombre Producto", "Cantidad", "Observación", "Usuario"];
+        const headers = ["Fecha", "Tipo", "Cliente", "Documento", "N° Documento", "Temperatura", "Lote Cliente", "Codigo Producto", "Nombre Producto", "Tipo Fruta", "Cantidad", "Observación", "Usuario"];
         const csv = convertToCSV(dataToExport, headers);
         downloadCSV(csv, 'kardex_fruta_otros_clientes.csv');
     };
@@ -557,6 +582,7 @@ export default function OtherFruitKardexReportPage() {
                                     <TableHead>Lote Cliente</TableHead>
                                     <TableHead>Cód. Prod.</TableHead>
                                     <TableHead>Producto</TableHead>
+                                    <TableHead>Tipo Fruta</TableHead>
                                     <TableHead>Cantidad</TableHead>
                                     <TableHead>Observación</TableHead>
                                     <TableHead>Usuario</TableHead>
@@ -565,7 +591,7 @@ export default function OtherFruitKardexReportPage() {
                             </TableHeader>
                             <TableBody>
                                 {loading ? (
-                                    Array.from({ length: 5 }).map((_, i) => <TableRow key={i}><TableCell colSpan={isMaestro ? 12 : 11}><Skeleton className="h-4 w-full" /></TableCell></TableRow>)
+                                    Array.from({ length: 5 }).map((_, i) => <TableRow key={i}><TableCell colSpan={isMaestro ? 13 : 12}><Skeleton className="h-4 w-full" /></TableCell></TableRow>)
                                 ) : filteredData.length > 0 ? (
                                     filteredData.map((item) => (
                                     <TableRow key={item.key}>
@@ -592,6 +618,7 @@ export default function OtherFruitKardexReportPage() {
                                         <TableCell className="font-mono">{item.clientLotId || '-'}</TableCell>
                                         <TableCell>{item.productCode}</TableCell>
                                         <TableCell>{item.productName}</TableCell>
+                                        <TableCell>{item.fruitType || '-'}</TableCell>
                                         <TableCell className={item.quantity > 0 ? 'text-green-600' : 'text-red-600'}>
                                             {item.quantity} {item.unit}
                                         </TableCell>
@@ -624,7 +651,7 @@ export default function OtherFruitKardexReportPage() {
                                     </TableRow>
                                     ))
                                 ) : (
-                                    <TableRow><TableCell colSpan={isMaestro ? 12 : 11} className="h-24 text-center">No hay movimientos para los filtros seleccionados.</TableCell></TableRow>
+                                    <TableRow><TableCell colSpan={isMaestro ? 13 : 12} className="h-24 text-center">No hay movimientos para los filtros seleccionados.</TableCell></TableRow>
                                 )}
                             </TableBody>
                         </Table>

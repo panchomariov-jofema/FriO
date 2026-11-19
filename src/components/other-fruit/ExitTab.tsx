@@ -40,6 +40,7 @@ interface AggregatedLot {
     chamberId?: string;
     quantity: number;
     observation?: string;
+    fruitType?: string;
     productName: string;
     productCode: string;
     clientLotId?: string;
@@ -207,6 +208,7 @@ export function OtherFruitExitTab({ clientId: fixedClientId }: { clientId?: stri
             chamberId: item.storageLocation.chamberId || '',
             quantity: availableQty,
             observation: item.observation,
+            fruitType: item.fruitType,
             productName: item.productName,
             productCode: item.productCode,
             clientLotId: item.clientLotId,
@@ -581,6 +583,7 @@ export function OtherFruitExitTab({ clientId: fixedClientId }: { clientId?: stri
                     productCode: string;
                     productName: string;
                     quantity: number;
+                    fruitType?: any;
                     observation?: string;
                     clientLotId?: string;
                 } = {
@@ -589,6 +592,9 @@ export function OtherFruitExitTab({ clientId: fixedClientId }: { clientId?: stri
                     quantity: quantityToDispatch,
                 };
 
+                if (typeof itemToUpdate.fruitType !== 'undefined') {
+                    newItemForMovement.fruitType = itemToUpdate.fruitType;
+                }
                 if (typeof itemToUpdate.observation !== 'undefined') {
                     newItemForMovement.observation = itemToUpdate.observation;
                 }
@@ -610,6 +616,9 @@ export function OtherFruitExitTab({ clientId: fixedClientId }: { clientId?: stri
                         coordinate: itemToUpdate.storageLocation?.coordinate || ''
                     }
                 };
+                if (itemToUpdate.fruitType) {
+                    locationObj.fruitType = itemToUpdate.fruitType;
+                }
                 if (itemToUpdate.clientLotId) {
                     locationObj.clientLotId = itemToUpdate.clientLotId;
                 }
@@ -1036,6 +1045,7 @@ export function OtherFruitExitTab({ clientId: fixedClientId }: { clientId?: stri
                                             </TableHead>
                                             <TableHead>Coordenada</TableHead>
                                             <TableHead>Producto</TableHead>
+                                            <TableHead className="hidden md:table-cell">Tipo Fruta</TableHead>
                                             <TableHead className="hidden md:table-cell">Lote Cliente</TableHead>
                                             <TableHead className="hidden md:table-cell">Observación</TableHead>
                                             <TableHead>Disp.</TableHead>
@@ -1055,6 +1065,7 @@ export function OtherFruitExitTab({ clientId: fixedClientId }: { clientId?: stri
                                                     </TableCell>
                                                     <TableCell className="font-mono">{loc.coordinate}</TableCell>
                                                     <TableCell>{loc.productName}</TableCell>
+                                                    <TableCell className="hidden md:table-cell">{loc.fruitType || '-'}</TableCell>
                                                     <TableCell className="font-mono hidden md:table-cell">{loc.clientLotId || '-'}</TableCell>
                                                     <TableCell className="hidden md:table-cell">{loc.observation || '-'}</TableCell>
                                                     <TableCell>{loc.quantity}</TableCell>

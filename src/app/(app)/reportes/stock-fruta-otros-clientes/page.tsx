@@ -64,6 +64,7 @@ export default function OtherFruitStockReportPage() {
                     containerId: item.containerId || '-',
                     productCode: item.productCode,
                     productName: item.productName,
+                    fruitType: item.fruitType || '-',
                     unit: reception.unit,
                     quantity: item.quantity,
                     chamberId: item.storageLocation!.chamberId,
@@ -144,7 +145,7 @@ export default function OtherFruitStockReportPage() {
     }, [filteredData]);
 
     const handleExport = () => {
-        const headers = ["Fecha Recepción", "Cliente", "Documento Entrada", "N° Documento", "Lote", "Pallet ID", "QR Bin", "Codigo Producto", "Nombre Producto", "Cámara", "Ubicación", "Cantidad", "Unidad", "Usuario"];
+        const headers = ["Fecha Recepción", "Cliente", "Documento Entrada", "N° Documento", "Lote", "Pallet ID", "QR Bin", "Codigo Producto", "Nombre Producto", "Tipo Fruta", "Cámara", "Ubicación", "Cantidad", "Unidad", "Usuario"];
         const dataToExport = filteredData.map(item => {
             let formattedDate = '';
             if (item.receptionDate) {
@@ -163,6 +164,7 @@ export default function OtherFruitStockReportPage() {
                 "QR Bin": item.containerId,
                 "Codigo Producto": item.productCode,
                 "Nombre Producto": item.productName,
+                "Tipo Fruta": item.fruitType,
                 "Cámara": item.chamberName,
                 "Ubicación": item.coordinate,
                 "Cantidad": item.quantity,
@@ -230,6 +232,7 @@ export default function OtherFruitStockReportPage() {
                                     <TableHead>QR Bin</TableHead>
                                     <TableHead>Cód. Producto</TableHead>
                                     <TableHead>Producto</TableHead>
+                                    <TableHead>Tipo Fruta</TableHead>
                                     <TableHead>Cámara</TableHead>
                                     <TableHead>Ubicación</TableHead>
                                     <TableHead>Usuario</TableHead>
@@ -239,7 +242,7 @@ export default function OtherFruitStockReportPage() {
                             </TableHeader>
                             <TableBody>
                                 {loadingReceptions ? (
-                                    Array.from({ length: 5 }).map((_, i) => <TableRow key={i}><TableCell colSpan={13}><Skeleton className="h-4 w-full" /></TableCell></TableRow>)
+                                    Array.from({ length: 5 }).map((_, i) => <TableRow key={i}><TableCell colSpan={14}><Skeleton className="h-4 w-full" /></TableCell></TableRow>)
                                 ) : filteredData.length > 0 ? (
                                     <>
                                         {filteredData.map(item => (
@@ -264,6 +267,7 @@ export default function OtherFruitStockReportPage() {
                                                 <TableCell className="font-mono text-xs">{item.containerId}</TableCell>
                                                 <TableCell>{item.productCode}</TableCell>
                                                 <TableCell>{item.productName}</TableCell>
+                                                <TableCell>{item.fruitType}</TableCell>
                                                 <TableCell className="font-medium">{item.chamberName}</TableCell>
                                                 <TableCell className="font-mono">{item.coordinate}</TableCell>
                                                 <TableCell className="font-medium truncate max-w-[120px]" title={item.userName}>{item.userName}</TableCell>
@@ -272,7 +276,7 @@ export default function OtherFruitStockReportPage() {
                                             </TableRow>
                                         ))}
                                         <TableRow className="bg-muted/50 font-semibold hover:bg-muted/50">
-                                            <TableCell colSpan={11} className="text-right font-bold text-muted-foreground uppercase tracking-wider text-xs">Total</TableCell>
+                                            <TableCell colSpan={12} className="text-right font-bold text-muted-foreground uppercase tracking-wider text-xs">Total</TableCell>
                                             {(() => {
                                                 const uniqueUnits = [...new Set(filteredData.map(item => item.unit))].filter(Boolean);
                                                 if (uniqueUnits.length === 1) {
@@ -299,7 +303,7 @@ export default function OtherFruitStockReportPage() {
                                         </TableRow>
                                     </>
                                 ) : (
-                                    <TableRow><TableCell colSpan={13} className="h-24 text-center">No hay datos de stock para los filtros seleccionados.</TableCell></TableRow>
+                                    <TableRow><TableCell colSpan={14} className="h-24 text-center">No hay datos de stock para los filtros seleccionados.</TableCell></TableRow>
                                 )}
                             </TableBody>
                         </Table>
