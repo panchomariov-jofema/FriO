@@ -104,7 +104,7 @@ export default function BinsYMaterialesPage() {
                 }}
                 disabled={loadingExporters}
               >
-                <SelectTrigger id="exporter-select">
+                <SelectTrigger id="exporter-select" className="h-11 sm:h-10 text-base sm:text-sm">
                   <SelectValue placeholder="Seleccione un exportador..." />
                 </SelectTrigger>
                 <SelectContent>
@@ -165,7 +165,7 @@ export default function BinsYMaterialesPage() {
       
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           {visibleTabs.length > 0 && (
-            <TabsList className="grid w-full" style={{ gridTemplateColumns: `repeat(${visibleTabs.length}, 1fr)` }}>
+            <TabsList className="grid w-full h-11 sm:h-10" style={{ gridTemplateColumns: `repeat(${visibleTabs.length}, 1fr)` }}>
               {visibleTabs.map(tab => (
                 <TabsTrigger 
                   key={tab.value} 
@@ -174,7 +174,7 @@ export default function BinsYMaterialesPage() {
                     (tab.value === 'entradas' && (!selectedExporterId || !selectedProducerId)) ||
                     (tab.value === 'salidas' && (!selectedExporterId || !selectedProducerId || isDirectDispatch))
                   }
-                  className="flex items-center gap-2"
+                  className="flex items-center justify-center gap-2 h-9 sm:h-8 text-sm font-medium"
                 >
                   {tab.label}
                 </TabsTrigger>

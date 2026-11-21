@@ -94,7 +94,7 @@ export function ProducerCombobox({
           aria-expanded={open}
           disabled={disabled || loading || !hasExporterSelected}
           className={cn(
-            'w-full justify-between font-normal text-left h-10 border border-input bg-background px-3',
+            'w-full justify-between font-normal text-left h-11 sm:h-10 text-base sm:text-sm border border-input bg-background px-3',
             !selectedProducer && 'text-muted-foreground'
           )}
         >
@@ -105,7 +105,7 @@ export function ProducerCombobox({
         </Button>
       </PopoverTrigger>
       <PopoverContent
-        className="w-[--radix-popover-trigger-width] min-w-[300px] p-2"
+        className="w-[--radix-popover-trigger-width] min-w-[280px] p-2"
         align="start"
       >
         <div className="flex items-center border-b px-2 pb-2 mb-2 gap-2">
@@ -116,7 +116,7 @@ export function ProducerCombobox({
             onChange={(e) => setSearchTerm(e.target.value)}
             onKeyDown={handleKeyDown}
             autoFocus
-            className="h-8 border-none focus-visible:ring-0 focus-visible:ring-offset-0 p-0 text-sm"
+            className="h-9 sm:h-8 border-none focus-visible:ring-0 focus-visible:ring-offset-0 p-0 text-base sm:text-sm"
           />
           {searchTerm && (
             <button
@@ -148,7 +148,7 @@ export function ProducerCombobox({
                       setOpen(false);
                     }}
                     className={cn(
-                      'relative flex w-full cursor-pointer select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground text-left',
+                      'relative flex w-full cursor-pointer select-none items-center rounded-sm py-2.5 sm:py-1.5 pl-8 pr-2 text-base sm:text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground text-left',
                       isSelected && 'bg-accent/80 font-medium'
                     )}
                   >

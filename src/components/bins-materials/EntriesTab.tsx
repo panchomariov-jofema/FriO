@@ -21,6 +21,7 @@ import { usePackingsByExporter } from '@/hooks/use-packings-by-exporter';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
 import { isBinMaterialItem } from '@/lib/bins-rental-utils';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 
 const movementItemSchema = z.object({
   binMaterialId: z.string(),
@@ -219,6 +220,7 @@ export function EntriesTab({ exporterId, exporterName, producerId, isDirectDispa
   };
 
   const formItems = form.getValues('items');
+  const [showOptionalMobile, setShowOptionalMobile] = React.useState(false);
 
   return (
     <Card>
@@ -241,56 +243,20 @@ export function EntriesTab({ exporterId, exporterName, producerId, isDirectDispa
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>N° Documento</FormLabel>
-                    <FormControl><Input {...field} placeholder="Ej: 1234" autoComplete="off" inputMode="numeric" /></FormControl>
+                    <FormControl><Input {...field} placeholder="Ej: 1234" autoComplete="off" inputMode="numeric" className="h-11 sm:h-10 text-base sm:text-sm" /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
               <FormField
-                control={form.control}
-                name="driverName"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Nombre Conductor (Opcional)</FormLabel>
-                    <FormControl>
-                        <div className="relative">
-                            <Input {...field} autoComplete="off" list="entry-driver-names" />
-                            <datalist id="entry-driver-names">
-                                {suggestions.names.map(name => <option key={name} value={name} />)}
-                            </datalist>
-                        </div>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="driverRUT"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Rut Conductor (Opcional)</FormLabel>
-                    <FormControl>
-                        <div className="relative">
-                            <Input {...field} autoComplete="off" inputMode="numeric" list="entry-driver-ruts" />
-                            <datalist id="entry-driver-ruts">
-                                {suggestions.ruts.map(rut => <option key={rut} value={rut} />)}
-                            </datalist>
-                        </div>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-               <FormField
                 control={form.control}
                 name="packingId"
                 render={({ field }) => (
                     <FormItem>
-                        <FormLabel>Packing</FormLabel>
+                        <FormLabel>Packing (Opcional)</FormLabel>
                         <Select onValueChange={field.onChange} value={field.value} disabled={!exporterId || loadingPackings}>
                             <FormControl>
-                                <SelectTrigger>
+                                <SelectTrigger className="h-11 sm:h-10 text-base sm:text-sm">
                                     <SelectValue placeholder={!exporterId ? 'Seleccione exportador' : 'Opcional...'} />
                                 </SelectTrigger>
                             </FormControl>
@@ -304,6 +270,54 @@ export function EntriesTab({ exporterId, exporterName, producerId, isDirectDispa
                     </FormItem>
                 )}
               />
+              <div className="sm:hidden">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="w-full justify-between text-xs text-muted-foreground border border-dashed h-9"
+                  onClick={() => setShowOptionalMobile(prev => !prev)}
+                >
+                  <span>Datos del Conductor (Opcional)</span>
+                  {showOptionalMobile ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                </Button>
+              </div>
+              <FormField
+                control={form.control}
+                name="driverName"
+                render={({ field }) => (
+                  <FormItem className={showOptionalMobile ? 'block' : 'hidden sm:block'}>
+                    <FormLabel>Nombre Conductor (Opcional)</FormLabel>
+                    <FormControl>
+                        <div className="relative">
+                            <Input {...field} autoComplete="off" list="entry-driver-names" className="h-11 sm:h-10 text-base sm:text-sm" />
+                            <datalist id="entry-driver-names">
+                                {suggestions.names.map(name => <option key={name} value={name} />)}
+                            </datalist>
+                        </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="driverRUT"
+                render={({ field }) => (
+                  <FormItem className={showOptionalMobile ? 'block' : 'hidden sm:block'}>
+                    <FormLabel>Rut Conductor (Opcional)</FormLabel>
+                    <FormControl>
+                        <div className="relative">
+                            <Input {...field} autoComplete="off" inputMode="numeric" list="entry-driver-ruts" className="h-11 sm:h-10 text-base sm:text-sm" />
+                            <datalist id="entry-driver-ruts">
+                                {suggestions.ruts.map(rut => <option key={rut} value={rut} />)}
+                            </datalist>
+                        </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
             </div>
 
             <div className="space-y-2">
@@ -313,18 +327,28 @@ export function EntriesTab({ exporterId, exporterName, producerId, isDirectDispa
                   {loadingMaterials ? (
                     <Skeleton className="h-20 w-full" />
                   ) : formItems.map((item, index) => (
-                    <div key={item.binMaterialId} className="border p-4 rounded-lg">
+                    <div key={item.binMaterialId} className="border p-3.5 rounded-lg bg-card shadow-xs">
                       <FormField
                         control={form.control}
                         name={`items.${index}.quantity`}
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel className="text-base">
+                            <FormLabel className="text-base font-semibold">
                                 {item.binMaterialName}
                                 <span className="text-muted-foreground text-sm font-normal">{getMultiplierLabel(item.binMaterialCode)}</span>
                             </FormLabel>
                             <FormControl>
-                                <Input type="number" {...field} value={field.value ?? ''} autoComplete="off" min="0" placeholder="Cantidad" className="h-12 text-lg" />
+                                <Input
+                                  type="number"
+                                  {...field}
+                                  value={field.value ?? ''}
+                                  autoComplete="off"
+                                  inputMode="numeric"
+                                  min="0"
+                                  placeholder="Cantidad"
+                                  onFocus={(e) => e.target.select()}
+                                  className="h-12 text-lg font-semibold"
+                                />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -364,7 +388,15 @@ export function EntriesTab({ exporterId, exporterName, producerId, isDirectDispa
                                             render={({ field }) => (
                                                 <FormItem>
                                                     <FormControl>
-                                                        <Input type="number" {...field} value={field.value ?? ''} autoComplete="off" min="0" />
+                                                        <Input
+                                                          type="number"
+                                                          {...field}
+                                                          value={field.value ?? ''}
+                                                          autoComplete="off"
+                                                          inputMode="numeric"
+                                                          min="0"
+                                                          onFocus={(e) => e.target.select()}
+                                                        />
                                                     </FormControl>
                                                     <FormMessage />
                                                 </FormItem>
@@ -379,7 +411,7 @@ export function EntriesTab({ exporterId, exporterName, producerId, isDirectDispa
             </div>
 
             <div className="flex justify-end">
-              <Button type="submit" disabled={form.formState.isSubmitting || loadingMaterials}>
+              <Button type="submit" disabled={form.formState.isSubmitting || loadingMaterials} className="w-full sm:w-auto h-12 sm:h-10 text-base sm:text-sm font-semibold">
                 {form.formState.isSubmitting ? 'Registrando...' : 'Registrar Entrada'}
               </Button>
             </div>

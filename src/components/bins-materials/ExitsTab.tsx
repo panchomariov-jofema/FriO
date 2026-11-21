@@ -20,6 +20,8 @@ import { FirestorePermissionError } from '@/firebase/errors';
 import { Table, TableBody, TableCell, TableHeader, TableRow, TableHead } from '../ui/table';
 import { Skeleton } from '../ui/skeleton';
 import { Textarea } from '../ui/textarea';
+import { Badge } from '../ui/badge';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 
 const movementItemSchema = z.object({
   binMaterialId: z.string(),
@@ -367,6 +369,7 @@ export function ExitsTab({ exporterId, exporterName, producerId }: ExitsTabProps
   
   const isLoading = loadingMaterials || loadingMovements || loadingEntities || loadingChamberLots || loadingDispatches || loadingExporters;
   const formItems = form.getValues('items');
+  const [showOptionalMobile, setShowOptionalMobile] = React.useState(false);
 
   return (
     <Card>
@@ -384,20 +387,32 @@ export function ExitsTab({ exporterId, exporterName, producerId }: ExitsTabProps
                 render={({ field }) => (
                     <FormItem>
                     <FormLabel>N° Documento</FormLabel>
-                    <FormControl><Input {...field} autoComplete="off" placeholder="Ej: 1234" /></FormControl>
+                    <FormControl><Input {...field} autoComplete="off" inputMode="numeric" placeholder="Ej: 1234" className="h-11 sm:h-10 text-base sm:text-sm" /></FormControl>
                     <FormMessage />
                     </FormItem>
                 )}
                 />
+                <div className="sm:hidden">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="w-full justify-between text-xs text-muted-foreground border border-dashed h-9"
+                    onClick={() => setShowOptionalMobile(prev => !prev)}
+                  >
+                    <span>Conductor, Patente y Observaciones (Opcional)</span>
+                    {showOptionalMobile ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                  </Button>
+                </div>
                  <FormField
                 control={form.control}
                 name="driverName"
                 render={({ field }) => (
-                  <FormItem>
+                  <FormItem className={showOptionalMobile ? 'block' : 'hidden sm:block'}>
                     <FormLabel>Nombre Conductor (Opcional)</FormLabel>
                     <FormControl>
                         <div className="relative">
-                            <Input {...field} autoComplete="off" list="exit-driver-names" />
+                            <Input {...field} autoComplete="off" list="exit-driver-names" className="h-11 sm:h-10 text-base sm:text-sm" />
                             <datalist id="exit-driver-names">
                                 {suggestions.names.map(name => <option key={name} value={name} />)}
                             </datalist>
@@ -411,11 +426,11 @@ export function ExitsTab({ exporterId, exporterName, producerId }: ExitsTabProps
                 control={form.control}
                 name="driverRUT"
                 render={({ field }) => (
-                  <FormItem>
+                  <FormItem className={showOptionalMobile ? 'block' : 'hidden sm:block'}>
                     <FormLabel>Rut Conductor (Opcional)</FormLabel>
                     <FormControl>
                         <div className="relative">
-                            <Input {...field} autoComplete="off" inputMode="numeric" list="exit-driver-ruts" />
+                            <Input {...field} autoComplete="off" inputMode="numeric" list="exit-driver-ruts" className="h-11 sm:h-10 text-base sm:text-sm" />
                             <datalist id="exit-driver-ruts">
                                 {suggestions.ruts.map(rut => <option key={rut} value={rut} />)}
                             </datalist>
@@ -429,11 +444,11 @@ export function ExitsTab({ exporterId, exporterName, producerId }: ExitsTabProps
                 control={form.control}
                 name="patente_vehiculo"
                 render={({ field }) => (
-                  <FormItem>
+                  <FormItem className={showOptionalMobile ? 'block' : 'hidden sm:block'}>
                     <FormLabel>Patente Vehículo (Opcional)</FormLabel>
                     <FormControl>
                         <div className="relative">
-                            <Input {...field} value={field.value || ''} autoComplete="off" list="exit-vehicle-plates" />
+                            <Input {...field} value={field.value || ''} autoComplete="off" list="exit-vehicle-plates" className="h-11 sm:h-10 text-base sm:text-sm" />
                             <datalist id="exit-vehicle-plates">
                                 {suggestions.plates.map(plate => <option key={plate} value={plate} />)}
                             </datalist>
@@ -447,9 +462,9 @@ export function ExitsTab({ exporterId, exporterName, producerId }: ExitsTabProps
                 control={form.control}
                 name="observaciones"
                 render={({ field }) => (
-                  <FormItem className="lg:col-span-2">
+                  <FormItem className={showOptionalMobile ? 'block lg:col-span-2' : 'hidden sm:block lg:col-span-2'}>
                     <FormLabel>Observaciones</FormLabel>
-                    <FormControl><Textarea {...field} /></FormControl>
+                    <FormControl><Textarea {...field} className="text-base sm:text-sm" /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -462,29 +477,43 @@ export function ExitsTab({ exporterId, exporterName, producerId }: ExitsTabProps
                 <div className="sm:hidden space-y-3">
                   {isLoading ? (
                     <Skeleton className="h-24 w-full" />
-                  ) : formItems.map((item, index) => (
-                    <div key={item.binMaterialId} className="border p-4 rounded-lg">
+                  ) : formItems.map((item, index) => {
+                    const availableStock = getStockForMaterial(item.binMaterialCode);
+                    return (
+                    <div key={item.binMaterialId} className="border p-3.5 rounded-lg bg-card shadow-xs">
                       <FormField
                         control={form.control}
                         name={`items.${index}.quantity`}
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel className="text-base">
-                                {item.binMaterialName}
-                                <span className="text-muted-foreground text-sm font-normal">{getMultiplierLabel(item.binMaterialCode)}</span>
-                            </FormLabel>
+                            <div className="flex items-center justify-between gap-2 pb-1">
+                              <FormLabel className="text-base font-semibold leading-tight">
+                                  {item.binMaterialName}
+                                  <span className="text-muted-foreground text-sm font-normal">{getMultiplierLabel(item.binMaterialCode)}</span>
+                              </FormLabel>
+                              <Badge variant={availableStock > 0 ? 'secondary' : 'outline'} className="shrink-0 font-mono text-xs">
+                                Stock: {availableStock.toLocaleString('es-CL')}
+                              </Badge>
+                            </div>
                             <FormControl>
-                                <Input type="number" {...field} value={field.value ?? ''} autoComplete="off" min="0" placeholder="Cantidad a retirar" className="h-12 text-lg" />
+                                <Input
+                                  type="number"
+                                  {...field}
+                                  value={field.value ?? ''}
+                                  autoComplete="off"
+                                  inputMode="numeric"
+                                  min="0"
+                                  placeholder="Cantidad a retirar"
+                                  onFocus={(e) => e.target.select()}
+                                  className="h-12 text-lg font-semibold"
+                                />
                             </FormControl>
-                             <p className="text-sm text-muted-foreground pt-1">
-                                Stock disponible: {getStockForMaterial(item.binMaterialCode)}
-                             </p>
                             <FormMessage />
                           </FormItem>
                         )}
                       />
                     </div>
-                  ))}
+                  )})}
                 </div>
 
                 {/* Desktop View */}
@@ -517,7 +546,15 @@ export function ExitsTab({ exporterId, exporterName, producerId }: ExitsTabProps
                                             render={({ field }) => (
                                                 <FormItem>
                                                     <FormControl>
-                                                        <Input type="number" {...field} value={field.value ?? ''} autoComplete="off" min="0" />
+                                                        <Input
+                                                          type="number"
+                                                          {...field}
+                                                          value={field.value ?? ''}
+                                                          autoComplete="off"
+                                                          inputMode="numeric"
+                                                          min="0"
+                                                          onFocus={(e) => e.target.select()}
+                                                        />
                                                     </FormControl>
                                                      <p className="text-xs text-muted-foreground pt-1">
                                                         Stock: {getStockForMaterial(item.binMaterialCode)}
@@ -535,7 +572,7 @@ export function ExitsTab({ exporterId, exporterName, producerId }: ExitsTabProps
             </div>
 
             <div className="flex justify-end">
-              <Button type="submit" disabled={form.formState.isSubmitting || isLoading}>
+              <Button type="submit" disabled={form.formState.isSubmitting || isLoading} className="w-full sm:w-auto h-12 sm:h-10 text-base sm:text-sm font-semibold">
                 {form.formState.isSubmitting ? 'Registrando...' : 'Registrar Salida'}
               </Button>
             </div>

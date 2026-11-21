@@ -177,7 +177,7 @@ export default function RecepcionPage() {
                     }}
                     disabled={loadingExporters}
                   >
-                    <SelectTrigger id="exporter-select">
+                    <SelectTrigger id="exporter-select" className="h-11 sm:h-10 text-base sm:text-sm">
                       <SelectValue placeholder="Seleccione un exportador..." />
                     </SelectTrigger>
                     <SelectContent>
@@ -206,23 +206,95 @@ export default function RecepcionPage() {
                     </FormItem>
                 )} />
                 <FormField control={form.control} name="document" render={({ field }) => (
-                  <FormItem className="md:col-span-2"><FormLabel>N° Guía / Documento</FormLabel><FormControl><Input {...field} value={field.value || ''} placeholder="Ej: 1234" autoComplete="off" inputMode="numeric" /></FormControl><FormMessage /></FormItem>
+                  <FormItem className="md:col-span-2">
+                    <FormLabel>N° Guía / Documento</FormLabel>
+                    <FormControl>
+                      <Input {...field} value={field.value || ''} placeholder="Ej: 1234" autoComplete="off" inputMode="numeric" className="h-11 sm:h-10 text-base sm:text-sm" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
                 )} />
                 <FormField control={form.control} name="binCount" render={({ field }) => (
-                  <FormItem><FormLabel>Cantidad de Bins</FormLabel><FormControl><Input type="number" {...field} value={field.value || ''} autoComplete="off" inputMode="numeric" /></FormControl><FormMessage /></FormItem>
+                  <FormItem className="border sm:border-none p-3 sm:p-0 rounded-lg bg-card sm:bg-transparent">
+                    <FormLabel className="text-base sm:text-sm font-semibold sm:font-medium">Cantidad de Bins</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        {...field}
+                        value={field.value ?? ''}
+                        autoComplete="off"
+                        inputMode="numeric"
+                        min="0"
+                        onFocus={(e) => e.target.select()}
+                        className="h-12 sm:h-10 text-lg sm:text-sm font-semibold"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
                 )} />
                 <FormField control={form.control} name="toteCount" render={({ field }) => (
-                  <FormItem><FormLabel>Cantidad de Totes (x24)</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''} autoComplete="off" inputMode="numeric" /></FormControl><FormMessage /></FormItem>
+                  <FormItem className="border sm:border-none p-3 sm:p-0 rounded-lg bg-card sm:bg-transparent">
+                    <FormLabel className="text-base sm:text-sm font-semibold sm:font-medium">
+                      Cantidad de Totes <span className="text-muted-foreground font-normal">(x24)</span>
+                    </FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        {...field}
+                        value={field.value ?? ''}
+                        autoComplete="off"
+                        inputMode="numeric"
+                        min="0"
+                        onFocus={(e) => e.target.select()}
+                        className="h-12 sm:h-10 text-lg sm:text-sm font-semibold"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
                 )} />
                 <FormField control={form.control} name="laminaCount" render={({ field }) => (
-                  <FormItem><FormLabel>Cantidad de Láminas (x1)</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''} autoComplete="off" inputMode="numeric" /></FormControl><FormMessage /></FormItem>
+                  <FormItem className="border sm:border-none p-3 sm:p-0 rounded-lg bg-card sm:bg-transparent">
+                    <FormLabel className="text-base sm:text-sm font-semibold sm:font-medium">
+                      Cantidad de Láminas <span className="text-muted-foreground font-normal">(x1)</span>
+                    </FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        {...field}
+                        value={field.value ?? ''}
+                        autoComplete="off"
+                        inputMode="numeric"
+                        min="0"
+                        onFocus={(e) => e.target.select()}
+                        className="h-12 sm:h-10 text-lg sm:text-sm font-semibold"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
                 )} />
                 <FormField control={form.control} name="emptyTotes" render={({ field }) => (
-                  <FormItem><FormLabel>Totes Vacíos Adicionales (Opcional)</FormLabel><FormControl><Input type="number" {...field} value={field.value || ''} autoComplete="off" inputMode="numeric" /></FormControl><FormMessage /></FormItem>
+                  <FormItem className="border sm:border-none p-3 sm:p-0 rounded-lg bg-card sm:bg-transparent">
+                    <FormLabel className="text-base sm:text-sm font-semibold sm:font-medium">
+                      Totes Vacíos Adicionales <span className="text-muted-foreground font-normal">(Opcional)</span>
+                    </FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        {...field}
+                        value={field.value ?? ''}
+                        autoComplete="off"
+                        inputMode="numeric"
+                        min="0"
+                        onFocus={(e) => e.target.select()}
+                        className="h-12 sm:h-10 text-lg sm:text-sm font-semibold"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
                 )} />
               </div>
               <div className="flex justify-start md:justify-end">
-                <Button type="submit" disabled={isFormSubmitting || !selectedExporter || !selectedProducerId}>
+                <Button type="submit" disabled={isFormSubmitting || !selectedExporter || !selectedProducerId} className="w-full sm:w-auto h-12 sm:h-10 text-base sm:text-sm font-semibold">
                   {isFormSubmitting ? 'Guardando...' : 'Registrar Recepción'}
                 </Button>
               </div>
