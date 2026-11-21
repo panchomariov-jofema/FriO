@@ -27,6 +27,7 @@ interface PermanenceRow {
     loteCliente: string;
     codProducto: string;
     nombreProducto: string;
+    variedad: string;
     tipoFruta: string;
     cantidad: string;
     fechaRecepcion: Date | null;
@@ -223,6 +224,7 @@ export default function PermanenceReportPage() {
                         loteCliente: item.clientLotId || '—',
                         codProducto: item.productCode || '—',
                         nombreProducto: item.productName || 'Producto',
+                        variedad: item.variety || '—',
                         tipoFruta: item.fruitType || '—',
                         cantidad: `${item.quantity || 1} ${reception.unit || (isVita ? 'Pallet' : 'Unid.')}`,
                         fechaRecepcion: fechaIngreso,
@@ -246,6 +248,7 @@ export default function PermanenceReportPage() {
                         loteCliente: item.clientLotId || '—',
                         codProducto: item.productCode || '—',
                         nombreProducto: item.productName || 'Producto',
+                        variedad: item.variety || '—',
                         tipoFruta: item.fruitType || '—',
                         cantidad: `${item.quantity || 1} ${reception.unit || (isVita ? 'Pallet' : 'Unid.')}`,
                         fechaRecepcion: fechaIngreso,
@@ -348,6 +351,7 @@ export default function PermanenceReportPage() {
             { key: 'loteCliente', label: 'Lote Cliente' },
             { key: 'codProducto', label: 'Cód. Producto' },
             { key: 'nombreProducto', label: 'Producto' },
+            { key: 'variedad', label: 'Variedad' },
             { key: 'tipoFruta', label: 'Tipo Fruta' },
             { key: 'cantidad', label: 'Cantidad' },
         ];
@@ -491,6 +495,7 @@ export default function PermanenceReportPage() {
                                     <TableHead>Doc. Salida</TableHead>
                                     <TableHead>Lote</TableHead>
                                     <TableHead>Producto</TableHead>
+                                    <TableHead>Variedad</TableHead>
                                     <TableHead>Tipo Fruta</TableHead>
                                     <TableHead>Cantidad</TableHead>
                                     <TableHead className="text-right font-bold">Días Permanencia</TableHead>
@@ -500,7 +505,7 @@ export default function PermanenceReportPage() {
                                 {loading ? (
                                     Array.from({ length: 8 }).map((_, i) => (
                                         <TableRow key={i}>
-                                            <TableCell colSpan={13}><Skeleton className="h-6 w-full" /></TableCell>
+                                            <TableCell colSpan={14}><Skeleton className="h-6 w-full" /></TableCell>
                                         </TableRow>
                                     ))
                                 ) : filteredData && filteredData.length > 0 ? (
@@ -546,6 +551,7 @@ export default function PermanenceReportPage() {
                                             <TableCell className="text-xs max-w-[180px] truncate" title={item.nombreProducto}>
                                                 {item.nombreProducto}
                                             </TableCell>
+                                            <TableCell className="text-xs">{item.variedad}</TableCell>
                                             <TableCell className="text-xs">{item.tipoFruta}</TableCell>
                                             <TableCell className="text-xs">{item.cantidad}</TableCell>
                                             <TableCell className="text-right font-bold text-sm">
@@ -563,7 +569,7 @@ export default function PermanenceReportPage() {
                                     ))
                                 ) : (
                                     <TableRow>
-                                        <TableCell colSpan={13} className="h-28 text-center text-muted-foreground">
+                                        <TableCell colSpan={14} className="h-28 text-center text-muted-foreground">
                                             No se encontraron registros de permanencia para el filtro seleccionado.
                                         </TableCell>
                                     </TableRow>

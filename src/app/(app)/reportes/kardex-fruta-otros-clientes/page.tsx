@@ -265,7 +265,7 @@ function EditMovementDialog({ open, onOpenChange, item, onSave }: EditMovementDi
                                             </Badge>
                                         )}
                                     </div>
-                                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
                                         <div className="space-y-1">
                                             <Label className="text-[10px] uppercase font-bold text-muted-foreground">Cantidad ({item?.unit})</Label>
                                             <Input 
@@ -273,6 +273,15 @@ function EditMovementDialog({ open, onOpenChange, item, onSave }: EditMovementDi
                                                 className="h-8 text-xs"
                                                 value={it.quantity}
                                                 onChange={(e) => handleItemChange(idx, 'quantity', Number(e.target.value))}
+                                            />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <Label className="text-[10px] uppercase font-bold text-muted-foreground">Variedad</Label>
+                                            <Input 
+                                                className="h-8 text-xs font-mono"
+                                                placeholder="Ej: SANTINA"
+                                                value={it.variety || ''}
+                                                onChange={(e) => handleItemChange(idx, 'variety', e.target.value)}
                                             />
                                         </div>
                                         <div className="space-y-1">
@@ -355,6 +364,7 @@ export default function OtherFruitKardexReportPage() {
                 const productNames = [...new Set(receivedItems.map(i => i?.productName).filter(Boolean))].join(', ');
                 const productCodes = [...new Set(receivedItems.map(i => i?.productCode).filter(Boolean))].join(', ');
                 const clientLotIds = [...new Set(receivedItems.map(i => i?.clientLotId).filter(Boolean))].join(', ');
+                const varieties = [...new Set(receivedItems.map(i => i?.variety).filter(Boolean))].join(', ');
                 const fruitTypes = [...new Set(receivedItems.map(i => i?.fruitType).filter(Boolean))].join(', ');
 
                 allMovements.push({
@@ -369,6 +379,7 @@ export default function OtherFruitKardexReportPage() {
                     clientLotId: clientLotIds || '-',
                     productCode: productCodes,
                     productName: productNames,
+                    variety: varieties || '-',
                     fruitType: fruitTypes || '-',
                     quantity: totalQuantity,
                     unit: reception.unit || 'Bins',
@@ -390,6 +401,10 @@ export default function OtherFruitKardexReportPage() {
                 const productCodes = [...new Set(movItems.map(i => i?.productCode).filter(Boolean))].join(', ');
                 const clientLotIds = [...new Set(movItems.map(i => i?.clientLotId).filter(Boolean))].join(', ');
                 const movLocations = Array.isArray(movement.locations) ? movement.locations : [];
+                const varieties = [...new Set([
+                    ...movItems.map(i => i?.variety),
+                    ...movLocations.map(l => l?.variety)
+                ].filter(Boolean))].join(', ');
                 const fruitTypes = [...new Set([
                     ...movItems.map(i => i?.fruitType),
                     ...movLocations.map(l => l?.fruitType)
@@ -406,6 +421,7 @@ export default function OtherFruitKardexReportPage() {
                     clientLotId: clientLotIds || '-',
                     productCode: productCodes,
                     productName: productNames,
+                    variety: varieties || '-',
                     fruitType: fruitTypes || '-',
                     quantity: -totalQuantity,
                     unit: movement.unit || 'Bins',
@@ -447,13 +463,14 @@ export default function OtherFruitKardexReportPage() {
                 "Lote Cliente": item.clientLotId || '',
                 "Codigo Producto": item.productCode,
                 "Nombre Producto": item.productName,
+                "Variedad": item.variety || '',
                 "Tipo Fruta": item.fruitType || '',
                 "Cantidad": `${item.quantity} ${item.unit}`,
                 "Observación": item.observation || '',
                 "Usuario": item.userName || '',
             };
         });
-        const headers = ["Fecha", "Tipo", "Cliente", "Documento", "N° Documento", "Temperatura", "Lote Cliente", "Codigo Producto", "Nombre Producto", "Tipo Fruta", "Cantidad", "Observación", "Usuario"];
+        const headers = ["Fecha", "Tipo", "Cliente", "Documento", "N° Documento", "Temperatura", "Lote Cliente", "Codigo Producto", "Nombre Producto", "Variedad", "Tipo Fruta", "Cantidad", "Observación", "Usuario"];
         const csv = convertToCSV(dataToExport, headers);
         downloadCSV(csv, 'kardex_fruta_otros_clientes.csv');
     };
@@ -582,6 +599,7 @@ export default function OtherFruitKardexReportPage() {
                                     <TableHead>Lote Cliente</TableHead>
                                     <TableHead>Cód. Prod.</TableHead>
                                     <TableHead>Producto</TableHead>
+                                    <TableHead>Variedad</TableHead>
                                     <TableHead>Tipo Fruta</TableHead>
                                     <TableHead>Cantidad</TableHead>
                                     <TableHead>Observación</TableHead>
@@ -591,7 +609,7 @@ export default function OtherFruitKardexReportPage() {
                             </TableHeader>
                             <TableBody>
                                 {loading ? (
-                                    Array.from({ length: 5 }).map((_, i) => <TableRow key={i}><TableCell colSpan={isMaestro ? 13 : 12}><Skeleton className="h-4 w-full" /></TableCell></TableRow>)
+                                    Array.from({ length: 5 }).map((_, i) => <TableRow key={i}><TableCell colSpan={isMaestro ? 14 : 13}><Skeleton className="h-4 w-full" /></TableCell></TableRow>)
                                 ) : filteredData.length > 0 ? (
                                     filteredData.map((item) => (
                                     <TableRow key={item.key}>
@@ -618,6 +636,7 @@ export default function OtherFruitKardexReportPage() {
                                         <TableCell className="font-mono">{item.clientLotId || '-'}</TableCell>
                                         <TableCell>{item.productCode}</TableCell>
                                         <TableCell>{item.productName}</TableCell>
+                                        <TableCell>{item.variety || '-'}</TableCell>
                                         <TableCell>{item.fruitType || '-'}</TableCell>
                                         <TableCell className={item.quantity > 0 ? 'text-green-600' : 'text-red-600'}>
                                             {item.quantity} {item.unit}

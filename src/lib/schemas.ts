@@ -175,6 +175,7 @@ export const otherFruitReceptionItemSchema = z.object({
     productName: z.string().min(1, "El nombre es obligatorio."),
     quantity: z.coerce.number().min(1, "La cantidad debe ser al menos 1."),
     fruitType: z.enum(['Convencional', 'Organico']).optional(),
+    variety: z.string().optional(),
     observation: z.string().optional(),
 });
 

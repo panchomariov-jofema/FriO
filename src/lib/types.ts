@@ -342,6 +342,7 @@ export interface OtherFruitReceptionItem {
     productName: string;
     quantity: number;
     fruitType?: FruitType;
+    variety?: string;
     observation?: string;
     status: 'Pendiente de recibir' | 'Recibido' | 'Pendiente de almacenar' | 'Almacenado' | 'Despachado' | 'No Recepcionado';
     storageLocation?: {
@@ -397,6 +398,7 @@ export interface OtherFruitMovementLocation {
   productCode: string;
   productName: string;
   fruitType?: FruitType;
+  variety?: string;
   clientLotId?: string;
   location: {
     chamberId: string;
@@ -419,6 +421,7 @@ export interface OtherFruitMovement {
     productName: string;
     quantity: number;
     fruitType?: FruitType;
+    variety?: string;
     observation?: string;
     clientLotId?: string;
   }[];
@@ -510,6 +513,8 @@ export type StoredItem = {
   storedAt?: any;
   productCode?: string;
   productName?: string;
+  variety?: string;
+  fruitType?: string;
 }
 
 export interface BusinessEntity {

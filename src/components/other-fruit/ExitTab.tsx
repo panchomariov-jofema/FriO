@@ -41,6 +41,7 @@ interface AggregatedLot {
     quantity: number;
     observation?: string;
     fruitType?: string;
+    variety?: string;
     productName: string;
     productCode: string;
     clientLotId?: string;
@@ -209,6 +210,7 @@ export function OtherFruitExitTab({ clientId: fixedClientId }: { clientId?: stri
             quantity: availableQty,
             observation: item.observation,
             fruitType: item.fruitType,
+            variety: item.variety,
             productName: item.productName,
             productCode: item.productCode,
             clientLotId: item.clientLotId,
@@ -584,6 +586,7 @@ export function OtherFruitExitTab({ clientId: fixedClientId }: { clientId?: stri
                     productName: string;
                     quantity: number;
                     fruitType?: any;
+                    variety?: string;
                     observation?: string;
                     clientLotId?: string;
                 } = {
@@ -594,6 +597,9 @@ export function OtherFruitExitTab({ clientId: fixedClientId }: { clientId?: stri
 
                 if (typeof itemToUpdate.fruitType !== 'undefined') {
                     newItemForMovement.fruitType = itemToUpdate.fruitType;
+                }
+                if (typeof itemToUpdate.variety !== 'undefined') {
+                    newItemForMovement.variety = itemToUpdate.variety;
                 }
                 if (typeof itemToUpdate.observation !== 'undefined') {
                     newItemForMovement.observation = itemToUpdate.observation;
@@ -618,6 +624,9 @@ export function OtherFruitExitTab({ clientId: fixedClientId }: { clientId?: stri
                 };
                 if (itemToUpdate.fruitType) {
                     locationObj.fruitType = itemToUpdate.fruitType;
+                }
+                if (itemToUpdate.variety) {
+                    locationObj.variety = itemToUpdate.variety;
                 }
                 if (itemToUpdate.clientLotId) {
                     locationObj.clientLotId = itemToUpdate.clientLotId;
@@ -1064,7 +1073,7 @@ export function OtherFruitExitTab({ clientId: fixedClientId }: { clientId?: stri
                                                         />
                                                     </TableCell>
                                                     <TableCell className="font-mono">{loc.coordinate}</TableCell>
-                                                    <TableCell>{loc.productName}</TableCell>
+                                                    <TableCell>{loc.productName}{loc.variety ? ` (${loc.variety})` : ''}</TableCell>
                                                     <TableCell className="hidden md:table-cell">{loc.fruitType || '-'}</TableCell>
                                                     <TableCell className="font-mono hidden md:table-cell">{loc.clientLotId || '-'}</TableCell>
                                                     <TableCell className="hidden md:table-cell">{loc.observation || '-'}</TableCell>

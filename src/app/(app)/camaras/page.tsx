@@ -281,7 +281,7 @@ export default function CamarasPage() {
                         ? `${reception.displayLotId || reception.id}-${item.clientLotId}-${item.productName}` 
                         : `${reception.displayLotId || reception.id}-${item.productName}`,
                     ownerName: reception.clientName,
-                    varietyOrProduct: item.productName,
+                    varietyOrProduct: item.variety ? `${item.productName} (${item.variety})` : item.productName,
                     quantity: item.quantity,
                     unit: reception.unit,
                     chamberId: item.storageLocation!.chamberId,
@@ -290,6 +290,8 @@ export default function CamarasPage() {
                     itemIndex: index, // This is now the correct original index
                     netWeightPerBin: 0,
                     clientLotId: item.clientLotId,
+                    variety: item.variety,
+                    fruitType: item.fruitType,
                     observation: item.observation,
                     exporterId: reception.clientId,
                     document: reception.document,

@@ -126,12 +126,15 @@ function ProductSearchSelect({ value, onSelect, products, disabled }: ProductSea
   );
 }
 
+export const CHERRY_VARIETIES = ['SANTINA', 'LAPINS', 'REGINA', 'KORDIA', 'SKEENA', 'SWEETHEART', 'SYLVIA', 'SUNBURST'] as const;
+
 const defaultItem = {
   clientLotId: '',
   productCode: '',
   productName: '',
   quantity: 1,
   fruitType: 'Convencional' as const,
+  variety: '',
   observation: '',
 };
 
@@ -670,6 +673,9 @@ export function OtherFruitReceptionTab({ clientId: fixedClientId }: { clientId?:
         if (!item.fruitType) {
             delete newItem.fruitType;
         }
+        if (!item.variety || item.variety === '' || item.variety === 'N/A') {
+            delete newItem.variety;
+        }
 
         return newItem as OtherFruitReceptionItem;
     });
@@ -1042,7 +1048,7 @@ export function OtherFruitReceptionTab({ clientId: fixedClientId }: { clientId?:
                         control={form.control}
                         name={`items.${index}.productName`}
                         render={({ field: itemField }) => (
-                          <FormItem className={cn("flex flex-col gap-1.5", showClientLot ? "sm:col-span-3" : "sm:col-span-4")}>
+                          <FormItem className={cn("flex flex-col gap-1.5", isOlmue(selectedClient) ? (showClientLot ? "sm:col-span-2" : "sm:col-span-3") : (showClientLot ? "sm:col-span-3" : "sm:col-span-4"))}>
                             <FormLabel>Nombre Producto</FormLabel>
                             <FormControl>
                               <ProductSearchSelect
@@ -1056,6 +1062,31 @@ export function OtherFruitReceptionTab({ clientId: fixedClientId }: { clientId?:
                           </FormItem>
                         )}
                       />
+                      {isOlmue(selectedClient) && (
+                        <FormField
+                          control={form.control}
+                          name={`items.${index}.variety`}
+                          render={({ field }) => (
+                            <FormItem className="sm:col-span-2">
+                              <FormLabel>Variedad</FormLabel>
+                              <Select onValueChange={field.onChange} value={field.value || ''} disabled={!selectedClient}>
+                                <FormControl>
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Variedad..." />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  <SelectItem value="N/A">Sin Variedad</SelectItem>
+                                  {CHERRY_VARIETIES.map(v => (
+                                    <SelectItem key={v} value={v}>{v}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      )}
                       <FormField
                         control={form.control}
                         name={`items.${index}.quantity`}
@@ -1071,7 +1102,7 @@ export function OtherFruitReceptionTab({ clientId: fixedClientId }: { clientId?:
                         control={form.control}
                         name={`items.${index}.fruitType`}
                         render={({ field }) => (
-                          <FormItem className={showClientLot ? "sm:col-span-2" : "sm:col-span-3"}>
+                          <FormItem className={isOlmue(selectedClient) ? "sm:col-span-2" : (showClientLot ? "sm:col-span-2" : "sm:col-span-3")}>
                             <FormLabel>Tipo Fruta</FormLabel>
                             <Select onValueChange={field.onChange} value={field.value || 'Convencional'} disabled={!selectedClient}>
                               <FormControl>
@@ -1092,7 +1123,7 @@ export function OtherFruitReceptionTab({ clientId: fixedClientId }: { clientId?:
                         control={form.control}
                         name={`items.${index}.observation`}
                         render={({ field }) => (
-                          <FormItem className="sm:col-span-3">
+                          <FormItem className={isOlmue(selectedClient) ? (showClientLot ? "sm:col-span-2" : "sm:col-span-3") : "sm:col-span-3"}>
                             <FormLabel>Observación</FormLabel>
                             <FormControl>
                               <Input

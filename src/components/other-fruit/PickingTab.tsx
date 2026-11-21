@@ -163,7 +163,7 @@ export function OtherFruitPickingTab() {
       const qrsString = validBinsInThisLoc.map(b => `${b.containerId} (${b.palletId || 'Suelto'})`).join('\n') || 'N/A';
       
       return [
-        loc.productName,
+        loc.productName + (loc.variety ? ` (${loc.variety})` : ''),
         loc.clientLotId || 'N/A',
         `${loc.location.chamberId} / ${loc.location.coordinate}`,
         loc.quantity,

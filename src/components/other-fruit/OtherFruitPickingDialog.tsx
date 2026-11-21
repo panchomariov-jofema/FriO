@@ -334,12 +334,13 @@ export function OtherFruitPickingDialog({
     
     // Recalculate summary items based on what was actually picked
     const summaryItems = newLocations.reduce((acc, loc) => {
-      const key = `${loc.productCode}_${loc.fruitType || ''}`;
+      const key = `${loc.productCode}_${loc.fruitType || ''}_${loc.variety || ''}`;
       if (!acc[key]) {
           acc[key] = {
               productCode: loc.productCode,
               productName: loc.productName,
               fruitType: loc.fruitType,
+              variety: loc.variety,
               quantity: 0,
               clientLotIds: new Set<string>(),
           };
@@ -349,7 +350,7 @@ export function OtherFruitPickingDialog({
           acc[key].clientLotIds.add(loc.clientLotId);
       }
       return acc;
-    }, {} as Record<string, { productCode: string; productName: string; fruitType?: string; quantity: number; clientLotIds: Set<string> }>);
+    }, {} as Record<string, { productCode: string; productName: string; fruitType?: string; variety?: string; quantity: number; clientLotIds: Set<string> }>);
     
     newMovement.items = Object.values(summaryItems).map(summary => {
         const item: any = {
@@ -359,6 +360,9 @@ export function OtherFruitPickingDialog({
         };
         if (summary.fruitType) {
             item.fruitType = summary.fruitType;
+        }
+        if (summary.variety) {
+            item.variety = summary.variety;
         }
         const clientLotIds = Array.from(summary.clientLotIds).join(', ');
         if (clientLotIds) {
@@ -536,7 +540,9 @@ export function OtherFruitPickingDialog({
                          )}
                       </TableCell>
                       <TableCell className="px-2 py-3">
-                          <div className="font-semibold text-sm leading-tight">{item.productName}</div>
+                          <div className="font-semibold text-sm leading-tight">
+                            {item.productName}{item.variety ? ` (${item.variety})` : ''}
+                          </div>
                           <div className="text-xs text-muted-foreground font-mono mt-0.5">{item.clientLotId || 'N/A'}</div>
                       </TableCell>
                       <TableCell className="font-mono text-sm px-2">{item.location.chamberId}<br/>{item.location.coordinate}</TableCell>

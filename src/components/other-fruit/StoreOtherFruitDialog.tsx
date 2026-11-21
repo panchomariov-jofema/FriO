@@ -16,7 +16,7 @@ import { chambersConfig } from '@/lib/chambers-config';
 import { useToast } from '@/hooks/use-toast';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
 import { getSortedCoordinates, getPairedCoordinates, safeToMillis, getEffectiveChamberConfig, cn, naturalSort } from '@/lib/utils';
-import { isFallCreek, isVitafood, binsPerUnit } from '@/lib/clients';
+import { isFallCreek, isVitafood, isOlmue, binsPerUnit } from '@/lib/clients';
 import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
 import { Zap, Warehouse as WarehouseIcon, Snowflake } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -208,7 +208,7 @@ export function StoreOtherFruitDialog({
     const isChamberColsPQREnabled = selectedChamberId === 'CAMARA-5' && !!chamberSettings?.find(s => s.id === selectedChamberId)?.colsPQREnabled;
     const chamberConfig = getEffectiveChamberConfig(rawChamberConfig, isChamberRow13Enabled, isChamberColsKLEnabled, isChamberColsPQREnabled);
 
-    const occupancyMap = new Map<string, { lots: {displayLotId: string, binCount: number, clientId: string, clientName?: string, productCode?: string, productName?: string, unit?: string }[] }>();
+    const occupancyMap = new Map<string, { lots: {displayLotId: string, binCount: number, clientId: string, clientName?: string, productCode?: string, productName?: string, variety?: string, unit?: string }[] }>();
     let lastCoordInChamber: string | null = null;
     let latestTimestamp = 0;
     
@@ -223,6 +223,7 @@ export function StoreOtherFruitDialog({
             binCount: lot.binCount,
             clientId: lot.exporterId,
             productName: lot.variety,
+            variety: lot.variety,
             unit: 'Bins'
           });
 
@@ -256,6 +257,7 @@ export function StoreOtherFruitDialog({
                      clientName: reception.clientName,
                      productCode: storedItem.productCode,
                      productName: storedItem.productName,
+                     variety: storedItem.variety,
                      unit: reception.unit
                    });
                 }
@@ -351,6 +353,11 @@ export function StoreOtherFruitDialog({
                 const incomingVariety = (item.productName || '').trim().toUpperCase();
                 return targetVariety && incomingVariety ? targetVariety !== incomingVariety : false;
             }
+            if (isOlmue(item)) {
+                const targetVar = (l.variety || '').trim().toUpperCase();
+                const incomingVar = (item.variety || '').trim().toUpperCase();
+                if (targetVar && incomingVar && targetVar !== incomingVar) return true;
+            }
             if (!l.productCode) return true;
             return l.productCode !== item.productCode;
         });
@@ -380,6 +387,11 @@ export function StoreOtherFruitDialog({
                 const targetVariety = (l.productName || '').trim().toUpperCase();
                 const incomingVariety = (item.productName || '').trim().toUpperCase();
                 return targetVariety && incomingVariety ? targetVariety !== incomingVariety : false;
+            }
+            if (isOlmue(item)) {
+                const targetVar = (l.variety || '').trim().toUpperCase();
+                const incomingVar = (item.variety || '').trim().toUpperCase();
+                if (targetVar && incomingVar && targetVar !== incomingVar) return true;
             }
             if (!l.productCode) return true;
             return l.productCode !== item.productCode;
@@ -548,6 +560,16 @@ export function StoreOtherFruitDialog({
                 <Badge variant="outline" className="font-mono text-primary border-primary/30">
                   {item.unit === 'Bins' ? 'BIN' : 'PALLET'}: {item.palletId || item.containerId || item.productCode}
                 </Badge>
+                {item.variety && (
+                  <Badge variant="secondary" className="font-bold">
+                    {item.variety}
+                  </Badge>
+                )}
+                {item.fruitType && (
+                  <Badge variant="outline" className="text-xs">
+                    {item.fruitType}
+                  </Badge>
+                )}
                 <span className="text-muted-foreground">•</span>
                 <span className="font-medium text-foreground">{item.quantity} {item.unit}</span>
               </div>

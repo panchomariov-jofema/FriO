@@ -30,6 +30,7 @@ interface StoredOtherFruitItem {
     containerId?: string;
     clientLotId?: string;
     fruitType?: string;
+    variety?: string;
     document?: string;
     storedAt?: any;
 }
@@ -60,6 +61,7 @@ export function StockAndRelocationTab({ clientId: fixedClientId }: { clientId?: 
                     containerId: item.containerId,
                     clientLotId: item.clientLotId,
                     fruitType: item.fruitType,
+                    variety: item.variety,
                     document: reception.document,
                     storedAt: item.storedAt || reception.createdAt,
                 } as StoredOtherFruitItem))
@@ -78,6 +80,7 @@ export function StockAndRelocationTab({ clientId: fixedClientId }: { clientId?: 
         const clientStr = String(item.clientName || '').toLowerCase();
         const prodStr = String(item.productName || '').toLowerCase();
         const fruitTypeStr = String(item.fruitType || '').toLowerCase();
+        const varietyStr = String(item.variety || '').toLowerCase();
         const chamberStr = String(chambersConfig[item.location.chamberId]?.name || item.location.chamberId).toLowerCase();
         const coordStr = String(item.location.coordinate || '').toLowerCase();
 
@@ -88,6 +91,7 @@ export function StockAndRelocationTab({ clientId: fixedClientId }: { clientId?: 
                clientStr.includes(q) ||
                prodStr.includes(q) ||
                fruitTypeStr.includes(q) ||
+               varietyStr.includes(q) ||
                chamberStr.includes(q) ||
                coordStr.includes(q);
     });
@@ -212,7 +216,9 @@ export function StockAndRelocationTab({ clientId: fixedClientId }: { clientId?: 
                           {item.containerId || '-'}
                         </TableCell>
                         <TableCell className="font-mono text-xs">{item.clientLotId || '-'}</TableCell>
-                        <TableCell className="text-xs">{item.productName}</TableCell>
+                        <TableCell className="text-xs">
+                          {item.productName}{item.variety ? ` (${item.variety})` : ''}
+                        </TableCell>
                         <TableCell className="text-xs">{item.fruitType || '-'}</TableCell>
                         <TableCell className="text-xs">{chambersConfig[item.location.chamberId]?.name || item.location.chamberId}</TableCell>
                         <TableCell className="font-mono font-bold text-[#004b8d] text-xs">{item.location.coordinate}</TableCell>

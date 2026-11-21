@@ -64,6 +64,7 @@ export default function OtherFruitStockReportPage() {
                     containerId: item.containerId || '-',
                     productCode: item.productCode,
                     productName: item.productName,
+                    variety: item.variety || '-',
                     fruitType: item.fruitType || '-',
                     unit: reception.unit,
                     quantity: item.quantity,
@@ -145,7 +146,7 @@ export default function OtherFruitStockReportPage() {
     }, [filteredData]);
 
     const handleExport = () => {
-        const headers = ["Fecha Recepción", "Cliente", "Documento Entrada", "N° Documento", "Lote", "Pallet ID", "QR Bin", "Codigo Producto", "Nombre Producto", "Tipo Fruta", "Cámara", "Ubicación", "Cantidad", "Unidad", "Usuario"];
+        const headers = ["Fecha Recepción", "Cliente", "Documento Entrada", "N° Documento", "Lote", "Pallet ID", "QR Bin", "Codigo Producto", "Nombre Producto", "Variedad", "Tipo Fruta", "Cámara", "Ubicación", "Cantidad", "Unidad", "Usuario"];
         const dataToExport = filteredData.map(item => {
             let formattedDate = '';
             if (item.receptionDate) {
@@ -164,6 +165,7 @@ export default function OtherFruitStockReportPage() {
                 "QR Bin": item.containerId,
                 "Codigo Producto": item.productCode,
                 "Nombre Producto": item.productName,
+                "Variedad": item.variety,
                 "Tipo Fruta": item.fruitType,
                 "Cámara": item.chamberName,
                 "Ubicación": item.coordinate,
@@ -232,6 +234,7 @@ export default function OtherFruitStockReportPage() {
                                     <TableHead>QR Bin</TableHead>
                                     <TableHead>Cód. Producto</TableHead>
                                     <TableHead>Producto</TableHead>
+                                    <TableHead>Variedad</TableHead>
                                     <TableHead>Tipo Fruta</TableHead>
                                     <TableHead>Cámara</TableHead>
                                     <TableHead>Ubicación</TableHead>
@@ -242,7 +245,7 @@ export default function OtherFruitStockReportPage() {
                             </TableHeader>
                             <TableBody>
                                 {loadingReceptions ? (
-                                    Array.from({ length: 5 }).map((_, i) => <TableRow key={i}><TableCell colSpan={14}><Skeleton className="h-4 w-full" /></TableCell></TableRow>)
+                                    Array.from({ length: 5 }).map((_, i) => <TableRow key={i}><TableCell colSpan={15}><Skeleton className="h-4 w-full" /></TableCell></TableRow>)
                                 ) : filteredData.length > 0 ? (
                                     <>
                                         {filteredData.map(item => (
@@ -267,6 +270,7 @@ export default function OtherFruitStockReportPage() {
                                                 <TableCell className="font-mono text-xs">{item.containerId}</TableCell>
                                                 <TableCell>{item.productCode}</TableCell>
                                                 <TableCell>{item.productName}</TableCell>
+                                                <TableCell>{item.variety}</TableCell>
                                                 <TableCell>{item.fruitType}</TableCell>
                                                 <TableCell className="font-medium">{item.chamberName}</TableCell>
                                                 <TableCell className="font-mono">{item.coordinate}</TableCell>
