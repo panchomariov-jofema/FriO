@@ -153,3 +153,75 @@ export function isExporterSelfMovement(
 
   return false;
 }
+
+export interface ExporterMaterialBinding {
+  bin: { code: string; name: string; type: string };
+  tote: { code: string; name: string; type: string };
+  lamina: { code: string; name: string; type: string };
+}
+
+const DEFAULT_EXPORTER_MATERIAL_CODES: Record<string, { bin: string; tote: string; lamina: string }> = {
+  EXP001: { bin: '10001', tote: '10002', lamina: '10003' },
+  EXP002: { bin: '10007', tote: '10008', lamina: '10009' },
+  EXP003: { bin: '10011', tote: '10012', lamina: '10013' },
+};
+
+/**
+ * Resuelve los códigos y nombres oficiales de Bins, Totes y Láminas/Esponjas para un exportador,
+ * permitiendo que los retornos con fruta registrados en /recepcion se crucen 1 a 1 con las
+ * salidas de /bins-y-materiales en Saldo por Productor y Kardex.
+ */
+export function resolveExporterReceptionMaterialCodes(
+  exporterId: string,
+  allMaterials: BinMaterial[]
+): ExporterMaterialBinding {
+  const matByCode = new Map((allMaterials || []).map((m) => [m.code, m]));
+  const expMaterials = (allMaterials || []).filter((m) => m.exporterId === exporterId);
+  const preset = DEFAULT_EXPORTER_MATERIAL_CODES[exporterId];
+
+  const resolveSlot = (
+    presetCode: string | undefined,
+    predicate: (m: BinMaterial) => boolean,
+    fallbackCode: string,
+    fallbackName: string,
+    fallbackType: string
+  ) => {
+    if (presetCode && matByCode.has(presetCode)) {
+      const m = matByCode.get(presetCode)!;
+      return { code: m.code, name: m.name, type: m.type || fallbackType };
+    }
+    const found = expMaterials.find(predicate);
+    if (found) {
+      return { code: found.code, name: found.name, type: found.type || fallbackType };
+    }
+    return { code: presetCode || fallbackCode, name: fallbackName, type: fallbackType };
+  };
+
+  return {
+    bin: resolveSlot(
+      preset?.bin,
+      (m) => isBinMaterialItem(m),
+      'REC-BINS',
+      'BINS',
+      'BINS'
+    ),
+    tote: resolveSlot(
+      preset?.tote,
+      (m) => m.name?.toUpperCase().includes('TOTE') || m.type?.toUpperCase().includes('TOTE'),
+      'REC-TOTES',
+      'TOTES',
+      'TOTES'
+    ),
+    lamina: resolveSlot(
+      preset?.lamina,
+      (m) =>
+        m.name?.toUpperCase().includes('LAMINA') ||
+        m.name?.toUpperCase().includes('ESPONJA') ||
+        m.type?.toUpperCase().includes('LAMINA'),
+      'REC-LAMINA',
+      'LAMINA',
+      'material'
+    ),
+  };
+}
+

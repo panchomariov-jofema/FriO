@@ -11,12 +11,10 @@ Clientes: exportadoras (`exporters`) con sus productores (`producers`). Unidad: 
 - "Despacho directo" exportador→productor: movimiento con `noAffectStock: true`.
 - Stock = suma de movimientos (+ arriendos desde FÑO + efectos de recepción/despacho de fruta). Admin (email hardcode) puede importar saldos y limpiar historial.
 
-## 2. Recepción (`/recepcion`)
-Componentes: `LotCreationForm` → `LotList` → `WeightCalculator` → `TemperatureForm` (`EditLotDialog` para correcciones).
-- Crea `receptionLots` (`displayLotId`, guía, variedad, bins, totes).
-- Pesaje: pesos parciales; neto = total − tara bin **65 kg** − ajuste totes. Al guardar peso se crea el `hidrocoolerLots` correspondiente (batch).
-- T° Pre-Hidro y Post-Hidro; con Post-Hidro el lote queda `Cerrado`.
-- Variedades: `Variety` en `types.ts` (SANTINA, LAPINS, REGINA, KORDIA, SKEENA, SWEETHEART, SYLVIA, SUNBURST).
+## 2. Recepción (`/recepcion`) — Modo Bypass Retorno de Bins y Materiales con Fruta
+Componentes: `recepcion/page.tsx` (`ProducerCombobox` predictivo) → `LotList` → `EditLotDialog`.
+- Crea `receptionLots` (`displayLotId`, guía, `binCount`, `toteCount` sugerido x24, `laminaCount` sugerido x1, `emptyTotes`). El campo `variety` está oculto del frontend (opcional en esquema).
+- **Cruce 1 a 1 en reportería (`resolveExporterReceptionMaterialCodes`):** Los bins, totes (+ totes vacíos) y láminas recepcionados con fruta descuentan de inmediato y de forma individual la deuda del productor en `Saldo por Productor` (`/reportes/saldo-por-productor`) sobre los mismos códigos de material del exportador (`10001`/`10002`/`10003` en Subsole, `10007`/`10008`/`10009` en Meyer, `10011`/`10012`/`10013` en Blossom) y se reflejan en el `Kardex` (`/reportes/kardex-bins-materiales`) con `noAffectStock: true` (no suman al stock de bins vacíos disponibles en planta hasta que regresen vacíos desde el Packing en `/bins-y-materiales → Entradas`).
 
 ## 3. Hidrocooler (`/hidrocooler`)
 - Toma `hidrocoolerLots` y los divide en cargas `processingLots` por hidrocooler (capacidad en `hidrocoolers`).

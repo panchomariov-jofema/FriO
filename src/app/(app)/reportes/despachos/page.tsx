@@ -72,7 +72,7 @@ export default function DispatchReportPage() {
                 const receptionLot = receptionLotMap[bin.displayLotId];
                 if (receptionLot) {
                     producersInDispatch.add(producerMap[receptionLot.producerId] || receptionLot.producerId);
-                    varietiesInDispatch.add(receptionLot.variety);
+                    if (receptionLot.variety) varietiesInDispatch.add(receptionLot.variety);
                 }
             });
 

@@ -115,31 +115,14 @@ export function LotCreationForm({ exporterId, producerId, open, onOpenChange, on
                 <FormField control={form.control} name="document" render={({ field }) => (
                   <FormItem><FormLabel>Documento</FormLabel><FormControl><Input {...field} value={field.value || ''} autoComplete="off" /></FormControl><FormMessage /></FormItem>
                 )} />
-                <FormField
-                  control={form.control}
-                  name="variety"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Variedad</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Seleccione una variedad" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {varieties.map(v => <SelectItem key={v} value={v}>{v}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
                 <FormField control={form.control} name="binCount" render={({ field }) => (
                   <FormItem><FormLabel>Cantidad de Bins</FormLabel><FormControl><Input type="number" {...field} value={field.value || 0} autoComplete="off" /></FormControl><FormMessage /></FormItem>
                 )} />
                 <FormField control={form.control} name="toteCount" render={({ field }) => (
                   <FormItem><FormLabel>Cantidad de Totes</FormLabel><FormControl><Input type="number" {...field} value={field.value || 0} autoComplete="off" /></FormControl><FormMessage /></FormItem>
+                )} />
+                <FormField control={form.control} name="laminaCount" render={({ field }) => (
+                  <FormItem><FormLabel>Cantidad de Láminas</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? 0} autoComplete="off" /></FormControl><FormMessage /></FormItem>
                 )} />
                 <FormField control={form.control} name="emptyTotes" render={({ field }) => (
                   <FormItem><FormLabel>Totes Vacíos (Opcional)</FormLabel><FormControl><Input type="number" {...field} value={field.value || 0} autoComplete="off" /></FormControl><FormMessage /></FormItem>

@@ -7,7 +7,7 @@ import type { BinMaterialMovement, Exporter, Producer, BinMaterial, ReceptionLot
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ReportHeader } from '@/components/reports/ReportHeader';
-import { isBinMaterialItem, isExporterSelfMovement } from '@/lib/bins-rental-utils';
+import { isBinMaterialItem, isExporterSelfMovement, resolveExporterReceptionMaterialCodes } from '@/lib/bins-rental-utils';
 import {
     Accordion,
     AccordionContent,
@@ -159,7 +159,7 @@ export default function ProducerBalanceReportPage() {
             });
         });
 
-        // Descontar del saldo general del productor los Bins y Totes ingresados con fruta en Recepción (/recepcion)
+        // Cruzar 1 a 1 los retornos con fruta registrados en Recepción (/recepcion) con los códigos de material del exportador
         (receptionLots || []).forEach(lot => {
             if (!lot.exporterId || !activeExporterIds.has(lot.exporterId)) return;
             const matchingProd = findProducer(lot.producerId);
@@ -168,40 +168,33 @@ export default function ProducerBalanceReportPage() {
             const effectiveProducerId = matchingProd ? matchingProd.producerId : lot.producerId;
             const effectiveProducerName = matchingProd ? (matchingProd.shortName || matchingProd.name) : (producerMap.get(lot.producerId) || lot.producerId);
             const expName = exporterMap.get(lot.exporterId) || lot.exporterId;
+            const binding = resolveExporterReceptionMaterialCodes(lot.exporterId, allMaterials);
+
+            const addReceptionEntry = (slot: { code: string; name: string; type: string }, qty: number) => {
+                if (qty <= 0) return;
+                const key = `${lot.exporterId}_${effectiveProducerId}_${slot.code}`;
+                if (!aggregation[key]) {
+                    aggregation[key] = {
+                        exporterName: expName,
+                        producerName: effectiveProducerName,
+                        materialName: slot.name,
+                        materialCode: slot.code,
+                        materialType: slot.type,
+                        entradas: 0,
+                        salidas: 0,
+                    };
+                }
+                aggregation[key].entradas += qty;
+            };
 
             const binCount = Number(lot.binCount) || 0;
-            if (binCount > 0) {
-                const binKey = `${lot.exporterId}_${effectiveProducerId}_REC_FRUTA_BINS`;
-                if (!aggregation[binKey]) {
-                    aggregation[binKey] = {
-                        exporterName: expName,
-                        producerName: effectiveProducerName,
-                        materialName: 'Retorno Bins con Fruta (Recepción)',
-                        materialCode: 'REC-FRUTA',
-                        materialType: 'BINS',
-                        entradas: 0,
-                        salidas: 0,
-                    };
-                }
-                aggregation[binKey].entradas += binCount;
-            }
+            addReceptionEntry(binding.bin, binCount);
 
-            const toteCount = Number(lot.toteCount) || 0;
-            if (toteCount > 0) {
-                const toteKey = `${lot.exporterId}_${effectiveProducerId}_REC_FRUTA_TOTES`;
-                if (!aggregation[toteKey]) {
-                    aggregation[toteKey] = {
-                        exporterName: expName,
-                        producerName: effectiveProducerName,
-                        materialName: 'Retorno Totes con Fruta (Recepción)',
-                        materialCode: 'REC-TOTES',
-                        materialType: 'TOTES',
-                        entradas: 0,
-                        salidas: 0,
-                    };
-                }
-                aggregation[toteKey].entradas += toteCount;
-            }
+            const toteCount = (Number(lot.toteCount) || 0) + (Number(lot.emptyTotes) || 0);
+            addReceptionEntry(binding.tote, toteCount);
+
+            const laminaCount = lot.laminaCount !== undefined ? (Number(lot.laminaCount) || 0) : 0;
+            addReceptionEntry(binding.lamina, laminaCount);
         });
 
         return Object.values(aggregation)

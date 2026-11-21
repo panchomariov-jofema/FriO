@@ -7,7 +7,7 @@ import { z } from 'zod';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useFirestoreCollection } from '@/hooks/use-firestore-collection';
-import type { Exporter, Variety, Producer, ReceptionLot } from '@/lib/types';
+import type { Exporter, Producer, ReceptionLot } from '@/lib/types';
 import { Label } from '@/components/ui/label';
 import { LotList } from '@/components/reception/LotList';
 import { useProducersByExporter } from '@/hooks/use-producers-by-exporter';
@@ -16,12 +16,11 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { receptionLotSchema } from '@/lib/schemas';
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
-import { useFirestore } from '@/firebase';
+import { useFirestore, useUser } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
-
-const varieties: Variety[] = ['SANTINA', 'LAPINS', 'REGINA', 'KORDIA', 'SKEENA', 'SWEETHEART', 'SYLVIA', 'SUNBURST'];
+import { ProducerCombobox } from '@/components/bins-materials/ProducerCombobox';
 
 type LotFormValues = z.infer<typeof receptionLotSchema>;
 
@@ -35,6 +34,7 @@ export default function RecepcionPage() {
 
   const { data: producers, loading: loadingProducers } = useProducersByExporter(selectedExporter);
   const firestore = useFirestore();
+  const { user } = useUser();
   const { toast } = useToast();
 
   const form = useForm<LotFormValues>({
@@ -44,17 +44,23 @@ export default function RecepcionPage() {
       variety: undefined,
       binCount: 0,
       toteCount: 0,
+      laminaCount: 0,
       emptyTotes: 0,
       noTotes: 0,
     },
   });
 
   const binCount = form.watch('binCount');
+  const selectedProducerId = form.watch('producerId');
   const isFormSubmitting = form.formState.isSubmitting;
   
   React.useEffect(() => {
+    const numericBins = Number(binCount) || 0;
     if (!form.formState.dirtyFields.toteCount) {
-      form.setValue('toteCount', binCount * 24);
+      form.setValue('toteCount', numericBins * 24);
+    }
+    if (!form.formState.dirtyFields.laminaCount) {
+      form.setValue('laminaCount', numericBins * 1);
     }
   }, [binCount, form]);
 
@@ -70,8 +76,8 @@ export default function RecepcionPage() {
   }, [exporters, loadingExporters, selectedExporter, form]);
 
   const onSubmit = (values: LotFormValues) => {
-    const selectedProducerId = form.getValues('producerId');
-    if (!selectedExporter || !selectedProducerId) {
+    const currentProducerId = form.getValues('producerId');
+    if (!selectedExporter || !currentProducerId) {
         toast({
             variant: 'destructive',
             title: 'Error de validación',
@@ -80,7 +86,7 @@ export default function RecepcionPage() {
         return;
     }
     
-    const producer = producers.find(p => p.producerId === selectedProducerId);
+    const producer = producers.find(p => p.producerId === currentProducerId || p.id === currentProducerId);
     if (!producer) {
         toast({ variant: 'destructive', title: 'Error', description: 'No se pudo encontrar el productor seleccionado o está inactivo.' });
         return;
@@ -99,30 +105,37 @@ export default function RecepcionPage() {
       : 0;
 
     const lotData: Partial<ReceptionLot> = {
-      ...values,
+      document: values.document,
       displayLotId,
       exporterId: selectedExporter,
-      producerId: selectedProducerId,
+      producerId: producer.producerId,
+      binCount: Number(values.binCount) || 0,
+      toteCount: Number(values.toteCount) || 0,
+      laminaCount: Number(values.laminaCount) || 0,
+      emptyTotes: Number(values.emptyTotes) || 0,
+      noTotes: Number(values.noTotes) || 0,
       status: 'Pendiente de Peso' as const,
       createdAt: serverTimestamp() as any,
       netWeightPerBin: netWeightPerBin > 0 ? netWeightPerBin : 0,
+      userId: user?.uid || '',
+      userName: user?.email || user?.displayName || 'Sistema',
     };
 
     const collRef = collection(firestore, 'receptionLots');
     addDoc(collRef, lotData)
       .then(() => {
-        toast({ title: 'Éxito', description: `Lote ${displayLotId} creado correctamente.` });
+        toast({ title: 'Éxito', description: `Recepción ${displayLotId} registrada correctamente.` });
         form.reset({
           document: '',
           variety: undefined,
           binCount: 0,
           toteCount: 0,
+          laminaCount: 0,
           emptyTotes: 0,
           noTotes: 0,
+          exporterId: selectedExporter,
+          producerId: currentProducerId,
         });
-        // Keep exporter and producer selected
-        form.setValue('exporterId', selectedExporter);
-        form.setValue('producerId', selectedProducerId);
       })
       .catch((error) => {
         console.error("Error creating lot: ", error);
@@ -146,21 +159,21 @@ export default function RecepcionPage() {
     <div className="space-y-4">
       <Card>
         <CardHeader>
-          <CardTitle>Crear Lote de Recepción</CardTitle>
-          <CardDescription>Complete los datos para registrar un nuevo lote de fruta.</CardDescription>
+          <CardTitle>Registrar Recepción (Retorno con Fruta)</CardTitle>
+          <CardDescription>Complete los datos para registrar el retorno de bins, totes y láminas con fruta del productor.</CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 md:max-w-none max-w-lg">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2 md:col-span-2">
+                <div className="space-y-2">
                   <Label htmlFor="exporter-select">Exportador</Label>
                   <Select
                     value={selectedExporter ?? ''}
                     onValueChange={(value) => {
                         setSelectedExporter(value);
                         form.setValue('exporterId', value);
-                        form.reset({ ...form.getValues(), producerId: undefined });
+                        form.setValue('producerId', '');
                     }}
                     disabled={loadingExporters}
                   >
@@ -177,54 +190,40 @@ export default function RecepcionPage() {
                   </Select>
                 </div>
                 <FormField control={form.control} name="producerId" render={({ field }) => (
-                    <FormItem className="md:col-span-2">
+                    <FormItem>
                         <FormLabel>Productor</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value} disabled={!selectedExporter || loadingProducers}>
-                            <FormControl>
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Seleccione un productor..." />
-                                </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                                {producers.map(p => (
-                                <SelectItem key={p.id} value={p.producerId}>
-                                    {p.shortName}
-                                </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
+                        <FormControl>
+                            <ProducerCombobox
+                                producers={producers}
+                                value={field.value || null}
+                                onSelect={(val) => field.onChange(val)}
+                                disabled={!selectedExporter || loadingProducers}
+                                loading={loadingProducers}
+                                hasExporterSelected={!!selectedExporter}
+                            />
+                        </FormControl>
                         <FormMessage />
                     </FormItem>
                 )} />
                 <FormField control={form.control} name="document" render={({ field }) => (
-                  <FormItem><FormLabel>Documento</FormLabel><FormControl><Input {...field} value={field.value || ''} autoComplete="off" inputMode="numeric" /></FormControl><FormMessage /></FormItem>
-                )} />
-                <FormField control={form.control} name="variety" render={({ field }) => (
-                    <FormItem>
-                        <FormLabel>Variedad</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
-                            <FormControl><SelectTrigger><SelectValue placeholder="Seleccione una variedad" /></SelectTrigger></FormControl>
-                            <SelectContent>{varieties.map(v => <SelectItem key={v} value={v}>{v}</SelectItem>)}</SelectContent>
-                        </Select>
-                        <FormMessage />
-                    </FormItem>
+                  <FormItem className="md:col-span-2"><FormLabel>N° Guía / Documento</FormLabel><FormControl><Input {...field} value={field.value || ''} placeholder="Ej: 1234" autoComplete="off" inputMode="numeric" /></FormControl><FormMessage /></FormItem>
                 )} />
                 <FormField control={form.control} name="binCount" render={({ field }) => (
                   <FormItem><FormLabel>Cantidad de Bins</FormLabel><FormControl><Input type="number" {...field} value={field.value || ''} autoComplete="off" inputMode="numeric" /></FormControl><FormMessage /></FormItem>
                 )} />
                 <FormField control={form.control} name="toteCount" render={({ field }) => (
-                  <FormItem><FormLabel>Cantidad de Totes</FormLabel><FormControl><Input type="number" {...field} value={field.value || ''} autoComplete="off" inputMode="numeric" /></FormControl><FormMessage /></FormItem>
+                  <FormItem><FormLabel>Cantidad de Totes (x24)</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''} autoComplete="off" inputMode="numeric" /></FormControl><FormMessage /></FormItem>
+                )} />
+                <FormField control={form.control} name="laminaCount" render={({ field }) => (
+                  <FormItem><FormLabel>Cantidad de Láminas (x1)</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''} autoComplete="off" inputMode="numeric" /></FormControl><FormMessage /></FormItem>
                 )} />
                 <FormField control={form.control} name="emptyTotes" render={({ field }) => (
-                  <FormItem><FormLabel>Totes Vacíos (Opcional)</FormLabel><FormControl><Input type="number" {...field} value={field.value || ''} autoComplete="off" inputMode="numeric" /></FormControl><FormMessage /></FormItem>
-                )} />
-                 <FormField control={form.control} name="noTotes" render={({ field }) => (
-                  <FormItem><FormLabel>Sin Totes (Opcional)</FormLabel><FormControl><Input type="number" {...field} value={field.value || ''} autoComplete="off" inputMode="numeric" /></FormControl><FormMessage /></FormItem>
+                  <FormItem><FormLabel>Totes Vacíos Adicionales (Opcional)</FormLabel><FormControl><Input type="number" {...field} value={field.value || ''} autoComplete="off" inputMode="numeric" /></FormControl><FormMessage /></FormItem>
                 )} />
               </div>
               <div className="flex justify-start md:justify-end">
-                <Button type="submit" disabled={isFormSubmitting || !selectedExporter || !form.getValues('producerId')}>
-                  {isFormSubmitting ? 'Guardando...' : 'Crear Lote'}
+                <Button type="submit" disabled={isFormSubmitting || !selectedExporter || !selectedProducerId}>
+                  {isFormSubmitting ? 'Guardando...' : 'Registrar Recepción'}
                 </Button>
               </div>
             </form>

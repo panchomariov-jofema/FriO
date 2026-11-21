@@ -211,9 +211,10 @@ export interface ReceptionLot {
     exporterId: string;
     producerId: string;
     document: string;
-    variety: Variety;
+    variety?: Variety;
     binCount: number;
     toteCount: number;
+    laminaCount?: number;
     emptyTotes?: number;
     noTotes?: number;
     status: 'Pendiente de Peso' | 'Pendiente de Pre-Hidro' | 'Pendiente de Post-Hidro' | 'Cerrado';

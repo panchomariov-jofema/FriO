@@ -1,21 +1,17 @@
 'use client';
 
 import * as React from 'react';
-import { collection, query, where, onSnapshot, Query } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, Query, doc, deleteDoc } from 'firebase/firestore';
 import { useFirestore } from '@/firebase';
 import type { ReceptionLot } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '../ui/button';
-import { WeightCalculator } from './WeightCalculator';
-import { TemperatureForm } from './TemperatureForm';
-import { Checkbox } from '../ui/checkbox';
-import { Label } from '../ui/label';
 import { EditLotDialog } from './EditLotDialog';
-import { safeToMillis, safeFormatQuantity } from '@/lib/utils';
-import { Pencil } from 'lucide-react';
+import { safeToMillis, safeFormatDate } from '@/lib/utils';
+import { Pencil, Trash2 } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 
 interface LotListProps {
   exporterId: string | null;
@@ -23,12 +19,10 @@ interface LotListProps {
 
 export function LotList({ exporterId }: LotListProps) {
   const firestore = useFirestore();
+  const { toast } = useToast();
   const [lots, setLots] = React.useState<ReceptionLot[]>([]);
   const [loading, setLoading] = React.useState(true);
-  const [showOnlyOpen, setShowOnlyOpen] = React.useState(true);
   
-  const [isWeightOpen, setWeightOpen] = React.useState(false);
-  const [isTempOpen, setTempOpen] = React.useState(false);
   const [isEditOpen, setEditOpen] = React.useState(false);
   const [selectedLot, setSelectedLot] = React.useState<ReceptionLot | null>(null);
 
@@ -63,95 +57,46 @@ export function LotList({ exporterId }: LotListProps) {
 
     return () => unsubscribe();
   }, [firestore, exporterId]);
-  
-  const handleActionClick = (lot: ReceptionLot) => {
-    setSelectedLot(lot);
-    if (lot.status === 'Pendiente de Peso') {
-      setWeightOpen(true);
-    } else if (['Pendiente de Pre-Hidro', 'Pendiente de Post-Hidro'].includes(lot.status)) {
-      setTempOpen(true);
-    }
-  };
 
   const handleEditClick = (lot: ReceptionLot) => {
     setSelectedLot(lot);
     setEditOpen(true);
-  }
+  };
 
-  const closeDialogs = () => {
-    setWeightOpen(false);
-    setTempOpen(false);
-    setEditOpen(false);
-    setSelectedLot(null);
-  }
-
-  const getStatusVariant = (status: ReceptionLot['status']) => {
-    switch (status) {
-      case 'Pendiente de Peso': return 'destructive';
-      case 'Pendiente de Pre-Hidro': return 'secondary';
-      case 'Pendiente de Post-Hidro': return 'outline';
-      case 'Cerrado': return 'default';
-      default: return 'default';
+  const handleDeleteClick = async (lot: ReceptionLot) => {
+    if (!firestore) return;
+    if (!window.confirm(`¿Eliminar el registro ${lot.displayLotId || lot.document}?`)) return;
+    try {
+      await deleteDoc(doc(firestore, 'receptionLots', lot.id));
+      toast({ title: 'Eliminado', description: `Registro ${lot.displayLotId || lot.document} eliminado.` });
+    } catch (error: any) {
+      toast({ variant: 'destructive', title: 'Error', description: 'No se pudo eliminar el registro.' });
     }
   };
 
-  const filteredLots = showOnlyOpen ? lots.filter(lot => lot.status !== 'Cerrado') : lots;
-
-  const renderCellContent = (lot: ReceptionLot, field: 'totalWeight' | 'preHydroTemp' | 'postHydroTemp') => {
-    const status = lot.status;
-
-    if (field === 'totalWeight') {
-        if (status === 'Pendiente de Peso') {
-            return <Button size="sm" variant="outline" onClick={() => handleActionClick(lot)}>Pesar</Button>;
-        }
-        return lot.totalWeight ? `${safeFormatQuantity(lot.totalWeight, 2)} kg` : '-';
-    }
-    
-    if (field === 'preHydroTemp') {
-        if (status === 'Pendiente de Pre-Hidro') {
-            return <Button size="sm" variant="outline" onClick={() => handleActionClick(lot)}>Registrar T°</Button>;
-        }
-        return lot.preHydroTemp ? `${safeFormatQuantity(lot.preHydroTemp, 1)} °C` : '-';
-    }
-
-    if (field === 'postHydroTemp') {
-        if (status === 'Pendiente de Post-Hidro') {
-            return <Button size="sm" variant="outline" onClick={() => handleActionClick(lot)}>Registrar T°</Button>;
-        }
-        return lot.postHydroTemp ? `${safeFormatQuantity(lot.postHydroTemp, 1)} °C` : '-';
-    }
-  }
-
+  const closeDialogs = () => {
+    setEditOpen(false);
+    setSelectedLot(null);
+  };
 
   return (
     <>
       <Card>
         <CardHeader>
-          <div className="flex justify-between items-center">
-            <div>
-              <CardTitle>Lotes en Recepción</CardTitle>
-              <CardDescription>Lotes activos para la selección actual.</CardDescription>
-            </div>
-            <div className="flex items-center space-x-2">
-              <Checkbox id="show-open" checked={showOnlyOpen} onCheckedChange={(checked) => setShowOnlyOpen(!!checked)} />
-              <Label htmlFor="show-open">Mostrar solo lotes abiertos</Label>
-            </div>
-          </div>
+          <CardTitle>Recepciones Registradas (Retornos con Fruta)</CardTitle>
+          <CardDescription>Historial de retornos de bins, totes y láminas recepcionados para el exportador seleccionado.</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="rounded-md border">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[150px]">ID Lote</TableHead>
-                  <TableHead className="hidden md:table-cell">Variedad</TableHead>
-                  <TableHead>Bins</TableHead>
-                  <TableHead className="hidden md:table-cell">Totes</TableHead>
-                  <TableHead>Estado</TableHead>
-                  <TableHead>Peso Total</TableHead>
-                  <TableHead className="hidden md:table-cell">Peso Neto</TableHead>
-                  <TableHead>T° Pre</TableHead>
-                  <TableHead>T° Post</TableHead>
+                  <TableHead>Fecha</TableHead>
+                  <TableHead>ID Lote / Guía</TableHead>
+                  <TableHead className="text-right">Bins</TableHead>
+                  <TableHead className="text-right">Totes</TableHead>
+                  <TableHead className="text-right">Láminas</TableHead>
+                  <TableHead className="text-right hidden md:table-cell">Totes Vacíos</TableHead>
                   <TableHead className="text-right">Acciones</TableHead>
                 </TableRow>
               </TableHeader>
@@ -159,32 +104,30 @@ export function LotList({ exporterId }: LotListProps) {
                 {loading ? (
                   Array.from({ length: 3 }).map((_, i) => (
                     <TableRow key={i}>
-                      <TableCell colSpan={10}><Skeleton className="h-4 w-full" /></TableCell>
+                      <TableCell colSpan={7}><Skeleton className="h-4 w-full" /></TableCell>
                     </TableRow>
                   ))
-                ) : filteredLots.length > 0 ? (
-                  filteredLots.map((lot) => {
-                     const pesoNeto = (lot.netWeightPerBin && lot.binCount > 0)
-                        ? lot.netWeightPerBin * lot.binCount
-                        : null;
-                    
+                ) : lots.length > 0 ? (
+                  lots.map((lot) => {
+                    const laminas = lot.laminaCount !== undefined ? lot.laminaCount : (lot.binCount || 0);
                     return (
                     <TableRow key={lot.id}>
-                      <TableCell className="font-medium">{lot.displayLotId || lot.id}</TableCell>
-                      <TableCell className="hidden md:table-cell">{lot.variety}</TableCell>
-                      <TableCell>{lot.binCount}</TableCell>
-                      <TableCell className="hidden md:table-cell">{lot.toteCount}</TableCell>
-                      <TableCell>
-                        <Badge variant={getStatusVariant(lot.status)}>{lot.status}</Badge>
+                      <TableCell className="text-xs text-muted-foreground">
+                        {lot.createdAt ? safeFormatDate(lot.createdAt, 'dd/MM/yyyy HH:mm') : '-'}
                       </TableCell>
-                      <TableCell>{renderCellContent(lot, 'totalWeight')}</TableCell>
-                      <TableCell className="hidden md:table-cell">{pesoNeto !== null ? `${safeFormatQuantity(pesoNeto, 2)} kg` : '-'}</TableCell>
-                      <TableCell>{renderCellContent(lot, 'preHydroTemp')}</TableCell>
-                      <TableCell>{renderCellContent(lot, 'postHydroTemp')}</TableCell>
-                       <TableCell className="text-right">
+                      <TableCell className="font-medium">{lot.displayLotId || lot.document || lot.id}</TableCell>
+                      <TableCell className="text-right font-semibold">{lot.binCount}</TableCell>
+                      <TableCell className="text-right">{lot.toteCount}</TableCell>
+                      <TableCell className="text-right">{laminas}</TableCell>
+                      <TableCell className="text-right hidden md:table-cell">{lot.emptyTotes || 0}</TableCell>
+                      <TableCell className="text-right space-x-1">
                         <Button variant="ghost" size="icon" onClick={() => handleEditClick(lot)}>
                           <Pencil className="h-4 w-4" />
                           <span className="sr-only">Editar</span>
+                        </Button>
+                        <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" onClick={() => handleDeleteClick(lot)}>
+                          <Trash2 className="h-4 w-4" />
+                          <span className="sr-only">Eliminar</span>
                         </Button>
                       </TableCell>
                     </TableRow>
@@ -192,8 +135,8 @@ export function LotList({ exporterId }: LotListProps) {
                   })
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={10} className="h-24 text-center">
-                      No se encontraron lotes para esta selección.
+                    <TableCell colSpan={7} className="h-24 text-center">
+                      No se encontraron recepciones para esta selección.
                     </TableCell>
                   </TableRow>
                 )}
@@ -204,28 +147,13 @@ export function LotList({ exporterId }: LotListProps) {
       </Card>
       
       {selectedLot && (
-        <>
-            <WeightCalculator 
-                lot={selectedLot} 
-                open={isWeightOpen}
-                onOpenChange={setWeightOpen}
-                onWeightSaved={closeDialogs}
-            />
-            <TemperatureForm 
-                lot={selectedLot}
-                open={isTempOpen}
-                onOpenChange={setTempOpen}
-                onTempSaved={closeDialogs}
-            />
-            <EditLotDialog
-                lot={selectedLot}
-                open={isEditOpen}
-                onOpenChange={setEditOpen}
-                onLotUpdated={closeDialogs}
-            />
-        </>
+        <EditLotDialog
+            lot={selectedLot}
+            open={isEditOpen}
+            onOpenChange={setEditOpen}
+            onLotUpdated={closeDialogs}
+        />
       )}
-
     </>
   );
 }

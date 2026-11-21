@@ -24,9 +24,9 @@ interface EditLotDialogProps {
 
 const editSchema = z.object({
   binCount: z.coerce.number({invalid_type_error: 'Debe ser un número.'}).positive("Debe ser mayor a 0.").optional(),
-  totalWeight: z.coerce.number({invalid_type_error: 'Debe ser un número.'}).optional(),
-  preHydroTemp: z.coerce.number({invalid_type_error: 'Debe ser un número.'}).optional(),
-  postHydroTemp: z.coerce.number({invalid_type_error: 'Debe ser un número.'}).optional(),
+  toteCount: z.coerce.number({invalid_type_error: 'Debe ser un número.'}).min(0, "No puede ser negativo.").optional(),
+  laminaCount: z.coerce.number({invalid_type_error: 'Debe ser un número.'}).min(0, "No puede ser negativo.").optional(),
+  emptyTotes: z.coerce.number({invalid_type_error: 'Debe ser un número.'}).min(0, "No puede ser negativo.").optional(),
 });
 
 type EditFormValues = z.infer<typeof editSchema>;
@@ -37,20 +37,20 @@ export function EditLotDialog({ lot, open, onOpenChange, onLotUpdated }: EditLot
   const form = useForm<EditFormValues>({
     resolver: zodResolver(editSchema),
     defaultValues: {
-      binCount: lot.binCount || undefined,
-      totalWeight: lot.totalWeight || undefined,
-      preHydroTemp: lot.preHydroTemp || undefined,
-      postHydroTemp: lot.postHydroTemp || undefined,
+      binCount: lot.binCount ?? 0,
+      toteCount: lot.toteCount ?? 0,
+      laminaCount: lot.laminaCount ?? lot.binCount ?? 0,
+      emptyTotes: lot.emptyTotes ?? 0,
     },
   });
 
   React.useEffect(() => {
     if (lot) {
       form.reset({
-        binCount: lot.binCount || undefined,
-        totalWeight: lot.totalWeight || undefined,
-        preHydroTemp: lot.preHydroTemp || undefined,
-        postHydroTemp: lot.postHydroTemp || undefined,
+        binCount: lot.binCount ?? 0,
+        toteCount: lot.toteCount ?? 0,
+        laminaCount: lot.laminaCount ?? lot.binCount ?? 0,
+        emptyTotes: lot.emptyTotes ?? 0,
       });
     }
   }, [lot, form, open]);
@@ -63,10 +63,10 @@ export function EditLotDialog({ lot, open, onOpenChange, onLotUpdated }: EditLot
             const lotRef = doc(firestore, 'receptionLots', lot.id);
             
             const updateData: Partial<ReceptionLot> = {};
-            if (values.binCount) updateData.binCount = values.binCount;
-            if (values.totalWeight) updateData.totalWeight = values.totalWeight;
-            if (values.preHydroTemp) updateData.preHydroTemp = values.preHydroTemp;
-            if (values.postHydroTemp) updateData.postHydroTemp = values.postHydroTemp;
+            if (values.binCount !== undefined) updateData.binCount = values.binCount;
+            if (values.toteCount !== undefined) updateData.toteCount = values.toteCount;
+            if (values.laminaCount !== undefined) updateData.laminaCount = values.laminaCount;
+            if (values.emptyTotes !== undefined) updateData.emptyTotes = values.emptyTotes;
 
             // 1. Update the reception lot
             transaction.update(lotRef, updateData);
@@ -128,12 +128,12 @@ export function EditLotDialog({ lot, open, onOpenChange, onLotUpdated }: EditLot
             />
             <FormField
               control={form.control}
-              name="totalWeight"
+              name="toteCount"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Peso Total (kg)</FormLabel>
+                  <FormLabel>Cantidad de Totes</FormLabel>
                   <FormControl>
-                    <Input type="number" step="0.01" {...field} value={field.value ?? ''} autoComplete="off" />
+                    <Input type="number" {...field} value={field.value ?? ''} autoComplete="off" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -141,12 +141,12 @@ export function EditLotDialog({ lot, open, onOpenChange, onLotUpdated }: EditLot
             />
             <FormField
               control={form.control}
-              name="preHydroTemp"
+              name="laminaCount"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>T° Pre-Hidro (°C)</FormLabel>
+                  <FormLabel>Cantidad de Láminas</FormLabel>
                   <FormControl>
-                    <Input type="number" step="0.1" {...field} value={field.value ?? ''} autoComplete="off" />
+                    <Input type="number" {...field} value={field.value ?? ''} autoComplete="off" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -154,12 +154,12 @@ export function EditLotDialog({ lot, open, onOpenChange, onLotUpdated }: EditLot
             />
             <FormField
               control={form.control}
-              name="postHydroTemp"
+              name="emptyTotes"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>T° Post-Hidro (°C)</FormLabel>
+                  <FormLabel>Totes Vacíos Adicionales</FormLabel>
                   <FormControl>
-                    <Input type="number" step="0.1" {...field} value={field.value ?? ''} autoComplete="off" />
+                    <Input type="number" {...field} value={field.value ?? ''} autoComplete="off" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

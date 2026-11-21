@@ -41,7 +41,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { cn, safeToMillis, safeToDate, safeFormatDate, safeFormatQuantity, formatLocaleDate, formatLocaleDateString } from '@/lib/utils';
-import { resolveLeasedTargetExporterId } from '@/lib/bins-rental-utils';
+import { resolveLeasedTargetExporterId, resolveExporterReceptionMaterialCodes } from '@/lib/bins-rental-utils';
 import { DateRange } from 'react-day-picker';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useForm } from 'react-hook-form';
@@ -234,6 +234,8 @@ export default function BinMaterialKardexReportPage() {
                 
                 if (mov.producerId === 'TRANSFORMACION_INTERNA') {
                     currentProductorName = 'Transformación Interna (FÑO)';
+                } else if (mov.producerId === '0') {
+                    currentProductorName = 'Carga / Saldo Inicial';
                 } else if (mov.document === 'SALDO-INICIAL-2028' && item.binMaterialCode === '10017') {
                     currentProductorName = 'PALOGIX';
                 }
@@ -288,6 +290,41 @@ export default function BinMaterialKardexReportPage() {
                     });
                 }
             });
+        });
+
+        (receptionLots || []).forEach(lot => {
+            if (!lot.exporterId) return;
+            const binding = resolveExporterReceptionMaterialCodes(lot.exporterId, allMaterials || []);
+            const expName = exporterMap.get(lot.exporterId) || lot.exporterId;
+            const prodName = producerMap.get(lot.producerId) || lot.producerId;
+            const lotDate = lot.createdAt ? getCorrectedTimestamp(lot.createdAt) : Timestamp.now();
+            const docLabel = lot.document || lot.displayLotId;
+
+            const pushRecItem = (slot: { code: string; name: string }, qty: number, suffix: string) => {
+                if (qty <= 0) return;
+                allItems.push({
+                    key: `rec-${lot.id}-${suffix}`,
+                    fecha: lotDate,
+                    exportador: expName,
+                    productor: prodName,
+                    codigoProducto: slot.code,
+                    nombreProducto: slot.name,
+                    cantidad: qty,
+                    movimiento: 'Retorno con Fruta (Recepción)',
+                    tipo: 'Entrada',
+                    userName: formatUserName(lot.userName),
+                    documento: docLabel,
+                    sourceType: 'automatic',
+                    noAffectStock: true,
+                    afectaStock: 'No',
+                });
+            };
+
+            pushRecItem(binding.bin, Number(lot.binCount) || 0, 'bin');
+            pushRecItem(binding.tote, (Number(lot.toteCount) || 0) + (Number(lot.emptyTotes) || 0), 'tote');
+            if (lot.laminaCount !== undefined) {
+                pushRecItem(binding.lamina, Number(lot.laminaCount) || 0, 'lamina');
+            }
         });
 
         (chamberLots || []).forEach(lot => {
