@@ -1,0 +1,964 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mini Manual Operativo: Gestión de Bins, Materiales y Recepción (FriO)</title>
+  <style>
+    :root {
+      --primary: #0f4c81;
+      --primary-dark: #0a355c;
+      --primary-light: #e8f1f8;
+      --accent: #16a34a;
+      --accent-light: #dcfce7;
+      --warning: #d97706;
+      --warning-light: #fef3c7;
+      --text: #1e293b;
+      --muted: #64748b;
+      --border: #cbd5e1;
+      --bg-soft: #f8fafc;
+      --card: #ffffff;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    @page {
+      size: A4 portrait;
+      margin: 12mm 14mm;
+    }
+
+    body {
+      font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Helvetica, Arial, sans-serif;
+      color: var(--text);
+      background: #ffffff;
+      line-height: 1.45;
+      font-size: 12.5px;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+
+    .container {
+      max-width: 960px;
+      margin: 0 auto;
+    }
+
+    /* Header Banner */
+    .hero {
+      background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 100%);
+      color: #ffffff;
+      padding: 20px 24px;
+      border-radius: 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+
+    .hero-brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 22px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+    }
+
+    .hero-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: #4ade80;
+      box-shadow: 0 0 8px #4ade80;
+    }
+
+    .hero-title {
+      font-size: 19px;
+      font-weight: 700;
+      margin-top: 4px;
+    }
+
+    .hero-sub {
+      font-size: 12px;
+      opacity: 0.9;
+      margin-top: 2px;
+    }
+
+    .hero-badge {
+      background: rgba(255, 255, 255, 0.15);
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      padding: 6px 12px;
+      border-radius: 8px;
+      text-align: right;
+      font-size: 11px;
+    }
+
+    /* Flow strip */
+    .flow-strip {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+      margin-bottom: 18px;
+      page-break-inside: avoid;
+    }
+
+    .flow-step {
+      background: var(--bg-soft);
+      border: 1px solid var(--border);
+      border-top: 4px solid var(--primary);
+      border-radius: 8px;
+      padding: 10px 12px;
+    }
+
+    .flow-step.green {
+      border-top-color: var(--accent);
+    }
+
+    .flow-step.amber {
+      border-top-color: var(--warning);
+    }
+
+    .flow-num {
+      font-size: 10px;
+      font-weight: 800;
+      text-transform: uppercase;
+      color: var(--primary);
+      letter-spacing: 0.5px;
+    }
+
+    .flow-step.green .flow-num { color: var(--accent); }
+    .flow-step.amber .flow-num { color: var(--warning); }
+
+    .flow-name {
+      font-size: 13px;
+      font-weight: 700;
+      margin: 2px 0 4px;
+    }
+
+    .flow-desc {
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    /* Section */
+    .section {
+      margin-bottom: 20px;
+      page-break-inside: avoid;
+    }
+
+    .page-break {
+      page-break-before: always;
+    }
+
+    .section-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px;
+      padding-bottom: 6px;
+      border-bottom: 2px solid var(--primary-light);
+    }
+
+    .step-pill {
+      background: var(--primary);
+      color: #fff;
+      font-weight: 700;
+      font-size: 11px;
+      padding: 3px 9px;
+      border-radius: 999px;
+    }
+
+    .step-pill.green { background: var(--accent); }
+    .step-pill.amber { background: var(--warning); }
+
+    .section-title {
+      font-size: 15px;
+      font-weight: 800;
+      color: var(--primary-dark);
+    }
+
+    .instructions-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      align-items: start;
+    }
+
+    .steps-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .steps-list li {
+      display: flex;
+      gap: 8px;
+      align-items: flex-start;
+      background: var(--bg-soft);
+      border: 1px solid #e2e8f0;
+      padding: 8px 10px;
+      border-radius: 8px;
+      font-size: 11.8px;
+    }
+
+    .step-circle {
+      background: var(--primary);
+      color: #fff;
+      width: 19px;
+      height: 19px;
+      border-radius: 50%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10.5px;
+      font-weight: 700;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+
+    .callout {
+      margin-top: 10px;
+      padding: 9px 12px;
+      border-radius: 8px;
+      font-size: 11.5px;
+      border-left: 4px solid var(--primary);
+      background: var(--primary-light);
+    }
+
+    .callout.green {
+      border-left-color: var(--accent);
+      background: var(--accent-light);
+    }
+
+    .callout.amber {
+      border-left-color: var(--warning);
+      background: var(--warning-light);
+    }
+
+    /* UI Mockups */
+    .screens-wrapper {
+      display: grid;
+      grid-template-columns: 1.35fr 0.85fr;
+      gap: 12px;
+      margin-top: 10px;
+    }
+
+    .ui-window {
+      border: 1px solid #94a3b8;
+      border-radius: 10px;
+      background: #ffffff;
+      overflow: hidden;
+      box-shadow: 0 2px 6px rgba(15, 23, 42, 0.06);
+    }
+
+    .ui-topbar {
+      background: #1e293b;
+      color: #f8fafc;
+      padding: 6px 10px;
+      font-size: 10.5px;
+      font-weight: 600;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .ui-dots {
+      display: flex;
+      gap: 4px;
+    }
+
+    .ui-dots span {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #64748b;
+    }
+
+    .ui-dots span:nth-child(1) { background: #ef4444; }
+    .ui-dots span:nth-child(2) { background: #f59e0b; }
+    .ui-dots span:nth-child(3) { background: #22c55e; }
+
+    .ui-body {
+      padding: 10px 12px;
+      background: #f8fafc;
+    }
+
+    .ui-card {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 9px 11px;
+      margin-bottom: 8px;
+    }
+
+    .ui-card-title {
+      font-size: 12px;
+      font-weight: 700;
+      color: #0f172a;
+      margin-bottom: 2px;
+    }
+
+    .ui-card-sub {
+      font-size: 10px;
+      color: #64748b;
+      margin-bottom: 8px;
+    }
+
+    .ui-row-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+
+    .ui-field label {
+      display: block;
+      font-size: 9.5px;
+      font-weight: 600;
+      color: #334155;
+      margin-bottom: 2px;
+    }
+
+    .ui-input, .ui-select {
+      border: 1px solid #cbd5e1;
+      background: #ffffff;
+      border-radius: 5px;
+      padding: 4px 8px;
+      font-size: 10.5px;
+      color: #0f172a;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-weight: 500;
+    }
+
+    .ui-input.highlight {
+      border-color: var(--primary);
+      background: #f0f9ff;
+      font-weight: 700;
+    }
+
+    .ui-tabs {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      background: #e2e8f0;
+      padding: 2px;
+      border-radius: 6px;
+      margin-bottom: 8px;
+      text-align: center;
+      font-size: 10px;
+      font-weight: 600;
+      color: #475569;
+    }
+
+    .ui-tab {
+      padding: 4px 0;
+      border-radius: 5px;
+    }
+
+    .ui-tab.active {
+      background: #ffffff;
+      color: #0f172a;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.08);
+    }
+
+    .ui-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 10px;
+      border: 1px solid #e2e8f0;
+    }
+
+    .ui-table th {
+      background: #f1f5f9;
+      color: #475569;
+      padding: 4px 7px;
+      text-align: left;
+      border-bottom: 1px solid #e2e8f0;
+    }
+
+    .ui-table td {
+      padding: 5px 7px;
+      border-bottom: 1px solid #f1f5f9;
+    }
+
+    .ui-btn {
+      background: var(--primary);
+      color: #ffffff;
+      font-weight: 700;
+      font-size: 10.5px;
+      padding: 6px 12px;
+      border-radius: 5px;
+      text-align: center;
+      display: inline-block;
+    }
+
+    .ui-btn.full {
+      display: block;
+      width: 100%;
+      padding: 7px 12px;
+    }
+
+    .ui-btn.green {
+      background: var(--accent);
+    }
+
+    /* Mobile Phone Frame */
+    .phone-frame {
+      border: 2px solid #334155;
+      border-radius: 16px;
+      background: #ffffff;
+      overflow: hidden;
+      box-shadow: 0 2px 6px rgba(15, 23, 42, 0.08);
+    }
+
+    .phone-header {
+      background: #0f172a;
+      color: #fff;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 5px 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .phone-body {
+      padding: 8px 10px;
+      background: #f8fafc;
+    }
+
+    .m-card {
+      border: 1px solid #cbd5e1;
+      background: #ffffff;
+      border-radius: 7px;
+      padding: 6px 8px;
+      margin-bottom: 6px;
+    }
+
+    .m-card-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 4px;
+    }
+
+    .m-title {
+      font-size: 10.5px;
+      font-weight: 700;
+      color: #0f172a;
+    }
+
+    .m-badge {
+      background: #e2e8f0;
+      color: #1e293b;
+      font-size: 9px;
+      font-weight: 700;
+      padding: 1px 6px;
+      border-radius: 999px;
+      font-family: Consolas, monospace;
+    }
+
+    .m-input-big {
+      border: 1.5px solid var(--primary);
+      background: #f0f9ff;
+      border-radius: 5px;
+      padding: 4px 8px;
+      font-size: 12px;
+      font-weight: 800;
+      color: #0f172a;
+    }
+
+    .m-kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 4px;
+      margin-top: 4px;
+    }
+
+    .m-kpi {
+      background: #f1f5f9;
+      border-radius: 5px;
+      padding: 3px 4px;
+      text-align: center;
+    }
+
+    .m-kpi span {
+      display: block;
+      font-size: 8px;
+      text-transform: uppercase;
+      color: #64748b;
+    }
+
+    .m-kpi strong {
+      font-size: 11px;
+      color: #0f172a;
+    }
+
+    /* Report table */
+    .report-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 11px;
+      margin-top: 8px;
+      border: 1px solid var(--border);
+    }
+
+    .report-table th {
+      background: var(--primary);
+      color: #ffffff;
+      padding: 6px 10px;
+      text-align: left;
+    }
+
+    .report-table td {
+      padding: 6px 10px;
+      border-bottom: 1px solid #e2e8f0;
+    }
+
+    .text-right { text-align: right !important; }
+    .font-bold { font-weight: 700; }
+    .badge-debt {
+      background: #fee2e2;
+      color: #991b1b;
+      padding: 2px 7px;
+      border-radius: 999px;
+      font-weight: 700;
+    }
+    .badge-ok {
+      background: #dcfce7;
+      color: #166534;
+      padding: 2px 7px;
+      border-radius: 999px;
+      font-weight: 700;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <!-- CABECERA -->
+    <div class="hero">
+      <div>
+        <div class="hero-brand">
+          <span class="hero-dot"></span>
+          <span>FriO · FrigoManager</span>
+        </div>
+        <div class="hero-title">Manual Rápido de Operación: Bins y Materiales + Recepción</div>
+        <div class="hero-sub">Control de entregas a productores, retorno con fruta (Modo Bypass) y retorno vacío desde Packing · Versión PC y Móvil</div>
+      </div>
+      <div class="hero-badge">
+        <div><strong>Temporada Cerezas</strong></div>
+        <div>Versión Operador Terreno</div>
+        <div>FÑO / Subsole / Exportadoras</div>
+      </div>
+    </div>
+
+    <!-- FLUJO GENERAL EN 4 BLOQUES -->
+    <div class="flow-strip">
+      <div class="flow-step">
+        <div class="flow-num">Paso 1 · Salida</div>
+        <div class="flow-name">Entrega a Productor</div>
+        <div class="flow-desc">En <strong>Bins y Materiales → Salidas</strong>. Rebaja stock disponible y asigna deuda al productor.</div>
+      </div>
+      <div class="flow-step green">
+        <div class="flow-num">Paso 2 · Recepción</div>
+        <div class="flow-name">Retorno con Fruta</div>
+        <div class="flow-desc">En <strong>Recepción (/recepcion)</strong>. Descuenta de inmediato la deuda del productor (Bins, Totes y Láminas).</div>
+      </div>
+      <div class="flow-step amber">
+        <div class="flow-num">Paso 3 · Entrada Packing</div>
+        <div class="flow-name">Retorno Vacío Planta</div>
+        <div class="flow-desc">En <strong>Bins y Materiales → Entradas</strong> (Subsole → Subsole + Packing). Vuelve a sumar al stock vacío.</div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-num">Paso 4 · Control</div>
+        <div class="flow-name">Saldo por Productor</div>
+        <div class="flow-desc">En <strong>Reportes</strong>. Cruza Salidas vs. Recepciones mostrando cuánto debe cada productor por ítem.</div>
+      </div>
+    </div>
+
+    <!-- PASO 1: SALIDAS DE BINS Y MATERIALES -->
+    <div class="section">
+      <div class="section-header">
+        <span class="step-pill">PASO 1</span>
+        <span class="section-title">Entrega de Bins, Totes y Láminas al Productor (/bins-y-materiales → Salidas)</span>
+      </div>
+
+      <ul class="steps-list" style="display:grid; grid-template-columns: 1fr 1fr; gap:8px;">
+        <li>
+          <span class="step-circle">1</span>
+          <div><strong>Seleccionar Exportador y Productor:</strong> Elija <code>SUBSOLE</code> y escriba el nombre o RUT del productor en el buscador predictivo (ej. <em>NDF</em>, <em>Agrícola Huenuihuen</em>).</div>
+        </li>
+        <li>
+          <span class="step-circle">2</span>
+          <div><strong>Ingresar N° Documento:</strong> Digite el folio de la guía. En celular, los datos de chofer/patente están ocultos en un botón desplegable opcional para no ocupar pantalla.</div>
+        </li>
+        <li>
+          <span class="step-circle">3</span>
+          <div><strong>Digitar Cantidad de Bins:</strong> Al tocar el campo de <code>BINS GENERICO SS</code> y escribir (ej. <code>100</code>), el sistema calcula solo <strong>Totes (100 × 24 = 2.400)</strong> y <strong>Láminas (100 × 1 = 100)</strong>.</div>
+        </li>
+        <li>
+          <span class="step-circle">4</span>
+          <div><strong>Confirmar Salida:</strong> Si van solo bins vacíos sin totes ni láminas, puede poner <code>0</code> en totes/láminas. Presione <strong>Registrar Salida</strong>.</div>
+        </li>
+      </ul>
+
+      <div class="screens-wrapper">
+        <!-- Mockup PC Salidas -->
+        <div class="ui-window">
+          <div class="ui-topbar">
+            <div class="ui-dots"><span></span><span></span><span></span></div>
+            <span>Vista PC · /bins-y-materiales (Pestaña Salidas)</span>
+            <span>Stock en vivo</span>
+          </div>
+          <div class="ui-body">
+            <div class="ui-card">
+              <div class="ui-row-2">
+                <div class="ui-field">
+                  <label>Exportador / Dueño</label>
+                  <div class="ui-select"><span>SUBSOLE</span><span>▾</span></div>
+                </div>
+                <div class="ui-field">
+                  <label>Productor / Arrendatario (Buscador Predictivo)</label>
+                  <div class="ui-select" style="border-color:#0f4c81;"><span>🔍 NDF</span><span>▾</span></div>
+                </div>
+              </div>
+              <div class="ui-tabs">
+                <div class="ui-tab">Entradas</div>
+                <div class="ui-tab active">Salidas</div>
+                <div class="ui-tab">Stock</div>
+              </div>
+              <div class="ui-row-2">
+                <div class="ui-field">
+                  <label>N° Documento</label>
+                  <div class="ui-input">4501</div>
+                </div>
+                <div class="ui-field">
+                  <label>Patente / Conductor (Opcional)</label>
+                  <div class="ui-input" style="color:#94a3b8;">Opcional...</div>
+                </div>
+              </div>
+              <table class="ui-table">
+                <thead>
+                  <tr>
+                    <th>Producto</th>
+                    <th style="width:150px;">Cantidad a Entregar</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><strong>BINS GENERICO SS</strong></td>
+                    <td>
+                      <div class="ui-input highlight">100</div>
+                      <div style="font-size:9px; color:#64748b; margin-top:2px;">Stock disponible: 542</div>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td><strong>TOTES PLASTICO</strong> <span style="color:#64748b;">(x24 auto)</span></td>
+                    <td>
+                      <div class="ui-input highlight">2400</div>
+                      <div style="font-size:9px; color:#64748b; margin-top:2px;">Stock disponible: 13.008</div>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td><strong>LAMINA</strong> <span style="color:#64748b;">(x1 auto)</span></td>
+                    <td>
+                      <div class="ui-input highlight">100</div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+              <div style="text-align:right; margin-top:8px;">
+                <span class="ui-btn">Registrar Salida</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Mockup Móvil Salidas -->
+        <div class="phone-frame">
+          <div class="phone-header">
+            <span>📱 Vista Móvil en Patio</span>
+            <span>Salidas</span>
+          </div>
+          <div class="phone-body">
+            <div class="ui-field" style="margin-bottom:5px;">
+              <label>N° Documento</label>
+              <div class="ui-input">4501</div>
+            </div>
+            <div style="border:1px dashed #cbd5e1; border-radius:5px; padding:4px 8px; font-size:9.5px; color:#64748b; margin-bottom:6px; display:flex; justify-content:space-between;">
+              <span>Conductor, Patente y Obs. (Opcional)</span><span>▾</span>
+            </div>
+            <div class="m-card">
+              <div class="m-card-top">
+                <span class="m-title">BINS GENERICO SS</span>
+                <span class="m-badge">Stock: 542</span>
+              </div>
+              <div class="m-input-big">100</div>
+            </div>
+            <div class="m-card">
+              <div class="m-card-top">
+                <span class="m-title">TOTES PLASTICO (x24)</span>
+                <span class="m-badge">Stock: 13.008</span>
+              </div>
+              <div class="m-input-big">2400</div>
+            </div>
+            <div class="m-card">
+              <div class="m-card-top">
+                <span class="m-title">LAMINA (x1)</span>
+                <span class="m-badge">Auto</span>
+              </div>
+              <div class="m-input-big">100</div>
+            </div>
+            <span class="ui-btn full">Registrar Salida</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SALTO DE PÁGINA PARA PASO 2, 3 Y 4 -->
+    <div class="page-break"></div>
+
+    <!-- PASO 2: RECEPCIÓN CON FRUTA (MODO BYPASS) -->
+    <div class="section">
+      <div class="section-header">
+        <span class="step-pill green">PASO 2</span>
+        <span class="section-title">Retorno de Bins, Totes y Láminas con Fruta (/recepcion — Modo Bypass)</span>
+      </div>
+
+      <ul class="steps-list" style="display:grid; grid-template-columns: 1fr 1fr; gap:8px;">
+        <li>
+          <span class="step-circle" style="background:var(--accent);">1</span>
+          <div><strong>Ingreso Simplificado (Sin Variedad):</strong> En el menú <strong>Recepción</strong>, seleccione el Exportador (<code>SUBSOLE</code>) y busque al Productor (ej. <em>NDF</em>).</div>
+        </li>
+        <li>
+          <span class="step-circle" style="background:var(--accent);">2</span>
+          <div><strong>N° Guía y Cantidad de Bins:</strong> Digite la guía con la que llega el camión (ej. <code>8820</code>) y la <strong>Cantidad de Bins con fruta</strong> (ej. <code>80</code>).</div>
+        </li>
+        <li>
+          <span class="step-circle" style="background:var(--accent);">3</span>
+          <div><strong>Auto-cálculo Instantáneo:</strong> El sistema rellena automáticamente <strong>Totes (80 × 24 = 1.920)</strong> y <strong>Láminas (80 × 1 = 80)</strong>. Si el productor trajo menos o trajo totes vacíos extra, puede editar el número con un toque.</div>
+        </li>
+        <li>
+          <span class="step-circle" style="background:var(--accent);">4</span>
+          <div><strong>Efecto en Trazabilidad:</strong> Al pulsar <strong>Registrar Recepción</strong>, se descuenta de inmediato de la deuda del productor, sin sumar aún al stock de bins vacíos disponibles de planta.</div>
+        </li>
+      </ul>
+
+      <div class="screens-wrapper">
+        <!-- Mockup PC Recepción -->
+        <div class="ui-window">
+          <div class="ui-topbar">
+            <div class="ui-dots"><span></span><span></span><span></span></div>
+            <span>Vista PC · /recepcion (Registrar Recepción - Retorno con Fruta)</span>
+            <span>Modo Bypass</span>
+          </div>
+          <div class="ui-body">
+            <div class="ui-card">
+              <div class="ui-card-title">Registrar Recepción (Retorno con Fruta)</div>
+              <div class="ui-card-sub">Complete los datos para registrar el retorno de bins, totes y láminas con fruta del productor.</div>
+              <div class="ui-row-2">
+                <div class="ui-field">
+                  <label>Exportador</label>
+                  <div class="ui-select"><span>SUBSOLE</span><span>▾</span></div>
+                </div>
+                <div class="ui-field">
+                  <label>Productor (Buscador Predictivo)</label>
+                  <div class="ui-select" style="border-color:#16a34a;"><span>🔍 NDF</span><span>▾</span></div>
+                </div>
+              </div>
+              <div class="ui-field" style="margin-bottom:6px;">
+                <label>N° Guía / Documento</label>
+                <div class="ui-input">8820</div>
+              </div>
+              <div class="ui-row-2">
+                <div class="ui-field">
+                  <label>Cantidad de Bins</label>
+                  <div class="ui-input highlight">80</div>
+                </div>
+                <div class="ui-field">
+                  <label>Cantidad de Totes (x24)</label>
+                  <div class="ui-input highlight">1920</div>
+                </div>
+              </div>
+              <div class="ui-row-2">
+                <div class="ui-field">
+                  <label>Cantidad de Láminas (x1)</label>
+                  <div class="ui-input highlight">80</div>
+                </div>
+                <div class="ui-field">
+                  <label>Totes Vacíos Adicionales (Opcional)</label>
+                  <div class="ui-input">0</div>
+                </div>
+              </div>
+              <div style="text-align:right; margin-top:6px;">
+                <span class="ui-btn green">Registrar Recepción</span>
+              </div>
+            </div>
+
+            <div class="ui-card" style="margin-bottom:0;">
+              <div class="ui-card-title" style="font-size:11px; margin-bottom:5px;">Recepciones Registradas (Retornos con Fruta)</div>
+              <table class="ui-table">
+                <thead>
+                  <tr>
+                    <th>Fecha</th>
+                    <th>ID Lote / Guía</th>
+                    <th class="text-right">Bins</th>
+                    <th class="text-right">Totes</th>
+                    <th class="text-right">Láminas</th>
+                    <th class="text-right">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>21/11/2026 14:30</td>
+                    <td><strong>NDF-8820</strong></td>
+                    <td class="text-right font-bold">80</td>
+                    <td class="text-right">1.920</td>
+                    <td class="text-right">80</td>
+                    <td class="text-right">✏️ 🗑️</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Mockup Móvil Recepción -->
+        <div class="phone-frame">
+          <div class="phone-header" style="background:#14532d;">
+            <span>📱 Vista Móvil · Recepción</span>
+            <span>Bypass</span>
+          </div>
+          <div class="phone-body">
+            <div class="m-card">
+              <div class="m-title" style="margin-bottom:3px;">Cantidad de Bins</div>
+              <div class="m-input-big" style="border-color:#16a34a;">80</div>
+            </div>
+            <div class="m-card">
+              <div class="m-title" style="margin-bottom:3px;">Cantidad de Totes (x24)</div>
+              <div class="m-input-big" style="border-color:#16a34a;">1920</div>
+            </div>
+            <div class="m-card">
+              <div class="m-title" style="margin-bottom:3px;">Cantidad de Láminas (x1)</div>
+              <div class="m-input-big" style="border-color:#16a34a;">80</div>
+            </div>
+            <span class="ui-btn green full" style="margin-bottom:8px;">Registrar Recepción</span>
+
+            <!-- Tarjeta Móvil de Historial -->
+            <div class="m-card" style="margin-bottom:0; background:#ffffff;">
+              <div class="m-card-top">
+                <div>
+                  <div class="m-title">NDF-8820</div>
+                  <div style="font-size:8.5px; color:#64748b;">21/11/2026 14:30</div>
+                </div>
+                <div style="font-size:10px;">✏️ 🗑️</div>
+              </div>
+              <div class="m-kpi-grid">
+                <div class="m-kpi"><span>Bins</span><strong>80</strong></div>
+                <div class="m-kpi"><span>Totes</span><strong>1920</strong></div>
+                <div class="m-kpi"><span>Láminas</span><strong>80</strong></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PASO 3 Y PASO 4 LADO A LADO -->
+    <div class="instructions-grid" style="margin-top: 14px;">
+      <!-- PASO 3: RETORNO VACÍO DESDE PACKING -->
+      <div class="section" style="margin-bottom:0;">
+        <div class="section-header">
+          <span class="step-pill amber">PASO 3</span>
+          <span class="section-title">Retorno Vacío desde Packing</span>
+        </div>
+        <p style="font-size:11.5px; margin-bottom:8px;">
+          Cuando los bins se vacían en el Packing y regresan vacíos al Frigorífico para volver a ser utilizados:
+        </p>
+        <div class="ui-window">
+          <div class="ui-topbar" style="background:#78350f;">
+            <span>/bins-y-materiales → Pestaña Entradas</span>
+            <span>Retorno Packing</span>
+          </div>
+          <div class="ui-body">
+            <div class="ui-row-2">
+              <div class="ui-field">
+                <label>Exportador / Dueño</label>
+                <div class="ui-select"><span>SUBSOLE</span><span>▾</span></div>
+              </div>
+              <div class="ui-field">
+                <label>Productor / Arrendatario</label>
+                <div class="ui-select" style="border-color:#d97706;"><span>SUBSOLE</span><span>▾</span></div>
+              </div>
+            </div>
+            <div class="ui-row-2">
+              <div class="ui-field">
+                <label>N° Guía Retorno</label>
+                <div class="ui-input">9105</div>
+              </div>
+              <div class="ui-field">
+                <label>Packing de Origen</label>
+                <div class="ui-select" style="border-color:#d97706; background:#fffbeb;"><span>AGROSAN</span><span>▾</span></div>
+              </div>
+            </div>
+            <div class="callout amber" style="margin-top:6px;">
+              <strong>Regla de Oro:</strong> Al seleccionar <code>SUBSOLE → SUBSOLE</code> e indicar el <strong>Packing</strong> (Agrosan, Green Pack, Cerasus, El Olivar), los bins vuelven a sumar al <strong>Stock Disponible</strong> de Subsole sin alterar el saldo de los productores.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PASO 4: REPORTE SALDO POR PRODUCTOR -->
+      <div class="section" style="margin-bottom:0;">
+        <div class="section-header">
+          <span class="step-pill">PASO 4</span>
+          <span class="section-title">Control Individual: Saldo por Productor</span>
+        </div>
+        <p style="font-size:11.5px; margin-bottom:8px;">
+          En <strong>Reportes → Saldo por Productor</strong>, el sistema cruza automáticamente lo entregado en <em>Salidas</em> contra lo devuelto con fruta en <em>Recepción</em> item por item:
+        </p>
+        <table class="report-table">
+          <thead>
+            <tr>
+              <th>Productor / Material</th>
+              <th class="text-right">Entregado (Salida)</th>
+              <th class="text-right">Devuelto (Recepción)</th>
+              <th class="text-right">Saldo Pendiente</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>NDF</strong> · BINS GENERICO SS</td>
+              <td class="text-right">100</td>
+              <td class="text-right">80</td>
+              <td class="text-right"><span class="badge-debt">20 Bins</span></td>
+            </tr>
+            <tr>
+              <td><strong>NDF</strong> · TOTES PLASTICO</td>
+              <td class="text-right">2.400</td>
+              <td class="text-right">1.920</td>
+              <td class="text-right"><span class="badge-debt">480 Totes</span></td>
+            </tr>
+            <tr>
+              <td><strong>NDF</strong> · LAMINA</td>
+              <td class="text-right">100</td>
+              <td class="text-right">80</td>
+              <td class="text-right"><span class="badge-debt">20 Láminas</span></td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="callout green" style="margin-top:8px;">
+          <strong>Trazabilidad Total en Kardex:</strong> Todos los movimientos (Transformación inicial de 542 Bins SS + 13.008 Totes, Salidas a productores, Retornos con fruta en Recepción y Retornos vacíos desde Packing) quedan auditados por fecha, guía y usuario en <strong>Reportes → Kardex de Bins y Materiales</strong>.
+        </div>
+      </div>
+    </div>
+
+  </div>
+</body>
+</html>

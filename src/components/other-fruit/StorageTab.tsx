@@ -27,9 +27,10 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { notifyPalletLogStored } from '@/lib/telegram';
 import { ChevronDown } from 'lucide-react';
 import { cleanFirestoreObject } from '@/lib/vitafood-utils';
-import { isFallCreek, binsPerUnit } from '@/lib/clients';
+import { isFallCreek, isOlmue, binsPerUnit } from '@/lib/clients';
 import { useOfflineSync, OfflineSyncIndicator } from './OfflineSyncIndicator';
 import { applyOfflineQueueToManifest, enqueueOfflineAction } from '@/lib/vitafood-offline-sync';
+import { OlmueAutoStorageDialog } from './OlmueAutoStorageDialog';
 
 type PendingFruitItem = OtherFruitReceptionItem & {
     type: 'fruit';
@@ -74,6 +75,8 @@ export function OtherFruitStorageTab({ clientId: fixedClientId, onlyPackaging }:
     strategy: 'secuencial' | 'pareado' | 'aisle-access' | 'serpentina-vertical' | 'modelo-sof' | 'fifo-vertical';
   } | null>(null);
   const [selectedClientId, setSelectedClientId] = React.useState<string | null>(null);
+  const [isOlmueAutoDialogOpen, setIsOlmueAutoDialogOpen] = React.useState(false);
+  const [autoStoreReceptionId, setAutoStoreReceptionId] = React.useState<string | undefined>(undefined);
   const [isScannerOpen, setIsScannerOpen] = React.useState(false);
   const [scanValue, setScanValue] = React.useState('');
   const [lastUsedChamberId, setLastUsedChamberId] = React.useState<string | null>(null);
@@ -983,11 +986,26 @@ export function OtherFruitStorageTab({ clientId: fixedClientId, onlyPackaging }:
           </div>
         </div>
 
-        {selectedClientId && !fixedClientId && (
+        <div className="flex items-center gap-2">
+          {(isOlmue(selectedClientId) || isOlmue(activeClientName)) && (
+            <Button
+              onClick={() => {
+                setAutoStoreReceptionId(undefined);
+                setIsOlmueAutoDialogOpen(true);
+              }}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold h-9 px-3.5 rounded-xl shadow-md gap-1.5 flex items-center text-xs animate-in fade-in"
+            >
+              <Zap className="h-4 w-4 fill-white" />
+              <span>Almacenamiento Automático</span>
+            </Button>
+          )}
+
+          {selectedClientId && !fixedClientId && (
             <Badge variant="outline" className="bg-primary/5 text-primary border-primary/20 px-3 py-1 font-bold">
-                Cliente: {activeClientName}
+              Cliente: {activeClientName}
             </Badge>
-        )}
+          )}
+        </div>
       </div>
 
       {showClientSelector ? (
@@ -1001,6 +1019,35 @@ export function OtherFruitStorageTab({ clientId: fixedClientId, onlyPackaging }:
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Left Panel: Scanner and Settings */}
         <div className="lg:col-span-5 space-y-4">
+            {(isOlmue(selectedClientId) || isOlmue(activeClientName)) && (
+              <Card className="border-2 border-emerald-500/30 bg-emerald-500/5 shadow-md animate-in fade-in">
+                <CardContent className="p-4 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-black uppercase tracking-wider text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5">
+                      <Zap className="h-4 w-4 fill-emerald-600 text-emerald-600" />
+                      Almacenamiento Express Olmué
+                    </span>
+                    <Badge className="bg-emerald-600 text-white text-[10px] font-bold">
+                      1 pallet / coord
+                    </Badge>
+                  </div>
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    Almacene recepciones completas de Olmué en orden ascendente (A1..AX → B1..BX) en un solo clic.
+                  </p>
+                  <Button 
+                    onClick={() => {
+                      setAutoStoreReceptionId(undefined);
+                      setIsOlmueAutoDialogOpen(true);
+                    }}
+                    className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold h-10 rounded-xl gap-2 shadow-sm"
+                  >
+                    <Zap className="h-4 w-4 fill-white" />
+                    Iniciar Almacenamiento Automático
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+
             <Card className="shadow-lg border-primary/20 bg-card/50 backdrop-blur-sm">
                 <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
                     <div className="flex items-center gap-3">
@@ -1299,7 +1346,23 @@ export function OtherFruitStorageTab({ clientId: fixedClientId, onlyPackaging }:
                                             <p className="font-black text-lg text-foreground">{(item as any).quantity || (item as any).palletCount}</p>
                                             <p className="text-[10px] uppercase font-bold text-muted-foreground">{item.unit}</p>
                                         </div>
-                                        <div className="flex items-center">
+                                        <div className="flex items-center gap-2">
+                                            {isOlmue(item.clientName) && (
+                                                <Button 
+                                                    size="sm" 
+                                                    variant="outline"
+                                                    className="border-emerald-500/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/10 font-bold text-[10px] h-8 rounded-lg px-2 gap-1 hidden sm:flex items-center"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setAutoStoreReceptionId(item.receptionId);
+                                                        setIsOlmueAutoDialogOpen(true);
+                                                    }}
+                                                >
+                                                    <Zap className="h-3 w-3 fill-emerald-600 text-emerald-600" />
+                                                    <span>Auto</span>
+                                                </Button>
+                                            )}
+
                                             {isDirectMode ? (
                                                 <Button 
                                                     size="sm" 
@@ -1368,6 +1431,15 @@ export function OtherFruitStorageTab({ clientId: fixedClientId, onlyPackaging }:
          open={isScannerOpen}
          onOpenChange={setIsScannerOpen}
          onScan={processScanValue}
+       />
+
+       <OlmueAutoStorageDialog
+         open={isOlmueAutoDialogOpen}
+         onOpenChange={setIsOlmueAutoDialogOpen}
+         receptions={effectiveOtherFruitReceptions || []}
+         chamberLots={allChamberLots || []}
+         chamberSettings={chamberSettings || []}
+         preselectedReceptionId={autoStoreReceptionId}
        />
     </div>
   );

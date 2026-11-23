@@ -39,6 +39,7 @@ export const columnsChamber5WithAux = [
 ];
 
 const rows = Array.from({ length: 14 }, (_, i) => i + 1);
+const rowsChamber4 = Array.from({ length: 15 }, (_, i) => i + 1);
 
 const generateComodinBlocked = (columns: { name: string }[]) => {
     return [
@@ -47,13 +48,24 @@ const generateComodinBlocked = (columns: { name: string }[]) => {
     ];
 };
 
+const generateComodinBlocked4 = (columns: { name: string }[]) => {
+    return [
+        ...columns.map(c => `${c.name}13`),
+        ...columns.map(c => `${c.name}14`),
+        ...columns.map(c => `${c.name}15`)
+    ];
+};
+
 export const getAllowedComodinCols = (chamberId: string, colsKLEnabled?: boolean, colsPQREnabled?: boolean): string[] => {
+  if (chamberId === 'CAMARA-4') {
+    return ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O'];
+  }
   if (chamberId === 'CAMARA-5') {
     return colsPQREnabled
       ? ['A', 'B', 'C', 'M', 'N', 'O', 'P', 'Q', 'R']
       : ['A', 'B', 'C', 'M', 'N', 'O'];
   }
-  const isLargeChamber = ['CAMARA-4', 'CAMARA-6'].includes(chamberId);
+  const isLargeChamber = ['CAMARA-6'].includes(chamberId);
   if (isLargeChamber) {
     return ['A', 'B', 'C', 'M', 'N', 'O'];
   }
@@ -66,6 +78,7 @@ export const getAllowedComodinCols = (chamberId: string, colsKLEnabled?: boolean
 };
 
 const blocked1to3 = generateComodinBlocked(columns1to3);
+const blocked4 = generateComodinBlocked4(columns4to6);
 const blocked4to6 = generateComodinBlocked(columns4to6);
 
 export const chambersConfig: ChambersConfig = {
@@ -98,8 +111,8 @@ export const chambersConfig: ChambersConfig = {
         name: 'CÁMARA 4',
         capacity: 1500,
         columns: columns4to6,
-        rows,
-        blocked: blocked4to6,
+        rows: rowsChamber4,
+        blocked: blocked4,
     },
     'CAMARA-5': {
         id: 'CAMARA-5',

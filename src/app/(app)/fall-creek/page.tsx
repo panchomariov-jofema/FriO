@@ -1334,7 +1334,7 @@ export default function FallCreekPage() {
                                     const config = getEffectiveChamberConfig(rawConfig, chamberSetting);
                                     const occupancy = chamberOccupancy[chamberId];
                                     const isRow13Enabled = !!chamberSetting?.row13Enabled;
-                                    const activeRows = isRow13Enabled ? config.rows : config.rows.filter(r => r !== 13 && r !== 14);
+                                    const activeRows = isRow13Enabled ? config.rows : config.rows.filter(r => r !== 13 && r !== 14 && r !== 15);
                                     return (
                                         <AccordionItem value={chamberId} key={chamberId} className="border rounded-lg mb-2 px-4">
                                             <div className="flex flex-col sm:flex-row w-full sm:items-center justify-between gap-2 pr-4 pb-2 sm:pb-0">
@@ -1405,8 +1405,8 @@ export default function FallCreekPage() {
                                                                 }
                                                             }
                                                              const allowedComodinCols = getAllowedComodinCols(chamberId, chamberSetting?.colsKLEnabled, chamberSetting?.colsPQREnabled);
-                                                             const isPermanentlyBlocked = (row === 13 || row === 14) && !allowedComodinCols.includes(col.name);
-                                                            const isComodinRow = row === 13 || row === 14;
+                                                             const isPermanentlyBlocked = (row === 13 || row === 14 || row === 15) && !allowedComodinCols.includes(col.name);
+                                                            const isComodinRow = row === 13 || row === 14 || row === 15;
 
                                                             const cellElement = (
                                                                 <div key={coord}

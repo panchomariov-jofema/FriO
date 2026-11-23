@@ -1135,7 +1135,7 @@ export default function CamarasPage() {
                     const isColsKLEnabled = chamberId === 'CAMARA-3' && !!chamberSettings?.find(s => s.id === chamberId)?.colsKLEnabled;
                     const isColsPQREnabled = chamberId === 'CAMARA-5' && !!chamberSettings?.find(s => s.id === chamberId)?.colsPQREnabled;
                     const effectiveConfig = getEffectiveChamberConfig(config, isRow13Enabled, isColsKLEnabled, isColsPQREnabled);
-                    const activeRows = isRow13Enabled ? effectiveConfig.rows : effectiveConfig.rows.filter((r: number) => r !== 13 && r !== 14);
+                    const activeRows = isRow13Enabled ? effectiveConfig.rows : effectiveConfig.rows.filter((r: number) => r !== 13 && r !== 14 && r !== 15);
                     return (
                         <AccordionItem value={chamberId} key={chamberId}>
                             <div className="flex flex-col sm:flex-row w-full items-start sm:items-center justify-between pr-4">
@@ -1154,7 +1154,9 @@ export default function CamarasPage() {
                                                 }}
                                                 className="scale-75 data-[state=checked]:bg-amber-500"
                                             />
-                                            <label htmlFor={`row13-${chamberId}`} className="text-[10px] font-black uppercase tracking-wider text-muted-foreground cursor-pointer select-none">Fila 13 y 14</label>
+                                            <label htmlFor={`row13-${chamberId}`} className="text-[10px] font-black uppercase tracking-wider text-muted-foreground cursor-pointer select-none">
+                                                {chamberId === 'CAMARA-4' ? 'Filas 13 a 15' : 'Fila 13 y 14'}
+                                            </label>
                                         </div>
                                         {chamberId === 'CAMARA-3' && (
                                             <div className="flex items-center gap-1.5 ml-1">
@@ -1350,8 +1352,8 @@ export default function CamarasPage() {
                                           }
     
                                            const allowedComodinCols = getAllowedComodinCols(chamberId, isColsKLEnabled, isColsPQREnabled);
-                                           const isPermanentlyBlocked = (row === 13 || row === 14) && !allowedComodinCols.includes(col.name);
-                                          const isComodinRow = row === 13 || row === 14;
+                                           const isPermanentlyBlocked = (row === 13 || row === 14 || row === 15) && !allowedComodinCols.includes(col.name);
+                                          const isComodinRow = row === 13 || row === 14 || row === 15;
 
                                           return (
                                               <Popover key={coord}>

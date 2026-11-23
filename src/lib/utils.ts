@@ -65,7 +65,7 @@ export const getEffectiveChamberConfig = (
       if (match) {
         const col = match[1];
         const row = parseInt(match[2], 10);
-        if (row === 13 || row === 14) {
+        if (row === 13 || row === 14 || row === 15) {
           return !allowedComodinCols.includes(col);
         }
       }

@@ -831,7 +831,7 @@ export function OtherFruitExitTab({ clientId: fixedClientId }: { clientId?: stri
                               {chamber.columns.map(col => {
                                 const coordName = `${col.name}${row}`;
                                 const allowedComodinCols = getAllowedComodinCols(activeChamber, isColsKLEnabled, isColsPQREnabled);
-                                const isPermanentlyBlocked = (row === 13 || row === 14) && !allowedComodinCols.includes(col.name);
+                                const isPermanentlyBlocked = (row === 13 || row === 14 || row === 15) && !allowedComodinCols.includes(col.name);
 
                                 // Find Fall Creek items in this coordinate
                                 const coordItems: {

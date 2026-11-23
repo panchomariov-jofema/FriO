@@ -7,7 +7,8 @@ Archivos: `src/lib/chambers-config.ts` (estática), `src/lib/utils.ts` (orden de
 |---|---|---|---|---|
 | CAMARA-1..3 | A–J (10) | 1–14 | 800 | Filas 13-14 bloqueadas por defecto |
 | CAMARA-3 | + K, L opcionales | | +160 | Si `chamberSettings/CAMARA-3.colsKLEnabled` |
-| CAMARA-4..6 | A–O (15) | 1–14 | 1500 | Filas 13-14 bloqueadas por defecto |
+| CAMARA-4 | A–O (15) | 1–15 | 1500 | Fila 15 agregada. Switch "Filas 13 a 15" desbloquea A-O completo (D13-14..L13-14 inclusive) |
+| CAMARA-5..6 | A–O (15) | 1–14 | 1500 | Filas 13-14 bloqueadas por defecto |
 | CAMARA-5 | + P, Q, R opcionales | | +300 | Si `chamberSettings/CAMARA-5.colsPQREnabled` |
 
 - Coordenada = `Columna + Fila` (`A1`, `K12`). Ordenar siempre con `naturalSort`.
