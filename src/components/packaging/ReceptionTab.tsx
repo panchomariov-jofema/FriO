@@ -46,7 +46,7 @@ export function ReceptionTab() {
   const { data: allReceptions } = useFirestoreCollection<OtherFruitReception>('otherFruitReceptions');
   const { data: allChamberLots } = useFirestoreCollection<ChamberLot>('chamberLots');
   const { data: clientConfigs } = useFirestoreCollection<ClientStorageConfig>('clientStorageConfigs');
-  const { data: chamberSettings } = useFirestoreCollection<{ id: string; row13Enabled?: boolean }>('chamberSettings');
+  const { data: chamberSettings } = useFirestoreCollection<{ id: string; row13Enabled?: boolean; colsKLEnabled?: boolean; colsPQREnabled?: boolean; colsPQRSEnabled?: boolean }>('chamberSettings');
 
   const firestore = useFirestore();
   const { user } = useUser();

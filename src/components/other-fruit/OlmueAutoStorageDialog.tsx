@@ -36,7 +36,7 @@ interface OlmueAutoStorageDialogProps {
   onOpenChange: (open: boolean) => void;
   receptions: OtherFruitReception[];
   chamberLots: ChamberLot[];
-  chamberSettings: { id: string; row13Enabled?: boolean; colsKLEnabled?: boolean; colsPQREnabled?: boolean }[];
+  chamberSettings: { id: string; row13Enabled?: boolean; colsKLEnabled?: boolean; colsPQREnabled?: boolean; colsPQRSEnabled?: boolean }[];
   preselectedReceptionId?: string;
   onSuccess?: () => void;
 }
@@ -120,6 +120,7 @@ export function OlmueAutoStorageDialog({
   const isRow13Enabled = !!activeChamberSetting?.row13Enabled;
   const isColsKLEnabled = selectedChamberId === 'CAMARA-3' && !!activeChamberSetting?.colsKLEnabled;
   const isColsPQREnabled = selectedChamberId === 'CAMARA-5' && !!activeChamberSetting?.colsPQREnabled;
+  const isColsPQRSEnabled = selectedChamberId === 'CAMARA-4' && !!activeChamberSetting?.colsPQRSEnabled;
 
   // Toggle de switch de cámara
   const handleToggleRowSwitch = async (checked: boolean) => {
@@ -149,12 +150,21 @@ export function OlmueAutoStorageDialog({
     }
   };
 
+  const handleToggleColsPQRS = async (checked: boolean) => {
+    if (!firestore || selectedChamberId !== 'CAMARA-4') return;
+    try {
+      await setDoc(doc(firestore, 'chamberSettings', selectedChamberId), { colsPQRSEnabled: checked }, { merge: true });
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Error', description: 'No se pudo actualizar el switch P, Q, R y S.' });
+    }
+  };
+
   // 3. Configuración efectiva y coordenadas secuenciales (A1..AX, B1..BX)
   const chamberConfig = chambersConfig[selectedChamberId];
   const effectiveChamberConfig = React.useMemo(() => {
     if (!chamberConfig) return null;
-    return getEffectiveChamberConfig(chamberConfig, isRow13Enabled, isColsKLEnabled, isColsPQREnabled);
-  }, [chamberConfig, isRow13Enabled, isColsKLEnabled, isColsPQREnabled]);
+    return getEffectiveChamberConfig(chamberConfig, isRow13Enabled, isColsKLEnabled, isColsPQREnabled, isColsPQRSEnabled);
+  }, [chamberConfig, isRow13Enabled, isColsKLEnabled, isColsPQREnabled, isColsPQRSEnabled]);
 
   const allSequentialCoords = React.useMemo(() => {
     if (!effectiveChamberConfig) return [];
@@ -487,6 +497,16 @@ export function OlmueAutoStorageDialog({
                     <p className="text-[10px] text-muted-foreground">Habilita las 2 columnas auxiliares de Cámara 3.</p>
                   </div>
                   <Switch checked={isColsKLEnabled} onCheckedChange={handleToggleColsKL} />
+                </div>
+              )}
+
+              {selectedChamberId === 'CAMARA-4' && (
+                <div className="flex items-center justify-between p-2 bg-background rounded-lg border">
+                  <div className="space-y-0.5">
+                    <span className="text-xs font-bold">Columnas P, Q, R y S (Cámara 4)</span>
+                    <p className="text-[10px] text-muted-foreground">Habilita las 4 columnas auxiliares de Cámara 4.</p>
+                  </div>
+                  <Switch checked={isColsPQRSEnabled} onCheckedChange={handleToggleColsPQRS} />
                 </div>
               )}
 

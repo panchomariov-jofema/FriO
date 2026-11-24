@@ -71,7 +71,7 @@ export function RelocatePackagingDialog({ item, open, onOpenChange, onConfirm }:
   const { data: allAisles, loading: loadingAisles } = useFirestoreCollection<Aisle>('aisles');
   const { data: allChamberLots } = useFirestoreCollection<ChamberLot>('chamberLots');
   const { data: otherFruitReceptions } = useFirestoreCollection<OtherFruitReception>('otherFruitReceptions');
-  const { data: chamberSettings } = useFirestoreCollection<{ id: string; row13Enabled?: boolean }>('chamberSettings');
+  const { data: chamberSettings } = useFirestoreCollection<{ id: string; row13Enabled?: boolean; colsKLEnabled?: boolean; colsPQREnabled?: boolean; colsPQRSEnabled?: boolean }>('chamberSettings');
 
   // Sanitary map: detect which chambers currently contain Fruit vs Packaging
   const chamberSanitaryMap = React.useMemo(() => {

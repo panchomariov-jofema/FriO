@@ -69,7 +69,7 @@ export default function FallCreekPage() {
     const { data: allReceptions, loading: loadingReceptions } = useFirestoreCollection<OtherFruitReception>('otherFruitReceptions');
     const { data: allMovements, loading: loadingMovements } = useFirestoreCollection<OtherFruitMovement>('otherFruitMovements');
     const { data: allChamberLots, loading: loadingChamberLots } = useFirestoreCollection<ChamberLot>('chamberLots');
-    const { data: chamberSettings } = useFirestoreCollection<{ id: string; row13Enabled?: boolean; colsKLEnabled?: boolean; colsPQREnabled?: boolean }>('chamberSettings');
+    const { data: chamberSettings } = useFirestoreCollection<{ id: string; row13Enabled?: boolean; colsKLEnabled?: boolean; colsPQREnabled?: boolean; colsPQRSEnabled?: boolean }>('chamberSettings');
     const { data: usersMaster } = useFirestoreCollection<UserMaster>('usersMaster');
     const { data: allTemperatures } = useFirestoreCollection<ChamberTemperature>('chamberTemperatures');
     const { data: allProducers, loading: loadingProducers } = useFirestoreCollection<Producer>('producers');
@@ -1404,7 +1404,7 @@ export default function FallCreekPage() {
                                                                     } as React.CSSProperties;
                                                                 }
                                                             }
-                                                             const allowedComodinCols = getAllowedComodinCols(chamberId, chamberSetting?.colsKLEnabled, chamberSetting?.colsPQREnabled);
+                                                             const allowedComodinCols = getAllowedComodinCols(chamberId, chamberSetting?.colsKLEnabled, chamberSetting?.colsPQREnabled, chamberSetting?.colsPQRSEnabled);
                                                              const isPermanentlyBlocked = (row === 13 || row === 14 || row === 15) && !allowedComodinCols.includes(col.name);
                                                             const isComodinRow = row === 13 || row === 14 || row === 15;
 

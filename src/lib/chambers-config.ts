@@ -38,6 +38,18 @@ export const columnsChamber5WithAux = [
     ...auxColumnsPQR
 ];
 
+export const auxColumnsPQRS = [
+    { name: 'P', id: 'P' },
+    { name: 'Q', id: 'Q' },
+    { name: 'R', id: 'R' },
+    { name: 'S', id: 'S' }
+];
+
+export const columnsChamber4WithAux = [
+    ...columns4to6,
+    ...auxColumnsPQRS
+];
+
 const rows = Array.from({ length: 14 }, (_, i) => i + 1);
 const rowsChamber4 = Array.from({ length: 15 }, (_, i) => i + 1);
 
@@ -56,9 +68,16 @@ const generateComodinBlocked4 = (columns: { name: string }[]) => {
     ];
 };
 
-export const getAllowedComodinCols = (chamberId: string, colsKLEnabled?: boolean, colsPQREnabled?: boolean): string[] => {
+export const getAllowedComodinCols = (
+  chamberId: string,
+  colsKLEnabled?: boolean,
+  colsPQREnabled?: boolean,
+  colsPQRSEnabled?: boolean
+): string[] => {
   if (chamberId === 'CAMARA-4') {
-    return ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O'];
+    return colsPQRSEnabled
+      ? ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S']
+      : ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O'];
   }
   if (chamberId === 'CAMARA-5') {
     return colsPQREnabled

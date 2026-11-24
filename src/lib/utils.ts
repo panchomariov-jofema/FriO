@@ -23,9 +23,10 @@ export const naturalSort = (a: string, b: string) => {
 
 export const getEffectiveChamberConfig = (
   chamberConfig: Chamber,
-  row13EnabledOrSettings?: boolean | { row13Enabled?: boolean; colsKLEnabled?: boolean; colsPQREnabled?: boolean },
+  row13EnabledOrSettings?: boolean | { row13Enabled?: boolean; colsKLEnabled?: boolean; colsPQREnabled?: boolean; colsPQRSEnabled?: boolean },
   colsKLEnabledParam?: boolean,
-  colsPQREnabledParam?: boolean
+  colsPQREnabledParam?: boolean,
+  colsPQRSEnabledParam?: boolean
 ): Chamber => {
   const row13Enabled = typeof row13EnabledOrSettings === 'object'
     ? !!row13EnabledOrSettings?.row13Enabled
@@ -36,6 +37,9 @@ export const getEffectiveChamberConfig = (
   const colsPQREnabled = typeof row13EnabledOrSettings === 'object'
     ? !!row13EnabledOrSettings?.colsPQREnabled
     : !!colsPQREnabledParam;
+  const colsPQRSEnabled = typeof row13EnabledOrSettings === 'object'
+    ? !!row13EnabledOrSettings?.colsPQRSEnabled
+    : !!colsPQRSEnabledParam;
 
   let columns = chamberConfig.columns;
   let blocked = chamberConfig.blocked ? [...chamberConfig.blocked] : [];
@@ -49,6 +53,19 @@ export const getEffectiveChamberConfig = (
     }
   }
 
+  if (chamberConfig.id === 'CAMARA-4' && colsPQRSEnabled) {
+    if (!columns.some(c => c.name === 'P')) {
+      columns = [...columns, { name: 'P', id: 'P' }, { name: 'Q', id: 'Q' }, { name: 'R', id: 'R' }, { name: 'S', id: 'S' }];
+      blocked.push(
+        'P13', 'P14', 'P15',
+        'Q13', 'Q14', 'Q15',
+        'R13', 'R14', 'R15',
+        'S13', 'S14', 'S15'
+      );
+      capacity = capacity + 400;
+    }
+  }
+
   if (chamberConfig.id === 'CAMARA-5' && colsPQREnabled) {
     if (!columns.some(c => c.name === 'P')) {
       columns = [...columns, { name: 'P', id: 'P' }, { name: 'Q', id: 'Q' }, { name: 'R', id: 'R' }];
@@ -58,7 +75,7 @@ export const getEffectiveChamberConfig = (
   }
 
   if (row13Enabled) {
-    const allowedComodinCols = getAllowedComodinCols(chamberConfig.id, colsKLEnabled, colsPQREnabled);
+    const allowedComodinCols = getAllowedComodinCols(chamberConfig.id, colsKLEnabled, colsPQREnabled, colsPQRSEnabled);
 
     blocked = blocked.filter(coord => {
       const match = coord.match(/^([A-Z])(\d+)$/);

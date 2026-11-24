@@ -58,7 +58,7 @@ export function RelocateOtherFruitDialog({
   clientConfigs,
 }: RelocateOtherFruitDialogProps) {
   const { toast } = useToast();
-  const { data: chamberSettings } = useFirestoreCollection<{ id: string; row13Enabled?: boolean }>('chamberSettings');
+  const { data: chamberSettings } = useFirestoreCollection<{ id: string; row13Enabled?: boolean; colsKLEnabled?: boolean; colsPQREnabled?: boolean; colsPQRSEnabled?: boolean }>('chamberSettings');
   const form = useForm<RelocateFormValues>({
     resolver: zodResolver(relocateSchema),
     defaultValues: {

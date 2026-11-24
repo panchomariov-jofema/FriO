@@ -298,6 +298,7 @@ export interface ChamberSetting {
   row13Enabled?: boolean;
   colsKLEnabled?: boolean;
   colsPQREnabled?: boolean;
+  colsPQRSEnabled?: boolean;
 }
 
 export interface ChamberTemperature {
