@@ -67,9 +67,17 @@ const getColorForLot = (colorKey: string) => {
         return getVitafoodProductColor(prodIdentifier);
     }
     if (!lotColorMap.has(colorKey)) {
-        const color = lotColorPalette[nextColorIndex];
+        let color: string;
+        if (nextColorIndex < lotColorPalette.length) {
+            color = lotColorPalette[nextColorIndex];
+            nextColorIndex++;
+        } else {
+            // Generación determinista HSL para variedad infinita sin repetición
+            const hash = Array.from(colorKey).reduce((acc, char) => acc + char.charCodeAt(0), 0);
+            const hue = Math.round((hash * 137.507764) % 360);
+            color = `hsl(${hue}, 80%, 48%)`;
+        }
         lotColorMap.set(colorKey, color);
-        nextColorIndex = (nextColorIndex + 1) % lotColorPalette.length;
     }
     return lotColorMap.get(colorKey)!;
 };
@@ -100,6 +108,11 @@ const getItemColorKey = (item: StoredItem) => {
     return `vitafood-prod-${resolvedCode}`;
   }
   if (item.type === 'otherFruit') {
+    // Si tiene documento o recepción, diferenciamos por recepción/documento para fácil identificación visual
+    const docKey = (item.documentNumber || item.document || item.receptionId || '').trim();
+    if (docKey) {
+      return `client-${item.ownerName || 'SOCIO'}-doc-${docKey}`;
+    }
     return `client-${item.ownerName}`;
   }
   return `exporter-${item.exporterId || 'default'}`;
@@ -1251,6 +1264,41 @@ export default function CamarasPage() {
                                                         <span className="w-3 h-3 rounded-full shrink-0 shadow-xs border border-black/20" style={{ backgroundColor: prod.color }} />
                                                         <span className="truncate max-w-[220px]" title={prod.description && prod.description !== prod.name ? `${prod.name} — ${prod.description}` : prod.name}>{prod.name}</span>
                                                         <span className="text-[10px] text-muted-foreground font-mono">({prod.count} {prod.count === 1 ? 'pallet' : 'pallets'})</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        );
+                                    })()}
+                                    {(() => {
+                                        const chamberCoords = Object.values(storedItemsByChamber[chamberId] || {});
+                                        const olmueItemsInChamber = chamberCoords.flat().filter(i => (isOlmue(i.ownerName) || isOlmue(i.exporterId)) && i.type === 'otherFruit');
+                                        if (olmueItemsInChamber.length === 0) return null;
+
+                                        const uniqueDocs = new Map<string, { key: string; docName: string; variety?: string; color: string; count: number }>();
+                                        olmueItemsInChamber.forEach(item => {
+                                            const key = getItemColorKey(item);
+                                            const docName = item.documentNumber || item.document || 'S/N';
+                                            const color = getColorForLot(key);
+                                            if (!uniqueDocs.has(key)) {
+                                                uniqueDocs.set(key, { key, docName, variety: item.variety, color, count: item.quantity });
+                                            } else {
+                                                uniqueDocs.get(key)!.count += item.quantity;
+                                            }
+                                        });
+                                        const docList = Array.from(uniqueDocs.values());
+
+                                        return (
+                                            <div className="mb-3 p-2.5 bg-background/90 rounded-lg border border-emerald-500/20 shadow-xs flex flex-wrap items-center gap-2">
+                                                <span className="text-[10px] font-black uppercase tracking-wider text-emerald-700 dark:text-emerald-400 mr-1 flex items-center gap-1.5">
+                                                    <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse" />
+                                                    Recepciones Olmué ({docList.length}):
+                                                </span>
+                                                {docList.map(docItem => (
+                                                    <div key={docItem.key} className="flex items-center gap-1.5 px-2.5 py-1 rounded-md border text-xs font-semibold bg-muted/40">
+                                                        <span className="w-3 h-3 rounded-full shrink-0 shadow-xs border border-black/20" style={{ backgroundColor: docItem.color }} />
+                                                        <span className="font-mono">Doc: {docItem.docName}</span>
+                                                        {docItem.variety && <span className="text-[10px] text-muted-foreground font-normal">({docItem.variety})</span>}
+                                                        <span className="text-[10px] text-muted-foreground font-mono">({docItem.count} {docItem.count === 1 ? 'pallet' : 'pallets'})</span>
                                                     </div>
                                                 ))}
                                             </div>
