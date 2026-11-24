@@ -50,11 +50,18 @@ export function isOlmue(input: ClientInput): boolean {
   if (!input) return false;
   if (typeof input === 'string') {
     const upper = input.trim().toUpperCase();
-    return upper === 'OLMUE' || upper === 'OLMUÉ' || upper === 'OLM';
+    return upper.includes('OLMUE') || upper.includes('OLMUÉ') || upper === 'OLM' || upper.startsWith('OLM') || upper === '3JSBDYVZCZMYS0LGSUK';
   }
   const name = (input.name || input.clientName || input.ownerName || '').trim().toUpperCase();
   const id = (input.clientId || input.id || '').trim().toUpperCase();
-  return name === 'OLMUE' || name === 'OLMUÉ' || id === 'OLM' || id === 'OLMUE';
+  return (
+    name.includes('OLMUE') || 
+    name.includes('OLMUÉ') || 
+    id === 'OLM' || 
+    id.includes('OLM') || 
+    id === 'OLMUE' ||
+    id === '3JSBDYVZCZMYS0LGSUK'
+  );
 }
 
 /**

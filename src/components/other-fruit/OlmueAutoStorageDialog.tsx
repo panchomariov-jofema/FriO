@@ -65,7 +65,13 @@ export function OlmueAutoStorageDialog({
       .filter(r => isOlmue(r))
       .map(r => {
         const pendingItems = (r.items || []).filter(
-          item => item && item.status === 'Pendiente de almacenar' && Number(item.quantity || 0) > 0
+          item =>
+            item &&
+            Number(item.quantity || 0) > 0 &&
+            item.status !== 'Almacenado' &&
+            item.status !== 'Despachado' &&
+            item.status !== 'No Recepcionado' &&
+            (!item.storageLocation?.chamberId || !item.storageLocation?.coordinate || item.status === 'Pendiente de almacenar')
         );
         const totalPendingPallets = pendingItems.reduce(
           (acc, it) => acc + Number(it.quantity || 1),
@@ -291,9 +297,9 @@ export function OlmueAutoStorageDialog({
         }
       });
 
-      // Conservar items que no estaban en estado "Pendiente de almacenar"
+      // Conservar items que ya estaban almacenados o no pendientes
       const nonPendingItems = (selectedReceptionData.reception.items || []).filter(
-        it => it.status !== 'Pendiente de almacenar'
+        it => it && (it.status === 'Almacenado' || it.status === 'Despachado' || it.status === 'No Recepcionado' || (it.storageLocation?.chamberId && it.storageLocation?.coordinate))
       );
       const finalItems = [...nonPendingItems, ...newStoredItems];
 

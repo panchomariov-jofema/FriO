@@ -954,13 +954,21 @@ export function OtherFruitStorageTab({ clientId: fixedClientId, onlyPackaging }:
     }
   };
 
+  const hasOlmuePendingReceptions = React.useMemo(() => {
+    return (effectiveOtherFruitReceptions || []).some(r => 
+      isOlmue(r) && (r.items || []).some(
+        it => it && it.status !== 'Almacenado' && it.status !== 'Despachado' && it.status !== 'No Recepcionado' && Number(it.quantity || 0) > 0 && (!it.storageLocation?.chamberId || !it.storageLocation?.coordinate || it.status === 'Pendiente de almacenar')
+      )
+    );
+  }, [effectiveOtherFruitReceptions]);
+
   const showClientSelector = !selectedClientId && !fixedClientId;
 
   return (
     <div className="space-y-6">
       {/* Global Control Bar */}
       <div className="flex items-center justify-between bg-card/30 backdrop-blur-md p-3 rounded-2xl border border-primary/5 shadow-sm">
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <OfflineSyncIndicator />
           <div className={cn(
             "flex items-center gap-3 px-4 py-2 rounded-xl border transition-all duration-500",
@@ -984,22 +992,39 @@ export function OtherFruitStorageTab({ clientId: fixedClientId, onlyPackaging }:
                 className="data-[state=checked]:bg-yellow-500"
             />
           </div>
+
+          {/* Switch Almacenamiento Automático Olmué */}
+          {hasOlmuePendingReceptions && (
+            <div className={cn(
+              "flex items-center gap-3 px-4 py-2 rounded-xl border transition-all duration-500",
+              isOlmueAutoDialogOpen 
+                  ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-700 shadow-lg shadow-emerald-500/5" 
+                  : "bg-muted/30 border-transparent text-muted-foreground hover:bg-emerald-500/5"
+            )}>
+              <div className="h-8 w-8 rounded-lg flex items-center justify-center transition-all duration-500 bg-emerald-600 text-white shadow-lg">
+                  <Zap className="h-4 w-4 fill-white" />
+              </div>
+              <div className="flex flex-col cursor-pointer" onClick={() => { setAutoStoreReceptionId(undefined); setIsOlmueAutoDialogOpen(true); }}>
+                  <span className="text-[11px] font-black uppercase tracking-widest leading-none mb-0.5">Almacenamiento Automático</span>
+                  <span className="text-[9px] opacity-70 font-bold leading-none text-emerald-600 dark:text-emerald-400">EXPRESS OLMUÉ</span>
+              </div>
+              <Switch 
+                  checked={isOlmueAutoDialogOpen} 
+                  onCheckedChange={(checked) => {
+                    if (checked) {
+                      setAutoStoreReceptionId(undefined);
+                      setIsOlmueAutoDialogOpen(true);
+                    } else {
+                      setIsOlmueAutoDialogOpen(false);
+                    }
+                  }}
+                  className="data-[state=checked]:bg-emerald-600"
+              />
+            </div>
+          )}
         </div>
 
         <div className="flex items-center gap-2">
-          {(isOlmue(selectedClientId) || isOlmue(activeClientName)) && (
-            <Button
-              onClick={() => {
-                setAutoStoreReceptionId(undefined);
-                setIsOlmueAutoDialogOpen(true);
-              }}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold h-9 px-3.5 rounded-xl shadow-md gap-1.5 flex items-center text-xs animate-in fade-in"
-            >
-              <Zap className="h-4 w-4 fill-white" />
-              <span>Almacenamiento Automático</span>
-            </Button>
-          )}
-
           {selectedClientId && !fixedClientId && (
             <Badge variant="outline" className="bg-primary/5 text-primary border-primary/20 px-3 py-1 font-bold">
               Cliente: {activeClientName}
@@ -1009,12 +1034,45 @@ export function OtherFruitStorageTab({ clientId: fixedClientId, onlyPackaging }:
       </div>
 
       {showClientSelector ? (
-        <ClientSelector 
-            clients={clientsWithPending}
-            onSelect={(id) => {
-                setSelectedClientId(id);
-            }}
-        />
+        <div className="space-y-4">
+          {hasOlmuePendingReceptions && (
+            <Card className="border-2 border-emerald-500/30 bg-emerald-500/5 shadow-md">
+              <CardContent className="p-4 flex flex-col sm:flex-row items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center shadow-md shrink-0">
+                    <Zap className="h-5 w-5 fill-white" />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-sm text-foreground flex items-center gap-2">
+                      Almacenamiento Automático Express (Olmué)
+                      <Badge className="bg-emerald-600 text-white text-[10px]">1 pallet / coord</Badge>
+                    </h4>
+                    <p className="text-xs text-muted-foreground">
+                      Hay pallets de Olmué pendientes. Active el almacenamiento automático para llenar en orden ascendente (A1..AX → B1..BX).
+                    </p>
+                  </div>
+                </div>
+                <Button 
+                  onClick={() => {
+                    setAutoStoreReceptionId(undefined);
+                    setIsOlmueAutoDialogOpen(true);
+                  }}
+                  className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white font-bold h-10 px-4 rounded-xl gap-2 shadow-sm shrink-0"
+                >
+                  <Zap className="h-4 w-4 fill-white" />
+                  Almacenar Olmué Ahora
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+
+          <ClientSelector 
+              clients={clientsWithPending}
+              onSelect={(id) => {
+                  setSelectedClientId(id);
+              }}
+          />
+        </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Left Panel: Scanner and Settings */}
